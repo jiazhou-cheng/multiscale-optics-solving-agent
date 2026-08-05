@@ -1,0 +1,18 @@
+{
+  "time_steps_total": 26,
+  "E_shape_before_run": [
+    3,
+    30,
+    30,
+    30
+  ],
+  "E_dtype": "float32",
+  "E_shape_after_run": [
+    3,
+    30,
+    30,
+    30
+  ],
+  "max_abs_E": 0.038928668946027756,
+  "any_nan": false
+}

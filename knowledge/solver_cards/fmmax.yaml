@@ -1,0 +1,32 @@
+id: fmmax
+validation_status: unvalidated
+role: M_RCWA_FMMAX
+framework: jax
+official_docs: https://invrs-io.github.io/fmmax/
+repository: https://github.com/invrs-io/fmmax  # mfschubert/fmmax now redirects here (org move)
+install:
+  source: "fmmax==1.7.1"  # real PyPI package, no namesquat issue
+  python_requires: ">=3.10"
+  environment: docker/Dockerfile (image `agent_solver`), see docker/requirements.txt
+knowledge_pack: knowledge/solvers/fmmax/  # conventions.md, capability_notes.md, api_minimal_examples.md, failure_guide.md, probes/
+agent_should_use_for:
+  - periodic gratings and metasurface unit cells
+  - differentiable Fourier-modal scattering
+  - batched wavelength/angle/polarization libraries
+agent_should_not_assume:
+  - local periodicity is valid for a finite varying surface
+  - low Fourier order is converged
+  - phase interpolation across wraps is harmless
+  - s11 is a reflection coefficient -- in FMMAX's own ScatteringMatrix
+    labeling s11 is TRANSMISSION and s21 is REFLECTION (opposite of the
+    common RF/photonic-circuit convention; see knowledge/solvers/fmmax/conventions.md)
+  - raw |amplitude|^2 from a scattering matrix is physical power (use
+    fmmax.amplitude_poynting_flux instead; a naive attempt did not close
+    energy conservation, see knowledge/solvers/fmmax/conventions.md)
+required_probes:
+  - Fresnel or homogeneous-layer limit  # done: matches analytic Fresnel R to ~3.0e-7 relative error
+  - energy conservation and order bookkeeping  # attempted, did NOT close with naive |amplitude|^2; needs Poynting-flux accessors
+  - Fourier-order convergence  # not yet done
+  - polarization and reference-plane convention  # partially done: found the s11/s21 transmission/reflection swap
+  - directional derivative of a smooth geometry/material parameterization  # done: one path, rel. error 1.24e-4 vs finite difference
+benchmarks: [L1-RCWA-01, L2-META-01, L3-ACHROMATIC-01]

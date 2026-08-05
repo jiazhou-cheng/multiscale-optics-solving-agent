@@ -1,0 +1,37 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.env
+.DS_Store
+runs/
+private_benchmarks/
+
+# Generated datasets and experiment artifacts
+data/
+datasets/
+artifacts/
+outputs/
+checkpoints/
+
+# Large scientific arrays, model weights, and archives
+*.h5
+*.hdf5
+*.zarr/
+*.nc
+*.netcdf
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.tar
+*.tar.gz
+*.tgz
+*.zip

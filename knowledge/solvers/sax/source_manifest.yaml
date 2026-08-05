@@ -1,0 +1,51 @@
+# Per-source provenance for the sax knowledge pack.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+
+sources:
+  - url: https://pypi.org/project/sax/
+    source_type: official_repository  # PyPI is the authoritative distribution channel for this package, see solver_card.yaml install_hazard
+    ref: "0.18.2"
+    retrieved_at: "2026-07-30"
+    license: Apache-2.0
+    usage_note: >
+      `pip download sax` and the PyPI JSON API (https://pypi.org/pypi/sax/json)
+      were used to confirm the real latest version (0.18.2) and its
+      requires-python floor (>=3.11.0). Chosen as the pin source instead of a
+      git commit because git tags on the canonical repo lag far behind actual
+      releases (see next entry).
+
+  - url: https://github.com/flaport/sax
+    source_type: official_repository
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      `curl -sI https://github.com/flaport/sax` returns HTTP 301 redirecting
+      to https://github.com/gdsfactory/sax. The knowledge/solver_cards/sax.yaml
+      stub's `repository:` field pointed at this old URL; updated to the
+      redirect target. `git ls-remote --tags` against BOTH URLs tops out at
+      tag 0.9.2, far behind the actual PyPI-published 0.18.2 -- confirms the
+      maintainers do not tag every release in git.
+
+  - url: https://gdsfactory.github.io/sax/
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Fetched for high-level orientation (core abstractions: models,
+      netlists, circuits) and one example snippet. That snippet used port
+      names `in0`/`out0`, which turned out to be stale relative to the
+      installed 0.18.2 package's own docstring examples (which use
+      `sax.set_port_naming_strategy("optical")` and `o1`/`o2`/`o3`/`o4`).
+      Treated as lower-priority than installed source per
+      docs/AGENT_KNOWLEDGE_BASE.md section 7 -- all specific conventions in
+      conventions.md were re-derived by running the installed package.
+
+  - url: "installed package, sax==0.18.2"
+    source_type: installed_source
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Primary source of truth. Inspected via `dir(sax)`, `dir(sax.models)`,
+      and `inspect.getdoc`/`inspect.signature` on `sax.circuit`,
+      `sax.models.coupler_ideal`, and `sax.models.straight`, run inside the
+      agent_solver container built from docker/Dockerfile. All numeric
+      claims in conventions.md and capability_notes.md come from actually
+      executing probes/*.py against this install, not from documentation
+      text.

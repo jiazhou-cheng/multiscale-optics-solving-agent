@@ -1,0 +1,63 @@
+# Routing-critical facts for M_WAVE_CHROMATIX.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Grounded in: docker build of ./docker/Dockerfile (2026-07-30) +
+# knowledge/solvers/chromatix/probes/*.py run against that image.
+# This supplements, and does not replace, knowledge/solver_cards/chromatix.yaml
+# (the flat routing card format used by the current registry docs).
+
+id: chromatix
+role: M_WAVE_CHROMATIX
+package:
+  name: chromatix
+  pinned_ref: "0.6.0"
+  pinned_commit: d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
+  install_source: "git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee"
+  install_hazard: >
+    The PyPI package literally named "chromatix" (0.0.1, published 2022-07-10,
+    2.6 kB wheel) is an unrelated namesquat with no optics code. `pip install
+    chromatix` alone silently installs the wrong package. Always install from
+    the pinned git ref above.
+  python_requires: ">=3.12"
+official_docs: https://chromatix.readthedocs.io/en/latest/
+repository: https://github.com/chromatix-team/chromatix
+license: MIT
+framework: jax
+supported_regimes:
+  - scalar wave propagation (ScalarField)
+  - vector wave propagation (VectorField), polarization elements
+  - Fourier/Fresnel (transform_propagate) and angular-spectrum (asm_propagate) free-space propagation
+  - phase/amplitude masks, thin/thick lenses, pupils, gratings, polarizers
+  - point/plane-wave/objective sources, basic sensor model
+  - batched wavelength (chromatic) and multi-depth (z) fields
+derivative:
+  mode: native_autodiff
+  mechanism: jax.grad through Field pytrees (Field is an equinox Module)
+  verified: false
+  verified_note: >
+    A single directional-derivative probe (probes/gradient_probe.py) passed
+    for one path (thin_lens focal length -> transform_propagate -> intensity
+    sum), relative error 2.30e-05 against one centered finite-difference
+    step. This is NOT the full repository gradient test required by
+    CLAUDE.md section 6.2 (needs multiple step sizes, a convergence table,
+    and an ill-conditioned case) and does not cover asm_propagate, vector
+    fields, or phase masks. Do not set verified: true from this alone.
+devices_reported: [cpu, gpu, tpu]
+devices_tested: [cpu]
+dtypes_observed: [complex64]
+input_output_artifacts:
+  - chromatix.core.field.ScalarField / VectorField (maps to project artifact `complex_field`)
+known_conventions: see conventions.md
+cost_scaling: "O(batch * pixels * log(pixels)) for FFT-based propagators (transform_propagate, asm_propagate)"
+limitations_and_failure_modes: see failure_guide.md
+validated_probe_ids:
+  - import_probe (passed, 2026-07-30)
+  - propagation_probe (passed, 2026-07-30; not yet compared to an analytic oracle)
+  - gradient_probe (passed for one narrow path, 2026-07-30)
+not_yet_probed:
+  - Airy-pattern analytic comparison (listed as required in knowledge/solver_cards/chromatix.yaml, not yet done)
+  - Gaussian-beam propagation analytic comparison
+  - CPU/GPU numerical agreement (no GPU available in this environment)
+  - vector field / polarization paths
+  - batched wavelength (chromatic) propagation
+adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
+validation_status: unvalidated

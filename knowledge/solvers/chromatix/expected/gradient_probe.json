@@ -1,0 +1,9 @@
+{
+  "parameter": "thin_lens focal length f (through transform_propagate)",
+  "f0": 1000.0,
+  "fd_step": 0.5,
+  "objective_value": 0.0573149174451828,
+  "grad_native_autodiff": -0.00011462981638032943,
+  "grad_finite_difference": -0.0001146271824836731,
+  "relative_error": 2.2977941176470588e-05
+}

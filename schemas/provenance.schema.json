@@ -1,0 +1,125 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "disclosed_knowledge": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Disclosed Knowledge",
+      "type": "array"
+    },
+    "environment_lock_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Environment Lock Sha256"
+    },
+    "graph_sha256": {
+      "title": "Graph Sha256",
+      "type": "string"
+    },
+    "hardware": {
+      "additionalProperties": true,
+      "title": "Hardware",
+      "type": "object"
+    },
+    "human_interventions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Human Interventions",
+      "type": "array"
+    },
+    "packages": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Packages",
+      "type": "object"
+    },
+    "prompt_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Prompt Sha256"
+    },
+    "python_version": {
+      "title": "Python Version",
+      "type": "string"
+    },
+    "repairs": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Repairs",
+      "type": "array"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seed": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Seed"
+    },
+    "source_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Commit"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    }
+  },
+  "required": [
+    "run_id",
+    "created_at",
+    "graph_sha256",
+    "python_version"
+  ],
+  "title": "RunProvenance",
+  "type": "object"
+}

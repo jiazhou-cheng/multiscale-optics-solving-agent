@@ -1,0 +1,9 @@
+{
+  "parameter": "substrate refractive index (bare interface reflectance)",
+  "n_substrate_0": 1.5,
+  "fd_step": 0.001,
+  "objective_value": 0.03999998793005943,
+  "grad_native_autodiff": 0.12799996137619019,
+  "grad_finite_difference": 0.12801587581634521,
+  "relative_error": 0.0001243161448027005
+}

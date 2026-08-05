@@ -1,0 +1,14 @@
+{
+  "n_ambient": 1.0,
+  "n_substrate": 1.5,
+  "wavelength": 0.55,
+  "fmmax_r_te": [
+    0.19999997317790985,
+    0.0
+  ],
+  "fmmax_R_te": 0.03999998793005943,
+  "analytic_fresnel_r": -0.2,
+  "analytic_fresnel_R": 0.04000000000000001,
+  "R_relative_error": 3.01748514369704e-07,
+  "note": "Reflectance |r|^2 matches the analytic Fresnel formula to ~1e-7 relative error, but the SIGN of the complex amplitude does not match the textbook convention (fmmax gives a positive real r_te here; textbook Fresnel gives negative for n_ambient < n_substrate). See conventions.md."
+}

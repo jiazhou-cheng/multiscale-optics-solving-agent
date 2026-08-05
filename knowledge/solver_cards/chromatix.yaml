@@ -1,0 +1,30 @@
+id: chromatix
+validation_status: unvalidated
+role: M_WAVE_CHROMATIX
+framework: jax
+official_docs: https://chromatix.readthedocs.io/
+repository: https://github.com/chromatix-team/chromatix
+install:
+  pypi_name_is_a_namesquat: true  # "chromatix" on PyPI (0.0.1) is unrelated; do not `pip install chromatix`
+  source: "git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee"
+  pinned_ref: "0.6.0"
+  python_requires: ">=3.12"
+  environment: docker/Dockerfile (image `agent_solver`), see docker/requirements-chromatix.txt
+knowledge_pack: knowledge/solvers/chromatix/  # conventions.md, capability_notes.md, api_minimal_examples.md, failure_guide.md, probes/
+agent_should_use_for:
+  - Fourier/Fresnel/angular-spectrum propagation
+  - differentiable PSF and microscopy models
+  - batched wavelength, field, and parameter sweeps
+agent_should_not_assume:
+  - scalar propagation is valid at high numerical aperture
+  - array axis order or sample spacing can be inferred
+  - all propagation kernels share the same normalization
+  - propagator output shape equals input shape (asm_propagate pads it)
+  - dx/sample-pitch is preserved across a propagation call (transform_propagate changes it)
+required_probes:
+  - Airy-pattern analytic comparison  # not yet done
+  - Gaussian-beam propagation  # not yet done
+  - sample-pitch and FFT convention  # done, see knowledge/solvers/chromatix/conventions.md
+  - CPU/GPU agreement  # not yet done, no GPU in this environment
+  - directional derivative of propagation distance or phase mask  # one narrow path probed, see conventions.md/solver_card.yaml derivative.verified_note
+benchmarks: [L1-WAVE-01, L2-PSF-01, L2-META-01, L3-HYBRID-01, L3-ACHROMATIC-01]

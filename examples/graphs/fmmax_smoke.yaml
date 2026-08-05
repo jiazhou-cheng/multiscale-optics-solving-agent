@@ -1,0 +1,18 @@
+schema_version: 0.1.0
+task_id: L1-RCWA-FMMAX-SMOKE
+nodes:
+  - id: grating
+    model: M_RCWA_FMMAX
+    config:
+      approximate_num_terms: 9
+      truncation: circular
+      formulation: fft
+metadata:
+  description: >-
+    Single-node smoke graph for M_RCWA_FMMAX: validates that the adapter's
+    declared model spec (inputs/outputs/derivative/validity) is well-formed
+    against the packaged registry. No edges, design variables, or objectives
+    are needed for adapter-level validation; a tiny periodic unit cell
+    (ambient / patterned layer / substrate, one wavelength, normal
+    incidence) is supplied directly to the node's input artifact at run
+    time by tests/test_fmmax_adapter.py, not by this graph file.

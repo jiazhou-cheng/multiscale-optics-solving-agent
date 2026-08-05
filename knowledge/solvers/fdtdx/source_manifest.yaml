@@ -1,0 +1,49 @@
+# Per-source provenance for the fdtdx knowledge pack.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+
+sources:
+  - url: https://pypi.org/project/fdtdx/
+    source_type: official_repository  # real PyPI release, matches project_urls -> github.com/ymahlau/fdtdx
+    ref: "0.6.2"
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Confirmed via `pip download --python-version 3.12 --only-binary=:all:
+      fdtdx` and the wheel's METADATA (Requires-Python <3.14,>=3.11;
+      Requires-Dist includes equinox, gdstk, jax, loguru, matplotlib,
+      moviepy, optax, pytreeclass, rich, seaborn, tidy3d, trimesh,
+      typing-extensions). No PyPI namesquat issue here (unlike chromatix).
+
+  - url: https://raw.githubusercontent.com/ymahlau/fdtdx/main/examples/simulate_gaussian_source.py
+    source_type: official_repository
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Used as the starting point for the propagation probe. This main-branch
+      example is API-DRIFTED relative to the pinned 0.6.2 release: it calls
+      `fdtdx.SimulationConfig(grid=fdtdx.UniformGrid(spacing=...))`, but the
+      installed 0.6.2 wheel's real signature (confirmed via
+      `inspect.signature(fdtdx.SimulationConfig.__init__)`) has no `grid`/
+      `UniformGrid` at all -- it takes `resolution: float` directly. See
+      failure_guide.md. Treat GitHub main-branch examples as a discovery aid
+      only, not ground truth for a pinned release (docs/AGENT_KNOWLEDGE_BASE.md
+      section 7 source hierarchy).
+
+  - url: "installed package fdtdx==0.6.2"
+    source_type: installed_source
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Primary source of truth. Inspected via `inspect.signature` on
+      SimulationConfig.__init__ and `inspect.getsource` on
+      SimulationConfig.__post_init__ (backend auto-fallback logic) inside
+      the agent_solver container. All conventions in conventions.md and
+      both gradient-probe failures were reproduced directly against this
+      installed version, not copied from documentation.
+
+  - url: https://fdtdx.readthedocs.io/en/latest/
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Fetched for high-level orientation only (landing page had little
+      technical detail beyond "GPU-accelerated, time-reversible for
+      efficient gradients, install via pip install fdtdx"). Not used as a
+      source for any specific API signature -- those all came from
+      inspecting the installed package directly.

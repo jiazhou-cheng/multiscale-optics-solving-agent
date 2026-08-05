@@ -1,0 +1,49 @@
+# Per-source provenance for the chromatix knowledge pack.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+
+sources:
+  - url: https://github.com/chromatix-team/chromatix
+    source_type: official_repository
+    ref: "0.6.0"
+    commit: d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
+    retrieved_at: "2026-07-30"
+    license: MIT
+    usage_note: >
+      Used to resolve the correct pip install source (chromatix is not on
+      PyPI under this name) and to confirm the pyproject.toml dependency
+      list pinned into docker/requirements-chromatix.txt.
+
+  - url: https://chromatix.readthedocs.io/en/latest/
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Fetched for high-level orientation only (site structure, core
+      abstractions, one example snippet). Treated as lower-priority than
+      the installed source per docs/AGENT_KNOWLEDGE_BASE.md section 7 --
+      all specific conventions in conventions.md were re-derived from
+      `inspect.getsource` / `inspect.signature` on the pinned commit, not
+      copied from this page.
+
+  - url: "installed package at commit d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee"
+    source_type: installed_source
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Primary source of truth. Inspected via `inspect.signature`,
+      `inspect.getdoc`, and `inspect.getsource` on chromatix.functional
+      (plane_wave, point_source, objective_point_source, asm_propagate,
+      transform_propagate, thin_lens, phase_change, fft, ifft,
+      kernel_propagate) and chromatix.core.field.Field, run inside the
+      agent_solver container built from docker/Dockerfile. Sections used:
+      function docstrings and bodies for propagation kernels; Field class
+      docstring and spatial_dims property for axis-order conventions.
+
+  - url: "https://pypi.org/project/chromatix/0.0.1/"
+    source_type: negative_result
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Downloaded and inspected this wheel directly (`pip download chromatix`,
+      then `zipfile -l`). It contains only a 22-byte __init__.py and a
+      22-byte _about.py from 2022-07-10 -- an unrelated namesquat, not the
+      chromatix-team library. Recorded here so no future agent re-discovers
+      this the hard way by trying `pip install chromatix` and silently
+      getting the wrong package.

@@ -1,0 +1,47 @@
+version: 0.1.0
+levels:
+  1:
+    name: one-model simulation
+    tasks:
+      - id: L1-RAY-01
+        title: Sequential lens analysis and bounded optimization
+        primary_model: M_RAY_OPTILAND
+      - id: L1-WAVE-01
+        title: Aperture diffraction and Gaussian-beam propagation
+        primary_model: M_WAVE_CHROMATIX
+      - id: L1-TMM-01
+        title: Multilayer Bragg mirror
+        primary_model: M_TMM_JAXLAYERLUMOS
+      - id: L1-RCWA-01
+        title: Binary grating diffraction
+        primary_model: M_RCWA_FMMAX
+      - id: L1-EM-01
+        title: Full-wave waveguide component
+        primary_model: M_EM_FDTDX
+      - id: L1-PC-01
+        title: Photonic-crystal band structure
+        primary_model: M_PC_LEGUME
+  2:
+    name: two-to-three-model orchestration
+    tasks:
+      - id: L2-PSF-01
+        title: PSF-engineered microscope
+        graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX, C_FIELD_TO_PSF, M_SENSOR_IDEAL]
+      - id: L2-META-01
+        title: Unit-cell-to-system meta-optic imaging
+        graph: [M_RCWA_FMMAX, C_CELL_TO_SURFACE, M_WAVE_CHROMATIX]
+      - id: L2-GRATING-01
+        title: Full-wave near-field to far-field/fiber overlap
+        graph: [M_EM_FDTDX, C_NEAR_TO_FAR]
+      - id: L2-THERMO-01
+        title: Optical absorption to thermo-optic response
+        graph: [M_EM_FDTDX, C_ABSORPTION_TO_HEAT, M_THERMAL_JAX_FEM, C_TEMPERATURE_TO_MATERIAL]
+  3:
+    name: hard inverse design
+    tasks:
+      - id: L3-HYBRID-01
+        title: Wide-field refractive-diffractive microscope
+      - id: L3-ACHROMATIC-01
+        title: Achromatic meta-optic computational imager
+      - id: L3-ROBUST-01
+        title: Robust adaptive-fidelity grating coupler

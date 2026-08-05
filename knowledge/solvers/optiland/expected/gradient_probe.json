@@ -1,0 +1,10 @@
+{
+  "parameter": "surfaces.surfaces[1].geometry.radius (ReverseTelephoto sample lens)",
+  "objective": "mean(x^2 + y^2) over traced rays at Hx=Hy=0 (RMS spot proxy)",
+  "r0": 1.6911,
+  "fd_step": 0.0001,
+  "objective_value": 2.251810400366594e-07,
+  "grad_native_autodiff": 4.12612817668375e-05,
+  "grad_finite_difference": 4.130711772631912e-05,
+  "relative_error": 0.0011096382900716369
+}

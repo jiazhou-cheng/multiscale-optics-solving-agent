@@ -1,0 +1,15 @@
+{
+  "optiland_file": "/usr/local/lib/python3.12/site-packages/optiland/__init__.py",
+  "optiland_version": "0.6.0",
+  "top_level_dir": [
+    "annotations",
+    "backend"
+  ],
+  "default_backend": "numpy",
+  "available_backends": [
+    "numpy",
+    "torch"
+  ],
+  "supports_gpu_default": false,
+  "supports_gradients_default": false
+}

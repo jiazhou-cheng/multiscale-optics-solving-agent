@@ -1,0 +1,68 @@
+# Routing-critical facts for M_CIRCUIT_SAX.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Grounded in: docker build of ./docker/Dockerfile (2026-07-30) +
+# knowledge/solvers/sax/probes/*.py run against that image.
+# This supplements, and does not replace, knowledge/solver_cards/sax.yaml
+# (the flat routing card format used by the current registry docs).
+
+id: sax
+role: M_CIRCUIT_SAX
+package:
+  name: sax
+  pinned_version: "0.18.2"
+  install_source: "pip install sax==0.18.2"
+  install_hazard: >
+    Unlike chromatix, SAX IS a real, correctly-named PyPI package -- but its
+    canonical GitHub repository moved from https://github.com/flaport/sax to
+    https://github.com/gdsfactory/sax (the old URL 301-redirects; confirmed
+    2026-07-30). Also, `git ls-remote --tags` on either URL only goes up to
+    tag 0.9.2 while PyPI's actual latest release is 0.18.2 -- the maintainers
+    stopped pushing git tags for recent releases. Do NOT pin SAX by git
+    commit the way chromatix is pinned; PyPI is the authoritative source
+    for this package. Pin by PyPI version number instead.
+  python_requires: ">=3.11.0"
+official_docs: https://gdsfactory.github.io/sax/
+repository: https://github.com/gdsfactory/sax
+license: Apache-2.0
+framework: jax
+supported_regimes:
+  - photonic S-parameter circuit composition from a netlist (instances/connections/ports dict)
+  - built-in ideal and dispersive component models (coupler_ideal, coupler, straight, mmi1x2/mmi2x2, grating_coupler, bend, phase_shifter, crossing_ideal, ...)
+  - RF/microwave circuit elements too (resistor, capacitor, inductor, transmission_line_s_params, microstrip, coplanar_waveguide) -- not photonics-only
+  - multiple S-matrix representations (SDict, SDense, SCoo) and multiple circuit-evaluation backends (default, additive, fg, forward, klu)
+  - measurement instrument data import/export (parse_touchstone, write_touchstone, parse_lumerical_dat)
+derivative:
+  mode: native_autodiff
+  mechanism: jax.grad through plain JAX-array-valued S-parameter dict/array returns
+  verified: false
+  verified_note: >
+    Two directional-derivative probes passed: (1) `jax.grad` of a single
+    `coupler_ideal` component's thru-power w.r.t. its coupling parameter,
+    relative error 4.4e-13 against centered finite difference -- but this is
+    a closed-form trig expression, so tight agreement is expected and does
+    NOT by itself validate differentiability through `sax.circuit`'s
+    netlist-assembly/matrix-solve path, which has not been gradient-probed.
+    This is NOT the full CLAUDE.md section 6.2 gradient test (needs multiple
+    step sizes, a convergence table, an ill-conditioned case, and ideally a
+    gradient through the assembled circuit, not just one component).
+devices_reported: [cpu, gpu, tpu]  # inherited from jax; not independently confirmed for sax's own ops
+devices_tested: [cpu]
+dtypes_observed: [complex64/complex128 depending on jax default; not pinned by sax itself]
+input_output_artifacts:
+  - S-parameter dict/matrix keyed by (port_name, port_name) tuples (maps to project artifact `s_parameters`)
+known_conventions: see conventions.md
+cost_scaling: "circuit backend dependent; default backend does a dense/sparse linear solve over the circuit's internal connection graph -- not yet characterized against port/instance count"
+limitations_and_failure_modes: see failure_guide.md
+validated_probe_ids:
+  - import_probe (passed, 2026-07-30)
+  - component_model_probe (passed, 2026-07-30; verified against analytic propagation-phase oracle AND energy conservation/reciprocity, both to ~1e-14 relative error)
+  - circuit_probe (passed, 2026-07-30; full netlist-assembled MZI verified against analytic sin^2 transmission formula to ~1.4e-15 relative error, plus exact energy conservation and reciprocity)
+  - gradient_probe (passed for one narrow closed-form path, 2026-07-30)
+not_yet_probed:
+  - port permutation failure test (listed as required in knowledge/solver_cards/sax.yaml, not yet done)
+  - gradient through an assembled `sax.circuit` (matrix-solve backend), only a single component model was gradient-tested
+  - non-ideal/dispersive `coupler` model (only `coupler_ideal` was tested)
+  - GPU numerical agreement (no GPU available in this environment)
+  - the `klu`/`filipsson_gunnar`/`additive`/`forward` circuit backends (only the `default` backend was exercised)
+adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
+validation_status: unvalidated

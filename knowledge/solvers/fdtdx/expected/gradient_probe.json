@@ -1,0 +1,12 @@
+{
+  "wavelength_probe": {
+    "objective_value": 0.23131464421749115,
+    "grad_native_autodiff": 0.0,
+    "grad_finite_difference": -1019075.5625,
+    "verdict": "AD gradient is exactly 0.0 while FD is large and nonzero -- phantom zero gradient, NOT a verified differentiable path."
+  },
+  "permittivity_probe": {
+    "failed": "ConcretizationTypeError: Abstract tracer value encountered where concrete value is expected: traced array with shape float32[]\nThe problem arose with the `float` function. If trying to convert the data type of a value, try using `x.astype(float)` or `jnp.array(x, float)` instead.\n\nSee https://docs.jax.dev/en/latest/errors.h",
+    "verdict": "place_objects() does concrete Python-level introspection of material properties (e.g. math.isclose on permittivity components) and cannot be called inside a jax.grad trace with a traced Material value."
+  }
+}

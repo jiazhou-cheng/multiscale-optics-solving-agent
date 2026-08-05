@@ -1,0 +1,46 @@
+# Per-source provenance for the optiland knowledge pack.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+
+sources:
+  - url: https://pypi.org/project/optiland/
+    source_type: official_repository
+    ref: "0.6.0"
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      `pip download --no-deps optiland` + reading the wheel METADATA
+      (Requires-Dist, Project-URL) is what actually revealed torch is not a
+      declared dependency and that the canonical repository moved to
+      github.com/optiland/optiland. Treated as higher-priority than the
+      README prose for these two facts, per docs/AGENT_KNOWLEDGE_BASE.md
+      section 7 (installed package metadata over docs).
+
+  - url: https://github.com/HarrisonKramer/optiland
+    source_type: official_repository
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      `curl -sI` returned HTTP 301 with `location: https://github.com/optiland/optiland`.
+      Recorded so no future agent treats the HarrisonKramer URL as stale/dead
+      -- it still works, it just isn't canonical.
+
+  - url: "installed package optiland==0.6.0"
+    source_type: installed_source
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Primary source of truth. Inspected via `dir()`, `inspect` on
+      optiland.backend (module docstring quoted verbatim in conventions.md),
+      optiland.samples.objectives.ReverseTelephoto, optiland.rays.real_rays,
+      and optiland.paraxial, run inside the agent_solver container. All
+      conventions in conventions.md were re-derived from the installed
+      source and executed probes, not copied from the README.
+
+  - url: https://optiland.readthedocs.io/en/latest/
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Fetched for high-level orientation only (Optic/Surface/Field
+      abstractions, the ReverseTelephoto quickstart pattern). The claim
+      "PyTorch for GPU acceleration and automatic differentiation" from this
+      page's README excerpt is real and consistent with the installed
+      source, but the page does NOT mention that torch must be installed
+      separately -- that gap was only found by reading the actual package
+      metadata (see the PyPI source entry above).

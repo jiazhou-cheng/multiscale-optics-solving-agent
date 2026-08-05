@@ -1,0 +1,50 @@
+schema_version: 0.1.0
+task_id: L2-PSF-01
+nodes:
+  - id: lens
+    model: M_RAY_OPTILAND
+    config:
+      wavelength_m: 5.5e-7
+      pupil_samples: 256
+  - id: wave
+    model: M_WAVE_CHROMATIX
+    config:
+      propagation: angular_spectrum
+edges:
+  - id: pupil_reconstruction
+    coupler: C_RAY_TO_WAVE
+    source:
+      node: lens
+      port: wavefront
+    target:
+      node: wave
+      port: input_field
+    config:
+      interpolation: conservative_scattered_to_grid
+      reference_sphere: exit_pupil
+      target_sample_pitch_m: 2.0e-6
+design_variables:
+  - name: asphere_coefficient
+    node: lens
+    parameter: surfaces[2].asphere.a4
+    bounds: [-0.01, 0.01]
+    requires_gradient: true
+objectives:
+  - name: focal_peak
+    node: wave
+    port: output_field
+    metric: normalized_peak_intensity
+    requires_gradient: true
+verification:
+  - id: pupil_power
+    kind: conservation
+    target: pupil_reconstruction
+    tolerance: 0.001
+  - id: directional_gradient
+    kind: directional_derivative
+    target: asphere_coefficient
+    tolerance: 0.01
+require_verified_gradients: false
+allow_cycles: false
+metadata:
+  description: Minimal graph used to characterize the existing ray-wave bridge.

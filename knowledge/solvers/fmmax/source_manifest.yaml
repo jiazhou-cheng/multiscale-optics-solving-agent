@@ -1,0 +1,47 @@
+# Per-source provenance for the fmmax knowledge pack.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+
+sources:
+  - url: https://github.com/invrs-io/fmmax
+    source_type: official_repository
+    ref: "1.7.1"
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Current canonical repository. The historically recorded
+      https://github.com/mfschubert/fmmax returns HTTP 301 and redirects
+      here (confirmed via `curl -sI` and the GitHub API's
+      `/repositories/{id}` lookup, which resolved the old repo id to
+      full_name "invrs-io/fmmax"). Fetched examples/ar_coating.py from this
+      repo's `main` branch to ground the minimal-example probes -- this is
+      the maintainers' own reference usage, not a third-party tutorial.
+
+  - url: https://invrs-io.github.io/fmmax/
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Fetched for high-level orientation and the stated conventions
+      (normalized units where c=eps0=mu0=1, exp(-i*omega*t) time
+      convention, unit-cell/grid-sampling definition, S-parameter
+      block-labeling caveat). Treated as lower-priority than the installed
+      source per docs/AGENT_KNOWLEDGE_BASE.md section 7 -- the S11/S21
+      transmission/reflection labeling and the axis-order/batching
+      behavior in conventions.md were re-derived from
+      `inspect.getdoc(fmmax.ScatteringMatrix)` and direct probe runs, not
+      copied from this page.
+
+  - url: "installed package fmmax==1.7.1"
+    source_type: installed_source
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Primary source of truth. Inspected via `dir(fmmax)`,
+      `inspect.getdoc(fmmax.ScatteringMatrix)`, and direct execution of
+      probes/*.py inside the agent_solver container (docker/requirements.txt
+      pins fmmax==1.7.1, jax==0.6.2, numpy==2.2.6).
+
+  - url: https://pypi.org/pypi/fmmax/json
+    source_type: official_docs
+    retrieved_at: "2026-07-30"
+    usage_note: >
+      Confirmed real PyPI package (not a namesquat, unlike chromatix),
+      requires-python >=3.10, direct deps jax>=0.4.36/jaxlib/numpy. No
+      install hazard found for this package specifically.

@@ -1,0 +1,293 @@
+{
+  "$defs": {
+    "DesignVariableSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bounds"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "node": {
+          "title": "Node",
+          "type": "string"
+        },
+        "parameter": {
+          "title": "Parameter",
+          "type": "string"
+        },
+        "requires_gradient": {
+          "default": true,
+          "title": "Requires Gradient",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "node",
+        "parameter"
+      ],
+      "title": "DesignVariableSpec",
+      "type": "object"
+    },
+    "EdgeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "coupler": {
+          "pattern": "^C_[A-Z0-9_]+$",
+          "title": "Coupler",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/PortRef"
+        },
+        "target": {
+          "$ref": "#/$defs/PortRef"
+        }
+      },
+      "required": [
+        "id",
+        "coupler",
+        "source",
+        "target"
+      ],
+      "title": "EdgeSpec",
+      "type": "object"
+    },
+    "NodeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "pattern": "^M_[A-Z0-9_]+$",
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "model"
+      ],
+      "title": "NodeSpec",
+      "type": "object"
+    },
+    "ObjectiveSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "node": {
+          "title": "Node",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "string"
+        },
+        "requires_gradient": {
+          "default": true,
+          "title": "Requires Gradient",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "node",
+        "port",
+        "metric"
+      ],
+      "title": "ObjectiveSpec",
+      "type": "object"
+    },
+    "PortRef": {
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "title": "Node",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node",
+        "port"
+      ],
+      "title": "PortRef",
+      "type": "object"
+    },
+    "VerificationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "additionalProperties": true,
+          "title": "Config",
+          "type": "object"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "target"
+      ],
+      "title": "VerificationSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allow_cycles": {
+      "default": false,
+      "title": "Allow Cycles",
+      "type": "boolean"
+    },
+    "design_variables": {
+      "items": {
+        "$ref": "#/$defs/DesignVariableSpec"
+      },
+      "title": "Design Variables",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/EdgeSpec"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NodeSpec"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "objectives": {
+      "items": {
+        "$ref": "#/$defs/ObjectiveSpec"
+      },
+      "title": "Objectives",
+      "type": "array"
+    },
+    "require_verified_gradients": {
+      "default": false,
+      "title": "Require Verified Gradients",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "verification": {
+      "items": {
+        "$ref": "#/$defs/VerificationSpec"
+      },
+      "title": "Verification",
+      "type": "array"
+    }
+  },
+  "required": [
+    "nodes"
+  ],
+  "title": "GraphSpec",
+  "type": "object"
+}

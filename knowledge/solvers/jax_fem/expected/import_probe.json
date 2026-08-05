@@ -1,0 +1,45 @@
+{
+  "jax_fem_file": "/usr/local/lib/python3.12/site-packages/jax_fem/__init__.py",
+  "jax_fem_top_level_exports": [
+    "Figlet",
+    "basis",
+    "f",
+    "fe",
+    "generate_mesh",
+    "logger",
+    "logger_setup",
+    "problem",
+    "setup_logger",
+    "utils"
+  ],
+  "jax_fem_problem_exports": [
+    "Any",
+    "FiniteElement",
+    "Mesh",
+    "Problem",
+    "dataclass",
+    "functools",
+    "jax",
+    "logger",
+    "np",
+    "onp",
+    "timeit"
+  ],
+  "jax_fem_generate_mesh_exports": [
+    "Mesh",
+    "box_mesh",
+    "box_mesh_gmsh",
+    "check_mesh_TET4",
+    "cylinder_mesh_gmsh",
+    "get_elements",
+    "get_face_shape_vals_and_grads",
+    "get_meshio_cell_type",
+    "gmsh",
+    "jax",
+    "meshio",
+    "np",
+    "onp",
+    "os",
+    "rectangle_mesh"
+  ]
+}

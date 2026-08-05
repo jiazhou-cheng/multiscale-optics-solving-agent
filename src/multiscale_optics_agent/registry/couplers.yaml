@@ -1,0 +1,298 @@
+couplers:
+  - id: C_RAY_TO_WAVE
+    version: 0.1.0
+    description: Reconstruct a sampled complex pupil/wavefront field from ray amplitudes and optical path lengths.
+    framework: internal
+    source:
+      name: rays_or_wavefront
+      artifact: wavefront_samples
+      requires_metadata: [wavelength, coordinates, optical_path_length, amplitude, polarization]
+    target:
+      name: complex_field
+      artifact: complex_field
+      provides_metadata:
+        [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
+    derivative:
+      mode: finite_difference
+      verified: false
+      parameters: ["*"]
+      notes: Initial safe fallback across PyTorch/JAX. Replace only with a tested unified or custom derivative bridge.
+    validity:
+      assumptions:
+        - Rays adequately sample the pupil and represent a locally single-valued wavefront.
+        - Amplitude reconstruction and reference sphere are explicitly defined.
+      warnings:
+        - Caustics, multi-valued phase, hard vignetting, and sparse rays can invalidate interpolation.
+    cost_model:
+      scaling: O(number_of_rays + number_of_pupil_samples)
+      memory_scaling: O(number_of_pupil_samples)
+    lossy: true
+    invariants: [phase_reference_consistency, pupil_power_consistency]
+    maturity: experimental
+    tags: [ray_wave, pupil, cross_framework]
+
+  - id: C_EIKONAL_TO_WAVE
+    version: 0.1.0
+    description: Convert travel time/eikonal and transport amplitude into a complex wave field.
+    framework: jax
+    source:
+      name: eikonal
+      artifact: travel_time_field
+      requires_metadata: [frequency, coordinates, amplitude_model]
+    target:
+      name: complex_field
+      artifact: complex_field
+      provides_metadata: [wavelength, sample_pitch, coordinate_frame, phasor, normalization]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Geometrical-optics transport is valid and the eikonal branch is defined.
+      warnings:
+        - Caustics require a uniform approximation or multi-branch representation.
+    cost_model:
+      scaling: O(number_of_samples)
+      memory_scaling: O(number_of_samples)
+    lossy: false
+    invariants: [phase_from_travel_time]
+    maturity: experimental
+    tags: [eikonal, wave]
+
+  - id: C_NEAR_TO_FAR
+    version: 0.1.0
+    description: Transform a tangential near field on a closed or planar surface into a radiative far-field representation.
+    framework: jax
+    source:
+      name: near_field
+      artifact: near_field_surface
+      requires_metadata:
+        [wavelength, sample_pitch, coordinate_frame, phasor, field_components, reference_plane]
+    target:
+      name: far_field
+      artifact: far_field_angular_spectrum
+      provides_metadata:
+        [wavelength, angular_coordinates, coordinate_frame, phasor, polarization, power_normalization]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - The monitor surface and equivalence formulation capture the radiating fields.
+      warnings:
+        - Truncation/windowing and evanescent components must be handled explicitly.
+    cost_model:
+      scaling: O(number_of_samples * log(number_of_samples)) for planar FFT form
+      memory_scaling: O(number_of_samples)
+    lossy: true
+    invariants: [radiated_power_consistency]
+    maturity: experimental
+    tags: [near_far, electromagnetics]
+
+  - id: C_CELL_TO_SURFACE
+    version: 0.1.0
+    description: Map periodic unit-cell scattering responses to a spatially varying effective optical surface.
+    framework: jax
+    source:
+      name: cell_response
+      artifact: diffraction_channels
+      requires_metadata:
+        [wavelength, incidence, polarization, order_basis, power_normalization, reference_plane]
+    target:
+      name: optical_surface
+      artifact: effective_surface
+      provides_metadata:
+        [wavelength, coordinate_frame, complex_transmission, polarization_basis, phase_reference]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Local periodicity or the chosen reduced model is valid over the aperture variation scale.
+      warnings:
+        - Neighbor coupling, finite-size effects, high spatial gradients, and phase interpolation can dominate error.
+    cost_model:
+      scaling: O(number_of_surface_samples * interpolation_cost)
+      memory_scaling: O(library_size + number_of_surface_samples)
+    lossy: true
+    invariants: [passivity_bound, polarization_basis_consistency]
+    maturity: experimental
+    tags: [metasurface, rcwa_wave]
+
+  - id: C_FIELD_TO_PSF
+    version: 0.1.0
+    description: Convert a coherent field or field ensemble at an image plane into a normalized point-spread function.
+    framework: jax
+    source:
+      name: image_field
+      artifact: complex_field
+      requires_metadata: [wavelength, sample_pitch, coordinate_frame, phasor, normalization]
+    target:
+      name: psf
+      artifact: psf
+      provides_metadata: [sample_pitch, normalization, coherence_model]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Coherent/incoherent and polarization aggregation are explicitly selected.
+    cost_model:
+      scaling: O(number_of_pixels * number_of_modes)
+      memory_scaling: O(number_of_pixels)
+    lossy: true
+    invariants: [nonnegative_intensity, declared_psf_normalization]
+    maturity: experimental
+    tags: [psf, imaging]
+
+  - id: C_ABSORPTION_TO_HEAT
+    version: 0.1.0
+    description: Transfer electromagnetic absorbed-power density to a thermal heat-source field with conservative regridding.
+    framework: jax
+    source:
+      name: absorbed_power
+      artifact: absorbed_power_density
+      units: W/m^3
+      requires_metadata: [spatial_grid, coordinate_frame, volume_normalization]
+    target:
+      name: heat_source
+      artifact: heat_source
+      units: W/m^3
+      provides_metadata: [spatial_grid, coordinate_frame, volume_normalization]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Optical time averaging and thermal source convention are consistent.
+      warnings:
+        - Regridding must conserve total absorbed power.
+    cost_model:
+      scaling: O(source_cells + target_cells)
+      memory_scaling: O(target_cells)
+    lossy: true
+    invariants: [total_absorbed_power_conservation]
+    maturity: experimental
+    tags: [electromagnetic, thermal, regrid]
+
+  - id: C_TEMPERATURE_TO_MATERIAL
+    version: 0.1.0
+    description: Convert a temperature field into a wavelength-dependent electromagnetic material field.
+    framework: jax
+    source:
+      name: temperature
+      artifact: temperature_field
+      units: K
+      requires_metadata: [spatial_grid, coordinate_frame, reference_temperature]
+    target:
+      name: material
+      artifact: material_field
+      provides_metadata: [spatial_grid, permittivity_convention, length_unit]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Thermo-optic/material model is valid over the temperature and wavelength range.
+      warnings:
+        - Phase transitions and tabulated interpolation knots may be non-smooth.
+    cost_model:
+      scaling: O(number_of_cells)
+      memory_scaling: O(number_of_cells)
+    lossy: false
+    invariants: [material_range_check]
+    maturity: experimental
+    tags: [thermal, material, thermo_optic]
+
+  - id: C_FIELD_TO_MODE
+    version: 0.1.0
+    description: Project a vector electromagnetic field onto a normalized guided/radiative mode basis.
+    framework: jax
+    source:
+      name: vector_field
+      artifact: vector_field
+      requires_metadata: [wavelength, sample_pitch, coordinate_frame, phasor, field_components]
+    target:
+      name: modal_amplitudes
+      artifact: modal_amplitudes
+      provides_metadata: [mode_ids, reference_plane, power_normalization, wave_definition]
+    derivative:
+      mode: analytic
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Mode fields and simulation fields share compatible surfaces and conventions.
+      warnings:
+        - A truncated or nonorthogonal mode basis requires residual/error reporting.
+    cost_model:
+      scaling: O(number_of_modes * number_of_field_samples)
+      memory_scaling: O(number_of_modes * number_of_field_samples)
+    lossy: true
+    invariants: [projected_power_not_greater_than_total_power]
+    maturity: experimental
+    tags: [mode_overlap, scattering]
+
+  - id: C_SMATRIX_TO_CIRCUIT
+    version: 0.1.0
+    description: Wrap a frequency-dependent S-parameter object as a circuit component with reconciled ports and reference planes.
+    framework: jax
+    source:
+      name: s_parameters
+      artifact: s_parameters
+      requires_metadata: [port_names, reference_plane, wave_definition]
+    target:
+      name: circuit_component
+      artifact: circuit_component
+      provides_metadata: [port_names, reference_plane, wave_definition]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Port order, propagation direction, and power-wave definitions are explicit.
+      warnings:
+        - Interpolation must preserve passivity/causality to the required tolerance.
+    cost_model:
+      scaling: O(number_of_frequency_points * number_of_ports^2)
+      memory_scaling: O(number_of_frequency_points * number_of_ports^2)
+    lossy: false
+    invariants: [port_bijection, passivity_check]
+    maturity: experimental
+    tags: [s_parameters, circuit]
+
+  - id: C_GENERALIZED_SNELL
+    version: 0.1.0
+    description: Map a phase-gradient surface model to transmitted/reflected ray directions under a declared branch convention.
+    framework: internal
+    source:
+      name: phase_profile
+      artifact: phase_profile
+      requires_metadata: [wavelength, coordinate_frame, phase_branch]
+    target:
+      name: rays
+      artifact: ray_bundle
+      provides_metadata: [wavelength, coordinates, direction, amplitude, polarization]
+    derivative:
+      mode: analytic
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - A local phase-gradient description is adequate and a propagating diffraction branch exists.
+      warnings:
+        - Efficiency, nonlocal response, evanescent orders, and branch changes require a fuller model.
+    cost_model:
+      scaling: O(number_of_rays)
+      memory_scaling: O(number_of_rays)
+    lossy: true
+    invariants: [tangential_momentum_balance]
+    maturity: experimental
+    tags: [generalized_snell, ray, metasurface]

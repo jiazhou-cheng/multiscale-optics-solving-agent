@@ -1,0 +1,6 @@
+{
+  "status": "EXPECTED FAILURE",
+  "blocked": true,
+  "error_type": "ModuleNotFoundError",
+  "error_message": "No module named 'petsc4py'"
+}

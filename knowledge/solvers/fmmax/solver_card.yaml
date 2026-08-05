@@ -1,0 +1,65 @@
+# Routing-critical facts for M_RCWA_FMMAX.
+# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Grounded in: agent_solver Docker image (docker/requirements.txt, fmmax==1.7.1)
+# + knowledge/solvers/fmmax/probes/*.py run against that image, 2026-07-30.
+# This supplements, and does not replace, knowledge/solver_cards/fmmax.yaml
+# (the flat routing card format used by the current registry docs).
+
+id: fmmax
+role: M_RCWA_FMMAX
+package:
+  name: fmmax
+  pinned_version: "1.7.1"
+  install_source: "fmmax==1.7.1"
+  install_hazard: >
+    None found -- real PyPI package, no namesquat (unlike chromatix). The
+    GitHub repository did move orgs though: the historical
+    https://github.com/mfschubert/fmmax now returns HTTP 301 and redirects
+    to https://github.com/invrs-io/fmmax (matches the docs domain
+    invrs-io.github.io/fmmax). Update any stored links.
+  python_requires: ">=3.10"
+official_docs: https://invrs-io.github.io/fmmax/
+repository: https://github.com/invrs-io/fmmax
+license: see repository (not re-verified in this pass)
+framework: jax
+supported_regimes:
+  - periodic Fourier-modal / RCWA scattering for stratified structures
+  - isotropic, anisotropic, and fully-anisotropic media eigensolves
+  - PML-terminated (non-periodic-in-z) stacks (apply_uniaxial_pml)
+  - far-field transforms (farfield, farfield_profile, farfield_integrated_flux)
+  - source construction (plane wave, Gaussian beam, dirac-delta, dipole-like)
+derivative:
+  mode: native_autodiff
+  mechanism: jax.grad through eigensolve/scattering-matrix pytrees
+  verified: false
+  verified_note: >
+    A single directional-derivative probe (probes/gradient_probe.py) passed
+    for one path (substrate refractive index -> bare-interface reflectance),
+    relative error 1.24e-04 against one centered finite-difference step.
+    This is NOT the full CLAUDE.md section 6.2 gradient test and does not
+    cover a real periodic grating, Fourier-order truncation, or anisotropic
+    media. Do not set verified: true from this alone.
+devices_reported: [cpu, gpu, tpu]  # per jax; not independently confirmed for fmmax specifically
+devices_tested: [cpu]
+dtypes_observed: [complex64]
+input_output_artifacts:
+  - fmmax.LayerSolveResult / fmmax.ScatteringMatrix (maps to project artifacts
+    `periodic_structure` in, `diffraction_channels`/`s_parameters` out)
+known_conventions: see conventions.md
+cost_scaling: "O(batch * harmonics^3 * layers) for the eigensolve/scattering-matrix recursion (matches registry cost_model)"
+limitations_and_failure_modes: see failure_guide.md
+validated_probe_ids:
+  - import_probe (passed, 2026-07-30)
+  - fresnel_oracle_probe (passed vs. analytic Fresnel formula for |r|^2, relative error 3.0e-07, 2026-07-30)
+  - gradient_probe (passed for one narrow path, 2026-07-30)
+not_yet_probed:
+  - a real periodic grating (only the zero-order/homogeneous limit was tested)
+  - Fourier-order convergence sweep
+  - anisotropic / fully-anisotropic media
+  - CPU/GPU numerical agreement (no GPU available in this environment)
+  - full R+T=1 energy conservation using amplitude_poynting_flux (attempted
+    with naive |s11|^2 index-ratio scaling; it did NOT close -- see
+    conventions.md and failure_guide.md. This needs fmmax's own
+    Poynting-flux-normalized amplitude accessors, not raw |amplitude|^2.)
+adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
+validation_status: unvalidated

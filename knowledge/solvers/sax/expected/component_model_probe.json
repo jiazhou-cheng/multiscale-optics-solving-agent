@@ -1,0 +1,25 @@
+{
+  "coupler_ideal": {
+    "wavelength": 1.55,
+    "coupling": 0.5,
+    "thru_o1_o4": [
+      0.7071067811865476,
+      0.0
+    ],
+    "cross_o1_o3": [
+      0.0,
+      0.7071067811865476
+    ],
+    "energy_conservation": 1.0000000000000002,
+    "reciprocal_o4_o1_equals_o1_o4": true
+  },
+  "straight": {
+    "wavelength": 1.55,
+    "neff": 2.34,
+    "length": 10.0,
+    "magnitude_observed": 1.0,
+    "phase_observed": 0.6080501910173587,
+    "phase_analytic_exp_plus_i_k_L": 0.6080501910173624,
+    "phase_relative_error": 6.025384146550497e-15
+  }
+}

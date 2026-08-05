@@ -1,0 +1,401 @@
+models:
+  - id: M_RAY_OPTILAND
+    version: 0.1.0
+    description: Differentiable sequential lens and ray model through the Optiland adapter.
+    framework: pytorch
+    approximation: geometric_optics
+    inputs:
+      - name: system
+        artifact: optical_system
+        requires_metadata: [length_unit, wavelength]
+        optional: true
+        description: Lens prescription, materials, stops, fields, and source definition.
+      - name: incident_rays
+        artifact: ray_bundle
+        optional: true
+        description: Optional externally generated rays.
+    outputs:
+      - name: rays
+        artifact: ray_bundle
+        provides_metadata: [wavelength, coordinates, direction, amplitude, polarization]
+      - name: wavefront
+        artifact: wavefront_samples
+        provides_metadata:
+          [wavelength, coordinates, optical_path_length, amplitude, polarization, pupil_mask]
+    devices: [cpu, gpu]
+    dtypes: [float32, float64]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+      notes: >-
+        "framework: pytorch" describes the optional differentiable backend,
+        not the default install: torch is NOT a declared optiland
+        dependency, and a bare `pip install optiland` is NumPy-only
+        (supports_gradients=False). native_autodiff requires installing
+        torch separately and calling optiland.backend.set_backend('torch')
+        at runtime -- record which backend a graph run actually used. One
+        path verified (surface radius -> Optic.trace -> RMS-spot proxy):
+        AD vs. finite-difference relative error 1.11e-03, looser than this
+        project's JAX-based solvers and not yet root-caused. Keep
+        verified: false.
+    validity:
+      assumptions:
+        - Geometric optics is adequate inside the traced lens system.
+        - Diffractive effects are introduced only after an explicit ray-to-wave coupler.
+      warnings:
+        - Ray caustics and hard apertures can create non-smooth derivatives.
+        - set_backend mutates global module state and is not thread-safe; never call it concurrently.
+        - >-
+          CONTRACT GAP found 2026-07-30 building
+          src/multiscale_optics_agent/adapters/optiland_adapter.py:
+          optiland.rays.real_rays.RealRays (pinned 0.6.0) exposes only
+          x, y, z, L, M, N, intensity, opd -- no polarization state and no
+          pupil mask. This adapter therefore does NOT populate
+          "polarization"/"pupil_mask" in its output ArtifactRecord.metadata
+          even though both ports declare them in provides_metadata (kept
+          unchanged here only because C_RAY_TO_WAVE.source.requires_metadata
+          already depends on "polarization" and examples/graphs/ray_to_wave.yaml
+          + tests/test_graph_validation.py assert that edge validates).
+          This is a pre-existing contract mismatch, not introduced by this
+          adapter -- resolve as part of the CLAUDE.md section 13 ray_wave/
+          ray_ewave bridge audit (decide whether to synthesize an explicit
+          unpolarized/scalar placeholder, or narrow both port and coupler
+          contracts) rather than silently declaring metadata this adapter
+          cannot produce.
+    cost_model:
+      scaling: O(number_of_surfaces * number_of_rays)
+      memory_scaling: O(number_of_rays)
+    source:
+      package: optiland
+      docs_url: https://optiland.readthedocs.io/
+      repository_url: https://github.com/optiland/optiland
+      pinned_version: "0.6.0"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [ray, lens, imaging, differentiable]
+
+  - id: M_WAVE_CHROMATIX
+    version: 0.1.0
+    description: Differentiable scalar/vector wave propagation and computational imaging through Chromatix.
+    framework: jax
+    approximation: vector_wave
+    inputs:
+      - name: input_field
+        artifact: complex_field
+        requires_metadata: [wavelength, sample_pitch, coordinate_frame, phasor]
+      - name: optical_surface
+        artifact: effective_surface
+        requires_metadata: [wavelength, coordinate_frame]
+        optional: true
+    outputs:
+      - name: output_field
+        artifact: complex_field
+        provides_metadata:
+          [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
+    devices: [cpu, gpu, tpu]
+    dtypes: [complex64]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+      notes: Validate each propagation kernel and parameterization used by a benchmark.
+    validity:
+      assumptions:
+        - Sampling and propagation method satisfy the relevant band-limit conditions.
+      warnings:
+        - Scalar propagation is not valid for every high-NA or strongly vectorial task.
+        - >-
+          A complex128 input array is silently downcast to complex64 inside
+          chromatix.core.field.ScalarField.__init__; there is no verified
+          complex128 path through Chromatix for this model. Confirmed
+          2026-07-30 while building src/multiscale_optics_agent/adapters/chromatix_adapter.py.
+    cost_model:
+      scaling: O(batch * pixels * log(pixels)) for FFT-based propagation
+      memory_scaling: O(batch * pixels)
+    source:
+      package: chromatix
+      docs_url: https://chromatix.readthedocs.io/
+      repository_url: https://github.com/chromatix-team/chromatix
+      pinned_version: "0.6.0"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [wave, fourier, imaging, jax, differentiable]
+
+  - id: M_RCWA_FMMAX
+    version: 0.1.0
+    description: Differentiable Fourier modal / RCWA model for periodic electromagnetic structures.
+    framework: jax
+    approximation: rcwa
+    inputs:
+      - name: structure
+        artifact: periodic_structure
+        requires_metadata: [period, wavelength, incidence, polarization, material_convention]
+    outputs:
+      - name: diffraction
+        artifact: diffraction_channels
+        provides_metadata:
+          [wavelength, incidence, polarization, order_basis, power_normalization, reference_plane]
+    devices: [cpu, gpu, tpu]
+    dtypes: [complex64, complex128]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Structure is periodic in the modeled transverse directions.
+        - Fourier truncation is converged for the requested observable.
+      warnings:
+        - A unit-cell result does not by itself validate a finite or rapidly varying metasurface.
+        - >-
+          A bare-interface Fresnel oracle check matched FMMAX's reflectance
+          magnitude to ~1e-7 relative error, but the complex amplitude's
+          SIGN did not match the textbook Fresnel convention -- reconcile
+          FMMAX's S-parameter phase reference explicitly before coupling to
+          another solver's phase convention. This sign/phase mismatch is
+          still open.
+        - >-
+          UPDATE 2026-07-30: an earlier attempt to close R+T=1 via a raw
+          |s11|^2 transmission term did not close (gave >1); that naive
+          formula is still wrong. However, computing R/T via
+          fmmax.directional_poynting_flux (now implemented in
+          src/multiscale_optics_agent/adapters/fmmax_adapter.py) DOES close
+          energy conservation: R+T=0.99999976 on a bare interface and
+          R+T=0.9999998584 on a 9-order/18-mode lamellar grating (~1e-7
+          residual in both cases). Only the phase/sign convention above
+          remains open. See knowledge/solvers/fmmax/conventions.md.
+    cost_model:
+      scaling: O(batch * harmonics^3 * layers)
+      memory_scaling: O(batch * harmonics^2)
+    source:
+      package: fmmax
+      docs_url: https://invrs-io.github.io/fmmax/
+      repository_url: https://github.com/invrs-io/fmmax
+      pinned_version: "1.7.1"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [rcwa, periodic, metasurface, jax, differentiable]
+
+  - id: M_EM_FDTDX
+    version: 0.1.0
+    description: Differentiable finite-difference time-domain electromagnetic simulation through FDTDX.
+    framework: jax
+    approximation: full_wave_em
+    inputs:
+      - name: material
+        artifact: material_field
+        requires_metadata: [spatial_grid, permittivity_convention, length_unit]
+    outputs:
+      - name: near_field
+        artifact: near_field_surface
+        provides_metadata:
+          [wavelength, sample_pitch, coordinate_frame, phasor, field_components, reference_plane]
+      - name: vector_field
+        artifact: vector_field
+        provides_metadata:
+          [wavelength, sample_pitch, coordinate_frame, phasor, field_components]
+      - name: absorbed_power
+        artifact: absorbed_power_density
+        units: W/m^3
+        provides_metadata: [spatial_grid, coordinate_frame, volume_normalization]
+    devices: [cpu, gpu, tpu]
+    dtypes: [float32, complex64]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+      notes: >-
+        Memory strategy and reverse-mode path must be characterized per
+        problem size. Two probed paths failed outright: (1) jax.grad w.r.t.
+        source wavelength returned exactly 0.0 against a large nonzero
+        finite-difference estimate (suspected internal round()); (2)
+        jax.grad w.r.t. background permittivity raised
+        ConcretizationTypeError because fdtdx.place_objects performs
+        concrete Python-level introspection and cannot be traced.
+        Differentiable parameters must flow through the separate
+        ParameterContainer/apply_params path, not construction-time
+        arguments. See knowledge/solvers/fdtdx/capability_notes.md.
+    validity:
+      assumptions:
+        - Grid, time step, boundaries, and run duration are converged.
+      warnings:
+        - Staircasing, dispersive materials, and PML settings require explicit validation.
+        - >-
+          The declared "*" differentiable-parameters claim is not yet
+          substantiated by any passing gradient probe; see derivative.notes.
+    cost_model:
+      scaling: O(time_steps * grid_cells)
+      memory_scaling: implementation dependent; potentially O(time_steps * grid_cells) for reverse mode
+    source:
+      package: fdtdx
+      docs_url: https://fdtdx.readthedocs.io/
+      repository_url: https://github.com/ymahlau/fdtdx
+      pinned_version: "0.6.2"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [fdtd, electromagnetics, jax, differentiable]
+
+  - id: M_THERMAL_JAX_FEM
+    version: 0.1.0
+    description: Differentiable thermal finite-element model through JAX-FEM.
+    framework: jax
+    approximation: thermal
+    inputs:
+      - name: heat_source
+        artifact: heat_source
+        units: W/m^3
+        requires_metadata: [spatial_grid, coordinate_frame, volume_normalization]
+    outputs:
+      - name: temperature
+        artifact: temperature_field
+        units: K
+        provides_metadata: [spatial_grid, coordinate_frame, reference_temperature]
+    devices: [cpu, gpu]
+    dtypes: [float32, float64]
+    derivative:
+      mode: implicit
+      verified: false
+      parameters: ["*"]
+      notes: Record whether the selected example uses unrolled AD or an implicit/adjoint path.
+    validity:
+      assumptions:
+        - Thermal material laws and boundary conditions match the modeled operating regime.
+      warnings:
+        - Mesh transfer from the electromagnetic grid is a separate verified coupler operation.
+        - >-
+          jax_fem.solver (the only FEM solve entry point) unconditionally
+          imports petsc4py, which has no prebuilt wheel and is not installed
+          in this project's pip-based environment; mesh/Problem construction
+          works, but no actual FEM solve is currently executable. See
+          knowledge/solvers/jax_fem/failure_guide.md before relying on this
+          model in a graph.
+        - >-
+          LICENSE MISMATCH: jax-fem's PyPI classifier metadata claims "BSD
+          License", but the actual LICENSE file in the deepmodeling/jax-fem
+          repository (verified directly, 2026-07-30) is GNU GPLv3, a strong
+          copyleft license. This project is MIT-licensed; adding jax-fem as
+          a dependency of a distributed adapter may carry GPLv3 obligations.
+          Get explicit legal/maintainer sign-off before shipping an adapter
+          that depends on jax-fem, not just a routine dependency addition.
+    cost_model:
+      scaling: O(linear_or_nonlinear_FEM_solve)
+      memory_scaling: O(degrees_of_freedom)
+    source:
+      package: jax-fem
+      docs_url: https://deepmodeling.github.io/jax-fem/
+      repository_url: https://github.com/deepmodeling/jax-fem
+      pinned_version: "0.0.12"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [thermal, fem, multiphysics, jax, differentiable]
+
+  - id: M_CIRCUIT_SAX
+    version: 0.1.0
+    description: Differentiable photonic-circuit composition through SAX.
+    framework: jax
+    approximation: photonic_circuit
+    inputs:
+      - name: component
+        artifact: circuit_component
+        requires_metadata: [port_names, reference_plane, wave_definition]
+      - name: s_parameters
+        artifact: s_parameters
+        requires_metadata: [port_names, reference_plane, wave_definition]
+        optional: true
+    outputs:
+      - name: response
+        artifact: circuit_response
+        provides_metadata: [port_names, wavelength, wave_definition]
+    devices: [cpu, gpu, tpu]
+    dtypes: [complex64, complex128]
+    derivative:
+      mode: native_autodiff
+      verified: false
+      parameters: ["*"]
+      notes: >-
+        Verified for one closed-form path: coupler_ideal's `coupling`
+        parameter, AD vs. finite-difference relative error 4.4e-13. A full
+        assembled two-coupler MZI circuit (via sax.circuit) also matched
+        the analytic sin^2(dphi/2) transmission formula to 1.36e-15
+        relative error with exact energy conservation/reciprocity, but a
+        gradient through the assembled-circuit path (not just one
+        component's closed-form model) has not yet been probed. Keep
+        verified: false pending that.
+    validity:
+      assumptions:
+        - Component scattering models share compatible port and wave conventions.
+      warnings:
+        - Circuit validity depends on the quality and reference planes of component models.
+        - >-
+          Port naming is global, mutable, settable state
+          (sax.set_port_naming_strategy), not a fixed convention -- record
+          which strategy was active for a given run rather than assuming a
+          default port-name scheme.
+    cost_model:
+      scaling: O(number_of_ports^3) for dense network solves
+      memory_scaling: O(number_of_ports^2)
+    source:
+      package: sax
+      docs_url: https://gdsfactory.github.io/sax/
+      repository_url: https://github.com/gdsfactory/sax
+      pinned_version: "0.18.2"
+      retrieved_at: "2026-07-30"
+    maturity: experimental
+    tags: [photonic_circuit, scattering, jax, differentiable]
+
+  - id: M_SENSOR_IDEAL
+    version: 0.1.0
+    description: Internal idealized image sensor model with optional pixel integration and noise.
+    framework: internal
+    approximation: sensor
+    inputs:
+      - name: psf
+        artifact: psf
+        requires_metadata: [sample_pitch, normalization, coherence_model]
+    outputs:
+      - name: image
+        artifact: sensor_image
+        provides_metadata: [pixel_pitch, radiometric_normalization]
+    devices: [cpu, gpu, tpu]
+    dtypes: [float32, float64]
+    derivative:
+      mode: analytic
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - The selected noise and pixel-response model is appropriate for the benchmark.
+    cost_model:
+      scaling: O(number_of_pixels)
+      memory_scaling: O(number_of_pixels)
+    maturity: experimental
+    tags: [sensor, imaging, internal]
+
+  - id: M_SCATTERING_ASSEMBLER_INTERNAL
+    version: 0.1.0
+    description: Internal model that assembles modal excitation/response data into an S-parameter object.
+    framework: internal
+    approximation: photonic_circuit
+    inputs:
+      - name: modes
+        artifact: modal_amplitudes
+        requires_metadata: [mode_ids, reference_plane, power_normalization, wave_definition]
+    outputs:
+      - name: s_parameters
+        artifact: s_parameters
+        provides_metadata: [port_names, reference_plane, wave_definition]
+    devices: [cpu, gpu]
+    dtypes: [complex64, complex128]
+    derivative:
+      mode: analytic
+      verified: false
+      parameters: ["*"]
+    validity:
+      assumptions:
+        - Excitations span the requested port/mode basis.
+    cost_model:
+      scaling: O(number_of_modes^3)
+      memory_scaling: O(number_of_modes^2)
+    maturity: experimental
+    tags: [modes, scattering, internal]

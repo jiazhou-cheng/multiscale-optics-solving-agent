@@ -1,0 +1,20 @@
+{
+  "sax_version": "0.18.2",
+  "sax_file": "/usr/local/lib/python3.12/site-packages/sax/__init__.py",
+  "jax_version": "0.6.2",
+  "jax_devices": [
+    "TFRT_CPU_0"
+  ],
+  "top_level_sample": [
+    "AnyNetlist",
+    "Backend",
+    "BackendLike",
+    "Bool",
+    "BoolArray",
+    "BoolArrayLike",
+    "BoolLike",
+    "CircuitInfo",
+    "Complex",
+    "ComplexArray"
+  ]
+}

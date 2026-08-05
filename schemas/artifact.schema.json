@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "ArtifactKind": {
+      "enum": [
+        "optical_system",
+        "ray_bundle",
+        "wavefront_samples",
+        "travel_time_field",
+        "complex_field",
+        "vector_field",
+        "phase_profile",
+        "periodic_structure",
+        "diffraction_channels",
+        "effective_surface",
+        "material_field",
+        "near_field_surface",
+        "far_field_angular_spectrum",
+        "mode_basis",
+        "modal_amplitudes",
+        "s_parameters",
+        "circuit_component",
+        "circuit_response",
+        "psf",
+        "otf",
+        "sensor_image",
+        "absorbed_power_density",
+        "heat_source",
+        "temperature_field",
+        "displacement_field",
+        "geometry_update"
+      ],
+      "title": "ArtifactKind",
+      "type": "string"
+    },
+    "Device": {
+      "enum": [
+        "cpu",
+        "gpu",
+        "tpu",
+        "external"
+      ],
+      "title": "Device",
+      "type": "string"
+    },
+    "Framework": {
+      "enum": [
+        "jax",
+        "pytorch",
+        "numpy",
+        "internal",
+        "external"
+      ],
+      "title": "Framework",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A serializable reference to solver data plus its scientific semantics.\n\nNumerical arrays remain in solver-owned storage. The graph runtime passes this record and\nloads/converts data only through registered adapters or couplers.",
+  "properties": {
+    "device": {
+      "$ref": "#/$defs/Device",
+      "default": "cpu"
+    },
+    "dtype": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dtype"
+    },
+    "framework": {
+      "$ref": "#/$defs/Framework",
+      "default": "internal"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/ArtifactKind"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sha256"
+    },
+    "shape": {
+      "default": [],
+      "items": {
+        "type": "integer"
+      },
+      "title": "Shape",
+      "type": "array"
+    },
+    "units": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Units"
+    },
+    "uri": {
+      "title": "Uri",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "uri"
+  ],
+  "title": "ArtifactRecord",
+  "type": "object"
+}

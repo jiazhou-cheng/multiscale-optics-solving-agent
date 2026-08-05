@@ -1,0 +1,41 @@
+id: optiland
+validation_status: unvalidated
+role: M_RAY_OPTILAND
+framework: numpy (default) / pytorch (optional, opt-in backend -- see below)
+official_docs: https://optiland.readthedocs.io/
+repository: https://github.com/optiland/optiland
+repository_note: >
+  Moved from https://github.com/HarrisonKramer/optiland, which now
+  301-redirects here; the PyPI package's own Project-URL metadata confirms
+  optiland/optiland is canonical.
+install:
+  source: "pip install optiland==0.6.0"
+  python_requires: ">=3.10"
+  torch_is_optional: true
+  install_hazard: >
+    torch is NOT a declared dependency of the optiland PyPI package
+    (confirmed via installed wheel metadata) even though the project
+    describes itself as PyTorch-differentiable. `pip install optiland`
+    alone gives a NumPy-only, non-differentiable install
+    (optiland.backend.supports_gradients is False by default). Install
+    torch separately and call optiland.backend.set_backend('torch') to
+    get gradients/GPU support.
+knowledge_pack: knowledge/solvers/optiland/  # conventions.md, capability_notes.md, api_minimal_examples.md, failure_guide.md, probes/
+agent_should_use_for:
+  - sequential lens tracing
+  - wavefront and aberration analysis
+  - lens-parameter optimization (torch backend only)
+  - Level 1 ray benchmark and Level 2 ray-to-wave microscope
+agent_should_not_assume:
+  - every analysis object preserves gradients
+  - hard stops and vignetting are smooth
+  - exported ray weight is already a coherent field amplitude
+  - a bare `pip install optiland` gives you differentiability (it does not; see install.install_hazard)
+  - the ray count returned by trace(num_rays=N) equals N (aperture/pupil sampling changes it; observed 16 -> 817)
+required_probes:
+  - import and backend selection  # done, see knowledge/solvers/optiland/conventions.md
+  - GPU device placement  # not done, no GPU in this environment
+  - one surface-parameter gradient  # done for one path (torch backend, lens radius -> trace -> RMS-spot proxy), relative error 1.11e-03 vs finite difference -- looser than JAX solvers, not root-caused
+  - wavefront/OPD export convention  # not done
+  - pupil power and coordinate orientation  # not done
+benchmarks: [L1-RAY-01, L2-PSF-01, L3-HYBRID-01]

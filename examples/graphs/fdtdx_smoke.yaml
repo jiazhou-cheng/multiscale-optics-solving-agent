@@ -1,0 +1,22 @@
+schema_version: 0.1.0
+task_id: null
+nodes:
+  - id: fdtd
+    model: M_EM_FDTDX
+    config:
+      time_s: 5.0e-15
+      resolution_m: 100.0e-9
+      backend: cpu
+      courant_factor: 0.99
+      volume_shape_m: [3.0e-6, 3.0e-6, 3.0e-6]
+      background_permittivity: 1.0
+      wavelength_m: 1.0e-6
+      seed: 0
+metadata:
+  description: >-
+    Single-node forward-only smoke graph for M_EM_FDTDX, mirroring
+    knowledge/solvers/fdtdx/probes/propagation_probe.py: a periodic vacuum
+    volume with one Gaussian plane source, run for a handful of time steps.
+    No gradients are requested. See
+    src/multiscale_optics_agent/adapters/fdtdx_adapter.py for the adapter's
+    documented scope and conventions.
