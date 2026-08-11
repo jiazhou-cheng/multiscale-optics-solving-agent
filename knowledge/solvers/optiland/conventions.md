@@ -101,11 +101,17 @@ staleness signal if it disappears in a future pinned version.
 
 ## Units
 
-Not independently verified in this pass (no analytic-oracle probe was run
-against a known focal length or refractive index in physical units).
-`ReverseTelephoto.paraxial.f2()` returned `2.005240270799113` for the
-bundled sample system, in whatever length unit that sample's prescription
-uses (not confirmed to be mm, though that is the near-universal convention
-in the lens-design field). Do not assume meters; a future adapter must
-locate and test the actual unit convention against a known reference
-design before trusting cross-solver unit conversion.
+CHE-12 verified that Optiland 0.6.0 geometry coordinates use millimetres and
+trace wavelengths use micrometres. The executable probe
+`benchmarks/probes/verify_m1_engines.py --engine ray` constructs planar
+surfaces separated by `thickness=10.0` and observes every final ray at
+`z=10.0`. The pinned `optiland.paraxial` source independently labels an
+offset in the same prescription coordinates as `10 mm before first
+surface`. A trace requested at `wavelength=0.55` returns `rays.w=0.55`, and
+the installed `Optic.trace` contract labels wavelength in micrometres.
+
+At the project boundary, convert geometry with `1e-3 m/mm` and wavelength
+with `1e-6 m/um`. The probe observes `rays.opd=12.0`, not the declared
+10 mm separation; its reference and piston convention remain unverified.
+Preserve that value as Optiland-native OPD and do not use it as a physical
+oracle until the reference convention has a dedicated test.

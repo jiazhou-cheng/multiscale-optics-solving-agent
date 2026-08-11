@@ -1,5 +1,9 @@
 id: chromatix
-validation_status: unvalidated
+validation_status: environment_verified
+validation_note: >
+  CHE-12 verified distribution 0.6.0 at exact Git commit
+  d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee on JAX CPU. Analytic Airy and
+  Gaussian benchmarks remain unverified.
 role: M_WAVE_CHROMATIX
 framework: jax
 official_docs: https://chromatix.readthedocs.io/
@@ -27,4 +31,5 @@ required_probes:
   - sample-pitch and FFT convention  # done, see knowledge/solvers/chromatix/conventions.md
   - CPU/GPU agreement  # not yet done, no GPU in this environment
   - directional derivative of propagation distance or phase mask  # one narrow path probed, see conventions.md/solver_card.yaml derivative.verified_note
+  - exact engine pin and isolated CPU import  # done, see benchmarks/probes/verify_m1_engines.py
 benchmarks: [L1-WAVE-01, L2-PSF-01, L2-META-01, L3-HYBRID-01, L3-ACHROMATIC-01]

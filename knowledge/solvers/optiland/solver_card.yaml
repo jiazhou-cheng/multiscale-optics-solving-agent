@@ -69,11 +69,15 @@ validated_probe_ids:
   - import_probe (passed, 2026-07-30)
   - raytrace_probe (passed, 2026-07-30; bundled sample system only, not an analytic oracle)
   - gradient_probe (passed for one narrow path with looser-than-JAX tolerance, 2026-07-30)
+  - m1_engine_contract (passed, 2026-08-11; exact pin, isolated CPU import, and known-distance mm/um check)
 not_yet_probed:
   - GPU device placement (no GPU in this environment)
   - wavefront/OPD export convention
   - pupil power and coordinate orientation
-  - a custom (non-bundled-sample) lens prescription built from scratch
   - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
-adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
-validation_status: unvalidated
+adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
+validation_status: environment_verified
+validation_note: >
+  CHE-12 verified the pinned CPU environment and the native geometry/wavelength
+  units. The L1 ray analytic benchmark and OPD reference convention remain open,
+  so this is not scientific validation.

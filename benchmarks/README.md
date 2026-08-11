@@ -19,3 +19,11 @@ benchmarks/levelN/<task_id>/
 ```
 
 Every run must emit `graph.yaml`, `result.json`, scientific artifacts, and `provenance.json`. Freeze task specifications and evaluator versions before comparing agents.
+
+The M1 ray and wave baselines additionally follow the frozen
+[`M1-BASELINE-CPU-V1`](M1_BASELINE_PROTOCOL.md) contract. Each baseline runs
+in a fresh process without importing the other engine or a coupler, and must
+emit `result.json`, `provenance.json`, `arrays.npz`, `plot.png`,
+`tolerances.yaml`, and `README.md`. Accuracy and performance results remain
+separate. Missing solver results are reported as structured blockers, never
+replaced with fabricated values.

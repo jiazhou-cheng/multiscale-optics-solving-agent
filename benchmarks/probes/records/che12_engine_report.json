@@ -1,0 +1,330 @@
+{
+  "errors": [],
+  "execution": "independent_subprocesses",
+  "expected_pins": {
+    "chromatix": "0.6.0",
+    "chromatix_commit": "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
+    "jax": "0.6.2",
+    "numpy": "2.2.6",
+    "optiland": "0.6.0",
+    "torch": "2.13.0"
+  },
+  "probe": "CHE-12 M1 engine and convention verification",
+  "reports": {
+    "ray": {
+      "engines": {
+        "ray": {
+          "backend": {
+            "available": [
+              "numpy",
+              "torch"
+            ],
+            "selected": "numpy",
+            "supports_gpu": false,
+            "supports_gradients": false,
+            "torch_cuda_available": false,
+            "torch_num_threads": 40
+          },
+          "engine": "M_RAY_OPTILAND",
+          "forbidden_modules_loaded": [],
+          "known_distance": {
+            "declared_surface_separation_mm": 10.0,
+            "expected_surface_separation_m": 0.01,
+            "max_direction_norm_error": 0.0,
+            "max_wavelength_error_um": 0.0,
+            "max_z_error_native": 0.0,
+            "native_geometry_length_unit": "mm",
+            "native_geometry_to_si_scale_m": 0.001,
+            "native_wavelength_to_si_scale_m": 1e-06,
+            "native_wavelength_unit": "um",
+            "observed_final_z_native_unique": [
+              10.0
+            ],
+            "ray_count": 37,
+            "source_unit_evidence": {
+              "geometry": {
+                "found": true,
+                "marker": "10 mm before first surface",
+                "module": "optiland.paraxial"
+              },
+              "wavelength": {
+                "callable": "optiland.optic.Optic.trace",
+                "found": true,
+                "marker": "micron"
+              }
+            },
+            "status": "verified",
+            "traced_wavelength_um": 0.55
+          },
+          "pin_checks": {
+            "numpy": true,
+            "optiland": true,
+            "torch": true
+          },
+          "versions": {
+            "numpy": "2.2.6",
+            "optiland_distribution": "0.6.0",
+            "optiland_module": "0.6.0",
+            "torch": "2.13.0+cpu"
+          }
+        }
+      },
+      "environment": {
+        "affinity_cpu_count": 80,
+        "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+        "logical_cpu_count": 80,
+        "machine": "x86_64",
+        "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+        "process_cpu_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "process_id": 7,
+        "python_executable": "/usr/local/bin/python",
+        "python_version": "3.12.13"
+      },
+      "errors": [],
+      "expected_pins": {
+        "chromatix": "0.6.0",
+        "chromatix_commit": "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
+        "jax": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "torch": "2.13.0"
+      },
+      "probe": "CHE-12 M1 engine and convention verification",
+      "requested_engines": [
+        "ray"
+      ],
+      "schema_version": 1,
+      "status": "compatible"
+    },
+    "wave": {
+      "engines": {
+        "wave": {
+          "backend": {
+            "jax_default_backend": "cpu",
+            "jax_devices": [
+              "TFRT_CPU_0"
+            ],
+            "jax_enable_x64": false
+          },
+          "engine": "M_WAVE_CHROMATIX",
+          "forbidden_modules_loaded": [],
+          "pin_checks": {
+            "chromatix": true,
+            "chromatix_commit": true,
+            "chromatix_requested_revision": true,
+            "jax": true,
+            "numpy": true
+          },
+          "versions": {
+            "chromatix_direct_url": {
+              "url": "https://github.com/chromatix-team/chromatix.git",
+              "vcs_info": {
+                "commit_id": "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
+                "requested_revision": "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
+                "vcs": "git"
+              }
+            },
+            "chromatix_distribution": "0.6.0",
+            "chromatix_module": "unknown",
+            "jax": "0.6.2",
+            "numpy": "2.2.6"
+          }
+        }
+      },
+      "environment": {
+        "affinity_cpu_count": 80,
+        "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+        "logical_cpu_count": 80,
+        "machine": "x86_64",
+        "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+        "process_cpu_affinity": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79
+        ],
+        "process_id": 137,
+        "python_executable": "/usr/local/bin/python",
+        "python_version": "3.12.13"
+      },
+      "errors": [],
+      "expected_pins": {
+        "chromatix": "0.6.0",
+        "chromatix_commit": "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
+        "jax": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "torch": "2.13.0"
+      },
+      "probe": "CHE-12 M1 engine and convention verification",
+      "requested_engines": [
+        "wave"
+      ],
+      "schema_version": 1,
+      "status": "compatible"
+    }
+  },
+  "requested_engines": [
+    "ray",
+    "wave"
+  ],
+  "schema_version": 1,
+  "status": "compatible"
+}

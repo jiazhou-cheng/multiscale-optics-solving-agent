@@ -1,5 +1,9 @@
 id: optiland
-validation_status: unvalidated
+validation_status: environment_verified
+validation_note: >
+  CHE-12 verified Optiland 0.6.0 in the CPU container and established native
+  geometry mm / wavelength um through an executable known-distance check.
+  The L1 analytic benchmark and OPD reference convention remain unverified.
 role: M_RAY_OPTILAND
 framework: numpy (default) / pytorch (optional, opt-in backend -- see below)
 official_docs: https://optiland.readthedocs.io/
@@ -38,4 +42,5 @@ required_probes:
   - one surface-parameter gradient  # done for one path (torch backend, lens radius -> trace -> RMS-spot proxy), relative error 1.11e-03 vs finite difference -- looser than JAX solvers, not root-caused
   - wavefront/OPD export convention  # not done
   - pupil power and coordinate orientation  # not done
+  - known-distance native-unit check  # done, see benchmarks/probes/verify_m1_engines.py
 benchmarks: [L1-RAY-01, L2-PSF-01, L3-HYBRID-01]

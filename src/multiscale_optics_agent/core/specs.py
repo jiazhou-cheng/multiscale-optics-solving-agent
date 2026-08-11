@@ -130,6 +130,7 @@ class SourceSpec(StrictModel):
     docs_url: str
     repository_url: str | None = None
     pinned_version: str | None = None
+    pinned_commit: str | None = None
     retrieved_at: str | None = None
 
 

@@ -6,9 +6,15 @@ levels:
       - id: L1-RAY-01
         title: Sequential lens analysis and bounded optimization
         primary_model: M_RAY_OPTILAND
+        protocol: benchmarks/protocol.yaml
+        result_schema: benchmarks/schemas/result.schema.json
+        provenance_schema: benchmarks/schemas/provenance.schema.json
       - id: L1-WAVE-01
         title: Aperture diffraction and Gaussian-beam propagation
         primary_model: M_WAVE_CHROMATIX
+        protocol: benchmarks/protocol.yaml
+        result_schema: benchmarks/schemas/result.schema.json
+        provenance_schema: benchmarks/schemas/provenance.schema.json
       - id: L1-TMM-01
         title: Multilayer Bragg mirror
         primary_model: M_TMM_JAXLAYERLUMOS

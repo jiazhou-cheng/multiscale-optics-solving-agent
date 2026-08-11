@@ -1,5 +1,11 @@
 # Chromatix conventions (pinned commit `d24bdf0`, tag `0.6.0`)
 
+CHE-12 re-verified the installed distribution as version 0.6.0 from exact
+Git commit `d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee`, with JAX 0.6.2 on
+CPU, NumPy 2.2.6, and `jax_enable_x64=False`. See
+`benchmarks/probes/verify_m1_engines.py --engine wave`. This is an
+environment and convention check, not an analytic propagation benchmark.
+
 Every fact below was either read from `inspect.getsource`/`inspect.getdoc` on
 the installed package, or observed directly by running
 `knowledge/solvers/chromatix/probes/propagation_probe.py` inside the

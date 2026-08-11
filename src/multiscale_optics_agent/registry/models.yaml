@@ -47,6 +47,10 @@ models:
         - Ray caustics and hard apertures can create non-smooth derivatives.
         - set_backend mutates global module state and is not thread-safe; never call it concurrently.
         - >-
+          CHE-12 verified Optiland 0.6.0 geometry in millimetres and
+          wavelength in micrometres on CPU. Convert both to SI at artifact
+          boundaries. The `opd` reference convention remains unverified.
+        - >-
           CONTRACT GAP found 2026-07-30 building
           src/multiscale_optics_agent/adapters/optiland_adapter.py:
           optiland.rays.real_rays.RealRays (pinned 0.6.0) exposes only
@@ -106,6 +110,10 @@ models:
       warnings:
         - Scalar propagation is not valid for every high-NA or strongly vectorial task.
         - >-
+          CHE-12 verified Chromatix distribution 0.6.0 from Git commit
+          d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee with JAX 0.6.2 on CPU;
+          analytic Airy/Gaussian validation remains a baseline task.
+        - >-
           A complex128 input array is silently downcast to complex64 inside
           chromatix.core.field.ScalarField.__init__; there is no verified
           complex128 path through Chromatix for this model. Confirmed
@@ -118,6 +126,7 @@ models:
       docs_url: https://chromatix.readthedocs.io/
       repository_url: https://github.com/chromatix-team/chromatix
       pinned_version: "0.6.0"
+      pinned_commit: d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
       retrieved_at: "2026-07-30"
     maturity: experimental
     tags: [wave, fourier, imaging, jax, differentiable]

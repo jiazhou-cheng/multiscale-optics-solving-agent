@@ -1,0 +1,86 @@
+schema_version: 1
+protocol_id: M1-BASELINE-CPU-V1
+scope:
+  benchmark_ids: [L1-RAY-01, L1-WAVE-01]
+  execution: independent_process_per_baseline
+  forbidden_import_prefixes:
+    L1-RAY-01: [chromatix, multiscale_optics_agent.couplers]
+    L1-WAVE-01: [optiland, multiscale_optics_agent.couplers]
+
+execution:
+  entrypoint: ./run.sh
+  device: cpu
+  warmup_runs: 2
+  measured_repeats: 7
+  seed: 20260811
+  synchronize_before_timing: true
+  synchronize_after_timing: true
+  timing:
+    clock: time.perf_counter_ns
+    unit: seconds
+    primary_statistic: median
+    additional_statistics: [minimum, p95]
+  cpu_isolation:
+    require_observed_affinity: true
+    require_logical_cpu_count: true
+    require_cpu_model: true
+    require_thread_counts: true
+    pinning_required: false
+    rule: Record observable affinity and thread counts; never claim isolation unless applied.
+  peak_memory:
+    preferred_method: resource.getrusage(RUSAGE_SELF).ru_maxrss
+    linux_conversion: Multiply ru_maxrss KiB by 1024 and report integer bytes.
+    unsupported_behavior:
+      status: unsupported
+      required_diagnostic: true
+
+artifacts:
+  required:
+    - result.json
+    - provenance.json
+    - arrays.npz
+    - plot.png
+    - tolerances.yaml
+    - README.md
+  hash:
+    algorithm: sha256
+    coverage: exact_file_bytes
+    files: [result.json, arrays.npz, plot.png, tolerances.yaml, README.md]
+    exclusion: provenance.json cannot contain its own content hash.
+    record_in: provenance.json
+  generated_output_rule: Never hand-edit or fabricate solver outputs, timings, or hashes.
+
+result_sections:
+  accuracy:
+    separate_from_performance: true
+    required: [oracle, metrics, tolerances, pass]
+  performance:
+    separate_from_accuracy: true
+    required: [warmup_runs, measured_repeats, samples_seconds, statistics, peak_memory]
+
+failure:
+  status: blocked
+  required: [code, message, stage, exception_type]
+  solver_values_permitted: false
+
+provenance:
+  required:
+    - benchmark_id
+    - protocol_id
+    - command
+    - git_commit
+    - dirty_worktree
+    - python_version
+    - platform
+    - machine
+    - cpu_model
+    - logical_cpu_count
+    - process_cpu_affinity
+    - thread_counts
+    - device
+    - dtype
+    - seed
+    - engine_versions
+    - input_parameters
+    - artifact_hashes
+    - timestamp_utc
