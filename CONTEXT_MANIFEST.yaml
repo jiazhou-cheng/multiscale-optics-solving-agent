@@ -27,6 +27,7 @@ loading_policy:
     - knowledge/
     - long package documentation
   reference_not_startup:
+    # Historical material created by CHE-9; load only when a task cites it.
     - docs/archive/
     - paper drafts
     - broad solver catalogs

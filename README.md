@@ -6,8 +6,8 @@ This pack replaces duplicated, always-loaded agent documentation with:
 - a one-line `CLAUDE.md` importing `AGENTS.md`;
 - a machine-readable context manifest;
 - concise, task-linkable current-scope documents;
-- a Linear issue template, project workflow, and ray/wave backlog;
-- a migration plan and static synchronization check.
+- the live Linear project as the task source of truth;
+- a static synchronization check and a reference-only historical archive.
 
 Copy the files into the repository root, preserving paths. Review names and test commands against the actual codebase before merging.
 
