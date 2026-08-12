@@ -21,7 +21,7 @@ upstream docs happen to use microns because that is the natural scale for
 visible-light optics, not because the library requires it.
 
 **Implication for this project:** the project's canonical convention (SI,
-meters; CLAUDE.md section 7) is not automatically satisfied. A future
+meters; repository scientific conventions) is not automatically satisfied. A future
 `M_WAVE_CHROMATIX` adapter must convert `sample_pitch`/`wavelength` from the
 project's meter-valued artifacts into whatever consistent scale is used for
 a given call, and convert back on the way out. This conversion boundary
@@ -77,7 +77,7 @@ explicit time dependence in its `Field` representation (fields are
 snapshots at a plane, not functions of time), so it does not itself declare
 a `exp(-i omega t)` vs. `exp(+i omega t)` time convention. Combined with
 `exp(+i k.r)`, it is **consistent with** this project's canonical
-`exp(-i omega t)` phasor convention (CLAUDE.md section 7) under the usual
+`exp(-i omega t)` phasor convention (repository scientific conventions) under the usual
 identification of a forward-traveling wave, but this has not been
 cross-checked against a second solver (e.g. FDTDX) in this repository. Any
 coupler joining Chromatix to a solver with an explicit time convention must
@@ -124,6 +124,61 @@ every `*_adapter.py` module (including `sax_adapter.py`) to read its
 chromatix-specific test runs, purely as a consequence of test collection
 order. `tests/test_chromatix_adapter.py` pins `jax_enable_x64=False` in an
 autouse fixture to keep its assertions reproducible regardless of order.
+
+## Grid centering and coordinate origin (CHE-14, verified)
+
+`Field.grid` was read directly for a `(128, 128)` field at `dx = 0.5 um`: the
+coordinate range is `[-3.2e-5, +3.15e-5]`, i.e. exactly
+`(arange(n) - n // 2) * dx`. **Index `n // 2` is coordinate zero on each
+spatial axis**, and for even `n` the sampled window is asymmetric by one
+pixel (one more negative sample than positive). The same rule was confirmed
+on the padded `(640, 640)` output. Any oracle or coupler that builds its own
+coordinate vector must use this rule; assuming a symmetric `linspace(-L/2,
+L/2, n)` introduces a half-pixel offset that shows up directly as a centroid
+error.
+
+Note that `field.dx` for an input built at `dx = 5e-7` reads back as
+`4.999999987e-07` (float32 storage), while the propagated output reports
+`5e-07`. Compare sample pitch with a tolerance, never for exact equality.
+
+## Discrete power semantics (CHE-14, verified)
+
+`field.power` is `sum(|u|^2) * dy * dx` over the **sampled window only**. It
+is not a radiometric power in watts, and it is not conserved by construction:
+energy that leaves the window is simply absent from the output sum. For the
+CHE-14 canonical Gaussian case (beam well inside the window, edge-energy
+fraction ~3e-10) the observed ratio was `power_out / power_in = 0.9999996`.
+Treat any deviation as a **window-truncation diagnostic**, not a physical
+conservation law, and read it together with the edge-energy fractions that
+`ChromatixAdapter.run_standalone` emits.
+
+## Padding: `compute_padding_transfer` is a worst-case estimator (CHE-14)
+
+`compute_padding_transfer(height, wavelength, dx, z)` derives padding from the
+Fresnel number of the **whole window at full bandwidth**:
+
+```
+D = height * dx;  Nf = (D / 2)**2 / (wavelength * z)
+Q = 2 * max(1, height / (4 * Nf));  pad_width = ceil(Q * height / 2) * 2 - height
+```
+
+For the CHE-14 case (128 px, `dx = 0.5 um`, `lambda = 532 nm`, `z = 1.77 mm`)
+this returns `pad_width = 7400`, i.e. a `14928 x 14928` grid (~3.3 GB at
+complex64), because it assumes the field occupies the full Nyquist bandwidth.
+A Gaussian with a `10 um` waist occupies only `~0.05 um^-1` of a `1 um^-1`
+Nyquist band, and an explicit `pad_width = 256` (a `640 x 640` grid)
+reproduces the analytic result to `7e-5` relative beam radius — verified in
+`benchmarks/level1/L1-WAVE-01`.
+
+**Implication:** choose padding from the *occupied* bandwidth (the physical
+ray displacement `z * lambda * f_max` must fit inside the padded window), not
+from `compute_padding_transfer`, and always gate it with a resource estimate.
+`run_standalone` refuses any grid above `max_output_pixels` with a
+`CHROMATIX_RESOURCE_ESTIMATE_EXCEEDED` diagnostic instead of attempting it.
+
+`asm_propagate` also accepts `mode="same"`, which crops the padded result back
+to the input shape inside Chromatix. The baseline defaults to `mode="full"`
+and records `cropped` explicitly, so a crop is never silent.
 
 ## Field construction from an arbitrary array (`Field.build`)
 

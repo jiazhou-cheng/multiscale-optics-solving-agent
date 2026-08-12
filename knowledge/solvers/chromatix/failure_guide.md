@@ -53,14 +53,58 @@ This is real memory-and-compute-cost behavior, not a bug — see
 
 **Fix:** check the returned pad width before committing to a shape in an
 adapter's cost estimator; do not call the propagator blind on
-user-controlled `z`/`dx` without a resource check (CLAUDE.md section 4.2:
+user-controlled `z`/`dx` without a resource check (the repository resource-safety policy says
 adapters must expose cost-estimation metadata).
+
+## Structured diagnostics from the standalone wave baseline (CHE-14)
+
+`ChromatixAdapter.run_standalone` never raises and never fabricates a field.
+Every rejection comes back as `ChromatixWaveResult(status=FAILED,
+failure=ChromatixWaveFailure(code, message, stage, exception_type))` with
+`output_field_path is None` and empty `summary_metrics`. The codes, and the
+stage at which each is decided:
+
+| Code | Stage | Triggered by |
+|---|---|---|
+| `CHROMATIX_INVALID_BASELINE_REQUEST` | `request_validation` | Malformed payload, or not exactly one of `input_field_path` / `input_field_array` |
+| `CHROMATIX_UNSUPPORTED_PROPAGATION` | `capability_gate` | Any kernel other than `angular_spectrum` |
+| `CHROMATIX_UNSUPPORTED_FIELD_KIND` | `capability_gate` | `field_kind="vector"` |
+| `CHROMATIX_GRADIENTS_NOT_SUPPORTED` | `capability_gate` | `require_gradients=True` |
+| `CHROMATIX_UNSUPPORTED_DEVICE` / `_DTYPE` | `capability_gate` | Anything but `cpu` / `complex64` |
+| `CHROMATIX_INVALID_METADATA` | `metadata_validation` | Blank `phasor`, `coordinate_frame`, `origin`, `reference_plane`, or `normalization` |
+| `CHROMATIX_INVALID_SAMPLING` | `sampling_validation` | Non-finite or non-positive wavelength, pitch, or index; non-finite `z` |
+| `CHROMATIX_INVALID_PADDING` | `padding_validation` | Policy/`pad_width` mismatch, negative width, bad `output_mode`, or `auto_transfer` with non-square pixels |
+| `CHROMATIX_RESOURCE_ESTIMATE_EXCEEDED` | `resource_estimate` | Padded grid above `max_output_pixels` (nothing is executed) |
+| `CHROMATIX_DEPENDENCY_UNAVAILABLE` | `dependency_gate` | chromatix/jax not importable |
+| `CHROMATIX_INPUT_FIELD_UNREADABLE` | `input_field_load` | Missing or unreadable `.npy` |
+| `CHROMATIX_INPUT_FIELD_NOT_COMPLEX` / `_NOT_2D` / `_NOT_FINITE` | `input_field_validation` | Real-valued array (intensity/amplitude confusion), wrong rank, NaN/Inf |
+| `CHROMATIX_NONFINITE_OUTPUT` | `output_validation` | NaN/Inf in the propagated field |
+| `CHROMATIX_SOLVER_EXECUTION_FAILED` | `solver_call` | Chromatix itself raised |
+
+Note the deliberate asymmetry with `ChromatixAdapter.run()` (the graph-facing
+path), which still *raises* `AdapterDependencyError` /
+`UnsupportedCapabilityError` per the repository exception policy. Both
+behaviors are intentional: the graph path fails loudly at composition time,
+the baseline path returns a machine-readable record for a benchmark bundle.
+
+## A real-valued input array is rejected, not promoted
+
+**Symptom:** `CHROMATIX_INPUT_FIELD_NOT_COMPLEX` from `run_standalone`, or a
+`SolverExecutionError` from `run()`, when passing a `float32`/`float64` array.
+
+**Cause:** deliberate. A real array at a field boundary is almost always an
+intensity map, and silently promoting it to a complex amplitude would
+reinterpret `I` as `u` — a factor-of-two error in every phase-sensitive
+downstream result.
+
+**Fix:** pass `u`, not `|u|^2`. If you genuinely have an amplitude stored as
+a real array, cast it yourself (`array.astype(np.complex64)`) so the
+intent is explicit and reviewable in the caller, not hidden in the adapter.
 
 ## Python version
 
 Chromatix's `pyproject.toml` requires `>=3.12`. This project's own
-`pyproject.toml` requires `>=3.11` (CLAUDE.md section 11 also says
-"Python 3.11+"). There is no conflict for the *project*, but any
+`pyproject.toml` requires `>=3.11`. There is no conflict for the *project*, but any
 environment that needs to import chromatix specifically must be 3.12+.
 The `agent_solver` Docker image is what actually satisfies this — do not
 assume the host's `.venv` (if one exists) is new enough.

@@ -1,7 +1,7 @@
 """Minimal directional-derivative probe for M_WAVE_CHROMATIX.
 
-This is a probe, not the repository gradient test required by
-CLAUDE.md section 6.2 (that needs multiple step sizes, a convergence
+This is a probe, not the full repository gradient test (which needs multiple
+step sizes, a convergence
 table, and a deliberately ill-conditioned case). It only establishes that
 `jax.grad` produces a finite value that agrees with a single centered
 finite-difference estimate for one parameter path: lens focal length ->

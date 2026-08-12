@@ -70,8 +70,8 @@ jax.grad(objective)(1000.0)  # -> -1.1463e-4
 
 Centered finite difference at the same point (`eps=0.5`) gives
 `-1.1463e-4` as well (relative error `2.30e-5`). This is one narrow
-directional-derivative check, not the full CLAUDE.md section 6.2 gradient
-test. Full probe: `probes/gradient_probe.py`; captured output:
+directional-derivative check, not the full repository gradient test. Full
+probe: `probes/gradient_probe.py`; captured output:
 `expected/gradient_probe.json`.
 
 ## 5. Serialization / export

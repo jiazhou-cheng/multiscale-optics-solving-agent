@@ -1,0 +1,125 @@
+schema_version: 2
+benchmark_id: L1-WAVE-01
+seed: 20260811
+
+# L1-WAVE-01 progresses from an exact homogeneous propagation primitive, to
+# ideal signed paraxial focusing with finite-aperture diffraction, to high-NA
+# vectorial focusing. Sampling, padding, reference-quadrature convergence, and
+# negative perturbations qualify the benchmark; they are not additional
+# physical cases.
+
+physics:
+  wavelength_m: 5.32e-7
+  refractive_index: 1.0
+
+conventions:
+  units: SI (metres, radians)
+  axis_order: "(y, x)"
+  origin: "array index n//2 along each spatial axis is coordinate zero"
+  handedness: right-handed
+  plus_z: propagation direction
+  phasor: "exp(-i omega t)"
+  spatial_factor: "exp(+i k z) for a forward-propagating wave"
+  amplitude: "arrays store complex field amplitude; intensity is abs(u)**2"
+  vector_component_order: "(E_x, E_y, E_z); chromatix VectorField.u is (E_z, E_y, E_x)"
+  normalization: "power = sum(|u|^2) * dy * dx over the sampled window only"
+
+# ---------------------------------------------------------------------------
+# Case 1 -- exact homogeneous propagation primitive
+# ---------------------------------------------------------------------------
+# A plane wave placed exactly on an FFT bin is an eigenmode of the discrete
+# angular-spectrum operator, so the oracle u * exp(i k_z z) is exact: no
+# paraxial expansion, no window truncation, no interpolation. Every residual
+# is floating-point round-off, which makes this the sharpest available test of
+# the phasor sign, the exact sqrt dispersion relation, SI scaling, axis order,
+# and grid centring.
+#
+# pad_width MUST be 0. The mode is periodic on the grid; zero-padding it would
+# manufacture an aperture edge that the physics does not contain.
+case1_plane_wave:
+  n_grid: 128
+  pitch_m: 5.0e-7
+  pad_width: 0
+  # (mode_y, mode_x) FFT bin indices. Asymmetric pairs make axis order
+  # observable; a symmetric mode would survive a y/x swap unchanged.
+  modes: [[0, 0], [5, 0], [-7, 13], [25, 40]]
+  distances_m: [1.0e-5, 2.5e-4]
+
+# ---------------------------------------------------------------------------
+# Case 2 -- ideal signed paraxial focusing with finite-aperture diffraction
+# ---------------------------------------------------------------------------
+# Rectangular pupil + ideal paraxial thin lens + three signed input tilts,
+# propagated one focal length. The lens quadratic phase cancels exactly under
+# Fresnel propagation, so the focal field is a scaled Fourier transform of the
+# pupil: a separable sinc whose position is +f*theta.
+#
+# The aperture is specified in samples, and odd counts are required so it is
+# exactly symmetric about the origin. That removes a half-pixel ambiguity
+# between the sampled pupil and the continuous width the oracle assumes.
+# The two axes differ (201 vs 121) so an axis swap is detectable.
+case2_paraxial_focus:
+  n_grid: 512
+  pitch_m: 1.0e-6
+  pad_width: 256
+  focal_length_m: 5.0e-3
+  aperture_samples_x: 201
+  aperture_samples_y: 121
+  # (tilt_x, tilt_y) in radians. Includes a negative, a zero, and an
+  # asymmetric positive tilt; the asymmetric one is what makes a y/x swap
+  # visible in the focal position rather than only in the lobe widths.
+  tilts_rad: [[-2.0e-3, 0.0], [0.0, 0.0], [2.0e-3, 1.0e-3]]
+
+# ---------------------------------------------------------------------------
+# Case 3 -- high-NA vectorial focusing
+# ---------------------------------------------------------------------------
+# x-polarized aplanatic objective through chromatix.functional.high_na_ff_lens,
+# compared against an independent float64 Richards-Wolf quadrature oracle.
+#
+# The pupil sweep is the qualifying sampling check: the focal field is a
+# physical object, so refining the pupil sampling alone must leave its scale
+# and its dimensionless component ratios unchanged.
+case3_high_na_vector:
+  numerical_aperture: 0.9
+  focal_length_m: 2.0e-3
+  output_samples: 96
+  output_pitch_over_lambda_na: 12.0   # output pitch = lambda / (12 * NA)
+  reference_pupil_samples: 256
+  pupil_sample_sweep: [128, 192, 256, 384, 512, 768]
+  # Richards-Wolf Gauss-Legendre quadrature convergence sweep. The oracle must
+  # be shown converged before it is used to judge anything.
+  quadrature_sweep: [25, 50, 100, 200, 400, 800]
+  reference_quadrature_points: 400
+
+# ---------------------------------------------------------------------------
+# Negative perturbations -- qualification only, not physical cases
+# ---------------------------------------------------------------------------
+# Each perturbation corrupts a convention that the corresponding case is meant
+# to pin down, and each has an unperturbed control that must pass. A detection
+# from an evaluator that rejects everything is worthless.
+perturbations:
+  case1_paraxial_dispersion:
+    case: case1
+    description: >
+      Replace the exact k_z = k sqrt(1 - (lambda f)^2) with the paraxial
+      expansion k (1 - (lambda f)^2 / 2) in the oracle. This proves Case 1
+      actually resolves the exact square-root dispersion relation rather than
+      merely agreeing with some plausible axial wavenumber.
+  case2_lens_sign_flip:
+    case: case2
+    description: >
+      Flip the thin-lens quadratic phase from converging to diverging. In the
+      exp(+i k z) convention the converging lens must carry a negative
+      quadratic phase; with the sign flipped there is no focus at +f at all.
+      This is the signed-focusing test.
+  case2_axis_transpose:
+    case: case2
+    description: >
+      Transpose the propagated field before measurement. The 201-by-121-sample
+      rectangular aperture and the asymmetric tilt make the (y, x) axis order
+      observable; a square aperture on axis would be transpose-invariant.
+  case2_si_scale:
+    case: case2
+    description: >
+      Supply the wavelength as the micrometre number 0.532 instead of 5.32e-7
+      metres, the most likely SI mistake at this boundary, while the oracle
+      keeps the correct SI value.

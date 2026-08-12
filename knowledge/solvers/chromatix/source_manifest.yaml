@@ -1,5 +1,5 @@
 # Per-source provenance for the chromatix knowledge pack.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+# Provenance follows AGENTS.md "Sources of Truth".
 
 sources:
   - url: https://github.com/chromatix-team/chromatix
@@ -19,7 +19,7 @@ sources:
     usage_note: >
       Fetched for high-level orientation only (site structure, core
       abstractions, one example snippet). Treated as lower-priority than
-      the installed source per docs/AGENT_KNOWLEDGE_BASE.md section 7 --
+      the installed source per the repository source-of-truth policy --
       all specific conventions in conventions.md were re-derived from
       `inspect.getsource` / `inspect.signature` on the pinned commit, not
       copied from this page.
