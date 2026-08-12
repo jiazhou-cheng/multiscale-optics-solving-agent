@@ -220,10 +220,25 @@ validated_probe_ids:
     ray_budget (passed, 2026-08-12). Output count is the caller's P*S budget,
     not a function of the input size. Feeds the Algorithm S1 cascade in CHE-26.
 
+  - >
+    round_trip_and_cascade (passed, 2026-08-12; CHE-26).
+    wave -> rays -> wave is exact in the enumeration limit (relative RMS < 1e-14)
+    and converges at the Monte Carlo rate under sampling;
+    rays -> wave -> rays recovers the modal amplitudes to 1e-10; and two
+    deliberately mismatched pairings (flipped phasor, mismatched obliquity
+    convention) each break the round trip, which is what makes the exactness
+    result mean anything. Algorithm S1 holds the ray count at the caller's P*S
+    budget across a two-surface cascade, a pure-phase DOE conserves discrete
+    power to 1e-10, and a 0.5-amplitude DOE gives exactly 0.25.
+  - >
+    curvature_bound (passed, 2026-08-12; CHE-27). eq S9 bounds the measured
+    locally-extracted direction error across R = 1k/10k/100k wavelengths and
+    D = 50..400 wavelengths, all 12 combinations. Tight where observable
+    (bound/measured = 1.15 at D = 400 lambda, R = 10k lambda) and conservative
+    below the observability width.
+
 not_yet_probed:
-  - curvature bound against measured tangent-plane error (CHE-27)
   - gradient bias against directional finite differences (CHE-28)
-  - round trip against C_RAY_TO_WAVE and the cascade (CHE-26)
   - behaviour when the evanescent fraction is large enough to invalidate a ray picture
   - conformal (curved) surfaces
   - vector fields, chromatic ensembles, GPU
@@ -244,6 +259,25 @@ registry_claims_now_audited:
   - wave_to_ray_declared_lossy
 
 measured_behaviour:
+  curvature_observability_width: >
+    CHE-27 finding, not stated in the paper. A patch of width D resolves
+    directions no finer than lambda/D, while the curvature spread it carries is
+    D/2R. The effect is therefore only spectrally observable when
+    D > sqrt(2 lambda R). Below that the aperture's own diffraction limit
+    dominates and the measured error falls far under eq S9 -- measured
+    bound/measured ratios were 208 at D = 100 lambda, 12.7 at 200, and 1.15 at
+    400, for R = 10k lambda where sqrt(2 lambda R) = 141 lambda. The bound
+    remains correct throughout; it simply cannot be confirmed tight below that
+    width, and a 200:1 gap there is a property of the aperture rather than
+    slack in the bound. Exposed as curvature_observability_width().
+  local_versus_global_measurement: >
+    Also CHE-27. Validating eq S9 against the extreme angle present in the whole
+    patch's angular spectrum makes it look violated at every patch size,
+    because that number is the truncated aperture's edge diffraction: a flat
+    50-lambda patch already reaches 0.02 rad at its first sinc null, fifty times
+    the curvature bound at R = 100k lambda. eq S9 bounds the error in the
+    EXTRACTED direction, so the measurement uses per-window spectral centroids,
+    which the window's own symmetric diffraction does not bias.
   fit_noise_in_the_convergence_exponent: >
     The fitted exponent is itself a noisy estimate. On the concentrated
     spectrum it read -0.5834 averaging 8 seeds per sweep point, -0.4982 at 32,
