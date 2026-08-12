@@ -1,0 +1,1643 @@
+^@### JSON
+{
+  "summary": {
+    "doc_files": 115,
+    "exact_duplicate_groups": 0,
+    "files_mentioning_ray_to_wave": 12,
+    "files_mentioning_wave_to_ray": 1,
+    "files_mentioning_legacy_raywave": 8,
+    "manifest_declared_paths": 7,
+    "manifest_missing_paths": [
+      "context/",
+      "solver/",
+      "archive/"
+    ],
+    "top_dirs_absent_from_manifest": [
+      "benchmarks/",
+      "docker/",
+      "examples/",
+      "linear/",
+      "schemas/",
+      "scripts/",
+      "src/",
+      "tests/",
+      "tmp_probes/"
+    ]
+  },
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 8460,
+      "lines": 160,
+      "sha256_12": "75fec80f85df",
+      "heading": "Repository Instructions \u2014 Canonical Shared Context",
+      "n_ray_to_wave": 4,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 4
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 11,
+      "lines": 1,
+      "sha256_12": "336cc4fbf19b",
+      "heading": "@AGENTS.md",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "CONTEXT_MANIFEST.yaml",
+      "bytes": 702,
+      "lines": 33,
+      "sha256_12": "7e1dfb4e17b3",
+      "heading": "version: 1",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "MIGRATION_PLAN.md",
+      "bytes": 3007,
+      "lines": 82,
+      "sha256_12": "adab84e8b32b",
+      "heading": "Documentation and Context Migration Plan",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "README.md",
+      "bytes": 695,
+      "lines": 20,
+      "sha256_12": "e35c05023e9e",
+      "heading": "Ray/Wave Agent Context Pack",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "VALIDATION_REPORT.md",
+      "bytes": 2268,
+      "lines": 31,
+      "sha256_12": "afe6a0cfdf2f",
+      "heading": "Validation Report",
+      "n_ray_to_wave": 2,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "benchmarks/README.md",
+      "bytes": 1040,
+      "lines": 21,
+      "sha256_12": "95d3067c107a",
+      "heading": "Benchmark Implementation Area",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "benchmarks/level1/README.md",
+      "bytes": 558,
+      "lines": 12,
+      "sha256_12": "b07f23904fb4",
+      "heading": "Level 1 \u2014 One-Model Simulation",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "benchmarks/level2/README.md",
+      "bytes": 505,
+      "lines": 10,
+      "sha256_12": "fa81505ba03f",
+      "heading": "Level 2 \u2014 Two-to-Three-Model Orchestration",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "benchmarks/level3/README.md",
+      "bytes": 621,
+      "lines": 9,
+      "sha256_12": "598b0a819ac1",
+      "heading": "Level 3 \u2014 Hard Inverse Design",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "benchmarks/manifest.yaml",
+      "bytes": 1706,
+      "lines": 47,
+      "sha256_12": "adc1ebe94691",
+      "heading": "name: one-model simulation",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/audit/logs/m01_import_graph.txt",
+      "bytes": 36354,
+      "lines": 940,
+      "sha256_12": "1c3889673a36",
+      "heading": "MODULE TABLE",
+      "n_ray_to_wave": 2,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/audit/logs/m01_pytest_baseline.txt",
+      "bytes": 3033,
+      "lines": 7,
+      "sha256_12": "a3d4ade59d4b",
+      "heading": "^@\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[0m\u001b[32m.\u001b[",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/audit/logs/m02_docs_inventory.txt",
+      "bytes": 0,
+      "lines": 0,
+      "sha256_12": "empty",
+      "heading": "",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/audit/probes/audit_docs_inventory.py",
+      "bytes": 6440,
+      "lines": 182,
+      "sha256_12": "289b61b4dea7",
+      "heading": "!/usr/bin/env python3",
+      "n_ray_to_wave": 10,
+      "n_wave_to_ray": 10,
+      "n_legacy_raywave": 8
+    },
+    {
+      "path": "docs/audit/probes/audit_import_graph.py",
+      "bytes": 6469,
+      "lines": 196,
+      "sha256_12": "8c7ece0b0e2d",
+      "heading": "!/usr/bin/env python3",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/context/CURRENT_SCOPE.md",
+      "bytes": 2909,
+      "lines": 68,
+      "sha256_12": "77a8a4c630be",
+      "heading": "Current Scope \u2014 Ray/Wave Vertical Slice",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 2
+    },
+    {
+      "path": "docs/context/MODULE_GRANULARITY.md",
+      "bytes": 3192,
+      "lines": 95,
+      "sha256_12": "68f1d9369e09",
+      "heading": "Module Granularity \u2014 Working Rules",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "docs/context/RAY_WAVE_VERTICAL_SLICE.md",
+      "bytes": 3601,
+      "lines": 95,
+      "sha256_12": "ea60f7c35163",
+      "heading": "Ray-to-Wave Vertical Slice \u2014 Execution Plan",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 1
+    },
+    {
+      "path": "examples/graphs/chromatix_smoke.yaml",
+      "bytes": 605,
+      "lines": 17,
+      "sha256_12": "d351d1a4acd4",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "examples/graphs/fdtdx_smoke.yaml",
+      "bytes": 706,
+      "lines": 22,
+      "sha256_12": "fb17df3662a4",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "examples/graphs/fmmax_smoke.yaml",
+      "bytes": 722,
+      "lines": 18,
+      "sha256_12": "8b2590cdfdc7",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "examples/graphs/optiland_smoke.yaml",
+      "bytes": 798,
+      "lines": 22,
+      "sha256_12": "c908c5270629",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "examples/graphs/ray_to_wave.yaml",
+      "bytes": 1203,
+      "lines": 50,
+      "sha256_12": "f3fb79d3040e",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 1
+    },
+    {
+      "path": "examples/graphs/sax_smoke.yaml",
+      "bytes": 713,
+      "lines": 24,
+      "sha256_12": "444e46b471b8",
+      "heading": "schema_version: 0.1.0",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/README.md",
+      "bytes": 676,
+      "lines": 9,
+      "sha256_12": "ac6f2231e3e5",
+      "heading": "Agent Knowledge Assets",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/chromatix.yaml",
+      "bytes": 1726,
+      "lines": 30,
+      "sha256_12": "fc3360749603",
+      "heading": "id: chromatix",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/fdtdx.yaml",
+      "bytes": 2175,
+      "lines": 34,
+      "sha256_12": "e6a9a5b97b04",
+      "heading": "id: fdtdx",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/fmmax.yaml",
+      "bytes": 1914,
+      "lines": 32,
+      "sha256_12": "db2eec127f85",
+      "heading": "id: fmmax",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/jax_fem.yaml",
+      "bytes": 2359,
+      "lines": 41,
+      "sha256_12": "f648baf3f569",
+      "heading": "id: jax-fem",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/optiland.yaml",
+      "bytes": 2248,
+      "lines": 41,
+      "sha256_12": "1366891eb081",
+      "heading": "id: optiland",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solver_cards/sax.yaml",
+      "bytes": 2171,
+      "lines": 36,
+      "sha256_12": "de0d31dd8ea5",
+      "heading": "id: sax",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/api_minimal_examples.md",
+      "bytes": 2881,
+      "lines": 83,
+      "sha256_12": "eb67795c847a",
+      "heading": "Minimal Chromatix examples (validated against pinned commit `d24bdf0`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/capability_notes.md",
+      "bytes": 3106,
+      "lines": 57,
+      "sha256_12": "2f26aa67b664",
+      "heading": "Chromatix capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/conventions.md",
+      "bytes": 7408,
+      "lines": 135,
+      "sha256_12": "4e5166b6b600",
+      "heading": "Chromatix conventions (pinned commit `d24bdf0`, tag `0.6.0`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/expected/gradient_probe.json",
+      "bytes": 298,
+      "lines": 9,
+      "sha256_12": "1e2d4ab01c80",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/expected/import_probe.json",
+      "bytes": 391,
+      "lines": 20,
+      "sha256_12": "5025c91926d0",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/expected/propagation_probe.json",
+      "bytes": 908,
+      "lines": 57,
+      "sha256_12": "4d702bf95165",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/failure_guide.md",
+      "bytes": 5016,
+      "lines": 106,
+      "sha256_12": "d2998d18cd60",
+      "heading": "Chromatix failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/probes/gradient_probe.py",
+      "bytes": 1669,
+      "lines": 58,
+      "sha256_12": "634891cf03c1",
+      "heading": "\"\"\"Minimal directional-derivative probe for M_WAVE_CHROMATIX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/probes/import_probe.py",
+      "bytes": 1002,
+      "lines": 36,
+      "sha256_12": "6fa408f3b6ef",
+      "heading": "\"\"\"Import/initialization probe for the M_WAVE_CHROMATIX solver card.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/probes/propagation_probe.py",
+      "bytes": 1905,
+      "lines": 65,
+      "sha256_12": "0e46c2f5f28c",
+      "heading": "\"\"\"Minimal forward-simulation probe for M_WAVE_CHROMATIX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/solver_card.yaml",
+      "bytes": 3280,
+      "lines": 63,
+      "sha256_12": "288815a9124c",
+      "heading": "Routing-critical facts for M_WAVE_CHROMATIX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/chromatix/source_manifest.yaml",
+      "bytes": 2357,
+      "lines": 49,
+      "sha256_12": "01a77abde49a",
+      "heading": "Per-source provenance for the chromatix knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/api_minimal_examples.md",
+      "bytes": 4428,
+      "lines": 120,
+      "sha256_12": "4e3a116ea49f",
+      "heading": "Minimal FDTDX examples (validated against pinned version `0.6.2`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/capability_notes.md",
+      "bytes": 3512,
+      "lines": 68,
+      "sha256_12": "8285a639e85c",
+      "heading": "FDTDX capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/conventions.md",
+      "bytes": 5437,
+      "lines": 101,
+      "sha256_12": "e2eca3775df8",
+      "heading": "FDTDX conventions (pinned version `0.6.2`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/expected/gradient_probe.json",
+      "bytes": 886,
+      "lines": 12,
+      "sha256_12": "5fcb3c2c9efd",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/expected/import_probe.json",
+      "bytes": 579,
+      "lines": 26,
+      "sha256_12": "e3251271f0ec",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/expected/propagation_probe.json",
+      "bytes": 231,
+      "lines": 18,
+      "sha256_12": "9a0682d3f610",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/failure_guide.md",
+      "bytes": 4636,
+      "lines": 102,
+      "sha256_12": "4dfed476d352",
+      "heading": "FDTDX failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/probes/gradient_probe.py",
+      "bytes": 5042,
+      "lines": 127,
+      "sha256_12": "a51be2402a9e",
+      "heading": "Probe A: gradient w.r.t. source wavelength (closed over a traced scalar,",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/probes/import_probe.py",
+      "bytes": 725,
+      "lines": 30,
+      "sha256_12": "7b4c9d4213f3",
+      "heading": "\"\"\"Import/initialization probe for M_EM_FDTDX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/probes/propagation_probe.py",
+      "bytes": 2963,
+      "lines": 90,
+      "sha256_12": "00502579b380",
+      "heading": "\"\"\"Minimal forward-simulation probe for M_EM_FDTDX: a periodic vacuum volume",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/solver_card.yaml",
+      "bytes": 4083,
+      "lines": 67,
+      "sha256_12": "4a7631259222",
+      "heading": "Routing-critical facts for M_EM_FDTDX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fdtdx/source_manifest.yaml",
+      "bytes": 2510,
+      "lines": 49,
+      "sha256_12": "470ab5f89884",
+      "heading": "Per-source provenance for the fdtdx knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/api_minimal_examples.md",
+      "bytes": 3586,
+      "lines": 99,
+      "sha256_12": "e71f76d354c4",
+      "heading": "Minimal FMMAX examples (validated against pinned version `1.7.1`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/capability_notes.md",
+      "bytes": 3903,
+      "lines": 75,
+      "sha256_12": "0bf45020efb7",
+      "heading": "FMMAX capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/conventions.md",
+      "bytes": 6991,
+      "lines": 140,
+      "sha256_12": "de1bdaa552e4",
+      "heading": "FMMAX conventions (pinned version `1.7.1`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/expected/fresnel_oracle_probe.json",
+      "bytes": 571,
+      "lines": 14,
+      "sha256_12": "014cbf476c40",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/expected/gradient_probe.json",
+      "bytes": 302,
+      "lines": 9,
+      "sha256_12": "94d4f036fdd7",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/expected/import_probe.json",
+      "bytes": 564,
+      "lines": 26,
+      "sha256_12": "68a24b0385f5",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/failure_guide.md",
+      "bytes": 3282,
+      "lines": 70,
+      "sha256_12": "d8134229722f",
+      "heading": "FMMAX failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py",
+      "bytes": 3042,
+      "lines": 85,
+      "sha256_12": "64232c18fbf6",
+      "heading": "\"\"\"Analytic-oracle probe for M_RCWA_FMMAX: bare interface vs. Fresnel formula.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/probes/gradient_probe.py",
+      "bytes": 2712,
+      "lines": 84,
+      "sha256_12": "b9a87eaf6643",
+      "heading": "\"\"\"Directional-derivative probe for M_RCWA_FMMAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/probes/import_probe.py",
+      "bytes": 925,
+      "lines": 34,
+      "sha256_12": "be10482ff80b",
+      "heading": "\"\"\"Import/initialization probe for the M_RCWA_FMMAX solver card.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/solver_card.yaml",
+      "bytes": 3458,
+      "lines": 65,
+      "sha256_12": "ef8cbb4ac4b9",
+      "heading": "Routing-critical facts for M_RCWA_FMMAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/fmmax/source_manifest.yaml",
+      "bytes": 2168,
+      "lines": 47,
+      "sha256_12": "8e2b90ef2168",
+      "heading": "Per-source provenance for the fmmax knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/api_minimal_examples.md",
+      "bytes": 1856,
+      "lines": 58,
+      "sha256_12": "8007d3e30730",
+      "heading": "Minimal JAX-FEM examples (validated against pinned version `0.0.12`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/capability_notes.md",
+      "bytes": 2638,
+      "lines": 51,
+      "sha256_12": "7487e813e6cf",
+      "heading": "JAX-FEM capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/conventions.md",
+      "bytes": 2326,
+      "lines": 49,
+      "sha256_12": "afd92a8db4d6",
+      "heading": "JAX-FEM conventions (pinned version `0.0.12`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/expected/import_probe.json",
+      "bytes": 772,
+      "lines": 45,
+      "sha256_12": "01a0a25d9de1",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/expected/mesh_probe.json",
+      "bytes": 153,
+      "lines": 14,
+      "sha256_12": "5444482701ff",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/expected/solver_failure_probe.json",
+      "bytes": 142,
+      "lines": 6,
+      "sha256_12": "6811fc23ab3e",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/failure_guide.md",
+      "bytes": 4335,
+      "lines": 93,
+      "sha256_12": "c3b482809d40",
+      "heading": "JAX-FEM failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/probes/import_probe.py",
+      "bytes": 1172,
+      "lines": 39,
+      "sha256_12": "278adbb8a612",
+      "heading": "\"\"\"Import/initialization probe for the M_THERMAL_JAX_FEM solver card.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/probes/mesh_probe.py",
+      "bytes": 1001,
+      "lines": 32,
+      "sha256_12": "e9d985bd9244",
+      "heading": "\"\"\"Minimal mesh-generation probe for M_THERMAL_JAX_FEM.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/probes/solver_failure_probe.py",
+      "bytes": 1654,
+      "lines": 44,
+      "sha256_12": "c8f9b29fd1b8",
+      "heading": "\"\"\"Regression probe: confirms `jax_fem.solver` cannot be imported without",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/solver_card.yaml",
+      "bytes": 5989,
+      "lines": 112,
+      "sha256_12": "f61608d36fba",
+      "heading": "Routing-critical facts for M_THERMAL_JAX_FEM.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/jax_fem/source_manifest.yaml",
+      "bytes": 3640,
+      "lines": 74,
+      "sha256_12": "03e0262b4a76",
+      "heading": "Per-source provenance for the jax-fem knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/api_minimal_examples.md",
+      "bytes": 3235,
+      "lines": 88,
+      "sha256_12": "05f0eadb4818",
+      "heading": "Minimal Optiland examples (validated against pinned version `0.6.0`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/capability_notes.md",
+      "bytes": 3500,
+      "lines": 63,
+      "sha256_12": "9203bbe9c99e",
+      "heading": "Optiland capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/conventions.md",
+      "bytes": 5548,
+      "lines": 111,
+      "sha256_12": "a6c119ab2256",
+      "heading": "Optiland conventions (pinned version `0.6.0`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/expected/gradient_probe.json",
+      "bytes": 391,
+      "lines": 10,
+      "sha256_12": "a755b763d643",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/expected/import_probe.json",
+      "bytes": 334,
+      "lines": 15,
+      "sha256_12": "e5e66bf29170",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/expected/raytrace_probe.json",
+      "bytes": 240,
+      "lines": 10,
+      "sha256_12": "691926501763",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/failure_guide.md",
+      "bytes": 3900,
+      "lines": 87,
+      "sha256_12": "f128dd93cdf1",
+      "heading": "Optiland failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/probes/gradient_probe.py",
+      "bytes": 2282,
+      "lines": 68,
+      "sha256_12": "f7d32a53a771",
+      "heading": "Optic.surface_group is deprecated in this version; use Optic.surfaces.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/probes/import_probe.py",
+      "bytes": 1138,
+      "lines": 35,
+      "sha256_12": "69d5ad96bb9b",
+      "heading": "\"\"\"Import/initialization probe for the M_RAY_OPTILAND solver card.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/probes/raytrace_probe.py",
+      "bytes": 1113,
+      "lines": 36,
+      "sha256_12": "7230d9479478",
+      "heading": "\"\"\"Minimal ray-trace probe for M_RAY_OPTILAND, numpy backend (default).",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/solver_card.yaml",
+      "bytes": 4492,
+      "lines": 79,
+      "sha256_12": "91a6d3797ece",
+      "heading": "Routing-critical facts for M_RAY_OPTILAND.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/optiland/source_manifest.yaml",
+      "bytes": 2228,
+      "lines": 46,
+      "sha256_12": "35c6f3cb4627",
+      "heading": "Per-source provenance for the optiland knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/api_minimal_examples.md",
+      "bytes": 3767,
+      "lines": 111,
+      "sha256_12": "e581ee28a292",
+      "heading": "Minimal SAX examples (validated against installed version `0.18.2`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/capability_notes.md",
+      "bytes": 3596,
+      "lines": 66,
+      "sha256_12": "e60680be8dcc",
+      "heading": "SAX capability notes",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/conventions.md",
+      "bytes": 8225,
+      "lines": 153,
+      "sha256_12": "fec13a9a3536",
+      "heading": "SAX conventions (pinned version `0.18.2`)",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/expected/circuit_probe.json",
+      "bytes": 697,
+      "lines": 30,
+      "sha256_12": "7c890d243a82",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/expected/component_model_probe.json",
+      "bytes": 553,
+      "lines": 25,
+      "sha256_12": "d6b458120911",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/expected/gradient_probe.json",
+      "bytes": 297,
+      "lines": 9,
+      "sha256_12": "7589d880d4b0",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/expected/import_probe.json",
+      "bytes": 370,
+      "lines": 20,
+      "sha256_12": "2cde253ebc17",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/failure_guide.md",
+      "bytes": 2754,
+      "lines": 63,
+      "sha256_12": "eafb5392d6ab",
+      "heading": "SAX failure guide",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/probes/circuit_probe.py",
+      "bytes": 2687,
+      "lines": 86,
+      "sha256_12": "de9c170655cd",
+      "heading": "\"\"\"Netlist circuit-composition probe for M_CIRCUIT_SAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/probes/component_model_probe.py",
+      "bytes": 2029,
+      "lines": 62,
+      "sha256_12": "afb7a21cf48c",
+      "heading": "\"\"\"Single-component S-matrix probe for M_CIRCUIT_SAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/probes/gradient_probe.py",
+      "bytes": 1646,
+      "lines": 55,
+      "sha256_12": "1f87b7c3894c",
+      "heading": "\"\"\"Minimal directional-derivative probe for M_CIRCUIT_SAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/probes/import_probe.py",
+      "bytes": 825,
+      "lines": 33,
+      "sha256_12": "c3ecbb67568b",
+      "heading": "\"\"\"Import/initialization probe for M_CIRCUIT_SAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/solver_card.yaml",
+      "bytes": 4525,
+      "lines": 68,
+      "sha256_12": "d6dd64298921",
+      "heading": "Routing-critical facts for M_CIRCUIT_SAX.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/solvers/sax/source_manifest.yaml",
+      "bytes": 2559,
+      "lines": 51,
+      "sha256_12": "7d1b493fb739",
+      "heading": "Per-source provenance for the sax knowledge pack.",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "knowledge/source_manifest.yaml",
+      "bytes": 10308,
+      "lines": 307,
+      "sha256_12": "ad1c00513b4e",
+      "heading": "name: JAX",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "linear/BACKLOG_RAY_WAVE.md",
+      "bytes": 3118,
+      "lines": 70,
+      "sha256_12": "b4c437c10c78",
+      "heading": "Proposed Linear Backlog \u2014 Ray/Wave Vertical Slice",
+      "n_ray_to_wave": 1,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 3
+    },
+    {
+      "path": "linear/ISSUE_TEMPLATE.md",
+      "bytes": 1123,
+      "lines": 54,
+      "sha256_12": "650702b72fc5",
+      "heading": "[RW] <single verifiable outcome>",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 1
+    },
+    {
+      "path": "linear/PROJECT_SETUP.md",
+      "bytes": 2389,
+      "lines": 79,
+      "sha256_12": "d2da484e2fb6",
+      "heading": "Linear Project Setup \u2014 Ray/Wave Vertical Slice",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 3
+    },
+    {
+      "path": "schemas/artifact.schema.json",
+      "bytes": 2748,
+      "lines": 136,
+      "sha256_12": "688fd1e6da16",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "schemas/coupler.schema.json",
+      "bytes": 8011,
+      "lines": 378,
+      "sha256_12": "9a126ef165b5",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "schemas/graph.schema.json",
+      "bytes": 6146,
+      "lines": 293,
+      "sha256_12": "91060c79170f",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "schemas/model.schema.json",
+      "bytes": 8303,
+      "lines": 396,
+      "sha256_12": "142160ac73c9",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    },
+    {
+      "path": "schemas/provenance.schema.json",
+      "bytes": 2300,
+      "lines": 125,
+      "sha256_12": "51df99ef9bda",
+      "heading": "{",
+      "n_ray_to_wave": 0,
+      "n_wave_to_ray": 0,
+      "n_legacy_raywave": 0
+    }
+  ],
+  "exact_duplicates": {},
+  "solver_card_pairs": [
+    {
+      "solver": "chromatix",
+      "flat_card": "knowledge/solver_cards/chromatix.yaml",
+      "nested_card": "knowledge/solvers/chromatix/solver_card.yaml",
+      "flat_lines": 30,
+      "nested_lines": 63,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "official_docs",
+        "repository",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "cost_scaling",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "dtypes_observed",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "repository",
+        "role",
+        "supported_regimes",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    },
+    {
+      "solver": "fdtdx",
+      "flat_card": "knowledge/solver_cards/fdtdx.yaml",
+      "nested_card": "knowledge/solvers/fdtdx/solver_card.yaml",
+      "flat_lines": 34,
+      "nested_lines": 67,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "official_docs",
+        "repository",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "cost_scaling",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "dtypes_observed",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "repository",
+        "role",
+        "supported_regimes",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    },
+    {
+      "solver": "fmmax",
+      "flat_card": "knowledge/solver_cards/fmmax.yaml",
+      "nested_card": "knowledge/solvers/fmmax/solver_card.yaml",
+      "flat_lines": 32,
+      "nested_lines": 65,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "official_docs",
+        "repository",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "cost_scaling",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "dtypes_observed",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "repository",
+        "role",
+        "supported_regimes",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    },
+    {
+      "solver": "jax_fem",
+      "flat_card": "knowledge/solver_cards/jax_fem.yaml",
+      "nested_card": "knowledge/solvers/jax_fem/solver_card.yaml",
+      "flat_lines": 41,
+      "nested_lines": 112,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "blocked",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "license",
+        "official_docs",
+        "repository",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "blocker",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "knowledge_pack",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "recommendation_for_registry",
+        "repository",
+        "role",
+        "supported_regimes_if_unblocked",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    },
+    {
+      "solver": "optiland",
+      "flat_card": "knowledge/solver_cards/optiland.yaml",
+      "nested_card": "knowledge/solvers/optiland/solver_card.yaml",
+      "flat_lines": 41,
+      "nested_lines": 79,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "official_docs",
+        "repository",
+        "repository_note",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "cost_scaling",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "dtypes_observed",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "repository",
+        "repository_note",
+        "role",
+        "supported_regimes",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    },
+    {
+      "solver": "sax",
+      "flat_card": "knowledge/solver_cards/sax.yaml",
+      "nested_card": "knowledge/solvers/sax/solver_card.yaml",
+      "flat_lines": 36,
+      "nested_lines": 68,
+      "identical": false,
+      "flat_top_keys": [
+        "agent_should_not_assume",
+        "agent_should_use_for",
+        "benchmarks",
+        "framework",
+        "id",
+        "install",
+        "knowledge_pack",
+        "official_docs",
+        "repository",
+        "required_probes",
+        "role",
+        "validation_status"
+      ],
+      "nested_top_keys": [
+        "adapter_location",
+        "cost_scaling",
+        "derivative",
+        "devices_reported",
+        "devices_tested",
+        "dtypes_observed",
+        "framework",
+        "id",
+        "input_output_artifacts",
+        "known_conventions",
+        "license",
+        "limitations_and_failure_modes",
+        "not_yet_probed",
+        "official_docs",
+        "package",
+        "repository",
+        "role",
+        "supported_regimes",
+        "validated_probe_ids",
+        "validation_status"
+      ]
+    }
+  ],
+  "manifest_paths": [
+    {
+      "declared": "AGENTS.md",
+      "exists": true
+    },
+    {
+      "declared": "CLAUDE.md",
+      "exists": true
+    },
+    {
+      "declared": "docs/",
+      "exists": true
+    },
+    {
+      "declared": "context/",
+      "exists": false
+    },
+    {
+      "declared": "solver/",
+      "exists": false
+    },
+    {
+      "declared": "knowledge/",
+      "exists": true
+    },
+    {
+      "declared": "archive/",
+      "exists": false
+    }
+  ]
+}
+
+### DOC TABLE
+| path | lines | r2w | w2r | legacy | heading |
+| --- | --- | --- | --- | --- | --- |
+| `AGENTS.md` | 160 | 4 | 0 | 4 | Repository Instructions — Canonical Shared Context |
+| `CLAUDE.md` | 1 | 0 | 0 | 0 | @AGENTS.md |
+| `CONTEXT_MANIFEST.yaml` | 33 | 0 | 0 | 0 | version: 1 |
+| `MIGRATION_PLAN.md` | 82 | 0 | 0 | 0 | Documentation and Context Migration Plan |
+| `README.md` | 20 | 0 | 0 | 0 | Ray/Wave Agent Context Pack |
+| `VALIDATION_REPORT.md` | 31 | 2 | 0 | 0 | Validation Report |
+| `benchmarks/README.md` | 21 | 0 | 0 | 0 | Benchmark Implementation Area |
+| `benchmarks/level1/README.md` | 12 | 0 | 0 | 0 | Level 1 — One-Model Simulation |
+| `benchmarks/level2/README.md` | 10 | 1 | 0 | 0 | Level 2 — Two-to-Three-Model Orchestration |
+| `benchmarks/level3/README.md` | 9 | 0 | 0 | 0 | Level 3 — Hard Inverse Design |
+| `benchmarks/manifest.yaml` | 47 | 1 | 0 | 0 | name: one-model simulation |
+| `docs/audit/logs/m01_import_graph.txt` | 940 | 2 | 0 | 0 | MODULE TABLE |
+| `docs/audit/logs/m01_pytest_baseline.txt` | 7 | 0 | 0 | 0 | ^@[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[ |
+| `docs/audit/logs/m02_docs_inventory.txt` | 0 | 0 | 0 | 0 | — |
+| `docs/audit/probes/audit_docs_inventory.py` | 182 | 10 | 10 | 8 | !/usr/bin/env python3 |
+| `docs/audit/probes/audit_import_graph.py` | 196 | 0 | 0 | 0 | !/usr/bin/env python3 |
+| `docs/context/CURRENT_SCOPE.md` | 68 | 1 | 0 | 2 | Current Scope — Ray/Wave Vertical Slice |
+| `docs/context/MODULE_GRANULARITY.md` | 95 | 1 | 0 | 0 | Module Granularity — Working Rules |
+| `docs/context/RAY_WAVE_VERTICAL_SLICE.md` | 95 | 1 | 0 | 1 | Ray-to-Wave Vertical Slice — Execution Plan |
+| `examples/graphs/chromatix_smoke.yaml` | 17 | 0 | 0 | 0 | schema_version: 0.1.0 |
+| `examples/graphs/fdtdx_smoke.yaml` | 22 | 0 | 0 | 0 | schema_version: 0.1.0 |
+| `examples/graphs/fmmax_smoke.yaml` | 18 | 0 | 0 | 0 | schema_version: 0.1.0 |
+| `examples/graphs/optiland_smoke.yaml` | 22 | 0 | 0 | 0 | schema_version: 0.1.0 |
+| `examples/graphs/ray_to_wave.yaml` | 50 | 1 | 0 | 1 | schema_version: 0.1.0 |
+| `examples/graphs/sax_smoke.yaml` | 24 | 0 | 0 | 0 | schema_version: 0.1.0 |
+| `knowledge/README.md` | 9 | 0 | 0 | 0 | Agent Knowledge Assets |
+| `knowledge/solver_cards/chromatix.yaml` | 30 | 0 | 0 | 0 | id: chromatix |
+| `knowledge/solver_cards/fdtdx.yaml` | 34 | 0 | 0 | 0 | id: fdtdx |
+| `knowledge/solver_cards/fmmax.yaml` | 32 | 0 | 0 | 0 | id: fmmax |
+| `knowledge/solver_cards/jax_fem.yaml` | 41 | 0 | 0 | 0 | id: jax-fem |
+| `knowledge/solver_cards/optiland.yaml` | 41 | 1 | 0 | 0 | id: optiland |
+| `knowledge/solver_cards/sax.yaml` | 36 | 0 | 0 | 0 | id: sax |
+| `knowledge/solvers/chromatix/api_minimal_examples.md` | 83 | 0 | 0 | 0 | Minimal Chromatix examples (validated against pinned commit `d24bdf0`) |
+| `knowledge/solvers/chromatix/capability_notes.md` | 57 | 0 | 0 | 0 | Chromatix capability notes |
+| `knowledge/solvers/chromatix/conventions.md` | 135 | 0 | 0 | 0 | Chromatix conventions (pinned commit `d24bdf0`, tag `0.6.0`) |
+| `knowledge/solvers/chromatix/expected/gradient_probe.json` | 9 | 0 | 0 | 0 | { |
+| `knowledge/solvers/chromatix/expected/import_probe.json` | 20 | 0 | 0 | 0 | { |
+| `knowledge/solvers/chromatix/expected/propagation_probe.json` | 57 | 0 | 0 | 0 | { |
+| `knowledge/solvers/chromatix/failure_guide.md` | 106 | 0 | 0 | 0 | Chromatix failure guide |
+| `knowledge/solvers/chromatix/probes/gradient_probe.py` | 58 | 0 | 0 | 0 | """Minimal directional-derivative probe for M_WAVE_CHROMATIX. |
+| `knowledge/solvers/chromatix/probes/import_probe.py` | 36 | 0 | 0 | 0 | """Import/initialization probe for the M_WAVE_CHROMATIX solver card. |
+| `knowledge/solvers/chromatix/probes/propagation_probe.py` | 65 | 0 | 0 | 0 | """Minimal forward-simulation probe for M_WAVE_CHROMATIX. |
+| `knowledge/solvers/chromatix/solver_card.yaml` | 63 | 0 | 0 | 0 | Routing-critical facts for M_WAVE_CHROMATIX. |
+| `knowledge/solvers/chromatix/source_manifest.yaml` | 49 | 0 | 0 | 0 | Per-source provenance for the chromatix knowledge pack. |
+| `knowledge/solvers/fdtdx/api_minimal_examples.md` | 120 | 0 | 0 | 0 | Minimal FDTDX examples (validated against pinned version `0.6.2`) |
+| `knowledge/solvers/fdtdx/capability_notes.md` | 68 | 0 | 0 | 0 | FDTDX capability notes |
+| `knowledge/solvers/fdtdx/conventions.md` | 101 | 0 | 0 | 0 | FDTDX conventions (pinned version `0.6.2`) |
+| `knowledge/solvers/fdtdx/expected/gradient_probe.json` | 12 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fdtdx/expected/import_probe.json` | 26 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fdtdx/expected/propagation_probe.json` | 18 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fdtdx/failure_guide.md` | 102 | 0 | 0 | 0 | FDTDX failure guide |
+| `knowledge/solvers/fdtdx/probes/gradient_probe.py` | 127 | 0 | 0 | 0 | Probe A: gradient w.r.t. source wavelength (closed over a traced scalar, |
+| `knowledge/solvers/fdtdx/probes/import_probe.py` | 30 | 0 | 0 | 0 | """Import/initialization probe for M_EM_FDTDX. |
+| `knowledge/solvers/fdtdx/probes/propagation_probe.py` | 90 | 0 | 0 | 0 | """Minimal forward-simulation probe for M_EM_FDTDX: a periodic vacuum volume |
+| `knowledge/solvers/fdtdx/solver_card.yaml` | 67 | 0 | 0 | 0 | Routing-critical facts for M_EM_FDTDX. |
+| `knowledge/solvers/fdtdx/source_manifest.yaml` | 49 | 0 | 0 | 0 | Per-source provenance for the fdtdx knowledge pack. |
+| `knowledge/solvers/fmmax/api_minimal_examples.md` | 99 | 0 | 0 | 0 | Minimal FMMAX examples (validated against pinned version `1.7.1`) |
+| `knowledge/solvers/fmmax/capability_notes.md` | 75 | 0 | 0 | 0 | FMMAX capability notes |
+| `knowledge/solvers/fmmax/conventions.md` | 140 | 0 | 0 | 0 | FMMAX conventions (pinned version `1.7.1`) |
+| `knowledge/solvers/fmmax/expected/fresnel_oracle_probe.json` | 14 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fmmax/expected/gradient_probe.json` | 9 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fmmax/expected/import_probe.json` | 26 | 0 | 0 | 0 | { |
+| `knowledge/solvers/fmmax/failure_guide.md` | 70 | 0 | 0 | 0 | FMMAX failure guide |
+| `knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py` | 85 | 0 | 0 | 0 | """Analytic-oracle probe for M_RCWA_FMMAX: bare interface vs. Fresnel formula. |
+| `knowledge/solvers/fmmax/probes/gradient_probe.py` | 84 | 0 | 0 | 0 | """Directional-derivative probe for M_RCWA_FMMAX. |
+| `knowledge/solvers/fmmax/probes/import_probe.py` | 34 | 0 | 0 | 0 | """Import/initialization probe for the M_RCWA_FMMAX solver card. |
+| `knowledge/solvers/fmmax/solver_card.yaml` | 65 | 0 | 0 | 0 | Routing-critical facts for M_RCWA_FMMAX. |
+| `knowledge/solvers/fmmax/source_manifest.yaml` | 47 | 0 | 0 | 0 | Per-source provenance for the fmmax knowledge pack. |
+| `knowledge/solvers/jax_fem/api_minimal_examples.md` | 58 | 0 | 0 | 0 | Minimal JAX-FEM examples (validated against pinned version `0.0.12`) |
+| `knowledge/solvers/jax_fem/capability_notes.md` | 51 | 0 | 0 | 0 | JAX-FEM capability notes |
+| `knowledge/solvers/jax_fem/conventions.md` | 49 | 0 | 0 | 0 | JAX-FEM conventions (pinned version `0.0.12`) |
+| `knowledge/solvers/jax_fem/expected/import_probe.json` | 45 | 0 | 0 | 0 | { |
+| `knowledge/solvers/jax_fem/expected/mesh_probe.json` | 14 | 0 | 0 | 0 | { |
+| `knowledge/solvers/jax_fem/expected/solver_failure_probe.json` | 6 | 0 | 0 | 0 | { |
+| `knowledge/solvers/jax_fem/failure_guide.md` | 93 | 0 | 0 | 0 | JAX-FEM failure guide |
+| `knowledge/solvers/jax_fem/probes/import_probe.py` | 39 | 0 | 0 | 0 | """Import/initialization probe for the M_THERMAL_JAX_FEM solver card. |
+| `knowledge/solvers/jax_fem/probes/mesh_probe.py` | 32 | 0 | 0 | 0 | """Minimal mesh-generation probe for M_THERMAL_JAX_FEM. |
+| `knowledge/solvers/jax_fem/probes/solver_failure_probe.py` | 44 | 0 | 0 | 0 | """Regression probe: confirms `jax_fem.solver` cannot be imported without |
+| `knowledge/solvers/jax_fem/solver_card.yaml` | 112 | 0 | 0 | 0 | Routing-critical facts for M_THERMAL_JAX_FEM. |
+| `knowledge/solvers/jax_fem/source_manifest.yaml` | 74 | 0 | 0 | 0 | Per-source provenance for the jax-fem knowledge pack. |
+| `knowledge/solvers/optiland/api_minimal_examples.md` | 88 | 0 | 0 | 0 | Minimal Optiland examples (validated against pinned version `0.6.0`) |
+| `knowledge/solvers/optiland/capability_notes.md` | 63 | 0 | 0 | 0 | Optiland capability notes |
+| `knowledge/solvers/optiland/conventions.md` | 111 | 0 | 0 | 0 | Optiland conventions (pinned version `0.6.0`) |
+| `knowledge/solvers/optiland/expected/gradient_probe.json` | 10 | 0 | 0 | 0 | { |
+| `knowledge/solvers/optiland/expected/import_probe.json` | 15 | 0 | 0 | 0 | { |
+| `knowledge/solvers/optiland/expected/raytrace_probe.json` | 10 | 0 | 0 | 0 | { |
+| `knowledge/solvers/optiland/failure_guide.md` | 87 | 0 | 0 | 0 | Optiland failure guide |
+| `knowledge/solvers/optiland/probes/gradient_probe.py` | 68 | 0 | 0 | 0 | Optic.surface_group is deprecated in this version; use Optic.surfaces. |
+| `knowledge/solvers/optiland/probes/import_probe.py` | 35 | 0 | 0 | 0 | """Import/initialization probe for the M_RAY_OPTILAND solver card. |
+| `knowledge/solvers/optiland/probes/raytrace_probe.py` | 36 | 0 | 0 | 0 | """Minimal ray-trace probe for M_RAY_OPTILAND, numpy backend (default). |
+| `knowledge/solvers/optiland/solver_card.yaml` | 79 | 0 | 0 | 0 | Routing-critical facts for M_RAY_OPTILAND. |
+| `knowledge/solvers/optiland/source_manifest.yaml` | 46 | 0 | 0 | 0 | Per-source provenance for the optiland knowledge pack. |
+| `knowledge/solvers/sax/api_minimal_examples.md` | 111 | 0 | 0 | 0 | Minimal SAX examples (validated against installed version `0.18.2`) |
+| `knowledge/solvers/sax/capability_notes.md` | 66 | 0 | 0 | 0 | SAX capability notes |
+| `knowledge/solvers/sax/conventions.md` | 153 | 0 | 0 | 0 | SAX conventions (pinned version `0.18.2`) |
+| `knowledge/solvers/sax/expected/circuit_probe.json` | 30 | 0 | 0 | 0 | { |
+| `knowledge/solvers/sax/expected/component_model_probe.json` | 25 | 0 | 0 | 0 | { |
+| `knowledge/solvers/sax/expected/gradient_probe.json` | 9 | 0 | 0 | 0 | { |
+| `knowledge/solvers/sax/expected/import_probe.json` | 20 | 0 | 0 | 0 | { |
+| `knowledge/solvers/sax/failure_guide.md` | 63 | 0 | 0 | 0 | SAX failure guide |
+| `knowledge/solvers/sax/probes/circuit_probe.py` | 86 | 0 | 0 | 0 | """Netlist circuit-composition probe for M_CIRCUIT_SAX. |
+| `knowledge/solvers/sax/probes/component_model_probe.py` | 62 | 0 | 0 | 0 | """Single-component S-matrix probe for M_CIRCUIT_SAX. |
+| `knowledge/solvers/sax/probes/gradient_probe.py` | 55 | 0 | 0 | 0 | """Minimal directional-derivative probe for M_CIRCUIT_SAX. |
+| `knowledge/solvers/sax/probes/import_probe.py` | 33 | 0 | 0 | 0 | """Import/initialization probe for M_CIRCUIT_SAX. |
+| `knowledge/solvers/sax/solver_card.yaml` | 68 | 0 | 0 | 0 | Routing-critical facts for M_CIRCUIT_SAX. |
+| `knowledge/solvers/sax/source_manifest.yaml` | 51 | 0 | 0 | 0 | Per-source provenance for the sax knowledge pack. |
+| `knowledge/source_manifest.yaml` | 307 | 0 | 0 | 0 | name: JAX |
+| `linear/BACKLOG_RAY_WAVE.md` | 70 | 1 | 0 | 3 | Proposed Linear Backlog — Ray/Wave Vertical Slice |
+| `linear/ISSUE_TEMPLATE.md` | 54 | 0 | 0 | 1 | [RW] <single verifiable outcome> |
+| `linear/PROJECT_SETUP.md` | 79 | 0 | 0 | 3 | Linear Project Setup — Ray/Wave Vertical Slice |
+| `schemas/artifact.schema.json` | 136 | 0 | 0 | 0 | { |
+| `schemas/coupler.schema.json` | 378 | 0 | 0 | 0 | { |
+| `schemas/graph.schema.json` | 293 | 0 | 0 | 0 | { |
+| `schemas/model.schema.json` | 396 | 0 | 0 | 0 | { |
+| `schemas/provenance.schema.json` | 125 | 0 | 0 | 0 | { |
+
+### SOLVER CARD PAIRS
+{"solver": "chromatix", "flat_card": "knowledge/solver_cards/chromatix.yaml", "nested_card": "knowledge/solvers/chromatix/solver_card.yaml", "flat_lines": 30, "nested_lines": 63, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "framework", "id", "install", "knowledge_pack", "official_docs", "repository", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "cost_scaling", "derivative", "devices_reported", "devices_tested", "dtypes_observed", "framework", "id", "input_output_artifacts", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "repository", "role", "supported_regimes", "validated_probe_ids", "validation_status"]}
+{"solver": "fdtdx", "flat_card": "knowledge/solver_cards/fdtdx.yaml", "nested_card": "knowledge/solvers/fdtdx/solver_card.yaml", "flat_lines": 34, "nested_lines": 67, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "framework", "id", "install", "knowledge_pack", "official_docs", "repository", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "cost_scaling", "derivative", "devices_reported", "devices_tested", "dtypes_observed", "framework", "id", "input_output_artifacts", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "repository", "role", "supported_regimes", "validated_probe_ids", "validation_status"]}
+{"solver": "fmmax", "flat_card": "knowledge/solver_cards/fmmax.yaml", "nested_card": "knowledge/solvers/fmmax/solver_card.yaml", "flat_lines": 32, "nested_lines": 65, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "framework", "id", "install", "knowledge_pack", "official_docs", "repository", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "cost_scaling", "derivative", "devices_reported", "devices_tested", "dtypes_observed", "framework", "id", "input_output_artifacts", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "repository", "role", "supported_regimes", "validated_probe_ids", "validation_status"]}
+{"solver": "jax_fem", "flat_card": "knowledge/solver_cards/jax_fem.yaml", "nested_card": "knowledge/solvers/jax_fem/solver_card.yaml", "flat_lines": 41, "nested_lines": 112, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "blocked", "framework", "id", "install", "knowledge_pack", "license", "official_docs", "repository", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "blocker", "derivative", "devices_reported", "devices_tested", "framework", "id", "input_output_artifacts", "knowledge_pack", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "recommendation_for_registry", "repository", "role", "supported_regimes_if_unblocked", "validated_probe_ids", "validation_status"]}
+{"solver": "optiland", "flat_card": "knowledge/solver_cards/optiland.yaml", "nested_card": "knowledge/solvers/optiland/solver_card.yaml", "flat_lines": 41, "nested_lines": 79, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "framework", "id", "install", "knowledge_pack", "official_docs", "repository", "repository_note", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "cost_scaling", "derivative", "devices_reported", "devices_tested", "dtypes_observed", "framework", "id", "input_output_artifacts", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "repository", "repository_note", "role", "supported_regimes", "validated_probe_ids", "validation_status"]}
+{"solver": "sax", "flat_card": "knowledge/solver_cards/sax.yaml", "nested_card": "knowledge/solvers/sax/solver_card.yaml", "flat_lines": 36, "nested_lines": 68, "identical": false, "flat_top_keys": ["agent_should_not_assume", "agent_should_use_for", "benchmarks", "framework", "id", "install", "knowledge_pack", "official_docs", "repository", "required_probes", "role", "validation_status"], "nested_top_keys": ["adapter_location", "cost_scaling", "derivative", "devices_reported", "devices_tested", "dtypes_observed", "framework", "id", "input_output_artifacts", "known_conventions", "license", "limitations_and_failure_modes", "not_yet_probed", "official_docs", "package", "repository", "role", "supported_regimes", "validated_probe_ids", "validation_status"]}
+
+### MANIFEST PATHS
+OK   AGENTS.md
+OK   CLAUDE.md
+OK   docs/
+MISS context/
+MISS solver/
+OK   knowledge/
+MISS archive/
+
+### SUMMARY
+{
+  "doc_files": 115,
+  "exact_duplicate_groups": 0,
+  "files_mentioning_ray_to_wave": 12,
+  "files_mentioning_wave_to_ray": 1,
+  "files_mentioning_legacy_raywave": 8,
+  "manifest_declared_paths": 7,
+  "manifest_missing_paths": [
+    "context/",
+    "solver/",
+    "archive/"
+  ],
+  "top_dirs_absent_from_manifest": [
+    "benchmarks/",
+    "docker/",
+    "examples/",
+    "linear/",
+    "schemas/",
+    "scripts/",
+    "src/",
+    "tests/",
+    "tmp_probes/"
+  ]
+}

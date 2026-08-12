@@ -1,0 +1,9 @@
+src/multiscale_optics_agent/registry/couplers.yaml:32:    tags: [ray_wave, pupil, cross_framework]
+AGENTS.md:127:- Treat `ray_wave`, `ray_ewave`, and similarly named code as untrusted until characterized.
+src/multiscale_optics_agent/registry/models.yaml:61:          adapter -- resolve as part of the CLAUDE.md section 13 ray_wave/
+src/multiscale_optics_agent/registry/models.yaml:62:          ray_ewave bridge audit (decide whether to synthesize an explicit
+docs/audit/probes/audit_docs_inventory.py:29:LEGACY = re.compile(r"ray_wave|ray_ewave|raywave|ray-wave", re.I)
+docs/audit/probes/audit_docs_inventory.py:82:                "n_legacy_raywave": len(LEGACY.findall(text)),
+docs/audit/probes/audit_docs_inventory.py:136:        "files_mentioning_legacy_raywave": sum(1 for r in rows if r["n_legacy_raywave"]),
+docs/audit/probes/audit_docs_inventory.py:163:            f"{r['n_legacy_raywave']} | {r['heading'][:90] or '—'} |"
+linear/BACKLOG_RAY_WAVE.md:31:- Output: actual mathematical/implementation semantics for `ray_wave`, `ray_ewave`, and related code.

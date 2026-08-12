@@ -13,6 +13,7 @@ dist/
 .DS_Store
 runs/
 private_benchmarks/
+tmp_probes/
 
 # Generated datasets and experiment artifacts
 data/

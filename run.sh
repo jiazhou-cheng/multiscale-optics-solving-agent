@@ -31,10 +31,41 @@ if [[ "$DO_BUILD" -eq 1 ]]; then
     docker build -t "$IMAGE" -f docker/Dockerfile .
 fi
 
+# Old container runs created scratch/cache directories as container-owned users.
+# Repair known generated paths once; subsequent runs use the invoking host user.
+mkdir -p tmp_probes
+generated_paths=(tmp_probes)
+for path in .pytest_cache .ruff_cache .mypy_cache; do
+    if [[ -e "$path" ]]; then
+        generated_paths+=("$path")
+    fi
+done
+
+repair_paths=()
+for path in "${generated_paths[@]}"; do
+    if [[ ! -w "$path" ]]; then
+        repair_paths+=("/workspace/$path")
+    fi
+done
+
+if [[ "${#repair_paths[@]}" -gt 0 ]]; then
+    docker run --rm \
+        -v "$(pwd)":/workspace \
+        "$IMAGE" \
+        chown -R "$(id -u):$(id -g)" "${repair_paths[@]}"
+fi
+
+docker_args=(run --rm -i)
+if [[ -t 0 ]]; then
+    docker_args+=(-t)
+fi
+
 # Mount the repo so edits to source/knowledge files are visible immediately
 # inside the container (the project is installed with `pip install -e .`).
 # Uncomment --gpus all if running on a host with NVIDIA CUDA + nvidia-docker.
-docker run --rm -it \
+docker "${docker_args[@]}" \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
     -v "$(pwd)":/workspace \
     -w /workspace \
     "$IMAGE" \

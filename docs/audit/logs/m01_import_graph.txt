@@ -1,0 +1,940 @@
+^@### JSON
+{
+  "summary": {
+    "root": "/workspace",
+    "python_files": 36,
+    "by_status": {
+      "active": 8,
+      "standalone-script": 3,
+      "test": 10,
+      "test-only": 6,
+      "unreferenced-by-python": 9
+    },
+    "asset_files": 14,
+    "unreferenced_assets": 6,
+    "external_packages_imported": [
+      "__future__",
+      "builtins",
+      "chromatix",
+      "conftest",
+      "dataclasses",
+      "datetime",
+      "enum",
+      "fdtdx",
+      "fmmax",
+      "functools",
+      "hashlib",
+      "importlib",
+      "jax",
+      "json",
+      "math",
+      "networkx",
+      "numpy",
+      "optiland",
+      "pathlib",
+      "pkgutil",
+      "pydantic",
+      "pytest",
+      "re",
+      "rich",
+      "sax",
+      "sys",
+      "tempfile",
+      "torch",
+      "typer",
+      "typing",
+      "unittest",
+      "uuid",
+      "yaml"
+    ]
+  },
+  "modules": {
+    "scripts.check_context_sync": {
+      "path": "scripts/check_context_sync.py",
+      "purpose": "Validate the static Codex/Claude Code context entrypoints.",
+      "loc": 57,
+      "imports_internal": [],
+      "imports_external_top": [
+        "__future__",
+        "pathlib",
+        "sys"
+      ],
+      "imported_by": [],
+      "status": "standalone-script"
+    },
+    "scripts.export_schemas": {
+      "path": "scripts/export_schemas.py",
+      "purpose": "Export JSON Schemas used by planners, editors, and external tooling.",
+      "loc": 36,
+      "imports_internal": [
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.provenance",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "json",
+        "pathlib"
+      ],
+      "imported_by": [],
+      "status": "standalone-script"
+    },
+    "scripts.validate_package": {
+      "path": "scripts/validate_package.py",
+      "purpose": "Fast repository consistency checks that do not import optional physics solvers.",
+      "loc": 52,
+      "imports_internal": [
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "pathlib",
+        "re",
+        "yaml"
+      ],
+      "imported_by": [],
+      "status": "standalone-script"
+    },
+    "multiscale_optics_agent": {
+      "path": "src/multiscale_optics_agent/__init__.py",
+      "purpose": "Typed physics graphs for multi-scale optical simulation.",
+      "loc": 16,
+      "imports_internal": [
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.adapters": {
+      "path": "src/multiscale_optics_agent/adapters/__init__.py",
+      "purpose": "External physics-solver adapters.",
+      "loc": 22,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [
+        "multiscale_optics_agent.adapters.registry",
+        "tests.test_chromatix_adapter"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.adapters.base": {
+      "path": "src/multiscale_optics_agent/adapters/base.py",
+      "purpose": "Stable interface implemented by external physics-solver adapters.",
+      "loc": 63,
+      "imports_internal": [
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "enum",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.registry",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.couplers.base",
+        "tests.test_chromatix_adapter",
+        "tests.test_fdtdx_adapter",
+        "tests.test_fmmax_adapter",
+        "tests.test_optiland_adapter",
+        "tests.test_sax_adapter"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.adapters.chromatix_adapter": {
+      "path": "src/multiscale_optics_agent/adapters/chromatix_adapter.py",
+      "purpose": "Adapter for ``M_WAVE_CHROMATIX``: Chromatix scalar angular-spectrum propagation.",
+      "loc": 602,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "chromatix",
+        "hashlib",
+        "jax",
+        "numpy",
+        "pathlib",
+        "typing"
+      ],
+      "imported_by": [
+        "tests.test_chromatix_adapter"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.adapters.fdtdx_adapter": {
+      "path": "src/multiscale_optics_agent/adapters/fdtdx_adapter.py",
+      "purpose": "Forward-only adapter for ``M_EM_FDTDX`` (FDTDX, pinned version 0.6.2).",
+      "loc": 599,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "fdtdx",
+        "functools",
+        "hashlib",
+        "jax",
+        "numpy",
+        "pathlib",
+        "tempfile",
+        "typing",
+        "uuid"
+      ],
+      "imported_by": [
+        "tests.test_fdtdx_adapter"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.adapters.fmmax_adapter": {
+      "path": "src/multiscale_optics_agent/adapters/fmmax_adapter.py",
+      "purpose": "Adapter for ``M_RCWA_FMMAX`` \u2014 FMMAX (Fourier Modal Method / RCWA), pinned ``fmmax==1.7.1``.",
+      "loc": 649,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "fmmax",
+        "hashlib",
+        "jax",
+        "numpy",
+        "pathlib",
+        "tempfile",
+        "typing"
+      ],
+      "imported_by": [
+        "tests.test_fmmax_adapter"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.adapters.optiland_adapter": {
+      "path": "src/multiscale_optics_agent/adapters/optiland_adapter.py",
+      "purpose": "Adapter for ``M_RAY_OPTILAND`` (Optiland sequential ray tracer, pinned 0.6.0).",
+      "loc": 669,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "functools",
+        "hashlib",
+        "numpy",
+        "optiland",
+        "pathlib",
+        "re",
+        "tempfile",
+        "torch",
+        "typing",
+        "uuid"
+      ],
+      "imported_by": [
+        "tests.test_optiland_adapter"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.adapters.registry": {
+      "path": "src/multiscale_optics_agent/adapters/registry.py",
+      "purpose": "Runtime discovery of concrete ModelAdapter implementations.",
+      "loc": 48,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters",
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.errors"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "functools",
+        "importlib",
+        "pkgutil",
+        "typing"
+      ],
+      "imported_by": [
+        "tests.test_adapter_registry"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.adapters.sax_adapter": {
+      "path": "src/multiscale_optics_agent/adapters/sax_adapter.py",
+      "purpose": "Adapter for ``M_CIRCUIT_SAX`` -- differentiable photonic-circuit S-parameter",
+      "loc": 652,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "hashlib",
+        "jax",
+        "json",
+        "sax",
+        "typing"
+      ],
+      "imported_by": [
+        "tests.test_sax_adapter"
+      ],
+      "status": "test-only"
+    },
+    "multiscale_optics_agent.agents": {
+      "path": "src/multiscale_optics_agent/agents/__init__.py",
+      "purpose": "Agents package placeholder for the first implementation milestone.",
+      "loc": 1,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.cli": {
+      "path": "src/multiscale_optics_agent/cli.py",
+      "purpose": "Command-line interface for registry inspection and graph validation.",
+      "loc": 78,
+      "imports_internal": [
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "pathlib",
+        "rich",
+        "typer"
+      ],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.core": {
+      "path": "src/multiscale_optics_agent/core/__init__.py",
+      "purpose": "Framework-neutral graph schemas and validation.",
+      "loc": 1,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.core.artifacts": {
+      "path": "src/multiscale_optics_agent/core/artifacts.py",
+      "purpose": "Framework-neutral records for arrays and scientific artifacts produced by solvers.",
+      "loc": 30,
+      "imports_internal": [
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.couplers.base",
+        "scripts.export_schemas",
+        "tests.test_artifacts",
+        "tests.test_chromatix_adapter",
+        "tests.test_fmmax_adapter",
+        "tests.test_optiland_adapter"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.core.errors": {
+      "path": "src/multiscale_optics_agent/core/errors.py",
+      "purpose": "Project-specific exceptions.",
+      "loc": 45,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.registry",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.registry.loader",
+        "tests.test_adapter_registry",
+        "tests.test_chromatix_adapter",
+        "tests.test_fdtdx_adapter",
+        "tests.test_fmmax_adapter",
+        "tests.test_optiland_adapter",
+        "tests.test_sax_adapter"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.core.graph": {
+      "path": "src/multiscale_optics_agent/core/graph.py",
+      "purpose": "Deterministic validation for typed model-coupler graphs.",
+      "loc": 434,
+      "imports_internal": [
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "enum",
+        "networkx",
+        "pydantic"
+      ],
+      "imported_by": [
+        "multiscale_optics_agent",
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.cli",
+        "multiscale_optics_agent.couplers.base",
+        "scripts.validate_package",
+        "tests.test_graph_validation"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.core.provenance": {
+      "path": "src/multiscale_optics_agent/core/provenance.py",
+      "purpose": "Minimal provenance schema for reproducible benchmark runs.",
+      "loc": 27,
+      "imports_internal": [],
+      "imports_external_top": [
+        "__future__",
+        "datetime",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [
+        "scripts.export_schemas"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.core.specs": {
+      "path": "src/multiscale_optics_agent/core/specs.py",
+      "purpose": "Pydantic schemas for the model-coupler intermediate representation.",
+      "loc": 258,
+      "imports_internal": [],
+      "imports_external_top": [
+        "__future__",
+        "enum",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [
+        "multiscale_optics_agent",
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.couplers.base",
+        "multiscale_optics_agent.registry.loader",
+        "scripts.export_schemas",
+        "tests.test_artifacts",
+        "tests.test_chromatix_adapter",
+        "tests.test_fmmax_adapter",
+        "tests.test_graph_validation",
+        "tests.test_optiland_adapter",
+        "tests.test_sax_adapter"
+      ],
+      "status": "active"
+    },
+    "multiscale_optics_agent.couplers": {
+      "path": "src/multiscale_optics_agent/couplers/__init__.py",
+      "purpose": "Couplers package placeholder for the first implementation milestone.",
+      "loc": 1,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.couplers.base": {
+      "path": "src/multiscale_optics_agent/couplers/base.py",
+      "purpose": "Stable interface for first-class physical couplers.",
+      "loc": 44,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.evaluation": {
+      "path": "src/multiscale_optics_agent/evaluation/__init__.py",
+      "purpose": "Evaluation package placeholder for the first implementation milestone.",
+      "loc": 1,
+      "imports_internal": [],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.evaluation.checks": {
+      "path": "src/multiscale_optics_agent/evaluation/checks.py",
+      "purpose": "Serializable outputs of numerical, physical, and derivative verification checks.",
+      "loc": 30,
+      "imports_internal": [],
+      "imports_external_top": [
+        "__future__",
+        "enum",
+        "pydantic",
+        "typing"
+      ],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.registry": {
+      "path": "src/multiscale_optics_agent/registry/__init__.py",
+      "purpose": "Model and coupler registries.",
+      "loc": 5,
+      "imports_internal": [
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "unreferenced-by-python"
+    },
+    "multiscale_optics_agent.registry.loader": {
+      "path": "src/multiscale_optics_agent/registry/loader.py",
+      "purpose": "Load model and coupler specifications from versioned YAML registries.",
+      "loc": 74,
+      "imports_internal": [
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "dataclasses",
+        "importlib",
+        "pathlib",
+        "typing",
+        "yaml"
+      ],
+      "imported_by": [
+        "multiscale_optics_agent",
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.cli",
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.registry",
+        "scripts.validate_package",
+        "tests.conftest",
+        "tests.test_graph_validation",
+        "tests.test_registry"
+      ],
+      "status": "active"
+    },
+    "tests.conftest": {
+      "path": "tests/conftest.py",
+      "purpose": "Shared pytest fixtures and helpers for the test suite.",
+      "loc": 29,
+      "imports_internal": [
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "json",
+        "pathlib",
+        "pytest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_adapter_registry": {
+      "path": "tests/test_adapter_registry.py",
+      "purpose": "",
+      "loc": 18,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.registry",
+        "multiscale_optics_agent.core.errors"
+      ],
+      "imports_external_top": [
+        "pytest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_artifacts": {
+      "path": "tests/test_artifacts.py",
+      "purpose": "",
+      "loc": 18,
+      "imports_internal": [
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_chromatix_adapter": {
+      "path": "tests/test_chromatix_adapter.py",
+      "purpose": "Tests for the M_WAVE_CHROMATIX adapter (chromatix_adapter.py).",
+      "loc": 323,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters",
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.chromatix_adapter",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "conftest",
+        "numpy",
+        "pathlib",
+        "pytest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_fdtdx_adapter": {
+      "path": "tests/test_fdtdx_adapter.py",
+      "purpose": "Tests for the forward-only M_EM_FDTDX adapter.",
+      "loc": 242,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.fdtdx_adapter",
+        "multiscale_optics_agent.core.errors"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "conftest",
+        "numpy",
+        "pytest",
+        "unittest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_fmmax_adapter": {
+      "path": "tests/test_fmmax_adapter.py",
+      "purpose": "Tests for the ``M_RCWA_FMMAX`` (FMMAX RCWA) adapter.",
+      "loc": 344,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.fmmax_adapter",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "builtins",
+        "conftest",
+        "jax",
+        "pytest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_graph_validation": {
+      "path": "tests/test_graph_validation.py",
+      "purpose": "",
+      "loc": 98,
+      "imports_internal": [
+        "multiscale_optics_agent.core.graph",
+        "multiscale_optics_agent.core.specs",
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [
+        "pathlib"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_optiland_adapter": {
+      "path": "tests/test_optiland_adapter.py",
+      "purpose": "Tests for the M_RAY_OPTILAND adapter (Optiland 0.6.0).",
+      "loc": 252,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.optiland_adapter",
+        "multiscale_optics_agent.core.artifacts",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "conftest",
+        "numpy",
+        "pytest",
+        "unittest"
+      ],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_registry": {
+      "path": "tests/test_registry.py",
+      "purpose": "",
+      "loc": 14,
+      "imports_internal": [
+        "multiscale_optics_agent.registry.loader"
+      ],
+      "imports_external_top": [],
+      "imported_by": [],
+      "status": "test"
+    },
+    "tests.test_sax_adapter": {
+      "path": "tests/test_sax_adapter.py",
+      "purpose": "Tests for the M_CIRCUIT_SAX adapter (src/multiscale_optics_agent/adapters/sax_adapter.py).",
+      "loc": 331,
+      "imports_internal": [
+        "multiscale_optics_agent.adapters.base",
+        "multiscale_optics_agent.adapters.sax_adapter",
+        "multiscale_optics_agent.core.errors",
+        "multiscale_optics_agent.core.specs"
+      ],
+      "imports_external_top": [
+        "__future__",
+        "conftest",
+        "jax",
+        "math",
+        "pytest",
+        "sax"
+      ],
+      "imported_by": [],
+      "status": "test"
+    }
+  },
+  "assets": [
+    {
+      "path": "benchmarks/manifest.yaml",
+      "bytes": 1706,
+      "referenced_by_python": []
+    },
+    {
+      "path": "examples/graphs/chromatix_smoke.yaml",
+      "bytes": 605,
+      "referenced_by_python": []
+    },
+    {
+      "path": "examples/graphs/fdtdx_smoke.yaml",
+      "bytes": 706,
+      "referenced_by_python": []
+    },
+    {
+      "path": "examples/graphs/fmmax_smoke.yaml",
+      "bytes": 722,
+      "referenced_by_python": []
+    },
+    {
+      "path": "examples/graphs/optiland_smoke.yaml",
+      "bytes": 798,
+      "referenced_by_python": []
+    },
+    {
+      "path": "examples/graphs/ray_to_wave.yaml",
+      "bytes": 1203,
+      "referenced_by_python": [
+        "tests.test_graph_validation"
+      ]
+    },
+    {
+      "path": "examples/graphs/sax_smoke.yaml",
+      "bytes": 713,
+      "referenced_by_python": []
+    },
+    {
+      "path": "schemas/artifact.schema.json",
+      "bytes": 2748,
+      "referenced_by_python": [
+        "scripts.export_schemas"
+      ]
+    },
+    {
+      "path": "schemas/coupler.schema.json",
+      "bytes": 8011,
+      "referenced_by_python": [
+        "scripts.export_schemas"
+      ]
+    },
+    {
+      "path": "schemas/graph.schema.json",
+      "bytes": 6146,
+      "referenced_by_python": [
+        "scripts.export_schemas"
+      ]
+    },
+    {
+      "path": "schemas/model.schema.json",
+      "bytes": 8303,
+      "referenced_by_python": [
+        "scripts.export_schemas"
+      ]
+    },
+    {
+      "path": "schemas/provenance.schema.json",
+      "bytes": 2300,
+      "referenced_by_python": [
+        "scripts.export_schemas"
+      ]
+    },
+    {
+      "path": "src/multiscale_optics_agent/registry/couplers.yaml",
+      "bytes": 10887,
+      "referenced_by_python": [
+        "multiscale_optics_agent.registry.loader"
+      ]
+    },
+    {
+      "path": "src/multiscale_optics_agent/registry/models.yaml",
+      "bytes": 16870,
+      "referenced_by_python": [
+        "multiscale_optics_agent.registry.loader"
+      ]
+    }
+  ]
+}
+
+### MODULE TABLE
+| module | path | loc | status | imported_by | purpose |
+| --- | --- | --- | --- | --- | --- |
+| `multiscale_optics_agent` | `src/multiscale_optics_agent/__init__.py` | 16 | unreferenced-by-python | — | Typed physics graphs for multi-scale optical simulation. |
+| `multiscale_optics_agent.adapters` | `src/multiscale_optics_agent/adapters/__init__.py` | 22 | active | adapters.registry, tests.test_chromatix_adapter | External physics-solver adapters. |
+| `multiscale_optics_agent.adapters.base` | `src/multiscale_optics_agent/adapters/base.py` | 63 | active | adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.registry, adapters.sax_adapter, couplers.base, tests.test_chromatix_adapter, tests.test_fdtdx_adapter, tests.test_fmmax_adapter, tests.test_optiland_adapter, tests.test_sax_adapter | Stable interface implemented by external physics-solver adapters. |
+| `multiscale_optics_agent.adapters.chromatix_adapter` | `src/multiscale_optics_agent/adapters/chromatix_adapter.py` | 602 | test-only | tests.test_chromatix_adapter | Adapter for ``M_WAVE_CHROMATIX``: Chromatix scalar angular-spectrum propagation. |
+| `multiscale_optics_agent.adapters.fdtdx_adapter` | `src/multiscale_optics_agent/adapters/fdtdx_adapter.py` | 599 | test-only | tests.test_fdtdx_adapter | Forward-only adapter for ``M_EM_FDTDX`` (FDTDX, pinned version 0.6.2). |
+| `multiscale_optics_agent.adapters.fmmax_adapter` | `src/multiscale_optics_agent/adapters/fmmax_adapter.py` | 649 | test-only | tests.test_fmmax_adapter | Adapter for ``M_RCWA_FMMAX`` — FMMAX (Fourier Modal Method / RCWA), pinned ``fmmax==1.7.1``. |
+| `multiscale_optics_agent.adapters.optiland_adapter` | `src/multiscale_optics_agent/adapters/optiland_adapter.py` | 669 | test-only | tests.test_optiland_adapter | Adapter for ``M_RAY_OPTILAND`` (Optiland sequential ray tracer, pinned 0.6.0). |
+| `multiscale_optics_agent.adapters.registry` | `src/multiscale_optics_agent/adapters/registry.py` | 48 | test-only | tests.test_adapter_registry | Runtime discovery of concrete ModelAdapter implementations. |
+| `multiscale_optics_agent.adapters.sax_adapter` | `src/multiscale_optics_agent/adapters/sax_adapter.py` | 652 | test-only | tests.test_sax_adapter | Adapter for ``M_CIRCUIT_SAX`` -- differentiable photonic-circuit S-parameter |
+| `multiscale_optics_agent.agents` | `src/multiscale_optics_agent/agents/__init__.py` | 1 | unreferenced-by-python | — | Agents package placeholder for the first implementation milestone. |
+| `multiscale_optics_agent.cli` | `src/multiscale_optics_agent/cli.py` | 78 | unreferenced-by-python | — | Command-line interface for registry inspection and graph validation. |
+| `multiscale_optics_agent.core` | `src/multiscale_optics_agent/core/__init__.py` | 1 | unreferenced-by-python | — | Framework-neutral graph schemas and validation. |
+| `multiscale_optics_agent.core.artifacts` | `src/multiscale_optics_agent/core/artifacts.py` | 30 | active | adapters.base, adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.sax_adapter, couplers.base, scripts.export_schemas, tests.test_artifacts, tests.test_chromatix_adapter, tests.test_fmmax_adapter, tests.test_optiland_adapter | Framework-neutral records for arrays and scientific artifacts produced by solvers. |
+| `multiscale_optics_agent.core.errors` | `src/multiscale_optics_agent/core/errors.py` | 45 | active | adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.registry, adapters.sax_adapter, registry.loader, tests.test_adapter_registry, tests.test_chromatix_adapter, tests.test_fdtdx_adapter, tests.test_fmmax_adapter, tests.test_optiland_adapter, tests.test_sax_adapter | Project-specific exceptions. |
+| `multiscale_optics_agent.core.graph` | `src/multiscale_optics_agent/core/graph.py` | 434 | active | multiscale_optics_agent, adapters.base, adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.sax_adapter, cli, couplers.base, scripts.validate_package, tests.test_graph_validation | Deterministic validation for typed model-coupler graphs. |
+| `multiscale_optics_agent.core.provenance` | `src/multiscale_optics_agent/core/provenance.py` | 27 | active | scripts.export_schemas | Minimal provenance schema for reproducible benchmark runs. |
+| `multiscale_optics_agent.core.specs` | `src/multiscale_optics_agent/core/specs.py` | 258 | active | multiscale_optics_agent, adapters.base, adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.sax_adapter, core.artifacts, core.graph, couplers.base, registry.loader, scripts.export_schemas, tests.test_artifacts, tests.test_chromatix_adapter, tests.test_fmmax_adapter, tests.test_graph_validation, tests.test_optiland_adapter, tests.test_sax_adapter | Pydantic schemas for the model-coupler intermediate representation. |
+| `multiscale_optics_agent.couplers` | `src/multiscale_optics_agent/couplers/__init__.py` | 1 | unreferenced-by-python | — | Couplers package placeholder for the first implementation milestone. |
+| `multiscale_optics_agent.couplers.base` | `src/multiscale_optics_agent/couplers/base.py` | 44 | unreferenced-by-python | — | Stable interface for first-class physical couplers. |
+| `multiscale_optics_agent.evaluation` | `src/multiscale_optics_agent/evaluation/__init__.py` | 1 | unreferenced-by-python | — | Evaluation package placeholder for the first implementation milestone. |
+| `multiscale_optics_agent.evaluation.checks` | `src/multiscale_optics_agent/evaluation/checks.py` | 30 | unreferenced-by-python | — | Serializable outputs of numerical, physical, and derivative verification checks. |
+| `multiscale_optics_agent.registry` | `src/multiscale_optics_agent/registry/__init__.py` | 5 | unreferenced-by-python | — | Model and coupler registries. |
+| `multiscale_optics_agent.registry.loader` | `src/multiscale_optics_agent/registry/loader.py` | 74 | active | multiscale_optics_agent, adapters.chromatix_adapter, adapters.fdtdx_adapter, adapters.fmmax_adapter, adapters.optiland_adapter, adapters.sax_adapter, cli, core.graph, registry, scripts.validate_package, tests.conftest, tests.test_graph_validation, tests.test_registry | Load model and coupler specifications from versioned YAML registries. |
+| `scripts.check_context_sync` | `scripts/check_context_sync.py` | 57 | standalone-script | — | Validate the static Codex/Claude Code context entrypoints. |
+| `scripts.export_schemas` | `scripts/export_schemas.py` | 36 | standalone-script | — | Export JSON Schemas used by planners, editors, and external tooling. |
+| `scripts.validate_package` | `scripts/validate_package.py` | 52 | standalone-script | — | Fast repository consistency checks that do not import optional physics solvers. |
+| `tests.conftest` | `tests/conftest.py` | 29 | test | — | Shared pytest fixtures and helpers for the test suite. |
+| `tests.test_adapter_registry` | `tests/test_adapter_registry.py` | 18 | test | — | — |
+| `tests.test_artifacts` | `tests/test_artifacts.py` | 18 | test | — | — |
+| `tests.test_chromatix_adapter` | `tests/test_chromatix_adapter.py` | 323 | test | — | Tests for the M_WAVE_CHROMATIX adapter (chromatix_adapter.py). |
+| `tests.test_fdtdx_adapter` | `tests/test_fdtdx_adapter.py` | 242 | test | — | Tests for the forward-only M_EM_FDTDX adapter. |
+| `tests.test_fmmax_adapter` | `tests/test_fmmax_adapter.py` | 344 | test | — | Tests for the ``M_RCWA_FMMAX`` (FMMAX RCWA) adapter. |
+| `tests.test_graph_validation` | `tests/test_graph_validation.py` | 98 | test | — | — |
+| `tests.test_optiland_adapter` | `tests/test_optiland_adapter.py` | 252 | test | — | Tests for the M_RAY_OPTILAND adapter (Optiland 0.6.0). |
+| `tests.test_registry` | `tests/test_registry.py` | 14 | test | — | — |
+| `tests.test_sax_adapter` | `tests/test_sax_adapter.py` | 331 | test | — | Tests for the M_CIRCUIT_SAX adapter (src/multiscale_optics_agent/adapters/sax_adapter.py). |
+
+### ASSET TABLE
+| asset | bytes | referenced_by_python |
+| --- | --- | --- |
+| `benchmarks/manifest.yaml` | 1706 | — |
+| `examples/graphs/chromatix_smoke.yaml` | 605 | — |
+| `examples/graphs/fdtdx_smoke.yaml` | 706 | — |
+| `examples/graphs/fmmax_smoke.yaml` | 722 | — |
+| `examples/graphs/optiland_smoke.yaml` | 798 | — |
+| `examples/graphs/ray_to_wave.yaml` | 1203 | tests.test_graph_validation |
+| `examples/graphs/sax_smoke.yaml` | 713 | — |
+| `schemas/artifact.schema.json` | 2748 | scripts.export_schemas |
+| `schemas/coupler.schema.json` | 8011 | scripts.export_schemas |
+| `schemas/graph.schema.json` | 6146 | scripts.export_schemas |
+| `schemas/model.schema.json` | 8303 | scripts.export_schemas |
+| `schemas/provenance.schema.json` | 2300 | scripts.export_schemas |
+| `src/multiscale_optics_agent/registry/couplers.yaml` | 10887 | multiscale_optics_agent.registry.loader |
+| `src/multiscale_optics_agent/registry/models.yaml` | 16870 | multiscale_optics_agent.registry.loader |
+
+### SUMMARY
+{
+  "root": "/workspace",
+  "python_files": 36,
+  "by_status": {
+    "active": 8,
+    "standalone-script": 3,
+    "test": 10,
+    "test-only": 6,
+    "unreferenced-by-python": 9
+  },
+  "asset_files": 14,
+  "unreferenced_assets": 6,
+  "external_packages_imported": [
+    "__future__",
+    "builtins",
+    "chromatix",
+    "conftest",
+    "dataclasses",
+    "datetime",
+    "enum",
+    "fdtdx",
+    "fmmax",
+    "functools",
+    "hashlib",
+    "importlib",
+    "jax",
+    "json",
+    "math",
+    "networkx",
+    "numpy",
+    "optiland",
+    "pathlib",
+    "pkgutil",
+    "pydantic",
+    "pytest",
+    "re",
+    "rich",
+    "sax",
+    "sys",
+    "tempfile",
+    "torch",
+    "typer",
+    "typing",
+    "unittest",
+    "uuid",
+    "yaml"
+  ]
+}

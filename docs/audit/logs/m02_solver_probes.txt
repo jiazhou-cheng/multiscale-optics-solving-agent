@@ -1,0 +1,206 @@
+^@--- running knowledge/solvers/chromatix/probes/gradient_probe.py
+--- running knowledge/solvers/chromatix/probes/import_probe.py
+--- running knowledge/solvers/chromatix/probes/propagation_probe.py
+--- running knowledge/solvers/fdtdx/probes/gradient_probe.py
+--- running knowledge/solvers/fdtdx/probes/import_probe.py
+--- running knowledge/solvers/fdtdx/probes/propagation_probe.py
+--- running knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py
+--- running knowledge/solvers/fmmax/probes/gradient_probe.py
+--- running knowledge/solvers/fmmax/probes/import_probe.py
+--- running knowledge/solvers/jax_fem/probes/import_probe.py
+--- running knowledge/solvers/jax_fem/probes/mesh_probe.py
+--- running knowledge/solvers/jax_fem/probes/solver_failure_probe.py
+--- running knowledge/solvers/optiland/probes/gradient_probe.py
+--- running knowledge/solvers/optiland/probes/import_probe.py
+--- running knowledge/solvers/optiland/probes/raytrace_probe.py
+--- running knowledge/solvers/sax/probes/circuit_probe.py
+--- running knowledge/solvers/sax/probes/component_model_probe.py
+--- running knowledge/solvers/sax/probes/gradient_probe.py
+--- running knowledge/solvers/sax/probes/import_probe.py
+
+### PROBE STATUS TABLE
+| solver | probe | status | detail |
+| --- | --- | --- | --- |
+| chromatix | `gradient_probe` | MATCH | — |
+| chromatix | `import_probe` | MATCH | — |
+| chromatix | `propagation_probe` | MATCH | — |
+| fdtdx | `gradient_probe` | MATCH | — |
+| fdtdx | `import_probe` | MATCH | — |
+| fdtdx | `propagation_probe` | MATCH | — |
+| fmmax | `fresnel_oracle_probe` | MATCH | — |
+| fmmax | `gradient_probe` | MATCH | — |
+| fmmax | `import_probe` | MATCH | — |
+| jax_fem | `import_probe` | MATCH | — |
+| jax_fem | `mesh_probe` | MATCH | — |
+| jax_fem | `solver_failure_probe` | MATCH | — |
+| optiland | `gradient_probe` | MATCH | — |
+| optiland | `import_probe` | MATCH | — |
+| optiland | `raytrace_probe` | MATCH | — |
+| sax | `circuit_probe` | MATCH | — |
+| sax | `component_model_probe` | MATCH | — |
+| sax | `gradient_probe` | MATCH | — |
+| sax | `import_probe` | MATCH | — |
+
+### JSON
+[
+  {
+    "solver": "chromatix",
+    "probe": "gradient_probe",
+    "path": "knowledge/solvers/chromatix/probes/gradient_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "chromatix",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/chromatix/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "chromatix",
+    "probe": "propagation_probe",
+    "path": "knowledge/solvers/chromatix/probes/propagation_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fdtdx",
+    "probe": "gradient_probe",
+    "path": "knowledge/solvers/fdtdx/probes/gradient_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fdtdx",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/fdtdx/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fdtdx",
+    "probe": "propagation_probe",
+    "path": "knowledge/solvers/fdtdx/probes/propagation_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fmmax",
+    "probe": "fresnel_oracle_probe",
+    "path": "knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fmmax",
+    "probe": "gradient_probe",
+    "path": "knowledge/solvers/fmmax/probes/gradient_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "fmmax",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/fmmax/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "jax_fem",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/jax_fem/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "jax_fem",
+    "probe": "mesh_probe",
+    "path": "knowledge/solvers/jax_fem/probes/mesh_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "jax_fem",
+    "probe": "solver_failure_probe",
+    "path": "knowledge/solvers/jax_fem/probes/solver_failure_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "optiland",
+    "probe": "gradient_probe",
+    "path": "knowledge/solvers/optiland/probes/gradient_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "optiland",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/optiland/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "optiland",
+    "probe": "raytrace_probe",
+    "path": "knowledge/solvers/optiland/probes/raytrace_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "sax",
+    "probe": "circuit_probe",
+    "path": "knowledge/solvers/sax/probes/circuit_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "sax",
+    "probe": "component_model_probe",
+    "path": "knowledge/solvers/sax/probes/component_model_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "sax",
+    "probe": "gradient_probe",
+    "path": "knowledge/solvers/sax/probes/gradient_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  },
+  {
+    "solver": "sax",
+    "probe": "import_probe",
+    "path": "knowledge/solvers/sax/probes/import_probe.py",
+    "status": "MATCH",
+    "n_diffs": 0,
+    "detail": ""
+  }
+]
+
+### SUMMARY
+{
+  "probes": 19,
+  "by_status": {
+    "MATCH": 19
+  }
+}

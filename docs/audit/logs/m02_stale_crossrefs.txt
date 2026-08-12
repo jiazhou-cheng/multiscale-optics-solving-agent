@@ -1,0 +1,20 @@
+tests/test_sax_adapter.py:4:marked `jax` and `integration` per CLAUDE.md section 10/16 and
+tests/test_sax_adapter.py:176:    the full CLAUDE.md section 6.2 gradient-verification bundle (that would
+tests/test_sax_adapter.py:221:        "full CLAUDE.md section 6.2 bundle (multiple step sizes, a "
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:24:Conventions declared by this adapter (CLAUDE.md section 3, rule 1)
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:38:  ``exp(-i omega t)`` (CLAUDE.md section 7). Chromatix's ``Field`` has no
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:45:- Complex fields store amplitude, not intensity (CLAUDE.md section 7). This
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:54:Derivative policy (CLAUDE.md section 6)
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:66:Artifact storage boundary (CLAUDE.md section 3, rule 3)
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:69:(``docs/ARCHITECTURE.md`` section 5 describes a future "content-addressed run
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:453:                "(CLAUDE.md section 7: complex fields store amplitude, not intensity)."
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:472:                f"{_EXPECTED_PHASOR!r} (CLAUDE.md section 7). Chromatix declares no "
+src/multiscale_optics_agent/adapters/chromatix_adapter.py:566:                "repository); this is a derivative boundary (CLAUDE.md section 3, "
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:22:  must be given in **meters** (CLAUDE.md section 7, SI units). FMMAX itself
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:28:Non-standard scattering-matrix labeling (CLAUDE.md section 3 rule 1)
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:68:Failure-reporting convention (CLAUDE.md section 3 rule 5 / ``core/errors.py``)
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:85:Derivative semantics and the "no silent detach" boundary (CLAUDE.md section 6)
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:112:section 6.2 five-part gradient-verification bundle.
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:166:            "(see CLAUDE.md section 8) or run inside the agent_solver Docker image."
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:492:    # re-verifying would be a silent fidelity change (CLAUDE.md section 3 rule 4).
+src/multiscale_optics_agent/adapters/fmmax_adapter.py:589:            "concretized with float() at the ModelRunResult output boundary (CLAUDE.md section 3 "

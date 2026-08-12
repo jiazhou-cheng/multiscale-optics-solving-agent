@@ -1,0 +1,45 @@
+===== ./run.sh python scripts/check_context_sync.py
+^@Context entrypoints are synchronized.
+Codex entrypoint: AGENTS.md
+Claude Code entrypoint: CLAUDE.md -> @AGENTS.md
+  - present: AGENTS.md
+  - present: CLAUDE.md
+  - present: CONTEXT_MANIFEST.yaml
+  - canonical_static_context: AGENTS.md
+  - CLAUDE.md -> @AGENTS.md (no duplicated content)
+  - AGENTS.md is 160 lines (limit 200)
+  - manifest paths exist (4 checked): AGENTS.md, CLAUDE.md, docs/context/, knowledge/
+  - AGENTS.md states the container-only rule
+  - documented ./run.sh flags implemented by run.sh: --no-build, --rebuild
+EXIT=0
+===== ./run.sh pytest -q tests/test_context_sync.py
+^@[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                       [100%][0m
+[32m[32m[1m18 passed[0m[32m in 0.05s[0m[0m
+EXIT=0
+===== ./run.sh ruff check scripts tests docs/audit/probes
+[1m[94m162 |[0m     with pytest.raises(ccs.ContextSyncError, match="run.sh is missing"):
+    [1m[94m|[0m                                                    [1m[91m^^^^^^^^^^^^^^^^^^^[0m
+[1m[94m163 |[0m         ccs.run_checks(repo)
+    [1m[94m|[0m
+[1m[96mhelp[0m: [1mUse a raw string or `re.escape()` to make the intention explicit[0m
+
+[1m[91mI001 [0m[[1m[96m*[0m] [1mImport block is un-sorted or un-formatted[0m
+ [1m[94m-->[0m tests/test_graph_validation.py:1:1
+  [1m[94m|[0m
+[1m[94m1 |[0m [1m[91m/[0m from pathlib import Path
+[1m[94m2 |[0m [1m[91m|[0m
+[1m[94m3 |[0m [1m[91m|[0m from multiscale_optics_agent.core.graph import GraphValidator, Severity
+[1m[94m4 |[0m [1m[91m|[0m from multiscale_optics_agent.core.specs import GraphSpec
+[1m[94m5 |[0m [1m[91m|[0m from multiscale_optics_agent.registry.loader import Registry
+  [1m[94m|[0m [1m[91m|____________________________________________________________^[0m
+  [1m[94m|[0m
+[1m[96mhelp[0m: [1mOrganize imports[0m
+[1m[94m [0m [1m[94m|[0m
+[1m[94m6[0m [1m[94m|[0m
+[1m[94m [0m [1m[31m-[0m[31m
+[0m[1m[94m7[0m [1m[94m|[0m ROOT = Path(__file__).resolve().parents[1]
+[1m[94m [0m [1m[94m|[0m
+
+Found 5 errors.
+[[36m*[0m] 1 fixable with the `--fix` option.
+EXIT=0

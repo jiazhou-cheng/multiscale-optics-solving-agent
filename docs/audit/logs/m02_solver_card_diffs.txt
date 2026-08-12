@@ -1,0 +1,216 @@
+===== diff -u knowledge/solver_cards/optiland.yaml knowledge/solvers/optiland/solver_card.yaml
+^@--- knowledge/solver_cards/optiland.yaml	2026-07-30 18:58:38.037303799 +0000
++++ knowledge/solvers/optiland/solver_card.yaml	2026-07-30 18:56:16.294534042 +0000
+@@ -1,41 +1,79 @@
++# Routing-critical facts for M_RAY_OPTILAND.
++# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
++# Grounded in: agent_solver container (docker/Dockerfile, optiland==0.6.0 +
++# separately-pinned CPU torch==2.13.0) + knowledge/solvers/optiland/probes/*.py
++# run against that image, 2026-07-30.
++# This supplements, and does not replace, knowledge/solver_cards/optiland.yaml
++# (the flat routing card format used by the current registry docs).
++
+ id: optiland
+-validation_status: unvalidated
+ role: M_RAY_OPTILAND
+-framework: numpy (default) / pytorch (optional, opt-in backend -- see below)
+-official_docs: https://optiland.readthedocs.io/
++package:
++  name: optiland
++  pinned_version: "0.6.0"
++  install_source: "pip install optiland==0.6.0"
++  install_hazard: >
++    A bare `pip install optiland` gives you a NumPy-only installation with
++    NO differentiability. torch is not a declared dependency (confirmed via
++    `importlib.metadata.distribution('optiland').requires`) even though the
++    project is described as PyTorch-differentiable. You must separately
++    install torch and call `optiland.backend.set_backend('torch')` at
++    runtime to get gradients or GPU support. See failure_guide.md.
++  python_requires: ">=3.10"
++official_docs: https://optiland.readthedocs.io/en/latest/
+ repository: https://github.com/optiland/optiland
+ repository_note: >
+-  Moved from https://github.com/HarrisonKramer/optiland, which now
+-  301-redirects here; the PyPI package's own Project-URL metadata confirms
+-  optiland/optiland is canonical.
+-install:
+-  source: "pip install optiland==0.6.0"
+-  python_requires: ">=3.10"
+-  torch_is_optional: true
+-  install_hazard: >
+-    torch is NOT a declared dependency of the optiland PyPI package
+-    (confirmed via installed wheel metadata) even though the project
+-    describes itself as PyTorch-differentiable. `pip install optiland`
+-    alone gives a NumPy-only, non-differentiable install
+-    (optiland.backend.supports_gradients is False by default). Install
+-    torch separately and call optiland.backend.set_backend('torch') to
+-    get gradients/GPU support.
+-knowledge_pack: knowledge/solvers/optiland/  # conventions.md, capability_notes.md, api_minimal_examples.md, failure_guide.md, probes/
+-agent_should_use_for:
+-  - sequential lens tracing
+-  - wavefront and aberration analysis
+-  - lens-parameter optimization (torch backend only)
+-  - Level 1 ray benchmark and Level 2 ray-to-wave microscope
+-agent_should_not_assume:
+-  - every analysis object preserves gradients
+-  - hard stops and vignetting are smooth
+-  - exported ray weight is already a coherent field amplitude
+-  - a bare `pip install optiland` gives you differentiability (it does not; see install.install_hazard)
+-  - the ray count returned by trace(num_rays=N) equals N (aperture/pupil sampling changes it; observed 16 -> 817)
+-required_probes:
+-  - import and backend selection  # done, see knowledge/solvers/optiland/conventions.md
+-  - GPU device placement  # not done, no GPU in this environment
+-  - one surface-parameter gradient  # done for one path (torch backend, lens radius -> trace -> RMS-spot proxy), relative error 1.11e-03 vs finite difference -- looser than JAX solvers, not root-caused
+-  - wavefront/OPD export convention  # not done
+-  - pupil power and coordinate orientation  # not done
+-benchmarks: [L1-RAY-01, L2-PSF-01, L3-HYBRID-01]
++  knowledge/solver_cards/optiland.yaml currently lists
++  https://github.com/HarrisonKramer/optiland, which now 301-redirects here.
++  The PyPI package's own Project-URL metadata confirms optiland/optiland is
++  canonical.
++license: not yet confirmed in this pass (not read from LICENSE file or PyPI classifier)
++framework: numpy (default) / pytorch (optional, opt-in backend)
++supported_regimes:
++  - sequential geometric ray tracing through lens/mirror systems (Optic, Surface)
++  - paraxial analysis (effective focal length, etc. via Optic.paraxial)
++  - bundled sample optical systems (optiland.samples.objectives, e.g. ReverseTelephoto)
++  - wavefront/PSF/MTF/Zernike analysis modules (present, not probed in this pass)
++  - tolerancing and optimization modules (present, not probed in this pass)
++derivative:
++  mode: native_autodiff
++  mechanism: >
++    torch.Tensor autograd through the "torch" backend, selected at runtime
++    via optiland.backend.set_backend('torch'). The NumPy backend
++    (default) has no gradients: `supports_gradients` is False under numpy,
++    True under torch (both observed directly, see conventions.md).
++  verified: false
++  verified_note: >
++    A single directional-derivative probe (probes/gradient_probe.py) passed
++    for one path (ReverseTelephoto sample lens, surfaces.surfaces[1]
++    radius-of-curvature -> Optic.trace() -> mean(x^2+y^2) RMS-spot proxy at
++    Hx=Hy=0), relative error 1.11e-03 against one centered finite-difference
++    step (eps=1e-4). This tolerance is looser than the JAX-based solvers in
++    this repository (typically 1e-4 to 1e-13) -- not yet root-caused; could
++    be non-smoothness near the optical axis, float64 autograd error
++    accumulation through the ray-trace recursion, or something else. Do not
++    set verified: true, and re-check tolerance before relying on this path
++    in a tight optimization loop. This is NOT the full CLAUDE.md section
++    6.2 gradient test (needs multiple step sizes, a convergence table, and
++    an ill-conditioned case) and covers only this one parameter/objective
++    pair -- not wavefront/OPD export, not every surface type, not GPU.
++devices_reported: [cpu, gpu]
++devices_tested: [cpu]
++dtypes_observed: [float64 (numpy backend rays), float64 (torch backend, explicitly requested)]
++input_output_artifacts:
++  - optiland.rays.real_rays.RealRays (maps to project artifact `ray_bundle`)
++known_conventions: see conventions.md
++cost_scaling: "O(number_of_surfaces * number_of_rays) per trace call (not independently benchmarked in this pass)"
++limitations_and_failure_modes: see failure_guide.md
++validated_probe_ids:
++  - import_probe (passed, 2026-07-30)
++  - raytrace_probe (passed, 2026-07-30; bundled sample system only, not an analytic oracle)
++  - gradient_probe (passed for one narrow path with looser-than-JAX tolerance, 2026-07-30)
++not_yet_probed:
++  - GPU device placement (no GPU in this environment)
++  - wavefront/OPD export convention
++  - pupil power and coordinate orientation
++  - a custom (non-bundled-sample) lens prescription built from scratch
++  - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
++adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
++validation_status: unvalidated
+EXIT=0
+
+===== diff -u knowledge/solver_cards/chromatix.yaml knowledge/solvers/chromatix/solver_card.yaml
+^@--- knowledge/solver_cards/chromatix.yaml	2026-07-30 18:09:07.081335725 +0000
++++ knowledge/solvers/chromatix/solver_card.yaml	2026-07-30 18:07:13.845896674 +0000
+@@ -1,30 +1,63 @@
++# Routing-critical facts for M_WAVE_CHROMATIX.
++# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
++# Grounded in: docker build of ./docker/Dockerfile (2026-07-30) +
++# knowledge/solvers/chromatix/probes/*.py run against that image.
++# This supplements, and does not replace, knowledge/solver_cards/chromatix.yaml
++# (the flat routing card format used by the current registry docs).
++
+ id: chromatix
+-validation_status: unvalidated
+ role: M_WAVE_CHROMATIX
+-framework: jax
+-official_docs: https://chromatix.readthedocs.io/
+-repository: https://github.com/chromatix-team/chromatix
+-install:
+-  pypi_name_is_a_namesquat: true  # "chromatix" on PyPI (0.0.1) is unrelated; do not `pip install chromatix`
+-  source: "git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee"
++package:
++  name: chromatix
+   pinned_ref: "0.6.0"
++  pinned_commit: d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
++  install_source: "git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee"
++  install_hazard: >
++    The PyPI package literally named "chromatix" (0.0.1, published 2022-07-10,
++    2.6 kB wheel) is an unrelated namesquat with no optics code. `pip install
++    chromatix` alone silently installs the wrong package. Always install from
++    the pinned git ref above.
+   python_requires: ">=3.12"
+-  environment: docker/Dockerfile (image `agent_solver`), see docker/requirements-chromatix.txt
+-knowledge_pack: knowledge/solvers/chromatix/  # conventions.md, capability_notes.md, api_minimal_examples.md, failure_guide.md, probes/
+-agent_should_use_for:
+-  - Fourier/Fresnel/angular-spectrum propagation
+-  - differentiable PSF and microscopy models
+-  - batched wavelength, field, and parameter sweeps
+-agent_should_not_assume:
+-  - scalar propagation is valid at high numerical aperture
+-  - array axis order or sample spacing can be inferred
+-  - all propagation kernels share the same normalization
+-  - propagator output shape equals input shape (asm_propagate pads it)
+-  - dx/sample-pitch is preserved across a propagation call (transform_propagate changes it)
+-required_probes:
+-  - Airy-pattern analytic comparison  # not yet done
+-  - Gaussian-beam propagation  # not yet done
+-  - sample-pitch and FFT convention  # done, see knowledge/solvers/chromatix/conventions.md
+-  - CPU/GPU agreement  # not yet done, no GPU in this environment
+-  - directional derivative of propagation distance or phase mask  # one narrow path probed, see conventions.md/solver_card.yaml derivative.verified_note
+-benchmarks: [L1-WAVE-01, L2-PSF-01, L2-META-01, L3-HYBRID-01, L3-ACHROMATIC-01]
++official_docs: https://chromatix.readthedocs.io/en/latest/
++repository: https://github.com/chromatix-team/chromatix
++license: MIT
++framework: jax
++supported_regimes:
++  - scalar wave propagation (ScalarField)
++  - vector wave propagation (VectorField), polarization elements
++  - Fourier/Fresnel (transform_propagate) and angular-spectrum (asm_propagate) free-space propagation
++  - phase/amplitude masks, thin/thick lenses, pupils, gratings, polarizers
++  - point/plane-wave/objective sources, basic sensor model
++  - batched wavelength (chromatic) and multi-depth (z) fields
++derivative:
++  mode: native_autodiff
++  mechanism: jax.grad through Field pytrees (Field is an equinox Module)
++  verified: false
++  verified_note: >
++    A single directional-derivative probe (probes/gradient_probe.py) passed
++    for one path (thin_lens focal length -> transform_propagate -> intensity
++    sum), relative error 2.30e-05 against one centered finite-difference
++    step. This is NOT the full repository gradient test required by
++    CLAUDE.md section 6.2 (needs multiple step sizes, a convergence table,
++    and an ill-conditioned case) and does not cover asm_propagate, vector
++    fields, or phase masks. Do not set verified: true from this alone.
++devices_reported: [cpu, gpu, tpu]
++devices_tested: [cpu]
++dtypes_observed: [complex64]
++input_output_artifacts:
++  - chromatix.core.field.ScalarField / VectorField (maps to project artifact `complex_field`)
++known_conventions: see conventions.md
++cost_scaling: "O(batch * pixels * log(pixels)) for FFT-based propagators (transform_propagate, asm_propagate)"
++limitations_and_failure_modes: see failure_guide.md
++validated_probe_ids:
++  - import_probe (passed, 2026-07-30)
++  - propagation_probe (passed, 2026-07-30; not yet compared to an analytic oracle)
++  - gradient_probe (passed for one narrow path, 2026-07-30)
++not_yet_probed:
++  - Airy-pattern analytic comparison (listed as required in knowledge/solver_cards/chromatix.yaml, not yet done)
++  - Gaussian-beam propagation analytic comparison
++  - CPU/GPU numerical agreement (no GPU available in this environment)
++  - vector field / polarization paths
++  - batched wavelength (chromatic) propagation
++adapter_location: not yet implemented (src/multiscale_optics_agent/adapters/ only has base.py as of 2026-07-30)
++validation_status: unvalidated
+EXIT=0

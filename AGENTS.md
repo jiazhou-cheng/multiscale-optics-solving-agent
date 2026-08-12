@@ -39,7 +39,8 @@ Task-specific scope lives in Linear and in files explicitly linked by the Linear
 ./run.sh                              # existing image, then interactive shell
 ./run.sh pytest -q                    # existing image, then test in container
 ./run.sh python path/to/probe.py      # existing image, then run probe in container
-./run.sh --rebuild pytest -q          # rebuild the image (cached), then test
+./run.sh --no-build pytest -q         # do not rebuild the image, default
+./run.sh --rebuild pytest -q          # rebuild the image (cached) when the package information changes, then test
 ```
 
 - The default path reuses the existing `agent_solver` image. Run with `--rebuild` after changing `docker/Dockerfile`, dependency files, or when the image does not exist.
