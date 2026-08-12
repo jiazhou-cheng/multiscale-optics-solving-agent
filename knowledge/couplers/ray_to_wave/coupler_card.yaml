@@ -108,20 +108,83 @@ derivative:
     none has been tested. See ../wave_to_ray for the direction where the paper's
     estimator is deliberately biased.
 
-devices_tested: []
-dtypes_planned: [complex128]
-validated_probe_ids: []
-not_yet_probed:
-  - tilted plane-wave reconstruction against the exact analytic oracle
-  - converging spherical bundle against the M1-verified Chromatix ASM
-  - power conservation across the transformation
-  - projection-factor, phase-sign, oblique-ramp, axis-transpose, and unit negative tests
-  - reconstruction error versus ray count
+devices_tested: [cpu]
+dtypes_validated: [complex128]
+validated_probe_ids:
+  - >
+    engine_independence (passed, 2026-08-12; CHE-24). Static AST scan of the
+    core modules plus a subprocess check that sys.modules contains neither
+    optiland nor chromatix after a reconstruction.
+  - >
+    exact_plane_wave_oracle (passed, 2026-08-12; CHE-24). A collimated bundle
+    launched from many lateral positions reconstructs
+    N * <n,d> * exp(+i k d.r) at four tilt angles, to a tolerance derived from
+    float64 round-off (32 * eps64 * N) rather than chosen. Simultaneously pins
+    the OPL handling, the dr(x,y) ramp, the phasor sign, and the projection
+    factor, because removing any one of them breaks it.
+  - >
+    launch_position_invariance (passed, 2026-08-12). Two ensembles of the same
+    angular mode, one on a grid and one at random lateral positions, agree to
+    round-off. This is the entire content of the dr(x,y) term.
+  - >
+    linearity (passed, 2026-08-12). Reconstructing two modes jointly equals the
+    sum of their separate reconstructions.
+  - >
+    chromatix_asm_cross_check (passed, 2026-08-12; CHE-24). Advancing rays
+    geometrically by 40 um and reconstructing agrees with propagating the
+    z=0 reconstruction through the M1-verified Chromatix angular spectrum:
+    relative residual 2.77e-05 against a bound of 3.00e-04 derived from M1's
+    own float32 phase round-off figure (5 * eps32 per radian, 502.7 rad
+    accumulated). The residual is below one eps32 per radian, so it is
+    accumulated rounding and not a physics disagreement. Chromatix is imported
+    by the test driver only, never by the coupler core.
+  - >
+    negative_controls 4/4 detected (passed, 2026-08-12). Phase sign flipped,
+    projection factor omitted, oblique ramp omitted, axes transposed -- each
+    run through the SHIPPING implementation with one term removed, each with a
+    passing unperturbed control.
+  - >
+    negative_control_blind_spots (passed, 2026-08-12). Two recorded traps: the
+    projection factor is exactly 1 at normal incidence, and the oblique ramp is
+    inert for a single centred on-axis ray. Both omissions are proven
+    undetectable in those configurations, which is why the negative tests are
+    run off-axis and multi-ray.
+  - >
+    grid_nyquist_condition (passed, 2026-08-12). |d_t| <= lambda / (2 * pitch)
+    enforced with a structured diagnostic; the same bundle refused at a 1 um
+    pitch reconstructs exactly at 0.25 um, confirming the limit is the grid and
+    not the physics.
 
-implementation_location: not_yet_implemented
-validation_status: unvalidated
+not_yet_probed:
+  - reconstruction error versus ray count for a non-planar wavefront (deferred to CHE-26 round trip)
+  - power conservation against a physical aperture rather than a chosen ensemble
+  - behaviour at a caustic or with multi-valued phase
+  - any gradient
+
+measured_behaviour:
+  power_scaling: >
+    N identical in-phase wavelets give N times the amplitude and N^2 times the
+    discrete power. Reported, not gated: it is bookkeeping about a chosen
+    ensemble, not a conservation law about a physical aperture.
+  two_independent_sampling_conditions: >
+    Grid Nyquist (can the output pitch write the steepest ramp?) and ray
+    density (do adjacent wavelets agree to better than pi?) fail independently,
+    and refining one does not fix the other. Both are reported so the failing
+    one is identifiable; the usual wasted debugging step is refining the grid
+    when the ray count is the problem.
+  ray_density_diagnostic_limit: >
+    The nearest-neighbour scan is O(N^2) and is skipped above 4096 rays,
+    reporting not_computed rather than a fabricated estimate.
+
+implementation_location: src/multiscale_optics_agent/couplers/ray_to_wave.py
+test_location: tests/test_ray_to_wave.py
+validation_status: analytically_validated_scalar_planar_cpu
 validation_note: >
-  CHE-22 authored this pack from the paper. Nothing is implemented or measured
-  yet. Status advances to environment_verified only after an executable forward
-  probe passes in the container, and to scientifically_validated only after the
-  analytic oracles and negative tests of CHE-24 pass.
+  CHE-22 authored this pack from the paper; CHE-24 implemented main-text eq 2
+  and validated it. The exact analytic oracle pins every factor of the equation
+  at once, the Chromatix cross-check provides an independent implementation,
+  and 4/4 negative controls are detected with passing unperturbed controls.
+  This validates scalar, monochromatic, fully coherent reconstruction onto a
+  PLANAR surface at float64 on CPU. Vector fields, chromatic ensembles, partial
+  coherence, curved reconstruction surfaces, accelerators, caustics, and every
+  gradient claim remain unvalidated.

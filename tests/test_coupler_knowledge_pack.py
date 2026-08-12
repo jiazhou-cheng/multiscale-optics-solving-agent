@@ -73,15 +73,27 @@ def test_reference_implementation_is_recorded_as_unused(direction: str) -> None:
 
 
 @pytest.mark.parametrize("direction", DIRECTIONS)
-def test_card_claims_nothing_before_a_probe_has_run(direction: str) -> None:
-    """CHE-22 is documentation. A pack that arrives already claiming validation
-    would defeat the point of the validation-status ladder."""
+def test_validation_status_matches_the_probes_the_card_actually_lists(direction: str) -> None:
+    """The validation-status ladder only means anything if a card cannot claim a
+    rung it has no evidence for, and cannot sit on a lower rung than its own
+    evidence while quietly being used as if validated."""
     card = _card(direction)
+    status = card["validation_status"]
+    probes = card["validated_probe_ids"]
 
-    assert card["validation_status"] == "unvalidated"
-    assert card["validated_probe_ids"] == []
-    assert card["devices_tested"] == []
-    assert card["not_yet_probed"], "an unvalidated card must list what remains unprobed"
+    if status == "unvalidated":
+        assert probes == [], "an unvalidated card must not list passing probes"
+        assert card["devices_tested"] == []
+        assert card["implementation_location"] == "not_yet_implemented"
+    else:
+        assert probes, f"{direction} claims {status!r} with no probe evidence"
+        assert card["devices_tested"], "a validated card must name the devices it ran on"
+        assert (ROOT / card["implementation_location"]).is_file()
+        assert (ROOT / card["test_location"]).is_file()
+
+    # Regardless of rung: unprobed regimes stay listed, and no gradient is
+    # claimed anywhere in M2 without the evidence coupler_protocol.yaml names.
+    assert card["not_yet_probed"]
     assert card["derivative"]["verified"] is False
 
 
