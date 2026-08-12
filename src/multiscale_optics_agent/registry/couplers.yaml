@@ -6,7 +6,12 @@ couplers:
     source:
       name: rays_or_wavefront
       artifact: wavefront_samples
-      requires_metadata: [wavelength, coordinates, optical_path_length, amplitude, polarization]
+      # CHE-23: `polarization` was removed from requires_metadata. The Optiland
+      # adapter documents that RealRays exposes no polarization state and
+      # deliberately refuses to fabricate one, so a required field nobody can
+      # supply was a contract defect rather than a safety feature. M2 is
+      # scalar-only; reinstate when a vector claim is made.
+      requires_metadata: [wavelength, coordinates, optical_path_length, amplitude]
     target:
       name: complex_field
       artifact: complex_field
@@ -21,8 +26,15 @@ couplers:
       assumptions:
         - Rays adequately sample the pupil and represent a locally single-valued wavefront.
         - Amplitude reconstruction and reference sphere are explicitly defined.
+        - >
+          The optical path length carries a declared reference. Optiland's
+          opd_native is not admissible: M1 recorded its sign and reference as
+          unverified, and a wrong sign conjugates the wavefront.
       warnings:
         - Caustics, multi-valued phase, hard vignetting, and sparse rays can invalidate interpolation.
+        - >
+          Omitting the <n, d> projection factor of main-text eq 2 is undetectable
+          at normal incidence and breaks power conservation off-axis.
     cost_model:
       scaling: O(number_of_rays + number_of_pupil_samples)
       memory_scaling: O(number_of_pupil_samples)
@@ -30,6 +42,63 @@ couplers:
     invariants: [phase_reference_consistency, pupil_power_consistency]
     maturity: experimental
     tags: [ray_wave, pupil, cross_framework]
+
+  - id: C_WAVE_TO_RAY
+    version: 0.1.0
+    description: >
+      Decompose a sampled complex field into its propagating plane-wave modes and
+      emit a Monte Carlo sample of them as rays carrying complex amplitudes.
+      Registered by CHE-23; implemented and characterized by CHE-25.
+    framework: internal
+    source:
+      name: complex_field
+      artifact: complex_field
+      requires_metadata: [wavelength, sample_pitch, coordinate_frame, phasor, normalization]
+    target:
+      name: ray_bundle
+      artifact: ray_bundle
+      provides_metadata:
+        [wavelength, coordinates, directions, amplitude, optical_path_length, normalization]
+    derivative:
+      # `surrogate`, not `native_autodiff`: the estimator differentiates a
+      # fixed-direction surrogate of the objective, not the objective itself.
+      mode: surrogate
+      verified: false
+      parameters: [field_amplitude]
+      notes: >
+        SI S7.2 fixed-direction estimator. Sampled wavevectors and the resulting
+        ray directions are held FIXED during backpropagation and the sampling
+        density is detached, so gradients flow only through the spectrum in the
+        amplitude a = U_tilde / p.detach(). The paper states directly that this
+        neglects gradients associated with changes in the sampled directions, so
+        it is a deliberately biased estimator of the true derivative. CHE-28
+        measures that bias; verified stays false until the evidence named in
+        benchmarks/coupler_protocol.yaml exists.
+    validity:
+      assumptions:
+        - Scalar, monochromatic, fully coherent field on a planar tangent patch.
+        - Sampling density is strictly positive wherever the spectrum is nonzero.
+        - Tangent-plane approximation holds within eps_curv <= arcsin(D / 2R).
+      warnings:
+        - >
+          Evanescent modes with ku^2 + kv^2 > k^2 are discarded. The discarded
+          power is a real loss and must be reported, not absorbed.
+        - >
+          Omitting the 1/p importance weight biases the estimator while still
+          producing a field that looks plausible.
+        - >
+          This is a Monte Carlo estimator. Bitwise reproducibility at a fixed
+          seed is not evidence of accuracy, and a single realization is never a
+          result.
+      hard_limits:
+        grazing_bin: kn = 0 at the propagating/evanescent boundary is excluded as singular.
+    cost_model:
+      scaling: O(pixels * log(pixels) + number_of_sampled_rays)
+      memory_scaling: O(pixels + number_of_sampled_rays)
+    lossy: true
+    invariants: [evanescent_power_accounted, importance_weight_applied, unit_direction_norm]
+    maturity: experimental
+    tags: [ray_wave, angular_spectrum, monte_carlo, stochastic]
 
   - id: C_EIKONAL_TO_WAVE
     version: 0.1.0

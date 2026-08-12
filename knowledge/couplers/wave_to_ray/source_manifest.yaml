@@ -75,7 +75,9 @@ sources:
   - source_type: inherited_repository_evidence
     retrieved_at: "2026-08-12"
     usage_note: >
-      benchmarks/verify_m1_independence.py currently asserts that C_WAVE_TO_RAY
-      does NOT exist (check id wave_to_ray_not_claimed). Registering this coupler
-      changes that claim, and the change must be made deliberately with a record
-      of what the replacement claim is backed by.
+      benchmarks/verify_m1_independence.py asserted that C_WAVE_TO_RAY did NOT
+      exist (check id wave_to_ray_not_claimed). CHE-23 registered the coupler and
+      replaced that single check with four narrower ones that audit what the
+      registry actually claims: experimental maturity, unverified gradient,
+      `surrogate` derivative mode, and declared lossiness. Recorded here so the
+      change reads as deliberate rather than as a check that quietly disappeared.

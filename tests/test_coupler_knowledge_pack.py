@@ -130,17 +130,19 @@ def test_wave_to_ray_records_the_estimator_as_knowingly_biased() -> None:
     assert "biased surrogate" in rejected["backward"]
 
 
-def test_wave_to_ray_flags_the_independence_check_it_will_invalidate() -> None:
-    """benchmarks/verify_m1_independence.py asserts C_WAVE_TO_RAY does NOT
-    exist. Registering it must be a deliberate act, not a silent one."""
-    note = _card("wave_to_ray")["registry_note"]
+def test_wave_to_ray_records_the_independence_check_it_replaced() -> None:
+    """verify_m1_independence.py used to assert C_WAVE_TO_RAY did NOT exist.
+    Registering it retired that check, so the replacements must actually be
+    present -- otherwise a claim audit silently got weaker."""
+    card = _card("wave_to_ray")
+    note = card["registry_note"]
     assert "wave_to_ray_not_claimed" in note
-    assert "verify_m1_independence.py" in note
+    assert "REPLACED" in note
 
     verifier = (ROOT / "benchmarks/verify_m1_independence.py").read_text()
-    assert "wave_to_ray_not_claimed" in verifier, (
-        "the check this note refers to has moved or been renamed; update both"
-    )
+    assert '"wave_to_ray_not_claimed": "C_WAVE_TO_RAY" not in by_id' not in verifier
+    for claim in card["registry_claims_now_audited"]:
+        assert f'"{claim}"' in verifier, claim
 
 
 def test_curvature_bound_is_recorded_with_its_assumptions() -> None:

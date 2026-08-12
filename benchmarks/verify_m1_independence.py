@@ -129,7 +129,31 @@ def _claim_audit() -> dict[str, Any]:
             "verified"
         ]
         is False,
-        "wave_to_ray_not_claimed": "C_WAVE_TO_RAY" not in by_id,
+        # CHE-23 registered C_WAVE_TO_RAY, so the original check --
+        # "C_WAVE_TO_RAY" not in by_id -- can no longer hold. It is replaced
+        # rather than deleted, because the thing it protected still matters:
+        # the registry must not claim a wave->ray capability M2 has not
+        # established. Registration is not a capability claim; maturity,
+        # verified-gradient, and lossiness are.
+        "wave_to_ray_registered_experimental": (
+            "C_WAVE_TO_RAY" in by_id and by_id["C_WAVE_TO_RAY"]["maturity"] == "experimental"
+        ),
+        "wave_to_ray_gradient_unverified": (
+            by_id["C_WAVE_TO_RAY"]["derivative"]["verified"] is False
+            if "C_WAVE_TO_RAY" in by_id
+            else True
+        ),
+        # SI S7.2's estimator differentiates a fixed-direction surrogate of the
+        # objective, not the objective itself. Declaring native_autodiff here
+        # would overstate what the paper's method computes.
+        "wave_to_ray_gradient_mode_is_surrogate": (
+            by_id["C_WAVE_TO_RAY"]["derivative"]["mode"] == "surrogate"
+            if "C_WAVE_TO_RAY" in by_id
+            else True
+        ),
+        "wave_to_ray_declared_lossy": (
+            by_id["C_WAVE_TO_RAY"]["lossy"] is True if "C_WAVE_TO_RAY" in by_id else True
+        ),
     }
     return {"checks": checks, "pass": all(checks.values())}
 
