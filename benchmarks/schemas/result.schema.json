@@ -153,7 +153,14 @@
       "additionalProperties": true,
       "required": ["claim", "estimator", "omitted_terms", "finite_difference_comparison"],
       "properties": {
-        "claim": {"enum": ["not_verified", "characterized_biased", "verified"]},
+        "claim": {
+          "enum": [
+            "not_verified",
+            "characterized_biased",
+            "characterized_unbiased_in_regime",
+            "verified"
+          ]
+        },
         "estimator": {"type": "string", "minLength": 1},
         "omitted_terms": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "finite_difference_comparison": {"type": "object"}

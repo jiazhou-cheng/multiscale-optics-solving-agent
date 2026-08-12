@@ -124,7 +124,32 @@ derivative:
     amplitude a = U_tilde / p.detach().   (SI S7.2, Algorithm S2)
   verified: false
   known_biased: true
+  measured_2026_08_12: >
+    CHE-28 finding, and the opposite of what the issue expected. In the regime
+    this repository implements -- a FIXED spectral grid and a fixed observation
+    plane -- the fixed-direction estimator is not detectably biased. Over 32
+    realizations at N=2048 the surrogate mean sits within 1 standard error of
+    the true derivative for both a linear functional and a windowed-intensity
+    functional after 20 um of propagation, and stays inside 3 SE across N from
+    512 to 32768 while the standard error falls ~8x.
+
+    The reason is structural: on a fixed spectral grid the sampled direction is
+    a property of the BIN, not of the DOE parameter, so there is no direction
+    gradient to neglect. The paper's caveat describes the continuous-wavevector
+    formulation -- the situation SI S7.3's Gumbel-Softmax relaxation exists to
+    address.
+
+    What IS measurable is the reverse: detaching the sampling density is what
+    makes the estimator unbiased, not what biases it. Letting p track the
+    parameter biases the quadratic objective's gradient by 26 standard errors,
+    because detaching drops exactly the term the omitted score-function term of
+    the discrete sampling distribution would have cancelled.
+
+    This does NOT promote the claim. One parameter, one grid, one wavelength,
+    two objectives, no vector or chromatic path, and no optimization loop.
+    verified stays false.
   omitted_terms:
+    - score-function term of the discrete sampling distribution
     - gradients associated with changes in the sampled secondary-ray directions
   two_quantities_not_to_conflate:
     - derivative of the fixed-direction surrogate objective (estimator should compute this exactly)
@@ -237,8 +262,18 @@ validated_probe_ids:
     (bound/measured = 1.15 at D = 400 lambda, R = 10k lambda) and conservative
     below the observability width.
 
+  - >
+    gradient_characterization (passed, 2026-08-12; CHE-28). Surrogate derivative
+    measured against a step-size-stable finite-difference reference on the exact
+    field. See derivative.measured_2026_08_12 for the finding. Includes the
+    recorded null case: at the DOE plane itself a pure-phase mask leaves |U|
+    pointwise unchanged, so every intensity objective there is exactly
+    theta-independent and a bias study run there compares two estimates of zero.
+
 not_yet_probed:
-  - gradient bias against directional finite differences (CHE-28)
+  - gradient in a continuous-wavevector formulation, where the paper's direction-gradient caveat does bite
+  - gradient through an actual optimization loop
+  - Gumbel-Softmax relaxation (documented, deliberately not implemented)
   - behaviour when the evanescent fraction is large enough to invalidate a ray picture
   - conformal (curved) surfaces
   - vector fields, chromatic ensembles, GPU
