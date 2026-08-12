@@ -283,13 +283,28 @@ optimization loop is a characterization. Promotion would additionally need the
 continuous-wavevector regime where the paper's caveat does bite, and a gradient
 exercised through an actual optimization.
 
-### L5 — Bundles were produced from a dirty worktree
+### L5 — Closed: the published bundle is from a clean tree
 
-`dirty_worktree: true`, recorded against commit `c20aa224`. Identical in kind to
-M1's L3: the fingerprints are valid for comparing these bundles and re-runs on
-this tree, but the clean-checkout criterion is fully satisfied only once the M2
-work is committed and the benchmark re-run against that commit. Bookkeeping, not
-scientific.
+M1 exited with this open (its L3). Here it is discharged: the M2 work was
+committed and the benchmark re-run, giving `dirty_worktree: false` against
+commit `86d916f2`, with the scientific fingerprint **unchanged** at
+`c928e4ca…`. That the fingerprint did not move across the commit is itself
+evidence that it covers physics rather than tree state.
+
+### M1 regression check, and M1's L3
+
+M2 touched the schemas, the protocol document, the registry and the independence
+verifier — all shared with M1 — so both M1 branches were re-run against the same
+commit. Both reproduce their recorded scientific fingerprints **exactly**:
+
+| Branch | Fingerprint | Matches M1 report |
+|---|---|---|
+| `L1-RAY-01` | `43dab1eedf5ca8fc…` | yes |
+| `L1-WAVE-01` | `b2d99bcc12874484…` | yes |
+
+So M2 did not disturb either baseline, and M1's L3 (bundles produced from a
+dirty worktree) is discharged: both branches now have `dirty_worktree: false`
+bundles against a citable commit.
 
 ### L6 — No performance envelope
 
