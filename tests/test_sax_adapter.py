@@ -1,7 +1,7 @@
 """Tests for the M_CIRCUIT_SAX adapter (src/multiscale_optics_agent/adapters/sax_adapter.py).
 
 All tests require the optional `circuit` extra (sax + jax), so they are
-marked `jax` and `integration` per CLAUDE.md section 10/16 and
+marked `jax` and `integration` under the repository test-marker policy and
 pyproject.toml's marker declarations, and skip cleanly (via
 `pytest.importorskip`) when sax/jax are not installed.
 """
@@ -173,7 +173,7 @@ def test_gradient_regression_against_probe_evidence() -> None:
     Reuses knowledge/solvers/sax/expected/gradient_probe.json's
     AD-vs-finite-difference comparison for `coupler_ideal`'s `coupling`
     parameter, evaluated directly (NOT through sax.circuit). This is NOT
-    the full CLAUDE.md section 6.2 gradient-verification bundle (that would
+    the full repository gradient-verification bundle (that would
     need multiple step sizes, a convergence table, and an ill-conditioned
     case) -- it is a regression check that the installed sax/jax still
     reproduce the recorded probe evidence.
@@ -218,7 +218,7 @@ def test_gradient_regression_against_probe_evidence() -> None:
         "relative-error denominator vanishes, which is why c0=0.3 is used "
         "here instead). strict=False: an XPASS here is real, useful evidence "
         "for a human to review, but it is only one parameter/point, not the "
-        "full CLAUDE.md section 6.2 bundle (multiple step sizes, a "
+        "full repository gradient-verification bundle (multiple step sizes, a "
         "convergence table, an ill-conditioned case) -- it must not be used "
         "to set derivative.verified=true on its own, and a failure (xfail) "
         "must not be papered over either."

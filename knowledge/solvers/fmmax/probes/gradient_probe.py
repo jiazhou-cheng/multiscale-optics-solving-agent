@@ -2,8 +2,8 @@
 
 One narrow path: reflectance |r|^2 of a bare ambient/substrate interface,
 differentiated via jax.grad w.r.t. the substrate refractive index, checked
-against a centered finite difference. This is NOT the full CLAUDE.md
-section 6.2 gradient test (needs multiple step sizes, a convergence table,
+against a centered finite difference. This is NOT the full repository
+gradient test (needs multiple step sizes, a convergence table,
 and an ill-conditioned case) -- it only establishes that autodiff produces
 a finite, FD-consistent value for this one parameter.
 

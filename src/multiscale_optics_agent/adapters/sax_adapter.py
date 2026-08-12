@@ -3,8 +3,8 @@ composition through the `sax <https://gdsfactory.github.io/sax/>`_ package
 (pinned version ``0.18.2``, PyPI-authoritative; see
 ``knowledge/solvers/sax/solver_card.yaml``).
 
-Scope of this adapter (deliberately narrow, per CLAUDE.md section 15 --
-"do not attempt to integrate every tool before the first end-to-end
+Scope of this adapter (deliberately narrow -- do not attempt to integrate
+every tool before the first end-to-end
 benchmark works"):
 
 * ``config["mode"] == "component"`` evaluates a single ``sax.models.coupler_ideal``
@@ -22,11 +22,11 @@ benchmark works"):
 Any other ``mode``, or an unsupported ``component.model`` name in
 ``"component"`` mode, is a deliberately unimplemented capability and raises
 ``UnsupportedCapabilityError`` *before* any call into ``sax``/``jax``
-(CLAUDE.md section 3 rule 5 / adapters/__init__.py convention).
+(repository scientific-contract requirements / adapters/__init__.py convention).
 
-Conventions declared explicitly (CLAUDE.md section 3 rule 1):
+Conventions declared explicitly (repository scientific-contract requirements):
 
-* Units: this project is SI-meters internally (CLAUDE.md section 7).
+* Units: this project is SI-meters internally (repository scientific conventions).
   SAX's built-in models (``coupler_ideal``, ``straight``) take ``wl``,
   ``wl0``, and ``length`` in **microns** by community convention (see
   ``knowledge/solvers/sax/conventions.md``, "Units" section) -- nothing in
@@ -37,7 +37,7 @@ Conventions declared explicitly (CLAUDE.md section 3 rule 1):
 * Phase/propagation sign: SAX's ``straight`` model was independently
   verified (see ``knowledge/solvers/sax/conventions.md``) to use
   ``exp(+i * 2*pi*n*L/wavelength)``, consistent with this project's
-  canonical ``exp(-i*omega*t)`` time convention (CLAUDE.md section 7). This
+  canonical ``exp(-i*omega*t)`` time convention (repository scientific conventions). This
   has only been checked for ``straight``; it is declared here, not
   re-derived, for every run.
 * Port naming: ``sax.set_port_naming_strategy`` is global, process-wide,
@@ -52,7 +52,7 @@ Conventions declared explicitly (CLAUDE.md section 3 rule 1):
   package's actual *default* strategy (before any call to
   ``set_port_naming_strategy``) is ``"inout"``, not ``"optical"`` -- see
   the note appended to ``knowledge/solvers/sax/conventions.md``.
-* Host-copy / derivative boundary (CLAUDE.md section 3 rule 3): SAX's
+* Host-copy / derivative boundary (repository scientific-contract requirements): SAX's
   ``SDict`` S-matrix values are JAX array scalars. To store them in a
   JSON-serializable ``ArtifactRecord``, this adapter converts every entry
   with ``complex(value)``, which is a host copy and a hard derivative
@@ -72,7 +72,7 @@ Conventions declared explicitly (CLAUDE.md section 3 rule 1):
   are stored as ``[real, imag]`` float pairs regardless of the source
   dtype), so no information is silently dropped.
 
-Failure-handling convention used in this module (CLAUDE.md section 3 rule 5
+Failure-handling convention used in this module (repository scientific-contract requirements
 / ``core/errors.py``):
 
 * ``AdapterDependencyError`` -- raised (propagates as a real exception) if
@@ -106,7 +106,7 @@ marked ``xfail(strict=False)``) found that ``jax.grad`` *does* appear to
 propagate correctly through an assembled ``sax.circuit`` away from a
 degenerate critical point -- see the addendum in
 ``knowledge/solvers/sax/conventions.md``. That is one point, not the
-CLAUDE.md section 6.2 bundle (multiple step sizes, a convergence table, an
+repository gradient-verification bundle (multiple step sizes, a convergence table, an
 ill-conditioned case), so it does not change ``derivative.verified``.
 Regardless, ``run()`` never computes or exposes a gradient itself, for
 either mode, and rejects ``require_gradients=True`` eagerly.
@@ -509,7 +509,7 @@ class SaxAdapter:
         warnings = [
             "S-matrix values were converted from JAX array scalars to Python "
             "complex for serialization: this is a host-copy derivative boundary "
-            "(CLAUDE.md section 3 rule 3); gradients cannot flow through this "
+            "(repository scientific-contract requirements); gradients cannot flow through this "
             "ArtifactRecord.",
         ]
         return {"response": artifact}, diagnostics, warnings
@@ -591,7 +591,7 @@ class SaxAdapter:
         warnings = [
             "S-matrix values were converted from JAX array scalars to Python "
             "complex for serialization: this is a host-copy derivative boundary "
-            "(CLAUDE.md section 3 rule 3); gradients cannot flow through this "
+            "(repository scientific-contract requirements); gradients cannot flow through this "
             "ArtifactRecord.",
             "Gradient flow through this assembled sax.circuit matrix-solve path "
             "has never been probed (registry derivative.verified=false); do not "

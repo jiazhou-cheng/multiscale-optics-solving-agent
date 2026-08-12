@@ -14,13 +14,13 @@ FMMAX is **normalized-unit**, not literally SI: the official docs state
 consistent length unit. **Implication for this project:** a future
 `M_RCWA_FMMAX` adapter must convert the project's meter-valued
 `period`/`wavelength` artifacts into whatever consistent scale is used for
-a given call, and convert back on the way out (CLAUDE.md section 7). This
+a given call, and convert back on the way out (repository scientific conventions). This
 conversion boundary needs an explicit round-trip test, not an assumption.
 
 ## Time convention
 
 Docs state the time-harmonic convention as `exp(-i*omega*t)`, matching this
-project's canonical convention (CLAUDE.md section 7) as stated -- not
+project's canonical convention (repository scientific conventions) as stated -- not
 independently re-derived from source in this pass (unlike Chromatix, where
 we derived the spatial sign convention from `inspect.getsource`). Treat
 this as "stated by the vendor," not "independently verified," until a
@@ -62,8 +62,7 @@ layer and `N` is the end layer. Concretely:
 **This is the opposite of the common RF/photonic-circuit convention**
 where `S11` is a reflection coefficient back into port 1 (see the official
 docs' own warning: "notably different from photonic integrated circuit
-conventions", also echoed in `docs/SOLVER_AND_COUPLER_CATALOG.md`'s
-FMMAX/SAX comparison). A coupler bridging FMMAX's scattering matrix to
+conventions"). A coupler bridging FMMAX's scattering matrix to
 SAX's S-parameter dictionaries (which use `("port_in", "port_out")` tuple
 keys, not `s11`/`s21` indices) must remap explicitly and test the remap,
 not assume index correspondence.
@@ -80,7 +79,7 @@ limit, no real grating), gives:
 | reflectance `\|r\|^2` | `0.039999988` | `0.040000000` |
 
 **Reflectance magnitude matches to ~3.0e-07 relative error** -- a genuine
-independent analytic verification (CLAUDE.md section 3 rule 6). **The
+independent analytic verification (repository scientific-contract requirements). **The
 complex amplitude's sign does not match the textbook convention**
 (positive here vs. the textbook `r=(n1-n2)/(n1+n2)` being negative for
 `n1<n2`). Do not assume FMMAX's phase reference agrees with a textbook or

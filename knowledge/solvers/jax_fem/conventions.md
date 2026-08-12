@@ -46,4 +46,4 @@ up the implicit-differentiation path implied by the project's registry
 entry (`derivative.mode: implicit` for `M_THERMAL_JAX_FEM`) -- cannot be
 imported without petsc4py. No gradient claim can be made for this solver
 until that blocker is resolved and a real directional-derivative probe
-passes (CLAUDE.md section 6.2).
+passes under the repository gradient-verification policy.

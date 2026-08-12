@@ -43,7 +43,7 @@ version source (they lag ~9 major/minor versions behind PyPI).
 ## Python version
 
 SAX 0.18.2 requires Python `>=3.11.0`. This project's own `pyproject.toml`
-requires `>=3.11` (CLAUDE.md section 11 says the same), so there is no
+also requires `>=3.11`, so there is no
 project-level conflict, but the host machine used to develop this knowledge
 pack only had Python 3.10/3.8 available -- the `agent_solver` Docker image
 (python:3.12-slim) is what actually satisfies this. Do not assume a host

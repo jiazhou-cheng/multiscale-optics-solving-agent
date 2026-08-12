@@ -28,8 +28,8 @@ values via ``place_objects``, then differentiate only through
 ``apply_params(arrays, objects, params, key)`` with respect to the
 ``params``/``ParameterContainer`` pytree, or via ``fdtdx.full_backward`` --
 has not been worked out or tested against this pinned version. Because no
-differentiable path has passed a directional-derivative test (CLAUDE.md
-section 6.2), this adapter raises ``UnsupportedCapabilityError`` eagerly
+differentiable path has passed the required directional-derivative test, this
+adapter raises ``UnsupportedCapabilityError`` eagerly
 for any request with ``require_gradients=True``, before importing fdtdx or
 touching the solver, rather than letting a caller discover either failure
 mode itself deep inside its own ``jax.grad`` call. This does **not**
@@ -518,7 +518,7 @@ class FdtdxAdapter:
                 },
             )
 
-        # Host copy / derivative-boundary note (rule 3): converting the JAX
+        # Host copy / derivative-boundary note: converting the JAX
         # array to NumPy here is a real host copy, recorded explicitly. This
         # is a forward-only adapter (require_gradients is rejected above),
         # so no differentiable path is broken by this conversion.

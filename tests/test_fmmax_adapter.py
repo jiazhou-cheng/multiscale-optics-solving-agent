@@ -38,7 +38,7 @@ def _bare_interface_structure(
     Matches knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py exactly
     (same n_ambient/n_substrate/wavelength, approximate_num_terms=1 is set
     via request.config by the caller), except lengths are expressed in
-    meters per this project's SI convention (CLAUDE.md section 7) rather
+    meters per this project's SI convention (repository scientific conventions) rather
     than fmmax's bare, scale-agnostic numbers.
     """
 
@@ -173,8 +173,8 @@ def test_bare_interface_matches_fresnel_oracle_and_closes_energy() -> None:
     record = result.outputs["diffraction"]
 
     # Magnitude-only independent verification against the analytic Fresnel formula
-    # (CLAUDE.md section 3 rule 6): reflectance |r|^2, matched to ~1e-7 in the recorded
-    # probe. We recompute R via a different formula (Poynting flux, not |s21|^2) and still
+    # Under the repository scientific contract, reflectance |r|^2 matched to ~1e-7 in the
+    # recorded probe. We recompute R via a different formula (Poynting flux, not |s21|^2) and still
     # expect close agreement, since both are physically the reflectance of the same
     # lossless bare interface.
     reflectance = record.metadata["reflectance_total"]
@@ -213,7 +213,7 @@ def test_bare_interface_matches_fresnel_oracle_and_closes_energy() -> None:
 def test_gradient_through_run_matches_recorded_probe() -> None:
     """jax.grad wrapped around FmmaxAdapter.run, regression-tested against gradient_probe.json.
 
-    This is NOT a CLAUDE.md section 6.2 five-part verification bundle (single step size, single
+    This is NOT a repository five-part gradient-verification bundle (single step size, single
     parameter, non-periodic homogeneous-limit structure) -- it is a regression check that this
     adapter's require_gradients=True output-boundary policy (module docstring) actually preserves
     a traceable JAX value all the way through ModelRunResult/ArtifactRecord construction, and that

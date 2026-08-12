@@ -1,5 +1,5 @@
 # Routing-critical facts for M_CIRCUIT_SAX.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Field contract follows AGENTS.md "Initial Artifact Boundary".
 # Grounded in: docker build of ./docker/Dockerfile (2026-07-30) +
 # knowledge/solvers/sax/probes/*.py run against that image.
 # This supplements, and does not replace, knowledge/solver_cards/sax.yaml
@@ -42,7 +42,7 @@ derivative:
     a closed-form trig expression, so tight agreement is expected and does
     NOT by itself validate differentiability through `sax.circuit`'s
     netlist-assembly/matrix-solve path, which has not been gradient-probed.
-    This is NOT the full CLAUDE.md section 6.2 gradient test (needs multiple
+    This is NOT the full repository gradient-verification test (needs multiple
     step sizes, a convergence table, an ill-conditioned case, and ideally a
     gradient through the assembled circuit, not just one component).
 devices_reported: [cpu, gpu, tpu]  # inherited from jax; not independently confirmed for sax's own ops

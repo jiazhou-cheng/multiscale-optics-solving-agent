@@ -1,8 +1,7 @@
 # FDTDX capability notes
 
 Grounded in the real `dir(fdtdx)` API surface of the pinned `0.6.2` install
-and the probes in `probes/`. See `docs/SOLVER_AND_COUPLER_CATALOG.md` for
-how this fits alongside Jaxwell/Tidy3D/fdtdz in the broader catalog.
+and the probes in `probes/`.
 
 ## Use FDTDX for
 
@@ -35,7 +34,7 @@ how this fits alongside Jaxwell/Tidy3D/fdtdz in the broader catalog.
   intended efficient-gradient mechanism, per its own cited method
   (Schubert et al., ACS Omega 2024) -- not yet exercised here.
 
-## Do not assume (per CLAUDE.md section 3, rule 1 and rule 2)
+## Do not assume (per repository scientific-contract requirements)
 
 - That the GitHub `main`-branch README example matches the pinned release's
   API. It does not (`UniformGrid`/`grid=` vs. `resolution=`) -- always

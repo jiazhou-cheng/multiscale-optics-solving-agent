@@ -91,7 +91,7 @@ zero gradient almost everywhere (a classic AD trap: a hard `round()` or
 **Fix:** none yet. Treat wavelength as effectively non-differentiable
 through this code path until investigated further. Do not silently accept
 a zero-valued AD gradient as evidence of zero true sensitivity -- always
-cross-check with finite differences, exactly as CLAUDE.md section 6.2
+cross-check with finite differences, exactly as the repository gradient-verification policy
 requires, precisely because this kind of failure produces no exception at
 all.
 

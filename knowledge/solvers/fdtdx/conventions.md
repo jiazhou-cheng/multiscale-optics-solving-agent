@@ -86,7 +86,7 @@ source profile, which has zero gradient almost everywhere. **Treat
 `wavelength` as a non-differentiable (or at best not-yet-differentiable)
 parameter of a `GaussianPlaneSource`/`WaveCharacter` until this is
 investigated further.** This is exactly the kind of "sharp/ill-conditioned
-region" CLAUDE.md section 6.2 asks a gradient test to include -- here it
+region" the repository gradient-verification policy asks a gradient test to include -- here it
 surfaced as a hard break rather than merely reduced accuracy.
 
 ## Differentiability mechanism (as designed, per the package's own claim)

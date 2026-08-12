@@ -87,7 +87,7 @@ Not yet executed in this repository.
 
 **Both attempts below failed** -- included here specifically because a
 failing, well-documented example is more useful than no example, per
-CLAUDE.md's ban on fabricated gradient claims.
+repository prohibition on unsupported gradient claims.
 
 ```python
 # (a) Gradient w.r.t. source wavelength -- returns exactly 0.0 (wrong):

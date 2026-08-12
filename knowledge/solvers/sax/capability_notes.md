@@ -34,7 +34,7 @@ Grounded in the real `sax`/`sax.models` API surface of the installed
   parametric model to measured/simulated data) -- potentially useful for
   validating a coupler against externally measured S-parameters.
 
-## Do not assume (per CLAUDE.md section 3, rule 1)
+## Do not assume (per repository scientific-contract requirements)
 
 - That port names are `in0`/`out0` or any other fixed scheme -- they depend
   on `sax.set_port_naming_strategy`, which is global mutable state (see

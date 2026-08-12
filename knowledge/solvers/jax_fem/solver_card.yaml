@@ -1,5 +1,5 @@
 # Routing-critical facts for M_THERMAL_JAX_FEM.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Field contract follows AGENTS.md "Initial Artifact Boundary".
 # Grounded in: docker build of ./docker/Dockerfile (2026-07-30) +
 # knowledge/solvers/jax_fem/probes/*.py run against that image.
 # This supplements, and does not replace, knowledge/solver_cards/jax_fem.yaml.
@@ -58,7 +58,7 @@ blocker:
     - "Switch to a conda-based image (e.g. condaforge/miniforge3) and
       `conda install -c conda-forge petsc4py` for a prebuilt binary --
       matches the project's own documented install path."
-    - "Re-check on refresh (docs/AGENT_KNOWLEDGE_BASE.md section 10)
+    - "Re-check on refresh (package-refresh policy)
       whether a future jax-fem release makes petsc4py optional/lazy."
     - "Debian's apt DOES ship python3-petsc4py, but that installs into the
       system Debian Python's site-packages, not this image's
@@ -67,7 +67,7 @@ blocker:
   do_not: >
     Do not hand-roll a replacement linear solver to work around this and
     call the result "jax-fem" -- that would misrepresent what the actual
-    jax_fem.solver code path does (CLAUDE.md section 3, rule 5: no
+    jax_fem.solver code path does (repository scientific-contract requirements: no
     fabricated solver output).
 
 supported_regimes_if_unblocked:
@@ -92,7 +92,7 @@ validated_probe_ids:
   - import_probe (passed, 2026-07-30; observes the pyfiglet banner side effect)
   - mesh_probe (passed, 2026-07-30; real 4x4 rectangle mesh, meshio.Mesh output)
   - solver_failure_probe (EXPECTED FAILURE captured, 2026-07-30; regression
-    check -- re-run on every refresh, see docs/AGENT_KNOWLEDGE_BASE.md section 10)
+    check -- re-run on every refresh, see package-refresh policy)
 not_yet_probed:
   - >-
     everything in knowledge/solver_cards/jax_fem.yaml required_probes, all

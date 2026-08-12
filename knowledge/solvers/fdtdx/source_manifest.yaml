@@ -1,5 +1,5 @@
 # Per-source provenance for the fdtdx knowledge pack.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+# Provenance follows AGENTS.md "Sources of Truth".
 
 sources:
   - url: https://pypi.org/project/fdtdx/
@@ -24,8 +24,8 @@ sources:
       `inspect.signature(fdtdx.SimulationConfig.__init__)`) has no `grid`/
       `UniformGrid` at all -- it takes `resolution: float` directly. See
       failure_guide.md. Treat GitHub main-branch examples as a discovery aid
-      only, not ground truth for a pinned release (docs/AGENT_KNOWLEDGE_BASE.md
-      section 7 source hierarchy).
+      only, not ground truth for a pinned release (under the repository
+      source-of-truth hierarchy).
 
   - url: "installed package fdtdx==0.6.2"
     source_type: installed_source

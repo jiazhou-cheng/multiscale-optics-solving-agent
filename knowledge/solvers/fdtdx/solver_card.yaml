@@ -1,5 +1,5 @@
 # Routing-critical facts for M_EM_FDTDX.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Field contract follows AGENTS.md "Initial Artifact Boundary".
 # Grounded in: agent_solver Docker image (docker/requirements.txt, fdtdx==0.6.2)
 # + knowledge/solvers/fdtdx/probes/*.py run against that image on 2026-07-30.
 # This supplements, and does not replace, knowledge/solver_cards/fdtdx.yaml.
@@ -55,7 +55,7 @@ limitations_and_failure_modes: see failure_guide.md
 validated_probe_ids:
   - import_probe (passed, 2026-07-30)
   - propagation_probe (passed, 2026-07-30; vacuum/periodic-boundary Gaussian source, no analytic oracle comparison yet)
-  - gradient_probe (both sub-probes FAILED as designed to surface real problems -- see derivative.verified_note; this satisfies CLAUDE.md's "test near an ill-conditioned/sharp region" requirement by documenting a genuine broken case, not a passing gradient test)
+  - gradient_probe (both sub-probes FAILED as designed to surface real problems -- see derivative.verified_note; this satisfies repository gradient-verification requirement by documenting a genuine broken case, not a passing gradient test)
 not_yet_probed:
   - Fresnel interface / waveguide mode (required_probes item, not done)
   - PML boundary + domain-size convergence (probe above used periodic boundaries only)

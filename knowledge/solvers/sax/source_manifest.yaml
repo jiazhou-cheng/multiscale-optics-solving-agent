@@ -1,5 +1,5 @@
 # Per-source provenance for the sax knowledge pack.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+# Provenance follows AGENTS.md "Sources of Truth".
 
 sources:
   - url: https://pypi.org/project/sax/
@@ -35,7 +35,7 @@ sources:
       installed 0.18.2 package's own docstring examples (which use
       `sax.set_port_naming_strategy("optical")` and `o1`/`o2`/`o3`/`o4`).
       Treated as lower-priority than installed source per
-      docs/AGENT_KNOWLEDGE_BASE.md section 7 -- all specific conventions in
+      the repository source-of-truth policy -- all specific conventions in
       conventions.md were re-derived by running the installed package.
 
   - url: "installed package, sax==0.18.2"

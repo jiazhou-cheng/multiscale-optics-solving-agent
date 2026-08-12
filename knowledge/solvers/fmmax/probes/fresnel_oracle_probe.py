@@ -3,7 +3,7 @@
 A single ambient/substrate interface with no in-plane periodicity content
 (`approximate_num_terms=1`, i.e. the homogeneous/zero-grating-order limit)
 must reduce to ordinary Fresnel reflection at normal incidence. This is an
-independent analytic check per CLAUDE.md section 3 rule 6, not just an API
+independent analytic check per repository scientific-contract requirements, not just an API
 smoke test.
 
 Run inside the agent_solver container:

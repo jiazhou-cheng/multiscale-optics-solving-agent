@@ -10,7 +10,7 @@ unusable here. petsc4py has no prebuilt PyPI wheel (source-dist only,
 requires compiling PETSc) and is deliberately not installed in this
 lightweight pip-based image -- see failure_guide.md for follow-up options.
 
-Run this probe on every refresh (docs/AGENT_KNOWLEDGE_BASE.md section 10):
+Run this probe on every refresh (package-refresh policy):
 if it ever reports "UNEXPECTED: import succeeded", the blocker has been
 resolved (e.g. a future jax-fem release made petsc4py optional, or the
 image gained a working petsc4py) and solver_card.yaml / capability_notes.md

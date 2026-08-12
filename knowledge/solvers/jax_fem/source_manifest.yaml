@@ -1,5 +1,5 @@
 # Per-source provenance for the jax-fem knowledge pack.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+# Provenance follows AGENTS.md "Sources of Truth".
 
 sources:
   - url: https://pypi.org/pypi/jax-fem/json

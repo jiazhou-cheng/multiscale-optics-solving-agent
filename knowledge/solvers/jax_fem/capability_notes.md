@@ -29,7 +29,7 @@ M_THERMAL_JAX_FEM," it currently is not, end-to-end, in this environment.
   gradient probe. All four `required_probes` in
   `knowledge/solver_cards/jax_fem.yaml` are blocked.
 
-## Do not assume (per CLAUDE.md section 3, rule 1 and rule 5)
+## Do not assume (per repository scientific-contract requirements)
 
 - That `pip install jax-fem` gives you a working environment -- it
   declares zero dependencies and needs a hand-assembled dependency set
@@ -40,7 +40,7 @@ M_THERMAL_JAX_FEM," it currently is not, end-to-end, in this environment.
   `M_THERMAL_JAX_FEM` -- it is not, until the petsc4py blocker is resolved.
 - That a workaround linear solver written to route around petsc4py would
   count as "using jax-fem" -- it would not; that is a silent fidelity
-  substitution (CLAUDE.md section 3, rule 4) and must not be represented as
+  substitution (repository scientific-contract requirements) and must not be represented as
   the real jax_fem.solver path.
 
 ## Follow-up required before this solver can be used

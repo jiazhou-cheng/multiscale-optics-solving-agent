@@ -19,13 +19,13 @@ Scope of this adapter (deliberately narrow; see ``knowledge/solvers/fmmax/``):
   supported — these are exactly what the pinned oracle/gradient probes used;
   changing either is an unverified fidelity change and is rejected eagerly.
 * Length quantities (``period``, ``wavelength_m``, layer ``thickness_m``)
-  must be given in **meters** (CLAUDE.md section 7, SI units). FMMAX itself
+  must be given in **meters** (repository scientific conventions, SI units). FMMAX itself
   is scale-invariant (``c = eps0 = mu0 = 1``, see
   ``knowledge/solvers/fmmax/conventions.md``) and only requires that all
   length-like inputs share one consistent scale; using meters everywhere
   satisfies that requirement without any implicit unit assumption.
 
-Non-standard scattering-matrix labeling (CLAUDE.md section 3 rule 1)
+Non-standard scattering-matrix labeling (repository scientific-contract requirements)
 ---------------------------------------------------------------------
 Per ``inspect.getdoc(fmmax.ScatteringMatrix)`` (echoed in
 ``knowledge/solvers/fmmax/conventions.md``), following [1999 Whittaker]::
@@ -65,7 +65,7 @@ the complex reflection amplitude's *sign/phase* does not match the textbook
 Fresnel convention (see ``knowledge/solvers/fmmax/conventions.md``) and is
 NOT reconciled by this adapter.
 
-Failure-reporting convention (CLAUDE.md section 3 rule 5 / ``core/errors.py``)
+Failure-reporting convention (repository scientific-contract requirements / ``core/errors.py``)
 -------------------------------------------------------------------------------
 * ``AdapterDependencyError`` — raised by :func:`_import_fmmax` if ``fmmax``
   or ``jax`` cannot be imported.
@@ -80,14 +80,14 @@ Failure-reporting convention (CLAUDE.md section 3 rule 5 / ``core/errors.py``)
   ``fmmax``/``jax``) are caught at the ``run()`` boundary and reported as
   ``ModelRunResult(status=RunStatus.FAILED, error_type=..., error_message=...)``
   rather than as a raised ``SolverExecutionError``, per the option offered in
-  ``adapters/base.py``/CLAUDE.md.
+  ``adapters/base.py`` and the repository failure contract.
 
-Derivative semantics and the "no silent detach" boundary (CLAUDE.md section 6)
+Derivative semantics and the "no silent detach" boundary (repository gradient policy)
 ---------------------------------------------------------------------------------
 The physics core of this adapter (lattice/expansion setup, eigensolve,
 scattering-matrix cascade, Poynting-flux reduction) is pure JAX and is
 reused unchanged whether or not gradients are requested — no separate
-"gradient path" is substituted (CLAUDE.md rule 4). The only difference is
+"gradient path" is substituted (repository scientific-contract requirements). The only difference is
 at the **output-construction boundary**:
 
 * If ``request.require_gradients`` is ``False`` (the default), scalar
@@ -108,8 +108,8 @@ at the **output-construction boundary**:
 ``derivative.verified`` for ``M_RCWA_FMMAX`` MUST remain ``false`` in the
 registry: only one narrow directional-derivative probe (substrate
 permittivity -> bare-interface reflectance, relative error 1.24e-4 vs. one
-centered finite difference) has been run, which is not the full CLAUDE.md
-section 6.2 five-part gradient-verification bundle.
+centered finite difference) has been run, which is not the full five-part
+gradient-verification bundle.
 """
 
 from __future__ import annotations
@@ -163,7 +163,8 @@ def _import_fmmax() -> tuple[Any, Any, Any]:
         raise AdapterDependencyError(
             "M_RCWA_FMMAX requires the 'fmmax' and 'jax' packages, which could not be "
             f"imported in this environment: {exc}. Install the 'wave' extras "
-            "(see CLAUDE.md section 8) or run inside the agent_solver Docker image."
+            "(see repository container-only execution policy) or run inside the "
+            "agent_solver Docker image."
         ) from exc
     return fmmax, jax, jnp
 
@@ -489,7 +490,7 @@ def _simulate(
     # formulation is pinned to FFT (not the fmmax default JONES_DIRECT_FOURIER) because FFT is
     # what knowledge/solvers/fmmax/probes/fresnel_oracle_probe.py and gradient_probe.py used to
     # obtain the independently-verified reflectance oracle match; switching formulations without
-    # re-verifying would be a silent fidelity change (CLAUDE.md section 3 rule 4).
+    # re-verifying would be a silent fidelity change (repository scientific-contract requirements).
     layer_solve_results = [
         fmmax.eigensolve_isotropic_media(
             wavelength=jnp.asarray(wavelength_m),
@@ -586,8 +587,8 @@ def _simulate(
         metadata["transmittance_total"] = float(transmittance_total)
         derivative_boundary = (
             "require_gradients=False: reflectance_total/transmittance_total/energy_residual were "
-            "concretized with float() at the ModelRunResult output boundary (CLAUDE.md section 3 "
-            "rule 3: this host/Python-scalar extraction is a derivative boundary and is recorded "
+            "concretized with float() at the ModelRunResult output boundary (this "
+            "host/Python-scalar extraction is a derivative boundary and is recorded "
             "here, not performed silently)."
         )
         digest_source = repr(

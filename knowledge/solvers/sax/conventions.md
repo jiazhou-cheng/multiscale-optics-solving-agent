@@ -48,7 +48,7 @@ t = s[("o1", "o2")]
 This confirms SAX's forward-propagation phase convention is
 `exp(+i * 2*pi*n*L/wavelength)` -- the **same sign** as chromatix's spatial
 `exp(+i k.r)` convention and consistent with this project's canonical
-`exp(-i omega t)` time convention (CLAUDE.md section 7). This is a positive
+`exp(-i omega t)` time convention (repository scientific conventions). This is a positive
 cross-solver consistency finding: unlike FMMAX (see
 `knowledge/solvers/fmmax/conventions.md`, which found a *sign* mismatch
 against the textbook Fresnel convention for `stack_s_matrix`), SAX's
@@ -88,7 +88,7 @@ power transmission against the analytic MZI formula
 | Energy conservation (`\|t_00\|^2 + \|t_01\|^2`) | 1.0000000000000002 |
 | Reciprocity (`out0->in0 == in0->out0`) | exact |
 
-This is a real, independent-oracle verification (CLAUDE.md rule 6) of the
+This is a real, independent-oracle verification (repository independent-verification requirement) of the
 full netlist-assembly path, not just an isolated component model -- a
 stronger result than the chromatix/fmmax packs currently have for their
 respective composed pipelines.
@@ -101,7 +101,7 @@ convention), and lengths (`length` in `straight`) are consistent with that
 scale, but nothing in the type signatures enforces a unit -- like
 chromatix, SAX is scale-agnostic as long as `wl`/`wl0`/`length` share a
 consistent unit. An adapter must convert from the project's SI-meter
-convention (CLAUDE.md section 7) explicitly.
+convention (repository scientific conventions) explicitly.
 
 ## Numerical dtype
 
@@ -147,7 +147,7 @@ is set). Not independently pinned by SAX itself.
   a degenerate test point, not evidence of a bug. This one-point check is
   documented as an `xfail(strict=False)` regression probe in
   `tests/test_sax_adapter.py::test_gradient_through_assembled_circuit_not_yet_verified`,
-  not as a promotion of `derivative.verified` to `true`: CLAUDE.md section
-  6.2 requires multiple step sizes, a convergence table, and a
+  not as a promotion of `derivative.verified` to `true`: the repository
+  gradient-verification policy requires multiple step sizes, a convergence table, and a
   deliberately ill-conditioned case before that claim can be made, and
   none of that has been done for the circuit-assembly path yet.

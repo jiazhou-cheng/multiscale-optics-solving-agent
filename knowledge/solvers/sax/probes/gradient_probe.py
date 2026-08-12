@@ -1,7 +1,7 @@
 """Minimal directional-derivative probe for M_CIRCUIT_SAX.
 
-This is a probe, not the repository gradient test required by CLAUDE.md
-section 6.2. It only establishes that `jax.grad` produces a finite value
+This is a probe, not the full repository gradient test. It only establishes
+that `jax.grad` produces a finite value
 that agrees with a centered finite-difference estimate for one parameter
 path: `coupler_ideal` coupling ratio -> thru-port power. This model is a
 closed-form trigonometric expression, so tight agreement here is expected

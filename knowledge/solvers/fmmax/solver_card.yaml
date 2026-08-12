@@ -1,5 +1,5 @@
 # Routing-critical facts for M_RCWA_FMMAX.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Field contract follows AGENTS.md "Initial Artifact Boundary".
 # Grounded in: agent_solver Docker image (docker/requirements.txt, fmmax==1.7.1)
 # + knowledge/solvers/fmmax/probes/*.py run against that image, 2026-07-30.
 # This supplements, and does not replace, knowledge/solver_cards/fmmax.yaml
@@ -36,7 +36,7 @@ derivative:
     A single directional-derivative probe (probes/gradient_probe.py) passed
     for one path (substrate refractive index -> bare-interface reflectance),
     relative error 1.24e-04 against one centered finite-difference step.
-    This is NOT the full CLAUDE.md section 6.2 gradient test and does not
+    This is NOT the full repository gradient-verification test and does not
     cover a real periodic grating, Fourier-order truncation, or anisotropic
     media. Do not set verified: true from this alone.
 devices_reported: [cpu, gpu, tpu]  # per jax; not independently confirmed for fmmax specifically

@@ -1,8 +1,7 @@
 # FMMAX capability notes
 
 Grounded in the real `fmmax` API surface (`fmmax==1.7.1`) and the probes in
-`probes/`. See `docs/SOLVER_AND_COUPLER_CATALOG.md` for how this fits
-alongside Meent/TORCWA/TorchRDIT in the broader RCWA catalog.
+`probes/`.
 
 ## Use FMMAX for
 
@@ -26,7 +25,7 @@ alongside Meent/TORCWA/TorchRDIT in the broader RCWA catalog.
   confirmed for one narrow path (substrate index -> bare-interface
   reflectance, relative error 1.24e-4 vs. finite difference).
 
-## Do not assume (per CLAUDE.md section 3, rule 1)
+## Do not assume (per repository scientific-contract requirements)
 
 - That `s11` is a reflection coefficient -- it is **transmission** in
   FMMAX's labeling; `s21` is reflection. See `conventions.md`.

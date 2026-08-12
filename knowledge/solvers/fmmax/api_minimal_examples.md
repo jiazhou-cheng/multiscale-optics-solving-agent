@@ -87,7 +87,7 @@ jax.grad(reflectance)(jnp.asarray(1.5))  # -> 0.12799996
 Centered finite difference at the same point (`eps=1e-3`) gives
 `0.12801588` (relative error `1.24e-4`). This is one narrow
 directional-derivative check on a non-periodic (homogeneous-limit)
-structure, not the full CLAUDE.md section 6.2 gradient test. Full probe:
+structure, not the full repository gradient-verification test. Full probe:
 `probes/gradient_probe.py`; captured output: `expected/gradient_probe.json`.
 
 ## 5. Serialization / export
