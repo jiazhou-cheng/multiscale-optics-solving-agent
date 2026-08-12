@@ -232,7 +232,7 @@ def ray_to_wave(
     grid_shape: tuple[int, int],
     sample_pitch_m: tuple[float, float],
     plane: ReferencePlane | None = None,
-    normalization: Literal["none", "one_over_n"] = "none",
+    normalization: Literal["none", "one_over_n"] | None = None,
     projection: Projection = Projection.ASM_CONSISTENT,
     perturbation: Perturbation = Perturbation(),
     enforce_grid_nyquist: bool = True,
@@ -251,8 +251,11 @@ def ray_to_wave(
     normalization
         ``"none"`` sums a given physical ray ensemble (main-text eq 2).
         ``"one_over_n"`` applies the ``1/N`` of SI eqs S3/S5, which belongs only
-        when the ensemble is a Monte Carlo sample of a spectrum. The choice is
-        recorded in the output metadata rather than inferred.
+        when the ensemble is a Monte Carlo sample of a spectrum. ``None``, the
+        default, takes the bundle's own ``reconstruction_normalization``
+        declaration -- the bundle knows which kind of ensemble it is, and making
+        every caller restate it invites the two to disagree. The resolved choice
+        is recorded in the output metadata either way.
 
     Returns
     -------
@@ -262,6 +265,8 @@ def ray_to_wave(
     """
     amplitude, optical_path_length = bundle.require_coherent()
 
+    if normalization is None:
+        normalization = bundle.reconstruction_normalization
     plane = plane or bundle.reference_plane
     ny, nx = int(grid_shape[0]), int(grid_shape[1])
     dy, dx = float(sample_pitch_m[0]), float(sample_pitch_m[1])

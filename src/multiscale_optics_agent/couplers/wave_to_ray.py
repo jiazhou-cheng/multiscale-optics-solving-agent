@@ -402,6 +402,9 @@ def spectrum_to_rays(
             "amplitudes carry the 1/p importance weight (SI eq S4); the 1/N of "
             "SI eq S5 is applied by the reconstruction, not stored on the rays"
         ),
+        # This ensemble is a Monte Carlo estimate of an integral, so a coherent
+        # reconstruction from it must divide by the ray count (SI eq S5).
+        reconstruction_normalization="one_over_n",
         provenance={
             "coupler": "C_WAVE_TO_RAY",
             "equation": "ACS Photonics 2026 eq 1 / SI eq S4",

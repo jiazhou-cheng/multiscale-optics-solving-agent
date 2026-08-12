@@ -281,6 +281,14 @@ class RayBundle:
     polarization: str = "scalar"
     coherence: str = "fully coherent"
     normalization: str = "none; sum over a given ray ensemble carries no 1/N"
+    #: Whether a coherent reconstruction from this bundle must divide by the ray
+    #: count. Structured rather than prose because two components have to agree
+    #: on it: a bundle sampled from a spectrum is a Monte Carlo estimate and
+    #: needs the 1/N of SI eq S5, while a bundle from a physical ray trace is
+    #: the ensemble itself and must not be averaged. Getting this wrong scales
+    #: the field by the ray count, which is exactly the kind of silent factor
+    #: the contract layer exists to prevent.
+    reconstruction_normalization: str = "none"
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -353,6 +361,15 @@ class RayBundle:
                 "an optical path length was supplied without declaring its reference",
                 declaration="optical_path_length_reference",
                 remedy="State the plane or ray the OPL is measured from.",
+            )
+        if self.reconstruction_normalization not in {"none", "one_over_n"}:
+            raise ContractError(
+                ContractCode.MISSING_DECLARATION,
+                (
+                    "reconstruction_normalization must be 'none' or 'one_over_n', "
+                    f"got {self.reconstruction_normalization!r}"
+                ),
+                declaration="reconstruction_normalization",
             )
         if self.weight is not None and not self.weight_semantics:
             raise ContractError(
@@ -480,6 +497,7 @@ class RayBundle:
             "polarization": self.polarization,
             "coherence": self.coherence,
             "normalization": self.normalization,
+            "reconstruction_normalization": self.reconstruction_normalization,
             "provenance": self.provenance,
         }
         current.update(changes)
