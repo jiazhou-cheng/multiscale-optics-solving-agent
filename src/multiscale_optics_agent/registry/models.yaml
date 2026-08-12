@@ -1,8 +1,8 @@
 models:
   - id: M_RAY_OPTILAND
     version: 0.1.0
-    description: Differentiable sequential lens and ray model through the Optiland adapter.
-    framework: pytorch
+    description: M1-validated sequential geometric ray tracing through the Optiland adapter.
+    framework: numpy
     approximation: geometric_optics
     inputs:
       - name: system
@@ -22,23 +22,18 @@ models:
         artifact: wavefront_samples
         provides_metadata:
           [wavelength, coordinates, optical_path_length, amplitude, polarization, pupil_mask]
-    devices: [cpu, gpu]
-    dtypes: [float32, float64]
+    devices: [cpu]
+    dtypes: [float64]
     derivative:
       mode: native_autodiff
       verified: false
       parameters: ["*"]
       notes: >-
-        "framework: pytorch" describes the optional differentiable backend,
-        not the default install: torch is NOT a declared optiland
-        dependency, and a bare `pip install optiland` is NumPy-only
-        (supports_gradients=False). native_autodiff requires installing
-        torch separately and calling optiland.backend.set_backend('torch')
-        at runtime -- record which backend a graph run actually used. One
-        path verified (surface radius -> Optic.trace -> RMS-spot proxy):
-        AD vs. finite-difference relative error 1.11e-03, looser than this
-        project's JAX-based solvers and not yet root-caused. Keep
-        verified: false.
+        M1 establishes only the NumPy CPU float64 forward path. Optiland has
+        an optional PyTorch backend and one exploratory directional-derivative
+        probe exists, but the repository gradient contract has not passed;
+        GPU, float32, and differentiable execution are not registered model
+        capabilities.
     validity:
       assumptions:
         - Geometric optics is adequate inside the traced lens system.
@@ -62,8 +57,8 @@ models:
           already depends on "polarization" and examples/graphs/ray_to_wave.yaml
           + tests/test_graph_validation.py assert that edge validates).
           This is a pre-existing contract mismatch, not introduced by this
-          adapter -- resolve as part of the CLAUDE.md section 13 ray_wave/
-          ray_ewave bridge audit (decide whether to synthesize an explicit
+          adapter -- resolve during the ray_wave/ray_ewave bridge audit
+          (decide whether to synthesize an explicit
           unpolarized/scalar placeholder, or narrow both port and coupler
           contracts) rather than silently declaring metadata this adapter
           cannot produce.
@@ -77,13 +72,13 @@ models:
       pinned_version: "0.6.0"
       retrieved_at: "2026-07-30"
     maturity: experimental
-    tags: [ray, lens, imaging, differentiable]
+    tags: [ray, lens, imaging, forward-only]
 
   - id: M_WAVE_CHROMATIX
     version: 0.1.0
-    description: Differentiable scalar/vector wave propagation and computational imaging through Chromatix.
+    description: M1-validated scalar angular-spectrum propagation through Chromatix.
     framework: jax
-    approximation: vector_wave
+    approximation: scalar_wave
     inputs:
       - name: input_field
         artifact: complex_field
@@ -97,13 +92,15 @@ models:
         artifact: complex_field
         provides_metadata:
           [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
-    devices: [cpu, gpu, tpu]
+    devices: [cpu]
     dtypes: [complex64]
     derivative:
       mode: native_autodiff
       verified: false
       parameters: ["*"]
-      notes: Validate each propagation kernel and parameterization used by a benchmark.
+      notes: >-
+        M1 establishes only forward scalar asm_propagate on CPU/complex64.
+        Gradients, GPU/TPU, vector fields, and other kernels remain unverified.
     validity:
       assumptions:
         - Sampling and propagation method satisfy the relevant band-limit conditions.
@@ -112,7 +109,8 @@ models:
         - >-
           CHE-12 verified Chromatix distribution 0.6.0 from Git commit
           d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee with JAX 0.6.2 on CPU;
-          analytic Airy/Gaussian validation remains a baseline task.
+          M1 validates scalar angular-spectrum cases and a Gaussian scaling
+          case; it does not validate vector, accelerator, or gradient paths.
         - >-
           A complex128 input array is silently downcast to complex64 inside
           chromatix.core.field.ScalarField.__init__; there is no verified
@@ -129,7 +127,7 @@ models:
       pinned_commit: d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
       retrieved_at: "2026-07-30"
     maturity: experimental
-    tags: [wave, fourier, imaging, jax, differentiable]
+    tags: [wave, fourier, imaging, jax, scalar, forward-only]
 
   - id: M_RCWA_FMMAX
     version: 0.1.0

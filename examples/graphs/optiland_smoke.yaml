@@ -17,6 +17,6 @@ metadata:
     ReverseTelephoto sample lens traced on the default (non-differentiable)
     numpy backend. No edges, design variables, or objectives -- this graph
     only exercises node/model validation against the packaged registry.
-    config['wavelength'] is in optiland's native, independently-unverified
-    length unit (see src/multiscale_optics_agent/adapters/optiland_adapter.py
-    module docstring), not SI meters.
+    config['wavelength'] is supplied to Optiland in its verified native
+    micrometre unit; the adapter persists wavelength and position in SI while
+    preserving RealRays.opd as a native, reference-unverified value.

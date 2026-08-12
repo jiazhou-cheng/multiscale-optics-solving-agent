@@ -10,3 +10,8 @@ Implement in this order:
 6. `L1-PC-01` — photonic-crystal band/eigenmode task.
 
 Level 1 calibrates adapters and verification. Do not begin a Level 2 graph until its constituent Level 1 models have passed their relevant tests.
+
+`L1-RAY-01` is implemented under [`L1-RAY-01/`](L1-RAY-01/) as the CHE-17
+Optiland-only analytic accuracy suite. It covers manufactured free-space
+propagation, ideal paraxial focusing, and a documented Edmund Optics catalog
+lens; bounded optimization remains outside this M1 accuracy issue.

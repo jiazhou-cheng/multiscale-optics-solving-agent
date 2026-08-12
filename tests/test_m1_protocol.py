@@ -61,7 +61,10 @@ def test_protocol_json_schemas_are_valid_json_and_match_protocol() -> None:
     assert (
         result_schema["properties"]["performance"]["properties"]["measured_repeats"]["minimum"] == 5
     )
-    assert provenance_schema["properties"]["protocol_id"]["const"] == ("M1-BASELINE-CPU-V1")
+    assert provenance_schema["properties"]["protocol_id"]["enum"] == [
+        "M1-BASELINE-CPU-V1",
+        "M1-BASELINE-CPU-V2",
+    ]
     assert (
         provenance_schema["properties"]["artifact_hashes"]["additionalProperties"]["pattern"]
         == "^[0-9a-f]{64}$"

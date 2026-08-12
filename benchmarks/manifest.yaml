@@ -1,20 +1,89 @@
 version: 0.1.0
+m1_exit_report: benchmarks/M1_BASELINE_REPORT.md
+m1_independence_check: benchmarks/verify_m1_independence.py
 levels:
   1:
     name: one-model simulation
     tasks:
       - id: L1-RAY-01
-        title: Sequential lens analysis and bounded optimization
+        title: Optiland analytic ray accuracy
         primary_model: M_RAY_OPTILAND
+        implementation: benchmarks/level1/L1-RAY-01
+        command: >-
+          ./run.sh python benchmarks/level1/L1-RAY-01/run_benchmark.py
+          --output-dir outputs/L1-RAY-01
+        scaling_command: >-
+          ./run.sh python benchmarks/level1/L1-RAY-01/run_scaling.py
+          --backend numpy --output-dir outputs/L1-RAY-01/scaling
+        scaling_evaluator: >-
+          ./run.sh python benchmarks/level1/L1-RAY-01/evaluate.py
+          --section scaling --output-dir outputs/L1-RAY-01/scaling
+        bundle_command: >-
+          ./run.sh python benchmarks/level1/L1-RAY-01/run_all.py
+          --output-dir outputs/M1/ray
+        bundle_evaluator: >-
+          ./run.sh python benchmarks/verify_m1_independence.py
+        evaluator_version: "1.0.0"
         protocol: benchmarks/protocol.yaml
         result_schema: benchmarks/schemas/result.schema.json
         provenance_schema: benchmarks/schemas/provenance.schema.json
       - id: L1-WAVE-01
-        title: Aperture diffraction and Gaussian-beam propagation
+        title: Chromatix wave-propagation accuracy, exact to high-NA vectorial
         primary_model: M_WAVE_CHROMATIX
+        implementation: benchmarks/level1/L1-WAVE-01
+        command: >-
+          ./run.sh python benchmarks/level1/L1-WAVE-01/evaluate.py
+          --case gaussian --output-dir outputs/L1-WAVE-01
+        reference_command: >-
+          ./run.sh python benchmarks/level1/L1-WAVE-01/generate_reference.py
+        scaling_command: >-
+          ./run.sh python benchmarks/level1/L1-WAVE-01/run_scaling.py
+          --device cpu --output-dir outputs/L1-WAVE-01/scaling
+        scaling_evaluator: >-
+          ./run.sh python benchmarks/level1/L1-WAVE-01/evaluate.py
+          --section scaling --output-dir outputs/L1-WAVE-01/scaling
+        bundle_command: >-
+          ./run.sh python benchmarks/level1/L1-WAVE-01/run_all.py
+          --output-dir outputs/M1/wave
+        bundle_evaluator: >-
+          ./run.sh python benchmarks/verify_m1_independence.py
+        evaluator_version: "1.0.0"
         protocol: benchmarks/protocol.yaml
         result_schema: benchmarks/schemas/result.schema.json
         provenance_schema: benchmarks/schemas/provenance.schema.json
+        cases:
+          - id: case1_exact_primitive
+            gates: true
+            summary: >-
+              FFT-compatible Helmholtz plane-wave eigenmodes propagated
+              unpadded, against an exact analytic phase-transfer oracle
+              u*exp(i k_z z). No approximation anywhere, so the tolerance is
+              derived from float32 phase round-off rather than chosen.
+          - id: case2_paraxial_focus
+            gates: true
+            summary: >-
+              Finite rectangular pupil, ideal paraxial thin lens, and three
+              signed input tilts. Focal position and diffraction compared to an
+              analytic Fresnel/Fourier oracle; an independent float64 angular
+              spectrum separates paraxial-model error from solver error.
+          - id: case3_high_na_vector
+            gates: false
+            status: blocked
+            summary: >-
+              High-NA linearly polarized objective against an independent
+              float64 Richards-Wolf quadrature oracle. BLOCKED: Chromatix
+              0.6.0's high_na_ff_lens is not sampling-independent -- refining
+              only the pupil sampling moves the focal scale by 10x, while the
+              oracle converges to 2e-14. Root cause recorded in the bundle's
+              blocked_reason and in benchmark_design.md.
+        scope_note: >-
+          Sampling, padding, reference-quadrature convergence, and negative
+          perturbations qualify the benchmark but do not define additional
+          physical cases. A catalog plano-convex lens is deliberately not used:
+          Chromatix 0.6.0's thick_plano_convex_lens is implemented through an
+          ABCD matrix and ray_transfer rather than a surface-resolved
+          wave-optical prescription. Chromatix-generated snapshots remain
+          regression evidence only, never oracles.
       - id: L1-TMM-01
         title: Multilayer Bragg mirror
         primary_model: M_TMM_JAXLAYERLUMOS

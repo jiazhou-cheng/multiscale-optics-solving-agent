@@ -8,6 +8,10 @@
   "properties": {
     "schema_version": {"const": 1},
     "benchmark_id": {"enum": ["L1-RAY-01", "L1-WAVE-01"]},
+    "protocol_id": {
+      "enum": ["M1-BASELINE-CPU-V1", "M1-BASELINE-CPU-V2"]
+    },
+    "protocol_amendment": {"type": "string", "minLength": 1},
     "status": {"enum": ["complete", "blocked"]},
     "accuracy": {
       "type": "object",
@@ -71,6 +75,56 @@
             }
           ]
         }
+      }
+    },
+    "scaling": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["cases", "environment_fingerprint", "pass"],
+      "properties": {
+        "cases": {"type": "array", "minItems": 1},
+        "environment_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "pass": {"type": "boolean"}
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "branch",
+        "scientific_fingerprint",
+        "environment_fingerprint",
+        "matching_environment_for_performance",
+        "scientific_projection",
+        "corrupted_fixture_rejection",
+        "pass"
+      ],
+      "properties": {
+        "branch": {"enum": ["ray", "wave"]},
+        "scientific_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "environment_fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "matching_environment_for_performance": {"type": "boolean"},
+        "scientific_projection": {"type": "object"},
+        "corrupted_fixture_rejection": {
+          "type": "object",
+          "required": ["fixture", "mutation", "evaluator_returncode", "detected"],
+          "properties": {
+            "fixture": {"type": "string", "minLength": 1},
+            "mutation": {"type": "string", "minLength": 1},
+            "evaluator_returncode": {"type": "integer", "minimum": 1},
+            "detected": {"const": true}
+          }
+        },
+        "pass": {"type": "boolean"}
       }
     },
     "failure": {

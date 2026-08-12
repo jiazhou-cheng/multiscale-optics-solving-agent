@@ -1,5 +1,5 @@
 # Pinned dependency lock for the agent_solver dev container, covering the
-# first vertical slice of P0 solvers named in CLAUDE.md section 15:
+# solver packages characterized by the existing adapters:
 # Chromatix, FMMAX, FDTDX, JAX-FEM, SAX, Optiland.
 #
 # Regenerate this file (do not hand-edit versions without re-verifying on
