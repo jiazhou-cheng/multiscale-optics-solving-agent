@@ -6,7 +6,7 @@ Grounded in ``knowledge/solvers/optiland/`` (``solver_card.yaml``,
 all captured against the ``agent_solver`` container on 2026-07-30. Nothing
 below relies on training-data memory of an older/different Optiland API.
 
-Scope (deliberately narrow -- see CLAUDE.md section 14 "do not broaden scope
+Scope (deliberately narrow -- see current Optiland scope "do not broaden scope
 while a P0 model/coupler lacks tests")
 ------------------------------------------------------------------------
 - Only the bundled sample lens systems that have actually been probed are
@@ -32,8 +32,7 @@ while a P0 model/coupler lacks tests")
   has validated every parameter path. Any other design-parameter key is
   rejected eagerly.
 
-Backend policy (CLAUDE.md section 3 rule 1: no silent convention changes;
-section 6: no unverified gradient claims)
+Backend policy (no silent convention changes or unverified gradient claims)
 ------------------------------------------------------------------------
 Optiland has exactly two numerical backends, selected process-globally at
 runtime via ``optiland.backend.set_backend(...)`` -- NOT per-object and NOT
@@ -51,7 +50,7 @@ Consequently:
   not explicitly ``"torch"``, ``run()``/``estimate()`` raise
   ``UnsupportedCapabilityError`` *before* importing optiland or torch. This
   adapter never silently substitutes a non-differentiable NumPy result for a
-  requested gradient (CLAUDE.md section 3 rule 1 and section 6).
+  requested gradient (repository scientific-contract requirements).
 - Every call to ``run()`` explicitly calls ``be.set_backend(backend_name)``,
   even when ``backend_name == "numpy"``. ``set_backend`` mutates global,
   process-wide module state and is documented as **not thread-safe**
@@ -64,7 +63,7 @@ Consequently:
   persistence goes through ``optiland.backend.utils.to_numpy``, which
   internally calls ``tensor.detach().cpu().numpy()`` (verified by reading its
   source in the pinned install). That is a real derivative-boundary detach
-  (CLAUDE.md section 3 rule 3) and is recorded explicitly in
+  (repository scientific-contract requirements) and is recorded explicitly in
   ``ModelRunResult.warnings``/``diagnostics`` on every torch-backend run; the
   live, still-differentiable tensor is additionally kept (undetached) in
   ``diagnostics["objective_tensor"]``/``diagnostics["design_parameter_tensors"]``
@@ -79,26 +78,15 @@ Consequently:
   for ``M_RAY_OPTILAND``; nothing in this adapter changes that, and this
   module never sets ``verified: true`` anywhere.
 
-Units (CLAUDE.md section 3 rule 1, section 7)
+Units (repository scientific-contract requirements)
 ------------------------------------------------------------------------
-The physical length unit Optiland's own API uses internally has **not**
-been independently verified in this repository (``conventions.md``, "Units"
-section: only a bare paraxial-focal-length number was observed, with no
-analytic oracle to pin it to meters/mm/etc.). This adapter therefore does
-**not** perform any implicit SI-meters conversion on ``config["wavelength"]``
-or other geometric quantities -- values are passed straight through to
-``Optic.trace(...)`` in whatever native unit Optiland itself uses, and every
-output ``ArtifactRecord`` records
-``metadata["length_unit"] = "optiland_native_unverified"`` plus a matching
-entry in ``ModelRunResult.warnings`` rather than silently assuming SI meters.
-This is a deliberate, documented deviation from this project's default SI
-convention (CLAUDE.md section 7), made because inventing a conversion factor
-without an oracle would itself be a silent, unverified convention change.
-Note this means ``examples/graphs/ray_to_wave.yaml``'s existing
-``wavelength_m`` config key (implying SI meters) is *not* consumed by this
-adapter as written -- flagged as a discovered inconsistency, not silently
-"fixed" here (``ray_to_wave.yaml`` is owned by another task; see CLAUDE.md
-section 13, treat existing graphs/configs as untrusted until audited).
+CHE-12 verified that Optiland geometry is expressed in millimetres and trace
+wavelength in micrometres. ``config["wavelength"]`` remains a native-
+micrometre solver input for compatibility, while persisted position and
+wavelength arrays cross the adapter boundary in SI using exactly ``1e-3
+m/mm`` and ``1e-6 m/um``. ``RealRays.opd`` is deliberately preserved as
+``opd_native``: its reference and sign semantics remain unverified and it is
+not presented as an absolute OPL/OPD oracle.
 
 Exception-handling convention (per ``core/errors.py`` docstring, mirroring
 ``fdtdx_adapter.py``)
@@ -118,7 +106,7 @@ Exception-handling convention (per ``core/errors.py`` docstring, mirroring
   ``ModelRunResult(status=RunStatus.FAILED, error_type=..., error_message=...)``
   rather than raised, per ``SolverExecutionError``'s docstring.
 
-Output ports and known metadata gaps (CLAUDE.md section 3 rule 5: no
+Output ports and known metadata gaps (repository scientific-contract requirements: no
 fabricated solver output)
 ------------------------------------------------------------------------
 ``registry/models.yaml`` declares that the ``rays`` output port provides
@@ -136,12 +124,20 @@ explicitly (``metadata["missing_declared_metadata"]`` plus a matching
 
 from __future__ import annotations
 
+import hashlib
+import json
+import platform
 import re
 import tempfile
+import time
 import uuid
+from collections.abc import Mapping
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from multiscale_optics_agent.adapters.base import (
     CostEstimate,
@@ -164,24 +160,77 @@ _SUPPORTED_BACKENDS = ("numpy", "torch")
 _SUPPORTED_SAMPLES = ("ReverseTelephoto",)
 _SUPPORTED_DEVICE = "cpu"
 _SUPPORTED_DTYPE = "float64"
+_DIRECTION_NORM_TOLERANCE = 1e-12
+_GEOMETRY_M_PER_MM = 1e-3
+_WAVELENGTH_M_PER_UM = 1e-6
+_BASELINE_SEED = 20260811
 
 # The only design-parameter path characterized by
 # knowledge/solvers/optiland/probes/gradient_probe.py.
 _VALIDATED_DESIGN_PARAMETER_PATTERN = re.compile(r"^surfaces\.surfaces\[(\d+)\]\.geometry\.radius$")
 
-_DEFAULT_WAVELENGTH = 0.55  # native optiland units, unverified -- see module docstring
+_DEFAULT_WAVELENGTH = 0.55  # micrometres; verified by CHE-12
 _DEFAULT_NUM_RAYS = 16
 _DEFAULT_HX = 0.0
 _DEFAULT_HY = 0.0
 
 _MISSING_WAVEFRONT_METADATA = ["amplitude", "polarization", "pupil_mask"]
 
-_LENGTH_UNIT_WARNING = (
-    "config['wavelength'] and all traced ray coordinates are in optiland's "
-    "native units, which have not been independently verified against SI "
-    "meters (see knowledge/solvers/optiland/conventions.md, 'Units'); do not "
-    "assume meters or any other specific unit."
+_OPD_WARNING = (
+    "RealRays.opd is preserved in Optiland-native values because its reference "
+    "and sign convention remain unverified; it is regression evidence, not an "
+    "absolute OPL/OPD oracle."
 )
+
+
+class OptilandRayRequest(BaseModel):
+    """Typed contract for the single CHE-13 standalone ray baseline."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prescription: Literal["ReverseTelephoto"] = "ReverseTelephoto"
+    backend: Literal["numpy"] = "numpy"
+    device: Literal["cpu"] = "cpu"
+    dtype: Literal["float64"] = "float64"
+    wavelength_um: float = Field(default=_DEFAULT_WAVELENGTH, gt=0)
+    field_hx: float = Field(default=_DEFAULT_HX, ge=-1.0, le=1.0)
+    field_hy: float = Field(default=_DEFAULT_HY, ge=-1.0, le=1.0)
+    pupil_sampling: int = Field(default=_DEFAULT_NUM_RAYS, gt=0)
+    output_directory: Path
+    seed: int = _BASELINE_SEED
+    require_gradients: Literal[False] = False
+
+
+class OptilandRayFailure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+    stage: str
+    exception_type: str | None = None
+
+
+class OptilandRayResult(BaseModel):
+    """Structured success/failure result for :class:`OptilandRayRequest`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: RunStatus
+    package_version: str | None = None
+    backend: str | None = None
+    device: str | None = None
+    cpu_device: str | None = None
+    dtype: str | None = None
+    requested_sampling: int | None = None
+    surviving_ray_count: int | None = None
+    runtime_seconds: float | None = None
+    output_directory: str | None = None
+    arrays_path: str | None = None
+    summary_path: str | None = None
+    scientific_array_sha256: str | None = None
+    summary_metrics: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    failure: OptilandRayFailure | None = None
 
 
 def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any, Any]:
@@ -224,12 +273,174 @@ def _load_spec() -> ModelSpec:
     return Registry.from_package().models[MODEL_ID]
 
 
+def _cpu_device_name() -> str:
+    """Return an observable CPU description without claiming core isolation."""
+    model = platform.processor().strip()
+    if not model:
+        try:
+            for line in Path("/proc/cpuinfo").read_text().splitlines():
+                if line.lower().startswith("model name"):
+                    model = line.split(":", 1)[1].strip()
+                    break
+        except OSError:
+            pass
+    return model or platform.machine() or "cpu"
+
+
+def _scientific_array_hash(arrays: Mapping[str, Any]) -> str:
+    """Hash names, dtype, shape, and contiguous bytes independent of NPZ metadata."""
+    import numpy as np
+
+    digest = hashlib.sha256()
+    for name in sorted(arrays):
+        array = np.ascontiguousarray(arrays[name])
+        digest.update(name.encode("utf-8"))
+        digest.update(str(array.dtype).encode("ascii"))
+        digest.update(json.dumps(list(array.shape)).encode("ascii"))
+        digest.update(array.tobytes(order="C"))
+    return digest.hexdigest()
+
+
 class OptilandAdapter:
     """``ModelAdapter`` for ``M_RAY_OPTILAND`` (Optiland 0.6.0). See module docstring."""
 
     @property
     def spec(self) -> ModelSpec:
         return _load_spec()
+
+    def run_standalone(self, request: OptilandRayRequest | Mapping[str, Any]) -> OptilandRayResult:
+        """Run the one deterministic CHE-13 CPU baseline and persist its summary.
+
+        A mapping is accepted at the process/CLI boundary so malformed input can
+        be returned as a structured diagnostic. Valid input is immediately
+        converted to the typed request above.
+        """
+        started = time.perf_counter()
+        try:
+            typed = (
+                request
+                if isinstance(request, OptilandRayRequest)
+                else OptilandRayRequest.model_validate(request)
+            )
+        except ValidationError as exc:
+            return OptilandRayResult(
+                status=RunStatus.FAILED,
+                runtime_seconds=time.perf_counter() - started,
+                failure=OptilandRayFailure(
+                    code="OPTILAND_INVALID_BASELINE_REQUEST",
+                    message=str(exc),
+                    stage="request_validation",
+                    exception_type=type(exc).__name__,
+                ),
+            )
+
+        model_request = ModelRunRequest(
+            run_id="che13-standalone",
+            node_id="optiland-ray-baseline",
+            inputs={},
+            config={
+                "sample": typed.prescription,
+                "backend": typed.backend,
+                "device": typed.device,
+                "dtype": typed.dtype,
+                "wavelength": typed.wavelength_um,
+                "Hx": typed.field_hx,
+                "Hy": typed.field_hy,
+                "num_rays": typed.pupil_sampling,
+                "output_directory": str(typed.output_directory),
+                "seed": typed.seed,
+            },
+            design_parameters={},
+            require_gradients=typed.require_gradients,
+        )
+        try:
+            result = self.run(model_request)
+        except (AdapterDependencyError, UnsupportedCapabilityError) as exc:
+            code = (
+                "OPTILAND_DEPENDENCY_UNAVAILABLE"
+                if isinstance(exc, AdapterDependencyError)
+                else "OPTILAND_UNSUPPORTED_BASELINE_REQUEST"
+            )
+            return OptilandRayResult(
+                status=RunStatus.FAILED,
+                backend=typed.backend,
+                device=typed.device,
+                cpu_device=_cpu_device_name(),
+                dtype=typed.dtype,
+                requested_sampling=typed.pupil_sampling,
+                runtime_seconds=time.perf_counter() - started,
+                output_directory=str(typed.output_directory),
+                failure=OptilandRayFailure(
+                    code=code,
+                    message=str(exc),
+                    stage="dependency_or_capability_gate",
+                    exception_type=type(exc).__name__,
+                ),
+            )
+
+        runtime_seconds = time.perf_counter() - started
+        if result.status is not RunStatus.SUCCEEDED:
+            diagnostic_code = str(result.diagnostics.get("code", "OPTILAND_BASELINE_FAILED"))
+            return OptilandRayResult(
+                status=RunStatus.FAILED,
+                package_version=result.diagnostics.get("package_version"),
+                backend=typed.backend,
+                device=typed.device,
+                cpu_device=_cpu_device_name(),
+                dtype=typed.dtype,
+                requested_sampling=typed.pupil_sampling,
+                runtime_seconds=runtime_seconds,
+                output_directory=str(typed.output_directory),
+                warnings=result.warnings,
+                failure=OptilandRayFailure(
+                    code=diagnostic_code,
+                    message=result.error_message or "Optiland baseline failed without a message.",
+                    stage=str(result.diagnostics.get("stage", "adapter_run")),
+                    exception_type=result.error_type,
+                ),
+            )
+
+        rays_artifact = result.outputs["rays"]
+        summary_metrics = dict(result.diagnostics["summary_metrics"])
+        summary = {
+            "schema_version": 1,
+            "prescription": typed.prescription,
+            "backend": typed.backend,
+            "device": typed.device,
+            "dtype": typed.dtype,
+            "wavelength_um": typed.wavelength_um,
+            "field_hx": typed.field_hx,
+            "field_hy": typed.field_hy,
+            "requested_sampling": typed.pupil_sampling,
+            "seed": typed.seed,
+            "seed_semantics": (
+                "recorded; Optiland hexapolar sampler is deterministic and uses no RNG"
+            ),
+            "surviving_ray_count": int(rays_artifact.shape[0]),
+            "scientific_array_sha256": result.diagnostics["scientific_array_sha256"],
+            "summary_metrics": summary_metrics,
+            "conventions": rays_artifact.metadata["conventions"],
+        }
+        summary_path = typed.output_directory / "summary.json"
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+
+        return OptilandRayResult(
+            status=RunStatus.SUCCEEDED,
+            package_version=result.diagnostics["package_version"],
+            backend=typed.backend,
+            device=typed.device,
+            cpu_device=result.diagnostics["cpu_device"],
+            dtype=typed.dtype,
+            requested_sampling=typed.pupil_sampling,
+            surviving_ray_count=int(rays_artifact.shape[0]),
+            runtime_seconds=runtime_seconds,
+            output_directory=str(typed.output_directory),
+            arrays_path=rays_artifact.uri,
+            summary_path=str(summary_path),
+            scientific_array_sha256=result.diagnostics["scientific_array_sha256"],
+            summary_metrics=summary_metrics,
+            warnings=result.warnings,
+        )
 
     def estimate(self, request: ModelRunRequest) -> CostEstimate:
         problems = self._capability_problems(request)
@@ -291,8 +502,8 @@ class OptilandAdapter:
         return ValidationReport(issues=issues)
 
     def run(self, request: ModelRunRequest) -> ModelRunResult:
-        # Eager, pre-solver capability gate (CLAUDE.md section 3 rule 1 and
-        # section 6): must happen before any optiland/torch import so a
+        # Eager, pre-solver capability gate: this must happen before any
+        # optiland/torch import so a
         # caller never silently receives a non-differentiable numpy result
         # when it asked for gradients, and never triggers an untested code
         # path (custom system, unsupported sample/device/dtype/parameter).
@@ -300,6 +511,20 @@ class OptilandAdapter:
         if problems:
             raise UnsupportedCapabilityError("; ".join(message for _, message in problems))
 
+        request_report = self.validate_request(request)
+        if not request_report.valid:
+            return ModelRunResult(
+                status=RunStatus.FAILED,
+                error_type="ValueError",
+                error_message="; ".join(issue.message for issue in request_report.errors),
+                diagnostics={
+                    "code": "OPTILAND_INVALID_REQUEST",
+                    "stage": "request_validation",
+                    "validation_codes": [issue.code for issue in request_report.errors],
+                },
+            )
+
+        started = time.perf_counter()
         backend_name = str(request.config.get("backend", "numpy"))
         sample_name = str(request.config.get("sample", "ReverseTelephoto"))
         wavelength = float(request.config.get("wavelength", _DEFAULT_WAVELENGTH))
@@ -311,13 +536,18 @@ class OptilandAdapter:
             need_torch=backend_name == "torch"
         )
 
+        try:
+            package_version = version("optiland")
+        except PackageNotFoundError:
+            package_version = "unknown"
+
         # optiland.backend.set_backend mutates global, process-wide module
         # state and is documented as not thread-safe (conventions.md). Set it
         # explicitly on every run, even for the numpy default, so a previous
         # run's backend choice in this process can never silently leak in.
         be.set_backend(backend_name)
 
-        warnings: list[str] = [_LENGTH_UNIT_WARNING]
+        warnings: list[str] = [_OPD_WARNING]
         if backend_name == "numpy":
             warnings.append(
                 "backend='numpy' (default): optiland.backend.supports_gradients "
@@ -355,9 +585,11 @@ class OptilandAdapter:
                 error_message=str(exc),
                 warnings=warnings,
                 diagnostics={
+                    "code": "OPTILAND_TRACE_FAILED",
                     "stage": "optiland_build_or_trace",
                     "sample": sample_name,
                     "backend_used": backend_name,
+                    "package_version": package_version,
                 },
             )
 
@@ -368,6 +600,14 @@ class OptilandAdapter:
             "Hx": hx,
             "Hy": hy,
             "wavelength_native_units": wavelength,
+            "package_version": package_version,
+            "device": _SUPPORTED_DEVICE,
+            "cpu_device": _cpu_device_name(),
+            "dtype": _SUPPORTED_DTYPE,
+            "seed": int(request.config.get("seed", _BASELINE_SEED)),
+            "seed_semantics": (
+                "recorded; Optiland hexapolar sampler is deterministic and uses no RNG"
+            ),
         }
 
         if backend_name == "torch" and request.require_gradients:
@@ -378,7 +618,7 @@ class OptilandAdapter:
                 "objective path characterized for this adapter "
                 "(knowledge/solvers/optiland/probes/gradient_probe.py)."
             )
-            # Kept undetached on purpose (CLAUDE.md section 3 rule 3): a
+            # Kept undetached on purpose (repository scientific-contract requirements): a
             # caller needing the gradient must call .backward() on this exact
             # tensor object. ArtifactRecord has no field for a live autograd
             # graph, so it cannot be exposed through `outputs` below.
@@ -391,12 +631,21 @@ class OptilandAdapter:
                 "NumPy copy (optiland.backend.utils.to_numpy, which calls "
                 "tensor.detach().cpu().numpy() internally) for on-disk "
                 "persistence -- that conversion is the recorded derivative "
-                "boundary (CLAUDE.md section 3 rule 3), and it does not carry "
+                "boundary (repository scientific-contract requirements), and it does not carry "
                 "gradient information."
             )
 
         try:
-            run_dir = Path(tempfile.mkdtemp(prefix=f"optiland_{request.run_id}_{request.node_id}_"))
+            configured_output = request.config.get("output_directory")
+            if configured_output is None:
+                run_dir = Path(
+                    tempfile.mkdtemp(prefix=f"optiland_{request.run_id}_{request.node_id}_")
+                )
+            else:
+                run_dir = Path(str(configured_output))
+                run_dir.mkdir(parents=True, exist_ok=True)
+            final_surface = lens.surfaces.surfaces[-1]
+            reference_plane_z_mm = float(be_utils.to_numpy(final_surface.geometry.cs.z))
             rays_artifact = self._build_ray_bundle_artifact(
                 request,
                 rays,
@@ -408,6 +657,7 @@ class OptilandAdapter:
                 hy,
                 num_rays,
                 run_dir,
+                reference_plane_z_mm,
             )
             wavefront_artifact, wavefront_warnings = self._build_wavefront_artifact(
                 request, rays, be_utils, backend_name, sample_name, wavelength, run_dir
@@ -418,10 +668,22 @@ class OptilandAdapter:
                 error_type=type(exc).__name__,
                 error_message=str(exc),
                 warnings=warnings,
-                diagnostics=diagnostics,
+                diagnostics={
+                    **diagnostics,
+                    "code": "OPTILAND_INVALID_OR_EMPTY_OUTPUT",
+                    "stage": "output_validation_or_persistence",
+                },
             )
 
         warnings.extend(wavefront_warnings)
+        diagnostics.update(
+            {
+                "actual_surviving_ray_count": int(rays_artifact.shape[0]),
+                "runtime_seconds": time.perf_counter() - started,
+                "scientific_array_sha256": rays_artifact.metadata["scientific_array_sha256"],
+                "summary_metrics": rays_artifact.metadata["summary_metrics"],
+            }
+        )
         return ModelRunResult(
             status=RunStatus.SUCCEEDED,
             outputs={"rays": rays_artifact, "wavefront": wavefront_artifact},
@@ -547,31 +809,75 @@ class OptilandAdapter:
         hy: float,
         num_rays: int,
         run_dir: Path,
+        reference_plane_z_mm: float,
     ) -> ArtifactRecord:
         import numpy as np
 
-        x = be_utils.to_numpy(rays.x)
-        y = be_utils.to_numpy(rays.y)
-        z = be_utils.to_numpy(rays.z)
-        direction_l = be_utils.to_numpy(rays.L)
-        direction_m = be_utils.to_numpy(rays.M)
-        direction_n = be_utils.to_numpy(rays.N)
-        intensity = be_utils.to_numpy(rays.i)
-        traced_wavelength = be_utils.to_numpy(rays.w)
+        native = {
+            "x": np.asarray(be_utils.to_numpy(rays.x), dtype=np.float64),
+            "y": np.asarray(be_utils.to_numpy(rays.y), dtype=np.float64),
+            "z": np.asarray(be_utils.to_numpy(rays.z), dtype=np.float64),
+            "L": np.asarray(be_utils.to_numpy(rays.L), dtype=np.float64),
+            "M": np.asarray(be_utils.to_numpy(rays.M), dtype=np.float64),
+            "N": np.asarray(be_utils.to_numpy(rays.N), dtype=np.float64),
+            "intensity": np.asarray(be_utils.to_numpy(rays.i), dtype=np.float64),
+            "wavelength_um": np.asarray(be_utils.to_numpy(rays.w), dtype=np.float64),
+            "opd_native": np.asarray(be_utils.to_numpy(rays.opd), dtype=np.float64),
+        }
+        shapes = {name: array.shape for name, array in native.items()}
+        if not native["x"].size:
+            raise ValueError("Optiland returned an empty surviving-ray set.")
+        if len(set(shapes.values())) != 1 or native["x"].ndim != 1:
+            raise ValueError(f"RealRays arrays must be equal-length 1-D arrays; got {shapes!r}.")
+        nonfinite = {
+            name: int(np.count_nonzero(~np.isfinite(array))) for name, array in native.items()
+        }
+        if any(nonfinite.values()):
+            raise ValueError(f"Optiland returned non-finite scientific output: {nonfinite!r}.")
+
+        direction_norm = np.sqrt(native["L"] ** 2 + native["M"] ** 2 + native["N"] ** 2)
+        max_direction_norm_error = float(np.max(np.abs(direction_norm - 1.0)))
+        if backend_name == "numpy" and max_direction_norm_error > _DIRECTION_NORM_TOLERANCE:
+            raise ValueError(
+                "Optiland direction vectors are not unit norm: "
+                f"max error {max_direction_norm_error:.17g} exceeds "
+                f"{_DIRECTION_NORM_TOLERANCE:.1e}."
+            )
+
+        arrays = {
+            "x_m": native["x"] * _GEOMETRY_M_PER_MM,
+            "y_m": native["y"] * _GEOMETRY_M_PER_MM,
+            "z_m": native["z"] * _GEOMETRY_M_PER_MM,
+            "L": native["L"],
+            "M": native["M"],
+            "N": native["N"],
+            "intensity": native["intensity"],
+            "wavelength_m": native["wavelength_um"] * _WAVELENGTH_M_PER_UM,
+            "opd_native": native["opd_native"],
+            # The trace API exposes survivors only. This derived boolean states
+            # the membership of each exported row; it is not an Optiland pupil mask.
+            "survived": np.ones(native["x"].shape, dtype=np.bool_),
+        }
+        scientific_hash = _scientific_array_hash(arrays)
+        summary_metrics = {
+            "max_direction_norm_error": max_direction_norm_error,
+            "direction_norm_tolerance": _DIRECTION_NORM_TOLERANCE,
+            "all_finite": True,
+            "intensity_min": float(np.min(native["intensity"])),
+            "intensity_max": float(np.max(native["intensity"])),
+            "intensity_sum": float(np.sum(native["intensity"])),
+            "opd_native_min": float(np.min(native["opd_native"])),
+            "opd_native_max": float(np.max(native["opd_native"])),
+            "x_m_min": float(np.min(arrays["x_m"])),
+            "x_m_max": float(np.max(arrays["x_m"])),
+            "y_m_min": float(np.min(arrays["y_m"])),
+            "y_m_max": float(np.max(arrays["y_m"])),
+            "z_m_min": float(np.min(arrays["z_m"])),
+            "z_m_max": float(np.max(arrays["z_m"])),
+        }
 
         path = run_dir / "rays.npz"
-        np.savez(
-            path,
-            x=x,
-            y=y,
-            z=z,
-            L=direction_l,
-            M=direction_m,
-            N=direction_n,
-            intensity=intensity,
-            wavelength=traced_wavelength,
-        )
-        import hashlib
+        np.savez(path, **arrays)
 
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -580,15 +886,20 @@ class OptilandAdapter:
             kind=ArtifactKind.RAY_BUNDLE,
             uri=str(path),
             sha256=digest,
-            shape=tuple(x.shape),
-            dtype=str(x.dtype),
+            shape=tuple(native["x"].shape),
+            dtype=str(native["x"].dtype),
             framework=Framework.PYTORCH if backend_name == "torch" else Framework.NUMPY,
             device=Device.CPU,
-            units=None,
+            units="SI for position and wavelength; dimensionless direction/intensity; native OPD",
             metadata={
-                "length_unit": "optiland_native_unverified",
-                "wavelength": float(traced_wavelength[0]) if traced_wavelength.size else None,
-                "coordinate_fields": ["x", "y", "z"],
+                "length_unit": "m",
+                "native_length_unit": "mm",
+                "native_to_si_scale": _GEOMETRY_M_PER_MM,
+                "wavelength_unit": "m",
+                "native_wavelength_unit": "um",
+                "native_wavelength_to_si_scale": _WAVELENGTH_M_PER_UM,
+                "wavelength_m": float(arrays["wavelength_m"][0]),
+                "coordinate_fields": ["x_m", "y_m", "z_m"],
                 "direction_fields": ["L", "M", "N"],
                 "intensity_field": "intensity",
                 "intensity_is_not_amplitude": (
@@ -600,9 +911,34 @@ class OptilandAdapter:
                 "requested_Hx": hx,
                 "requested_Hy": hy,
                 "requested_num_rays": num_rays,
-                "traced_num_rays": int(x.shape[0]),
+                "traced_num_rays": int(native["x"].shape[0]),
+                "survival_field": "survived",
+                "survival_semantics": (
+                    "Every exported row survived the sequential trace. Optic.trace "
+                    "does not expose rejected input candidates, so invalid and "
+                    "vignetted counts before survivor filtering are unavailable."
+                ),
                 "sample": sample_name,
                 "backend": backend_name,
+                "scientific_array_sha256": scientific_hash,
+                "summary_metrics": summary_metrics,
+                "conventions": {
+                    "axes": "x,y,z right-handed Cartesian; propagation is +z",
+                    "handedness": "right-handed",
+                    "direction": "(L,M,N) direction cosines in the same frame",
+                    "reference_plane": "final traced image surface, surface index 14",
+                    "reference_plane_z_m": reference_plane_z_mm * _GEOMETRY_M_PER_MM,
+                    "opd_field": "opd_native",
+                    "opd_unit": "Optiland native value (geometry-scale mm expected)",
+                    "opd_reference": "unverified",
+                    "opd_sign": "unverified",
+                    "polarization": "missing; RealRays provides no polarization state",
+                    "coherence": "missing; sequential rays are not a coherent complex field",
+                    "normalization": "raw Optiland ray intensity/weight; not normalized",
+                    "sampling": (
+                        "hexapolar pupil distribution; requested value is density, not output count"
+                    ),
+                },
             },
         )
 
@@ -618,13 +954,13 @@ class OptilandAdapter:
     ) -> tuple[ArtifactRecord, list[str]]:
         import numpy as np
 
-        x = be_utils.to_numpy(rays.x)
-        y = be_utils.to_numpy(rays.y)
+        x = be_utils.to_numpy(rays.x) * _GEOMETRY_M_PER_MM
+        y = be_utils.to_numpy(rays.y) * _GEOMETRY_M_PER_MM
         opd = be_utils.to_numpy(rays.opd)
-        traced_wavelength = be_utils.to_numpy(rays.w)
+        traced_wavelength = be_utils.to_numpy(rays.w) * _WAVELENGTH_M_PER_UM
 
         path = run_dir / "wavefront.npz"
-        np.savez(path, x=x, y=y, opd=opd, wavelength=traced_wavelength)
+        np.savez(path, x_m=x, y_m=y, opd_native=opd, wavelength_m=traced_wavelength)
         import hashlib
 
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -635,7 +971,7 @@ class OptilandAdapter:
             "optiland.rays.real_rays.RealRays exposes neither a polarization "
             "state nor a pupil mask (only x, y, z, L, M, N, i, opd, w). These "
             "metadata keys are intentionally left unpopulated rather than "
-            "fabricated (CLAUDE.md section 3 rule 5)."
+            "fabricated (repository scientific-contract requirements)."
         ]
 
         artifact = ArtifactRecord(
@@ -649,9 +985,10 @@ class OptilandAdapter:
             device=Device.CPU,
             units=None,
             metadata={
-                "length_unit": "optiland_native_unverified",
+                "length_unit": "m",
+                "wavelength_unit": "m",
                 "wavelength": float(traced_wavelength[0]) if traced_wavelength.size else None,
-                "coordinate_fields": ["x", "y"],
+                "coordinate_fields": ["x_m", "y_m"],
                 "optical_path_length_source": (
                     "RealRays.opd -- convention not independently verified "
                     "(absolute optical path length vs. OPD relative to a "

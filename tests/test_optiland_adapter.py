@@ -12,6 +12,8 @@ nothing here is a re-derived or assumed oracle.
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
@@ -22,8 +24,14 @@ optiland = pytest.importorskip("optiland")
 from conftest import load_probe_expected  # noqa: E402
 
 from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # noqa: E402
-from multiscale_optics_agent.adapters.optiland_adapter import OptilandAdapter  # noqa: E402
-from multiscale_optics_agent.core.errors import UnsupportedCapabilityError  # noqa: E402
+from multiscale_optics_agent.adapters.optiland_adapter import (  # noqa: E402
+    OptilandAdapter,
+    OptilandRayRequest,
+)
+from multiscale_optics_agent.core.errors import (  # noqa: E402
+    AdapterDependencyError,
+    UnsupportedCapabilityError,
+)
 from multiscale_optics_agent.core.specs import ArtifactKind  # noqa: E402
 
 pytestmark = pytest.mark.integration
@@ -81,7 +89,7 @@ def test_smoke_run_succeeds_with_ray_and_wavefront_outputs() -> None:
     # The persisted artifact on disk must be loadable and non-empty,
     # independent of the in-process diagnostics dict.
     saved_rays = np.load(rays_artifact.uri)
-    assert saved_rays["x"].shape == rays_artifact.shape
+    assert saved_rays["x_m"].shape == rays_artifact.shape
 
 
 # ---------------------------------------------------------------------------
@@ -103,8 +111,8 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
     assert result.diagnostics["sample"] == expected["lens_class"]
 
     saved = np.load(rays_artifact.uri)
-    assert saved["x"].shape == tuple(expected["rays_x_shape"])
-    assert str(saved["x"].dtype) == expected["rays_x_dtype"]
+    assert saved["x_m"].shape == tuple(expected["rays_x_shape"])
+    assert str(saved["x_m"].dtype) == expected["rays_x_dtype"]
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +125,7 @@ def test_gradient_matches_recorded_probe_within_known_tolerance() -> None:
     """Reproduce knowledge/solvers/optiland/probes/gradient_probe.py through the adapter.
 
     This is a regression lock on a *recorded* directional-derivative check,
-    not the full CLAUDE.md section 6.2 gradient-verification bundle (that
+    not the full repository gradient-verification bundle (that
     would need multiple finite-difference step sizes, a convergence table,
     and a deliberately ill-conditioned case -- out of scope here). The
     relative-error tolerance below (2e-3) is intentionally looser than every
@@ -250,3 +258,127 @@ def test_spec_matches_registry_entry(registry) -> None:
         adapter.spec is registry.models["M_RAY_OPTILAND"]
         or adapter.spec == registry.models["M_RAY_OPTILAND"]
     )
+
+
+def test_standalone_contract_is_deterministic_and_complete(tmp_path) -> None:
+    adapter = OptilandAdapter()
+    first = adapter.run_standalone(OptilandRayRequest(output_directory=tmp_path / "first"))
+    second = adapter.run_standalone(OptilandRayRequest(output_directory=tmp_path / "second"))
+
+    assert first.status is RunStatus.SUCCEEDED, first.failure
+    assert second.status is RunStatus.SUCCEEDED, second.failure
+    assert first.package_version == "0.6.0"
+    assert first.backend == "numpy"
+    assert first.device == "cpu"
+    assert first.dtype == "float64"
+    assert first.requested_sampling == 16
+    assert first.surviving_ray_count == 817
+    assert first.runtime_seconds is not None and first.runtime_seconds < 10.0
+    assert first.scientific_array_sha256 == second.scientific_array_sha256
+    assert first.summary_metrics == second.summary_metrics
+    assert json.loads((tmp_path / "first" / "summary.json").read_text()) == json.loads(
+        (tmp_path / "second" / "summary.json").read_text()
+    )
+
+    saved = np.load(first.arrays_path)
+    assert set(saved.files) == {
+        "x_m",
+        "y_m",
+        "z_m",
+        "L",
+        "M",
+        "N",
+        "intensity",
+        "wavelength_m",
+        "opd_native",
+        "survived",
+    }
+    assert np.all(saved["survived"])
+    assert np.max(np.abs(np.sqrt(saved["L"] ** 2 + saved["M"] ** 2 + saved["N"] ** 2) - 1)) <= 1e-12
+    assert np.all(saved["wavelength_m"] == pytest.approx(0.55e-6))
+
+    expected = load_probe_expected("optiland", "standalone_baseline")
+    assert first.scientific_array_sha256 == expected["stable_result"]["scientific_array_sha256"]
+    assert first.summary_metrics == expected["stable_result"]["summary_metrics"]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected_code"),
+    [
+        ({"prescription": "not-a-lens"}, "OPTILAND_INVALID_BASELINE_REQUEST"),
+        ({"backend": "torch"}, "OPTILAND_INVALID_BASELINE_REQUEST"),
+        ({"require_gradients": True}, "OPTILAND_INVALID_BASELINE_REQUEST"),
+    ],
+)
+def test_standalone_invalid_or_unsupported_request_is_structured(
+    tmp_path, overrides, expected_code
+) -> None:
+    payload = {"output_directory": tmp_path / "failed", **overrides}
+    result = OptilandAdapter().run_standalone(payload)
+
+    assert result.status is RunStatus.FAILED
+    assert result.failure is not None
+    assert result.failure.code == expected_code
+    assert result.failure.stage == "request_validation"
+    assert result.arrays_path is None
+
+
+def test_standalone_missing_dependency_is_structured(tmp_path) -> None:
+    adapter = OptilandAdapter()
+    with patch(
+        "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
+        side_effect=AdapterDependencyError("missing pinned package"),
+    ):
+        result = adapter.run_standalone({"output_directory": tmp_path / "failed"})
+
+    assert result.status is RunStatus.FAILED
+    assert result.failure is not None
+    assert result.failure.code == "OPTILAND_DEPENDENCY_UNAVAILABLE"
+    assert result.arrays_path is None
+
+
+def _fake_optiland_import(values):
+    class Backend:
+        @staticmethod
+        def set_backend(name):
+            assert name == "numpy"
+
+    class BackendUtils:
+        @staticmethod
+        def to_numpy(value):
+            return np.asarray(value)
+
+    class Lens:
+        surfaces = SimpleNamespace(
+            surfaces=[SimpleNamespace(geometry=SimpleNamespace(cs=SimpleNamespace(z=0.0)))]
+        )
+
+        def trace(self, **kwargs):
+            return values
+
+    return Backend, SimpleNamespace(ReverseTelephoto=Lens), BackendUtils, None
+
+
+@pytest.mark.parametrize("bad_value", [np.array([], dtype=float), np.array([np.nan])])
+def test_standalone_empty_or_nonfinite_output_is_structured(tmp_path, bad_value) -> None:
+    rays = SimpleNamespace(
+        x=bad_value,
+        y=bad_value,
+        z=bad_value,
+        L=bad_value,
+        M=bad_value,
+        N=bad_value,
+        i=bad_value,
+        w=bad_value,
+        opd=bad_value,
+    )
+    with patch(
+        "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
+        return_value=_fake_optiland_import(rays),
+    ):
+        result = OptilandAdapter().run_standalone({"output_directory": tmp_path / "failed"})
+
+    assert result.status is RunStatus.FAILED
+    assert result.failure is not None
+    assert result.failure.code == "OPTILAND_INVALID_OR_EMPTY_OUTPUT"
+    assert result.arrays_path is None

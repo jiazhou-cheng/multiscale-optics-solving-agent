@@ -1,0 +1,21 @@
+schema_version: 1
+benchmark_id: L1-RAY-01
+protocol_id: M1-BASELINE-CPU-V2
+device: cpu
+dtype: float64
+seed: 20260811
+free_space:
+  distance_mm: 100.0
+  wavelength_um: 0.5876
+paraxial_thin_lens:
+  focal_length_mm: 50.0
+  aperture_radius_mm: 1.0
+  wavelength_um: 0.5876
+  pupil_heights_mm: [-1.0, -0.5, 0.0, 0.5, 1.0]
+  launch_slopes_rad: [-0.01, 0.0, 0.01]
+catalog_lens:
+  object_plane_z_mm: -10.0
+  wavelength_um: 0.5876
+  pupil_heights_mm: [-4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0]
+  launch_slopes_rad: [-0.01, 0.0, 0.01]
+  aperture_test_heights_mm: [-9.6, -9.4, 9.4, 9.6]

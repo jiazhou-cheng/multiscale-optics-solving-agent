@@ -1,5 +1,5 @@
 # Per-source provenance for the optiland knowledge pack.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.2 for the field contract.
+# Provenance follows AGENTS.md "Sources of Truth".
 
 sources:
   - url: https://pypi.org/project/optiland/
@@ -11,8 +11,8 @@ sources:
       (Requires-Dist, Project-URL) is what actually revealed torch is not a
       declared dependency and that the canonical repository moved to
       github.com/optiland/optiland. Treated as higher-priority than the
-      README prose for these two facts, per docs/AGENT_KNOWLEDGE_BASE.md
-      section 7 (installed package metadata over docs).
+      README prose for these two facts, under the repository source-of-truth
+      policy (installed package metadata over docs).
 
   - url: https://github.com/HarrisonKramer/optiland
     source_type: official_repository
@@ -44,3 +44,20 @@ sources:
       source, but the page does NOT mention that torch must be installed
       separately -- that gap was only found by reading the actual package
       metadata (see the PyPI source entry above).
+
+  - url: https://www.edmundoptics.com/p/200mm-dia-x-500mm-fl-uncoated-plano-convex-lens/5832/
+    source_type: manufacturer_product_specification
+    retrieved_at: "2026-08-11"
+    usage_note: >
+      CHE-17 L1-RAY-01 catalog-lens prescription and reference: TECHSPEC stock
+      #45-362, 20 mm diameter, 19 mm clear aperture, N-BK7, R1=25.84 mm,
+      plano R2, 3.23 mm center thickness, EFL 50.00 mm and BFL 47.87 mm at
+      587.6 nm, with published focal-length and thickness tolerances.
+
+  - url: https://www.schott.com/shop/advanced-optics/en/Optical-Glass/SCHOTT-N-BK7/c/glass-SCHOTT%20N-BK7%C2%AE
+    source_type: manufacturer_material_datasheet
+    retrieved_at: "2026-08-11"
+    usage_note: >
+      Independent CHE-17 N-BK7 refractive-index and Sellmeier-dispersion
+      reference. The evaluator computes n at 587.6 nm without calling
+      Optiland, then uses it in thick-lens EFL/BFL and axial-OPL oracles.

@@ -1,7 +1,7 @@
 """Minimal directional-derivative probe for M_RAY_OPTILAND, torch backend.
 
-This is a probe, not the repository gradient test required by CLAUDE.md
-section 6.2 (needs multiple step sizes, a convergence table, and a
+This is a probe, not the repository gradient test (which needs multiple step
+sizes, a convergence table, and a
 deliberately ill-conditioned case). It establishes that torch autograd
 flows through `Optic.trace()` for one parameter path: a lens surface's
 radius of curvature -> ray trace -> RMS spot size at the origin field

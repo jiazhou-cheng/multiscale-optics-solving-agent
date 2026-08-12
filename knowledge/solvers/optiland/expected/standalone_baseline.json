@@ -1,0 +1,43 @@
+{
+  "deterministic": true,
+  "request": {
+    "backend": "numpy",
+    "device": "cpu",
+    "dtype": "float64",
+    "field_hx": 0.0,
+    "field_hy": 0.0,
+    "prescription": "ReverseTelephoto",
+    "pupil_sampling": 16,
+    "require_gradients": false,
+    "seed": 20260811,
+    "wavelength_um": 0.55
+  },
+  "runtime_under_10_seconds": true,
+  "schema_version": 1,
+  "stable_result": {
+    "backend": "numpy",
+    "device": "cpu",
+    "dtype": "float64",
+    "package_version": "0.6.0",
+    "requested_sampling": 16,
+    "scientific_array_sha256": "e494af418a859b722c5b24d1c142cf3f888399b3229a6b2601846ab4352c5a81",
+    "summary_metrics": {
+      "all_finite": true,
+      "direction_norm_tolerance": 1e-12,
+      "intensity_max": 0.999831103160469,
+      "intensity_min": 0.9998197316455706,
+      "intensity_sum": 816.8576191444665,
+      "max_direction_norm_error": 1.5543122344752192e-15,
+      "opd_native_max": 6.061975232699169,
+      "opd_native_min": 6.061956743316198,
+      "x_m_max": 5.695279815682992e-07,
+      "x_m_min": -5.695279815682992e-07,
+      "y_m_max": 5.68882899539519e-07,
+      "y_m_min": -5.68882899539519e-07,
+      "z_m_max": 0.005209361469999999,
+      "z_m_min": 0.005209361469999999
+    },
+    "surviving_ray_count": 817
+  },
+  "status": "passed"
+}

@@ -85,3 +85,22 @@ Optiland's `Requires-Python` is `>=3.10` per its wheel metadata — looser
 than chromatix's `>=3.12` or sax's `>=3.11`. Not a source of conflict in
 this repository's shared `python:3.12-slim` image, but worth knowing if
 optiland is ever split into its own lighter environment.
+
+## CHE-13 standalone structured failures
+
+`OptilandAdapter.run_standalone()` never returns fabricated ray arrays after a
+failure. Malformed prescriptions, non-CPU/non-NumPy/gradient requests, and
+invalid scalar inputs return `OPTILAND_INVALID_BASELINE_REQUEST`. A missing
+package returns `OPTILAND_DEPENDENCY_UNAVAILABLE`. Empty, unequal-shape,
+non-finite, or non-unit float64 NumPy ray output returns
+`OPTILAND_INVALID_OR_EMPTY_OUTPUT`. Each result records the failure stage and
+exception type, while `arrays_path` and scientific metrics remain absent.
+
+## L1-RAY-01 benchmark blockers
+
+`run_benchmark.py` writes a `status: blocked` result with code
+`L1_RAY_01_EXECUTION_FAILED` if the pinned dependency, prescription
+construction, trace, artifact generation, or provenance stage fails. It does
+not substitute sample-lens output or analytic values for missing solver rays.
+The evaluator also fails if any forbidden Chromatix or coupler module appears
+in the ray-only process.

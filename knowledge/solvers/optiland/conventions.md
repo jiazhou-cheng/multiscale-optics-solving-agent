@@ -36,7 +36,7 @@ Verbatim from `optiland.backend.__doc__` (Kramer Harrison, 2025):
 **Implications for this project:**
 
 - Every call to `be.to_numpy` (or `optiland.backend.utils.to_numpy`) is
-  exactly the kind of derivative boundary CLAUDE.md section 3 rule 3 (“no
+  exactly the kind of derivative boundary repository scientific-contract requirements (“no
   silent detach or host copy”) requires recording explicitly in provenance
   — treat it the same as a PyTorch `.detach()`/`.cpu()`/NumPy round trip.
 - `set_backend` is global, mutable, non-thread-safe process state. **Never
@@ -115,3 +115,35 @@ with `1e-6 m/um`. The probe observes `rays.opd=12.0`, not the declared
 10 mm separation; its reference and piston convention remain unverified.
 Preserve that value as Optiland-native OPD and do not use it as a physical
 oracle until the reference convention has a dedicated test.
+
+## CHE-13 standalone ray-state boundary
+
+`OptilandRayRequest` selects exactly the `ReverseTelephoto` prescription,
+NumPy backend, CPU device, float64 dtype, wavelength in um, normalized field
+coordinates, hexapolar pupil-sampling request, output directory, and recorded
+seed. The hexapolar sampler is deterministic and does not consume an exposed
+random seed; the seed is retained for the shared M1 provenance contract.
+
+The saved `rays.npz` contains flat, equal-length arrays `x_m`, `y_m`, `z_m`,
+`L`, `M`, `N`, `intensity`, `wavelength_m`, `opd_native`, and `survived`.
+Coordinates and wavelength are SI. `(L,M,N)` are dimensionless direction
+cosines in a right-handed Cartesian frame with nominal propagation along
+`+z`. The reference plane is the final traced image surface (surface 14 for
+the pinned sample), whose axial coordinate is recorded in metres. Every
+exported row is a surviving ray; Optiland does not expose rejected input
+candidates through `RealRays`, so pre-filter invalid/vignetted counts are not
+invented. The direction unit-norm tolerance is `1e-12` for the float64 NumPy
+baseline.
+
+`intensity` is the raw real Optiland ray intensity/weight. It is neither a
+complex field amplitude nor normalized power. Polarization and coherence are
+missing. `opd_native` preserves the solver value, with reference and sign both
+explicitly `unverified`.
+
+CHE-17 narrows that final caveat for explicitly constructed benchmark
+surfaces only. `L1-RAY-01` verifies Optiland's accumulated `RealRays.opd`
+against closed-form free-space and axial catalog-lens optical paths. It then
+defines comparison OPD by subtracting the pupil-height-zero chief ray within
+each field, with sign `ray minus chief`. This verified evaluator convention
+must not be projected onto bundled sample systems whose internal construction
+and OPD reference have not been independently audited.

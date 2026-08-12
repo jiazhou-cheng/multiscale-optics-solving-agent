@@ -1,5 +1,5 @@
 # Routing-critical facts for M_RAY_OPTILAND.
-# See docs/AGENT_KNOWLEDGE_BASE.md section 2.1 for the field contract.
+# Field contract follows AGENTS.md "Initial Artifact Boundary".
 # Grounded in: agent_solver container (docker/Dockerfile, optiland==0.6.0 +
 # separately-pinned CPU torch==2.13.0) + knowledge/solvers/optiland/probes/*.py
 # run against that image, 2026-07-30.
@@ -28,13 +28,16 @@ repository_note: >
   The PyPI package's own Project-URL metadata confirms optiland/optiland is
   canonical.
 license: not yet confirmed in this pass (not read from LICENSE file or PyPI classifier)
-framework: numpy (default) / pytorch (optional, opt-in backend)
+framework: numpy (M1-validated adapter path)
 supported_regimes:
-  - sequential geometric ray tracing through lens/mirror systems (Optic, Surface)
-  - paraxial analysis (effective focal length, etc. via Optic.paraxial)
-  - bundled sample optical systems (optiland.samples.objectives, e.g. ReverseTelephoto)
-  - wavefront/PSF/MTF/Zernike analysis modules (present, not probed in this pass)
-  - tolerancing and optimization modules (present, not probed in this pass)
+  - sequential geometric ray tracing on CPU/float64 with the NumPy backend
+  - manufactured free-space and ideal paraxial cases
+  - a spherical plano-convex catalog prescription with aperture classification
+  - the bundled ReverseTelephoto sample at one field and wavelength
+package_reported_unverified_regimes:
+  - optional PyTorch backend, GPU execution, and native autodiff
+  - wavefront/PSF/MTF/Zernike analysis modules
+  - tolerancing and optimization modules
 derivative:
   mode: native_autodiff
   mechanism: >
@@ -53,31 +56,47 @@ derivative:
     be non-smoothness near the optical axis, float64 autograd error
     accumulation through the ray-trace recursion, or something else. Do not
     set verified: true, and re-check tolerance before relying on this path
-    in a tight optimization loop. This is NOT the full CLAUDE.md section
-    6.2 gradient test (needs multiple step sizes, a convergence table, and
+    in a tight optimization loop. This is NOT the full repository gradient
+    test (needs multiple step sizes, a convergence table, and
     an ill-conditioned case) and covers only this one parameter/objective
     pair -- not wavefront/OPD export, not every surface type, not GPU.
-devices_reported: [cpu, gpu]
+devices_reported_by_package: [cpu, gpu]
 devices_tested: [cpu]
-dtypes_observed: [float64 (numpy backend rays), float64 (torch backend, explicitly requested)]
+dtypes_validated_for_m1: [float64]
 input_output_artifacts:
   - optiland.rays.real_rays.RealRays (maps to project artifact `ray_bundle`)
 known_conventions: see conventions.md
-cost_scaling: "O(number_of_surfaces * number_of_rays) per trace call (not independently benchmarked in this pass)"
+cost_scaling: >-
+  O(number_of_surfaces * number_of_rays) model; CHE-16 measured fixed-
+  prescription CPU scaling at requested hexapolar sampling 8, 16, 32, and 64.
 limitations_and_failure_modes: see failure_guide.md
 validated_probe_ids:
   - import_probe (passed, 2026-07-30)
   - raytrace_probe (passed, 2026-07-30; bundled sample system only, not an analytic oracle)
   - gradient_probe (passed for one narrow path with looser-than-JAX tolerance, 2026-07-30)
   - m1_engine_contract (passed, 2026-08-11; exact pin, isolated CPU import, and known-distance mm/um check)
+  - standalone_baseline (CHE-13; deterministic ReverseTelephoto CPU/float64 trace,
+    SI boundary conversion, survivor-aware shape, finite/unit-direction checks,
+    structured failures, and stable scientific-array hash)
+  - L1-RAY-01 (CHE-17; free-space and paraxial analytic oracles plus Edmund
+    Optics TECHSPEC #45-362 full prescription/reference trace on CPU/float64)
+  - L1-RAY-01 scaling (CHE-16; ReverseTelephoto requested sampling 8/16/32/64,
+    deterministic scientific hashes and survivor counts, raw timing and peak
+    RSS evidence, with the CHE-17 analytic suite as a mandatory accuracy gate)
 not_yet_probed:
   - GPU device placement (no GPU in this environment)
-  - wavefront/OPD export convention
+  - bundled-sample wavefront/OPD export convention (CHE-17 verifies accumulated
+    path and ray-minus-chief OPD only for explicitly constructed cases)
   - pupil power and coordinate orientation
   - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
 adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
 validation_status: environment_verified
 validation_note: >
-  CHE-12 verified the pinned CPU environment and the native geometry/wavelength
-  units. The L1 ray analytic benchmark and OPD reference convention remain open,
-  so this is not scientific validation.
+  CHE-12 verified the pinned CPU environment and native geometry/wavelength
+  units. CHE-13 stabilizes the standalone deterministic ray-state contract.
+  CHE-17 adds L1 analytic accuracy evidence for free space, ideal paraxial
+  focus, and one catalog plano-convex prescription. CHE-16 adds fixed-case
+  sampling, determinism, CPU runtime, and memory evidence. Registered M1
+  capability is NumPy CPU/float64 forward tracing only; GPU, float32,
+  gradients, broader prescriptions, and bundled-sample OPD coverage remain
+  unverified.

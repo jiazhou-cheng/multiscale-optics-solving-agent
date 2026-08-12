@@ -32,7 +32,7 @@ rays = lens.trace(Hx=0, Hy=0, wavelength=0.55, num_rays=16)
 # rays.x.dtype == float64
 
 f2 = lens.paraxial.f2()
-# f2 == 2.005240270799113  (unit not independently confirmed)
+# f2 == 2.005240270799113 mm
 ```
 
 Full probe: `probes/raytrace_probe.py`; captured output:
@@ -67,8 +67,8 @@ r0.grad.item()                # -> 4.12612817668375e-05
 Centered finite difference at the same point (`eps=1e-4`) gives
 `4.130711772631912e-05` — relative error `1.11e-03`. This is one narrow
 directional-derivative check with a looser tolerance than the JAX-based
-solvers in this repository (not yet root-caused), not the full CLAUDE.md
-section 6.2 gradient test. Full probe: `probes/gradient_probe.py`;
+solvers in this repository (not yet root-caused), not the full repository
+gradient test. Full probe: `probes/gradient_probe.py`;
 captured output: `expected/gradient_probe.json`.
 
 **What happens if torch is not installed was NOT independently verified in
@@ -81,7 +81,18 @@ without testing it directly.
 
 ## 5. Serialization / export
 
-Not yet exercised (`optiland.fileio` exists but was not probed).
+Use the typed CHE-13 boundary rather than serializing solver objects:
+
+```bash
+./run.sh python knowledge/solvers/optiland/probes/standalone_baseline.py \
+  --output-dir /tmp/optiland-che13
+```
+
+The command performs two real CPU traces, writes each SI ray bundle and
+machine-readable summary, then verifies stable summary metrics and the
+scientific-array SHA-256. The tracked regression fixture
+`expected/standalone_baseline.json` is generated only by passing
+`--write-expected` to this executable.
 
 ## 6. Common error signatures and repairs
 

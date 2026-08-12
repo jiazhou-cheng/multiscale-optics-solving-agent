@@ -1,0 +1,28 @@
+schema_version: 1
+manufacturer: Edmund Optics
+part_number: TECHSPEC stock "#45-362"
+description: 20.0 mm diameter x 50.0 mm FL uncoated plano-convex lens
+official_source: https://www.edmundoptics.com/p/200mm-dia-x-500mm-fl-uncoated-plano-convex-lens/5832/
+material_source: https://www.schott.com/shop/advanced-optics/en/Optical-Glass/SCHOTT-N-BK7/c/glass-SCHOTT%20N-BK7%C2%AE
+orientation: convex surface toward collimated input; propagation along +z
+geometry_unit: mm
+wavelength_unit: um
+wavelength_um: 0.5876
+diameter_mm: 20.0
+clear_aperture_mm: 19.0
+center_thickness_mm: 3.23
+center_thickness_tolerance_mm: 0.10
+surface_1_radius_mm: 25.84
+surface_2_radius_mm: .inf
+material: N-BK7
+coating: uncoated
+catalog_efl_mm: 50.00
+catalog_bfl_mm: 47.87
+catalog_focal_length_tolerance_relative: 0.01
+schott_n_d_at_587_6_nm: 1.51680
+object_plane_z_mm: -10.0
+front_vertex_z_mm: 0.0
+back_vertex_z_mm: 3.23
+image_reference_plane_z_mm: 51.10
+stop: circular clear aperture, radius 9.5 mm, applied at both lens surfaces
+

@@ -1,0 +1,6 @@
+schema_version: 1
+smallest_case_process_wall_seconds_max: 10.0
+matching_environment_median_runtime_relative_regression_max: 0.25
+matching_environment_required: true
+deterministic_policy: bitwise_identical_canonical_scientific_arrays_and_summary_metrics
+human_review_required_before_regression_envelope_change: true
