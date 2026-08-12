@@ -6,6 +6,36 @@ machine-readable contract is [`protocol.yaml`](protocol.yaml); benchmark
 implementations must validate their JSON files against the schemas in
 [`schemas/`](schemas/).
 
+## Protocol amendments
+
+| Protocol ID | Applies to | Issue | What changed |
+|---|---|---|---|
+| `M1-BASELINE-CPU-V1` | `L1-RAY-01`, `L1-WAVE-01` | CHE-12 | Base contract frozen below. |
+| `M1-BASELINE-CPU-V2` | `L1-RAY-01` | CHE-20 | Adds authoritative surface-shape and clear-aperture evidence. |
+
+An amendment may only **add** required evidence. It may not relax a V1
+requirement, and it may not change a physical case, a prescription, or a
+tolerance — those require a new `protocol_id` and a new frozen design. Because
+V2 only adds, every V1 metric of `L1-RAY-01` remains reproducible under V2.
+
+`M1-BASELINE-CPU-V2` adds two required `result.json` accuracy metrics —
+`surface_shape_pass` (front intersections satisfy the spherical sag equation,
+rear intersections satisfy the rear plane) and `aperture_classification_pass`
+(dedicated rays at `±9.4 mm` transmit, at `±9.6 mm` vignette; these rays are
+excluded from centroid and spot-RMS metrics) — and six required artifacts:
+`ray_inputs.npz`, `expected.npz`, `error_attribution.json`, and the three
+per-case `*_diagnostics.png` figures. The machine-readable form of this table
+is the `amendments:` block in [`protocol.yaml`](protocol.yaml).
+
+`L1-WAVE-01` remains on `M1-BASELINE-CPU-V1`. The two branches therefore
+legitimately declare different protocol IDs; this is recorded rather than
+normalized, because retrofitting V2 evidence onto the wave branch would mean
+re-freezing a design that already passed review.
+
+The coupler benchmarks introduced in M2 are governed by a separate contract,
+[`M2_COUPLER_PROTOCOL.md`](M2_COUPLER_PROTOCOL.md), which extends rather than
+replaces the measurement and artifact rules below.
+
 ## Verified engine decision
 
 The container probe `benchmarks/probes/verify_m1_engines.py` passed on

@@ -7,6 +7,35 @@ scope:
     L1-RAY-01: [chromatix, multiscale_optics_agent.couplers]
     L1-WAVE-01: [optiland, multiscale_optics_agent.couplers]
 
+# Amendments to the frozen V1 contract. A benchmark declares the amended
+# protocol_id in result.json and provenance.json; the base execution,
+# measurement, artifact, and failure rules below continue to apply unchanged.
+# An amendment may only ADD required evidence. Relaxing a V1 requirement, or
+# changing a physical case or its tolerance, requires a new protocol_id and a
+# new frozen design, not an amendment.
+amendments:
+  - protocol_id: M1-BASELINE-CPU-V2
+    supersedes: M1-BASELINE-CPU-V1
+    applies_to: [L1-RAY-01]
+    issue: CHE-20
+    rationale: >-
+      Surface-shape and clear-aperture behavior became authoritative accuracy
+      evidence for the catalog case. The three physical cases, the Edmund
+      #45-362 prescription, and every V1 metric and tolerance are unchanged, so
+      V1 results remain reproducible under V2.
+    adds_required_result_fields:
+      - accuracy.metrics.surface_shape_pass
+      - accuracy.metrics.aperture_classification_pass
+    adds_required_artifacts:
+      - ray_inputs.npz
+      - expected.npz
+      - error_attribution.json
+      - free_space_diagnostics.png
+      - paraxial_diagnostics.png
+      - catalog_diagnostics.png
+    removes: []
+    relaxes: []
+
 execution:
   entrypoint: ./run.sh
   device: cpu

@@ -7,9 +7,13 @@
   "required": ["schema_version", "benchmark_id", "status"],
   "properties": {
     "schema_version": {"const": 1},
-    "benchmark_id": {"enum": ["L1-RAY-01", "L1-WAVE-01"]},
+    "benchmark_id": {"enum": ["L1-RAY-01", "L1-WAVE-01", "L2-COUPLER-01"]},
     "protocol_id": {
-      "enum": ["M1-BASELINE-CPU-V1", "M1-BASELINE-CPU-V2"]
+      "enum": [
+        "M1-BASELINE-CPU-V1",
+        "M1-BASELINE-CPU-V2",
+        "M2-COUPLER-CPU-V1"
+      ]
     },
     "protocol_amendment": {"type": "string", "minLength": 1},
     "status": {"enum": ["complete", "blocked"]},
@@ -90,6 +94,71 @@
         "pass": {"type": "boolean"}
       }
     },
+    "stochastic": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "seed",
+        "rng_generator",
+        "realizations",
+        "exactness_limit",
+        "unbiasedness",
+        "convergence",
+        "pass"
+      ],
+      "properties": {
+        "seed": {"type": "integer"},
+        "rng_generator": {"type": "string", "minLength": 1},
+        "realizations": {"type": "integer", "minimum": 32},
+        "exactness_limit": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["enumerated_all_propagating_bins", "max_abs_error", "tolerance", "tolerance_basis", "pass"],
+          "properties": {
+            "enumerated_all_propagating_bins": {"const": true},
+            "max_abs_error": {"type": "number", "minimum": 0},
+            "tolerance": {"type": "number", "exclusiveMinimum": 0},
+            "tolerance_basis": {"const": "dtype_roundoff_derived"},
+            "pass": {"type": "boolean"}
+          }
+        },
+        "unbiasedness": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["mean_error", "standard_error", "k_sigma", "pass"],
+          "properties": {
+            "mean_error": {"type": "number"},
+            "standard_error": {"type": "number", "minimum": 0},
+            "k_sigma": {"type": "number", "exclusiveMinimum": 0},
+            "pass": {"type": "boolean"}
+          }
+        },
+        "convergence": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["sweep", "fitted_exponent", "expected_exponent", "exponent_tolerance", "pass"],
+          "properties": {
+            "sweep": {"type": "array", "minItems": 5},
+            "fitted_exponent": {"type": "number"},
+            "expected_exponent": {"type": "number"},
+            "exponent_tolerance": {"type": "number", "exclusiveMinimum": 0},
+            "pass": {"type": "boolean"}
+          }
+        },
+        "pass": {"type": "boolean"}
+      }
+    },
+    "differentiability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["claim", "estimator", "omitted_terms", "finite_difference_comparison"],
+      "properties": {
+        "claim": {"enum": ["not_verified", "characterized_biased", "verified"]},
+        "estimator": {"type": "string", "minLength": 1},
+        "omitted_terms": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "finite_difference_comparison": {"type": "object"}
+      }
+    },
     "reproducibility": {
       "type": "object",
       "additionalProperties": true,
@@ -103,7 +172,7 @@
         "pass"
       ],
       "properties": {
-        "branch": {"enum": ["ray", "wave"]},
+        "branch": {"enum": ["ray", "wave", "coupler"]},
         "scientific_fingerprint": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"

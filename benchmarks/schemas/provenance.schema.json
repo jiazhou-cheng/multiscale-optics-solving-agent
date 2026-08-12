@@ -28,8 +28,14 @@
   ],
   "properties": {
     "schema_version": {"const": 1},
-    "benchmark_id": {"enum": ["L1-RAY-01", "L1-WAVE-01"]},
-    "protocol_id": {"enum": ["M1-BASELINE-CPU-V1", "M1-BASELINE-CPU-V2"]},
+    "benchmark_id": {"enum": ["L1-RAY-01", "L1-WAVE-01", "L2-COUPLER-01"]},
+    "protocol_id": {
+      "enum": [
+        "M1-BASELINE-CPU-V1",
+        "M1-BASELINE-CPU-V2",
+        "M2-COUPLER-CPU-V1"
+      ]
+    },
     "command": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "git_commit": {"type": "string", "minLength": 7},
     "dirty_worktree": {"type": "boolean"},
