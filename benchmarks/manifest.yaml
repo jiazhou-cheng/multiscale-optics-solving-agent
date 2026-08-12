@@ -99,9 +99,26 @@ levels:
   2:
     name: two-to-three-model orchestration
     tasks:
+      - id: L2-COUPLER-01
+        title: Bidirectional ray-wave coupler characterization
+        graph: [C_RAY_TO_WAVE, C_WAVE_TO_RAY]
+        protocol_id: M2-COUPLER-CPU-V1
+        milestone: M2
+        implemented: true
+        entry_point: benchmarks/level2/L2-COUPLER-01/run_benchmark.py
+        note: >
+          Tests the couplers against each other and against analytic oracles, with
+          no solver engine in the coupler core. Deliberately not a graph benchmark:
+          L2-PSF-01 below is the end-to-end path, and it needs a verified
+          Optiland-to-coupler OPL convention that M2 did not establish.
       - id: L2-PSF-01
         title: PSF-engineered microscope
         graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX, C_FIELD_TO_PSF, M_SENSOR_IDEAL]
+        implemented: false
+        blocked_by: >
+          Optiland's opd_native sign and reference plane remain unverified (M1
+          limitation, carried into M2), so no admissible optical path length can be
+          handed to C_RAY_TO_WAVE from a real trace yet.
       - id: L2-META-01
         title: Unit-cell-to-system meta-optic imaging
         graph: [M_RCWA_FMMAX, C_CELL_TO_SURFACE, M_WAVE_CHROMATIX]

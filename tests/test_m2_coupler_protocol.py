@@ -155,11 +155,19 @@ def test_schemas_accept_the_coupler_benchmark_and_its_new_sections() -> None:
     )
 
     differentiability = result_schema["properties"]["differentiability"]
-    assert differentiability["properties"]["claim"]["enum"] == [
+    claims = differentiability["properties"]["claim"]["enum"]
+    # CHE-28 added "characterized_unbiased_in_regime": the estimator turned out
+    # not to be detectably biased in the regime measured, and forcing that
+    # result into either "characterized_biased" or "verified" would have
+    # misstated it. Every claim below "verified" must still be a
+    # characterization, so exactly one promoting value may exist.
+    assert set(claims) == {
         "not_verified",
         "characterized_biased",
+        "characterized_unbiased_in_regime",
         "verified",
-    ]
+    }
+    assert sum(claim == "verified" for claim in claims) == 1
     assert "omitted_terms" in differentiability["required"]
 
     assert "coupler" in result_schema["properties"]["reproducibility"]["properties"]["branch"]["enum"]
