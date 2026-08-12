@@ -1,0 +1,81 @@
+# Per-source provenance for the C_WAVE_TO_RAY knowledge pack.
+# Provenance follows AGENTS.md "Sources of Truth".
+
+sources:
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: peer_reviewed_paper
+    citation: >
+      Cheng, J.; Gao, M.; Shao, Y.; Mao, C.; Milster, T. D.; Fan, J. A.
+      A Differentiable Ray-Wave Framework for Hybrid Refractive-Diffractive
+      System Modeling and Optimization. ACS Photonics 2026.
+    local_copy: knowledge/papers/raywave_tracing/paper.pdf
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Primary source of truth. Sections used: eq 1 (secondary-ray complex
+      amplitude a = U_tilde/p), eq 4 (curvature bound), Figure 1c (the sampling
+      pipeline and which arrows carry gradients), Figure 3b/3c (patch size,
+      incident-ray and secondary-ray count trade-off, and curvature error versus
+      patch size), and Figure 4 (Monte Carlo convergence for uniform versus
+      magnitude-proportional sampling on a metalens and a Siemens-star
+      hologram).
+
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: supporting_information
+    local_copy: knowledge/papers/raywave_tracing/supporting_information.pdf
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Carries most of this coupler's mathematics. S2 (eqs S1-S5) derives
+      secondary-ray sampling as an unbiased Monte Carlo estimator of the
+      per-patch ASM integral, including the evanescent cut and the 1/p
+      importance weight. S3 (eqs S6-S9) derives the curvature-induced error
+      bound. S4 (Algorithm S1) gives the accumulate-transmit-FFT-resample
+      cascade that bounds ray count across planar DOEs. S6 (Figures S3, S4)
+      gives the ensemble-convergence and undersampling-artifact evidence that
+      justifies forbidding single-realization reporting. S7 (Algorithm S2)
+      defines the fixed-direction gradient estimator; S7.3 (Algorithm S3, eqs
+      S11-S15, Figure S6) defines the Gumbel-Softmax alternative and states why
+      it was rejected.
+
+  - url: https://arxiv.org/abs/2605.15418
+    source_type: preprint
+    retrieved_at: "2026-08-12"
+    usage_note: Recorded for citation completeness; the journal version was transcribed.
+
+  - url: https://github.com/jiazhou-cheng/raywave-tracing
+    source_type: reference_implementation
+    vendored: false
+    pinned: false
+    executed_by_this_repository: false
+    retrieved_at: null
+    usage_note: >
+      NOT used. Recorded so no future agent assumes the mathematics here was read
+      off working code, or cites it as evidence.
+
+  - url: https://doi.org/10.1002/wics.56
+    source_type: cited_method
+    citation: >
+      Tokdar, S. T.; Kass, R. E. Importance sampling: a review.
+      WIREs Comput. Stat. 2010, 2, 54-60.
+    retrieved_at: null
+    usage_note: >
+      Cited by SI S2 as the basis for the 1/p reweighting that keeps the
+      estimator unbiased under non-uniform sampling. Recorded as the provenance
+      of the unbiasedness claim; not independently consulted, because the claim
+      is verified here directly by the ensemble-mean test rather than by
+      citation.
+
+  - url: http://arxiv.org/abs/1611.01144
+    source_type: cited_method
+    citation: Jang, E.; Gu, S.; Poole, B. Categorical Reparameterization with Gumbel-Softmax. 2017.
+    retrieved_at: null
+    usage_note: >
+      Provenance for the rejected differentiable sampler of SI S7.3. Recorded
+      because M2 documents that alternative without implementing it.
+
+  - source_type: inherited_repository_evidence
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      benchmarks/verify_m1_independence.py currently asserts that C_WAVE_TO_RAY
+      does NOT exist (check id wave_to_ray_not_claimed). Registering this coupler
+      changes that claim, and the change must be made deliberately with a record
+      of what the replacement claim is backed by.

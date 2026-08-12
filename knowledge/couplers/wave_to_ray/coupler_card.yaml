@@ -1,0 +1,180 @@
+# Routing-critical facts for C_WAVE_TO_RAY.
+# Contract follows AGENTS.md "Initial Artifact Boundary" and the frozen
+# M2-COUPLER-CPU-V1 boundary table in benchmarks/M2_COUPLER_PROTOCOL.md.
+# Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
+# main text eq 1 and Figure 1c; SI S2 (eqs S1-S5), S3 (eqs S6-S9),
+# S4 (Algorithm S1), S7 (Algorithm S2).
+
+id: wave_to_ray
+role: C_WAVE_TO_RAY
+direction: complex_field -> ray_bundle
+transformation: >
+  angular-spectrum decomposition, evanescent cut, importance-weighted Monte
+  Carlo sampling of propagating plane-wave modes into rays
+
+scientific_source:
+  doi: 10.1021/acsphotonics.6c00818
+  equations: [main_text_eq_1, main_text_eq_4, S1, S2, S3, S4, S5, S6, S7, S8, S9]
+  algorithms: [Algorithm_S1, Algorithm_S2, Algorithm_S3]
+  figures: [Figure_1c, Figure_3c, Figure_4, SI_Figure_S3, SI_Figure_S4, SI_Figure_S6]
+  reference_implementation: https://github.com/jiazhou-cheng/raywave-tracing
+  reference_implementation_status: >
+    NOT vendored, NOT pinned, NOT executed by this repository. No claim here may
+    cite it as evidence.
+
+framework: numpy
+frameworks_deliberately_avoided:
+  - reason: coupler core is the physics under test; see ../ray_to_wave/coupler_card.yaml
+    forbidden_imports: [optiland, chromatix]
+
+estimator:
+  target_integral: >
+    U_obs(r) = double-integral of U_tilde(ku,kv) exp(i(ku x + kv y + kn d)) dku dkv   (eq S2)
+  statement: >
+    This coupler is a quadrature scheme for an integral whose exact value is
+    known, not an approximation of the physics. That is why enumerating every
+    propagating bin must reproduce the deterministic reference exactly, and why
+    that check is mandatory before any stochastic claim.
+  amplitude: a_i = U_tilde(ku_i, kv_i) / p(ku_i, kv_i)      # eq 1 / eq S4
+  direction: d_hat_i = (ku_i, kv_i, kn_i) / k
+  normal_component: kn = +sqrt(k^2 - ku^2 - kv^2)
+  normalization: 1/N                                          # eq S5
+  launch_phase: phi = ku * x_p + kv * y_p                     # Algorithm S1 line 9
+  evanescent_rule: ku^2 + kv^2 > k^2 discarded; discarded power reported as a named loss
+  unbiasedness_mechanism: >
+    The 1/p importance weight. Rays drawn from high-density regions carry
+    proportionally less weight. Omitting it while sampling non-uniformly
+    produces a confidently wrong field that still looks like a field.
+
+sampling_densities:
+  - id: p_uni
+    definition: uniform over propagating bins
+    note: robust; assumes nothing about the spectrum
+  - id: p_mag
+    definition: proportional to |U_tilde(ku,kv)|
+    note: >
+      Faster for spectra concentrated in a single lobe (Figure 4a, metalens);
+      comparable to uniform for multilobed spectra (Figure 4b, Siemens star).
+      Paper calls it robust and generally effective, with that caveat.
+
+sampling_is_an_input: >
+  The core takes pre-drawn spectral indices as an argument; drawing them is a
+  separate seeded step. Bitwise determinism is then trivial, one implementation
+  serves both the reference and the gradient study, and Algorithm S2's
+  "directions held fixed during backpropagation" becomes structural rather than
+  a detail to remember.
+
+cascade:
+  algorithm: Algorithm_S1
+  applies_to: planar surfaces only
+  rule: >
+    Accumulate ALL incident rays into U_in on the common plane, apply the DOE
+    transmission once, take one global FFT, then resample a caller-specified
+    budget of P launch positions times S secondary rays. Outgoing ray count is
+    the budget P*S, not the product of incoming and secondary counts.
+  preserves: coherent interference at the plane
+  not_applicable_to: >
+    Conformal (curved) DOEs. Rays there strike different local tangent planes
+    with position-dependent frames and normals, so there is no common plane to
+    accumulate onto. The direct per-patch implementation is retained, and patch
+    size is then bounded by the curvature condition below.
+
+validity_conditions:
+  - id: curvature_bound
+    statement: eps_curv <= arcsin(D / (2 R))      # eq S9 / main text eq 4
+    independent_of: the DOE phase profile
+    planar_limit: R -> infinity gives eps_curv -> 0
+    assumptions: [one principal curvature direction at a time, quadratic sag, D << R]
+    enforcement: executable precondition with a structured diagnostic (CHE-27)
+  - id: evanescent_fraction
+    statement: >
+      A large discarded-power fraction is the signature of a field that should
+      not be turned into rays at all.
+    enforcement: reported as a named loss term, never absorbed silently
+  - id: grazing_bin
+    statement: kn = 0 at the propagating/evanescent boundary is singular for 1/kn-type factors.
+    enforcement: excluded by default and recorded as an open question
+
+stochastic_contract:
+  reproducibility: bitwise for a given (seed, configuration)
+  reproducibility_is_not_accuracy: >
+    A bitwise-reproducible wrong answer is the failure mode this separation
+    exists to catch.
+  required_evidence:
+    - exactness limit under full bin enumeration, tolerance derived from dtype round-off
+    - unbiasedness within 3 standard errors over >= 32 seeds, tolerance IS the measured standard error
+    - fitted convergence exponent -0.5 +/- 0.1 over >= 5 sweep points
+    - variance comparison between p_uni and p_mag at matched N
+  forbidden:
+    - reporting a single realization as the accuracy result
+    - selecting the best of several seeds
+    - tuning N or the realization count after seeing the metric
+  why_single_realization_is_forbidden: >
+    SI Figures S3/S4: a converged system still looks speckled in one
+    realization, and an undersampled one produces strong seed-dependent
+    speckle across the whole plane. The distinction between physical speckle
+    and Monte Carlo noise IS reproducibility across seeds, so it cannot be
+    assessed from one seed.
+
+derivative:
+  mode: fixed_direction_estimator
+  mechanism: >
+    Sampled wavevector and resulting ray direction held FIXED during
+    backpropagation; p detached; gradients flow only through U_tilde in the
+    amplitude a = U_tilde / p.detach().   (SI S7.2, Algorithm S2)
+  verified: false
+  known_biased: true
+  omitted_terms:
+    - gradients associated with changes in the sampled secondary-ray directions
+  two_quantities_not_to_conflate:
+    - derivative of the fixed-direction surrogate objective (estimator should compute this exactly)
+    - derivative of the true objective (estimator is biased with respect to this, by construction)
+  paper_position: >
+    Neglects direction gradients, but provides low-variance gradients
+    sufficient for stable DOE optimization.
+  rejected_alternative:
+    id: gumbel_softmax
+    source: SI S7.3, Algorithm S3, eqs S11-S15
+    forward_bias: none (Gumbel-max identity, eq S12, preserves the sampling distribution)
+    backward: approximate, generally biased surrogate
+    temperature_used: 3
+    rejection_reason: >
+      Memory. Retains an N_t x qD x qD tensor per batch, and both N_t and qD
+      must be large for accurate Monte Carlo ray-wave simulation.
+    m2_status: documented, not implemented
+
+supported_regimes:
+  - scalar, monochromatic, fully coherent
+  - planar tangent patch
+  - CPU, float64 / complex128
+unsupported_regimes:
+  - vector fields and polarization
+  - chromatic / broadband
+  - partial coherence
+  - GPU and TPU
+  - conformal DOE inverse design
+
+devices_tested: []
+dtypes_planned: [complex128]
+validated_probe_ids: []
+not_yet_probed:
+  - exactness limit under full propagating-bin enumeration
+  - unbiasedness over an ensemble of seeds
+  - fitted convergence exponent
+  - p_uni versus p_mag variance at matched N
+  - evanescent-power accounting
+  - importance-weight, kn-sign, evanescent-cut, launch-phase, and axis-order negative tests
+  - curvature bound against measured tangent-plane error
+  - gradient bias against directional finite differences
+
+registry_note: >
+  Adding C_WAVE_TO_RAY flips the wave_to_ray_not_claimed check in
+  benchmarks/verify_m1_independence.py, which currently asserts its ABSENCE.
+  That claim must be replaced deliberately in CHE-25/CHE-29, with a record of
+  what the new claim is backed by -- not silently satisfied.
+
+implementation_location: not_yet_implemented
+validation_status: unvalidated
+validation_note: >
+  CHE-22 authored this pack from the paper. Nothing is implemented or measured
+  yet.

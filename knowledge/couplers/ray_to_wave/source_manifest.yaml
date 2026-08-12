@@ -1,0 +1,60 @@
+# Per-source provenance for the C_RAY_TO_WAVE knowledge pack.
+# Provenance follows AGENTS.md "Sources of Truth".
+
+sources:
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: peer_reviewed_paper
+    citation: >
+      Cheng, J.; Gao, M.; Shao, Y.; Mao, C.; Milster, T. D.; Fan, J. A.
+      A Differentiable Ray-Wave Framework for Hybrid Refractive-Diffractive
+      System Modeling and Optimization. ACS Photonics 2026.
+    local_copy: knowledge/papers/raywave_tracing/paper.pdf
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Primary source of truth for this coupler. Sections used: main text eq 2
+      (the coherent wavelet sum with the <n_hat, d_hat> projection factor),
+      Figure 1b/1c (the ray-DOE interaction picture), and Figure 2b (the planar
+      full-field patch rule and the linear-phase-ramp treatment of off-centre
+      incident rays).
+
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: supporting_information
+    local_copy: knowledge/papers/raywave_tracing/supporting_information.pdf
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Section S2 and Figure S1 supply the physical interpretation transcribed in
+      theory.md: a ray is a plane wavelet carrying exp(i k OPL) (Fig S1b), an
+      arbitrary wavefront decomposes into angular-spectrum modes (Fig S1a), and a
+      collimated bundle represents one angular mode only when per-ray phases
+      compensate the OPL differences of their lateral launch positions (Fig S1c).
+      That last statement is the exact-oracle test for this direction.
+
+  - url: https://arxiv.org/abs/2605.15418
+    source_type: preprint
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Recorded for citation completeness. The journal version above is the
+      version transcribed; the preprint was not separately consulted.
+
+  - url: https://github.com/jiazhou-cheng/raywave-tracing
+    source_type: reference_implementation
+    vendored: false
+    pinned: false
+    executed_by_this_repository: false
+    retrieved_at: null
+    usage_note: >
+      NOT used. Recorded so that a future agent does not assume the mathematics
+      here was read off working code, and does not cite this repository as
+      evidence for a claim. Every equation in theory.md comes from the paper;
+      every number that will appear in a coupler card must come from a probe run
+      in the agent_solver container.
+
+  - source_type: inherited_repository_evidence
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      Three constraints on this coupler come from prior milestones rather than
+      the paper, and are recorded in conventions.md as hazards H1-H3: Optiland's
+      opd sign and reference plane are unverified (M1, CHE-13/CHE-17); Optiland's
+      ray `intensity` is a weight and is marked intensity_is_not_amplitude
+      (M1 adapter contract); and chromatix asm_propagate returns padded arrays,
+      measured at 256^2 -> 1756^2 (M1, CHE-15).

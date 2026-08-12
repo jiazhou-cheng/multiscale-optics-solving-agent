@@ -1,0 +1,127 @@
+# Routing-critical facts for C_RAY_TO_WAVE.
+# Contract follows AGENTS.md "Initial Artifact Boundary" and the frozen
+# M2-COUPLER-CPU-V1 boundary table in benchmarks/M2_COUPLER_PROTOCOL.md.
+# Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
+# main text eq 2 and SI Figure S1.
+
+id: ray_to_wave
+role: C_RAY_TO_WAVE
+direction: ray_bundle -> complex_field
+transformation: coherent plane-wavelet accumulation onto a declared plane
+
+scientific_source:
+  doi: 10.1021/acsphotonics.6c00818
+  equations: [main_text_eq_2]
+  figures: [SI_Figure_S1]
+  reference_implementation: https://github.com/jiazhou-cheng/raywave-tracing
+  reference_implementation_status: >
+    NOT vendored, NOT pinned, NOT executed by this repository. No claim here may
+    cite it as evidence. All mathematics is taken from the paper; all evidence is
+    produced by this repository's own probes.
+
+framework: numpy
+frameworks_deliberately_avoided:
+  - reason: >
+      The coupler core is the physics under test, so it imports neither optiland
+      nor chromatix. M1 proved the engines are independently correct; if the core
+      could import one, a coupler defect could be misattributed to engine
+      behaviour and M1's independence evidence would stop bounding the search.
+    forbidden_imports: [optiland, chromatix]
+
+governing_equation: >
+  U_plane(x,y) = sum_i a_i * exp(i k (OPL_i + dr_i(x,y))) * <n_hat, d_hat_i>
+  with dr_i(x,y) = d_x_i (x - x0_i) + d_y_i (y - y0_i)
+
+required_source_metadata:
+  - wavelength_m
+  - positions_m
+  - directions_unit
+  - complex_amplitude
+  - optical_path_length_m
+  - optical_path_length_reference
+provides_target_metadata:
+  - wavelength_m
+  - sample_pitch_m
+  - coordinate_frame
+  - origin
+  - phasor
+  - normalization
+  - reference_plane_z_m
+  - plane_normal
+
+deliberately_not_required:
+  - name: polarization
+    reason: >
+      The registry port historically demanded it, but M2 is scalar-only and the
+      Optiland adapter documents that it does not fabricate polarization. A
+      required field nobody can supply is a contract defect, not a safety
+      feature. Reinstated when a vector claim is made.
+
+deliberately_refused:
+  - name: opd_native
+    reason: >
+      Optiland's opd sign and reference plane are both recorded unverified by
+      M1. A wrong OPL reference is a harmless piston; a wrong OPL sign
+      conjugates the wavefront and turns a converging beam into a diverging
+      one. Those are indistinguishable downstream, so the ambiguity is refused
+      rather than defaulted.
+  - name: ray_intensity_as_amplitude
+    reason: >
+      Optiland emits `intensity` with an explicit intensity_is_not_amplitude
+      marker. Converting a weight to an amplitude is a modelling decision (power
+      -> sqrt? photon count? already an amplitude?) that the caller must declare
+      and test. The coupler does not choose.
+
+supported_regimes:
+  - scalar, monochromatic, fully coherent
+  - planar reconstruction surface with a single declared normal
+  - CPU, float64 / complex128
+unsupported_regimes:
+  - vector fields and polarization
+  - chromatic / broadband ensembles
+  - partially coherent sources
+  - curved reconstruction surfaces (see ../wave_to_ray curvature bound)
+  - GPU and TPU
+
+validity_conditions:
+  - id: sampling_density
+    statement: >
+      Phase difference between adjacent rays at the reconstruction plane must be
+      below pi, or the reconstruction aliases. This is a Nyquist condition on the
+      wavefront, not on the output grid.
+    enforcement: measured and reported; structured diagnostic when violated
+  - id: single_valued_wavefront
+    statement: >
+      Coherent complex summation remains valid at caustics and at overlapping ray
+      branches. Any downstream operation that UNWRAPS phase is not valid there.
+    enforcement: documented; caller responsibility
+  - id: plane_not_surface
+    statement: Equation 2 reconstructs onto a plane with one normal n_hat.
+    enforcement: contract validation
+
+derivative:
+  mode: not_applicable_yet
+  verified: false
+  verified_note: >
+    Ray->wave is a coherent sum and is differentiable in principle with respect
+    to ray amplitudes, positions, and OPLs. No gradient is claimed in M2 because
+    none has been tested. See ../wave_to_ray for the direction where the paper's
+    estimator is deliberately biased.
+
+devices_tested: []
+dtypes_planned: [complex128]
+validated_probe_ids: []
+not_yet_probed:
+  - tilted plane-wave reconstruction against the exact analytic oracle
+  - converging spherical bundle against the M1-verified Chromatix ASM
+  - power conservation across the transformation
+  - projection-factor, phase-sign, oblique-ramp, axis-transpose, and unit negative tests
+  - reconstruction error versus ray count
+
+implementation_location: not_yet_implemented
+validation_status: unvalidated
+validation_note: >
+  CHE-22 authored this pack from the paper. Nothing is implemented or measured
+  yet. Status advances to environment_verified only after an executable forward
+  probe passes in the container, and to scientifically_validated only after the
+  analytic oracles and negative tests of CHE-24 pass.

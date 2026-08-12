@@ -4,7 +4,9 @@ This directory contains compact, versioned information disclosed to the planning
 
 - `source_manifest.yaml`: authoritative links, roles, frameworks, and ingestion priority.
 - `solver_cards/`: small routing and API-safety cards for the first-paper solver set.
-- `papers/`: reserved for project-authored notes about related papers; do not store copyrighted full papers.
+- `solvers/<name>/`: per-solver packs (card, conventions, capability notes, API examples, failure guide, probes, expected outputs).
+- `couplers/<direction>/`: per-coupler packs in the same shape as a solver pack. A coupler is documented separately from the solvers it joins because it carries its own physical assumptions.
+- `papers/`: project-authored notes about related papers. Do not store copyrighted full papers here, with one recorded exception: a paper this project's own authors wrote may be stored in full, in its own subdirectory, with a `README.md` naming the DOI and stating why the exception applies. `papers/raywave_tracing/` is that case.
 
 Validation status is intentionally narrower than scientific validity:
 
