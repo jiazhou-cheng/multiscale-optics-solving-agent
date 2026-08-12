@@ -109,6 +109,35 @@ Recorded rather than guessed, per AGENTS.md.
 
 | Question | Status |
 |---|---|
-| Whether `a⁽ⁱ⁾` in eq 2 is intended to already include the `1/p` importance weight when the rays came from `C_WAVE_TO_RAY` | Resolved by reading eq 1 with eq S4: yes, `a = Ũ/p` *is* the ray's amplitude. Eq 2 then sums those amplitudes. Verified by the round trip rather than assumed |
-| Whether `⟨n̂, d̂⟩` is an amplitude or an intensity projection | Read as amplitude, since eq 2 is a sum of complex amplitudes. To be confirmed by the power-conservation check, which distinguishes the two |
+| Whether `a⁽ⁱ⁾` in eq 2 already includes the `1/p` importance weight when the rays came from `C_WAVE_TO_RAY` | **Resolved** by reading eq 1 with eq S4: yes, `a = Ũ/p` *is* the ray's amplitude. Eq 2 then sums those amplitudes |
+| Whether `⟨n̂, d̂⟩` belongs in a field reconstruction at all | **Resolved by measurement — see below.** It does not |
 | The reference for `OPL⁽ⁱ⁾` when rays arrive from a real trace | Not fixed by the paper. This repository requires the caller to declare it; see H1 |
+
+## Finding: eq 2 and eq S5 are different operators
+
+Main-text eq 2 carries the factor `⟨n̂, d̂⟩`. SI eq S5, which derives the same
+wavelet sum as an estimator of the angular-spectrum integral (eq S2), does
+not. The paper does not flag the difference, and it is not cosmetic.
+
+CHE-25 measured which one preserves a field. Summing **every** propagating mode
+of a random field on a 16×16 grid:
+
+| Form | Agreement with the source field |
+|---|---|
+| without `⟨n̂, d̂⟩` (eq S5) | `7.1e-15` — round-off |
+| with `⟨n̂, d̂⟩` (eq 2) | `2.2 %` of peak amplitude |
+
+The `2.2 %` tracks the smallest `cos θ` on that grid. So:
+
+- **`Projection.ASM_CONSISTENT`** (no factor) is what the coupler uses. A
+  representation change must preserve the field, and only this form does. It is
+  the default, and it is what makes a round trip exact.
+- **`Projection.SENSOR_OBLIQUITY`** (with the factor) is main-text eq 2,
+  retained as an explicitly named **sensor** model: a detector whose response
+  depends on incidence angle. It is not a field reconstruction.
+
+Picking one silently would have produced a coupler that quietly loses a few
+percent off-axis, round-trips inexactly, and gives no test a name to fail
+under. Both forms are implemented, both are tested against the thing each
+actually claims to reproduce, and the choice is recorded in every
+reconstructed field's provenance.

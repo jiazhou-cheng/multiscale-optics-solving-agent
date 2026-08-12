@@ -154,18 +154,79 @@ unsupported_regimes:
   - GPU and TPU
   - conformal DOE inverse design
 
-devices_tested: []
-dtypes_planned: [complex128]
-validated_probe_ids: []
+devices_tested: [cpu]
+dtypes_validated: [complex128]
+validated_probe_ids:
+  - >
+    engine_independence (passed, 2026-08-12; CHE-25). AST scan confirms the core
+    imports neither optiland nor chromatix.
+  - >
+    exactness_limit (passed, 2026-08-12; CHE-25). Enumerating every propagating
+    bin with the 1/p weight reproduces the source field at round-off:
+    relative 1.41e-15 on a multilobed (random) field and 8.88e-16 on a
+    concentrated (Gaussian) field, against a bound derived from float64
+    round-off over an M-term coherent sum. This is the mandatory first check --
+    it removes sampling as an excuse before any stochastic claim.
+  - >
+    centered_dft_pairing (passed, 2026-08-12). The spatial origin is index n//2,
+    so the transform must be centered on both sides. Pinned as a test because
+    pairing the n//2 origin with an ordinary transform leaves an exp(-i pi m)
+    offset per axis and the reconstruction misses the field entirely.
+  - >
+    evanescent_accounting (passed, 2026-08-12). At a 200 nm pitch (below
+    lambda/2) 129 of 256 bins propagate and 45.50 percent of the spectral power
+    is evanescent and discarded. Reported as a named loss. Control: at a 1 um
+    pitch every bin propagates and the fraction is exactly zero.
+  - >
+    bitwise_determinism (passed, 2026-08-12). Identical (seed, configuration)
+    gives identical wavevectors, amplitudes and reconstructed field; different
+    seeds give different realizations, so determinism is not achieved by
+    ignoring the seed.
+  - >
+    unbiasedness (passed, 2026-08-12; CHE-25). Ensemble mean over 32 independent
+    seeds at N=2048 agrees with the deterministic reference within 3 standard
+    errors, for both p_uni and p_mag, on a scalar linear functional (the overlap
+    with the true field). The tolerance IS the measured standard error.
+  - >
+    convergence_order (passed, 2026-08-12; CHE-25). Fitted exponent over a
+    six-point sweep from N=256 to 8192: -0.4924 for p_uni and -0.4930 for p_mag
+    on a multilobed field, against the required -0.5 +/- 0.1. Gated on the
+    fitted exponent, not on the error at one N.
+  - >
+    variance_by_density (passed, 2026-08-12; CHE-25). RMS error at matched
+    N=1024. Concentrated Gaussian spectrum: 1.499e-01 (p_uni) versus 2.673e-02
+    (p_mag), a 5.6x advantage. Multilobed random spectrum: 6.700e-01 versus
+    5.888e-01, a 1.14x advantage. Consistent with the paper's Figure 4 claim
+    that magnitude-proportional sampling exploits spectral concentration and is
+    only comparable to uniform without it.
+  - >
+    negative_controls 4/4 detected (passed, 2026-08-12). Importance weight
+    omitted (biased beyond 3 SE under p_mag), evanescent bin selected (refused),
+    kn sign flipped (detected in the emitted directions), launch phase omitted
+    (detected for multi-position emission).
+  - >
+    negative_control_blind_spots (passed, 2026-08-12). Two recorded traps,
+    each pinned as its own test. Under p_uni the missing 1/p weight is a
+    constant scale factor equal to the propagating-mode count, so the bias test
+    would pass for the wrong reason and must be run under p_mag. The launch
+    phase is exactly 1 at a single centred position, so it must be tested with
+    off-centre launches.
+  - >
+    inconsistent_density_refused (passed, 2026-08-12). A density that is zero
+    where the spectrum is nonzero is refused, because those modes are never
+    drawn and no 1/p reweighting can recover them -- inconsistent, not merely
+    noisy.
+  - >
+    ray_budget (passed, 2026-08-12). Output count is the caller's P*S budget,
+    not a function of the input size. Feeds the Algorithm S1 cascade in CHE-26.
+
 not_yet_probed:
-  - exactness limit under full propagating-bin enumeration
-  - unbiasedness over an ensemble of seeds
-  - fitted convergence exponent
-  - p_uni versus p_mag variance at matched N
-  - evanescent-power accounting
-  - importance-weight, kn-sign, evanescent-cut, launch-phase, and axis-order negative tests
-  - curvature bound against measured tangent-plane error
-  - gradient bias against directional finite differences
+  - curvature bound against measured tangent-plane error (CHE-27)
+  - gradient bias against directional finite differences (CHE-28)
+  - round trip against C_RAY_TO_WAVE and the cascade (CHE-26)
+  - behaviour when the evanescent fraction is large enough to invalidate a ray picture
+  - conformal (curved) surfaces
+  - vector fields, chromatic ensembles, GPU
 
 registry_note: >
   benchmarks/verify_m1_independence.py previously asserted this coupler's
@@ -182,8 +243,44 @@ registry_claims_now_audited:
   - wave_to_ray_gradient_mode_is_surrogate
   - wave_to_ray_declared_lossy
 
-implementation_location: not_yet_implemented
-validation_status: unvalidated
+measured_behaviour:
+  fit_noise_in_the_convergence_exponent: >
+    The fitted exponent is itself a noisy estimate. On the concentrated
+    spectrum it read -0.5834 averaging 8 seeds per sweep point, -0.4982 at 32,
+    and -0.4842 at 64. The 8-seed value sits outside the required -0.5 +/- 0.1
+    band and would have looked like a real anomaly. Recorded because it is the
+    single-realization rule in another guise: averaging too few realizations
+    does not just widen an error bar, it can manufacture a finding. The gating
+    test therefore uses 16 seeds per point, and CHE-29 should use more.
+  projection_convention: >
+    Main-text eq 2 carries the <n,d> obliquity factor and SI eq S5 does not, so
+    they are different operators. Measured: summing every propagating mode of a
+    random 16x16 field reproduces the field to 7.1e-15 WITHOUT the factor and
+    misses it by 2.2 percent of peak amplitude WITH it. The coupler pair
+    therefore uses the factor-free form, since a representation change must
+    preserve the field; the eq-2 form is retained as an explicitly named sensor
+    model. See ../ray_to_wave/conventions.md.
+  normalization_resolution: >
+    The open question of how SI eq S5's 1/N combines with eq S2's dk measure is
+    resolved by construction rather than argued: the spectrum is defined with
+    the 1/(ny*nx) of the inverse transform folded in, so the coefficients ARE
+    the modal amplitudes and the exactness limit pins the scale. Parseval then
+    reads sum|U~|^2 = (1/(ny*nx)) sum|u|^2.
+
+implementation_location: src/multiscale_optics_agent/couplers/wave_to_ray.py
+test_location: tests/test_wave_to_ray.py
+validation_status: characterized_stochastic_scalar_planar_cpu
 validation_note: >
-  CHE-22 authored this pack from the paper. Nothing is implemented or measured
-  yet.
+  CHE-22 authored this pack from the paper; CHE-25 implemented SI S2 and
+  Algorithm S2 and characterized the estimator in the order the protocol
+  requires: exactness limit first, then unbiasedness against the measured
+  standard error, then a fitted convergence exponent, then variance by sampling
+  density. All four pass, with 4/4 negative controls detected and both of their
+  blind spots pinned as tests.
+
+  The status is "characterized" rather than "validated" deliberately. What is
+  established is that the estimator is unbiased and converges at the Monte
+  Carlo rate for scalar, monochromatic, fully coherent fields on a planar
+  patch at float64 on CPU. Curved surfaces, the round trip and cascade, every
+  gradient claim, vector fields, chromatic ensembles, and accelerators remain
+  unestablished.

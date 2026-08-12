@@ -14,6 +14,27 @@ the whole plane**, not a point. That is the single most important structural
 fact here: an implementation that deposits energy at ``(x0_i, y0_i)`` is doing
 something else entirely, and will still produce plausible-looking output.
 
+Two projection conventions
+--------------------------
+Main-text eq 2 carries the factor ``<n_hat, d_hat>``; SI eq S5, which derives
+the same sum as an estimator of the angular-spectrum integral (eq S2), does
+not. They are therefore **not the same operator**, and the difference is
+physical, not cosmetic.
+
+CHE-25 measured which one preserves a field. Summing every propagating mode of
+a random field on a 16x16 grid reproduces that field to 7.1e-15 without the
+factor, and misses it by 2.2 percent of peak amplitude with it -- consistent
+with the smallest ``cos(theta)`` on that grid. So:
+
+* :attr:`Projection.ASM_CONSISTENT` (no factor) is what a **coupler** must use,
+  because a representation change has to preserve the field. It is the default.
+* :attr:`Projection.SENSOR_OBLIQUITY` (with the factor) is main-text eq 2, and
+  models a **detector** whose response depends on incidence angle. It is a
+  sensor model, not a field reconstruction.
+
+Choosing silently would have produced a coupler that loses a few percent
+off-axis and round-trips inexactly for a reason no test would name.
+
 This module imports neither Optiland nor Chromatix. The coupler core is the
 physics under test; if it could import an engine, a coupler defect could be
 misattributed to engine behaviour and M1's independence evidence would stop
@@ -25,6 +46,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Literal
 
 import numpy as np
@@ -40,10 +62,27 @@ from multiscale_optics_agent.couplers.contracts import (
 
 __all__ = [
     "Perturbation",
+    "Projection",
     "ReconstructionDiagnostics",
-    "ray_to_wave",
+    "collimated_bundle",
     "grid_nyquist_direction_limit",
+    "ray_to_wave",
 ]
+
+
+class Projection(StrEnum):
+    """Which of the paper's two wavelet-sum conventions to apply.
+
+    See the module docstring: these differ by ``<n_hat, d_hat>`` and only the
+    first preserves the field, which was measured rather than argued.
+    """
+
+    #: SI eq S5. No obliquity factor. Reproduces the angular-spectrum field on
+    #: the plane exactly, so it round-trips. Correct for a coupler.
+    ASM_CONSISTENT = "asm_consistent"
+    #: Main-text eq 2. Applies <n_hat, d_hat>. Models an angle-dependent
+    #: detector response. Correct for a sensor, not for a representation change.
+    SENSOR_OBLIQUITY = "sensor_obliquity"
 
 #: Above this ray count, the pairwise nearest-neighbour scan used for the
 #: ray-density diagnostic is skipped rather than run at O(N^2). The diagnostic
@@ -64,7 +103,8 @@ class Perturbation:
 
     #: Flip the phasor sign. Conjugates the wavefront: a converging beam diverges.
     phase_sign: Literal[1, -1] = 1
-    #: Drop the ``<n_hat, d_hat>`` projection factor. Undetectable at normal incidence.
+    #: Drop whichever projection factor the chosen :class:`Projection` implies.
+    #: Undetectable at normal incidence, and a no-op under ASM_CONSISTENT.
     apply_projection_factor: bool = True
     #: Drop ``dr_i(x, y)``. Off-axis rays then deposit a piston instead of a ramp.
     apply_oblique_ramp: bool = True
@@ -104,6 +144,7 @@ class ReconstructionDiagnostics:
     grid_shape: tuple[int, int]
     sample_pitch_m: tuple[float, float]
     normalization: str
+    projection: str
     perturbation: str
     max_transverse_direction: float
     grid_nyquist_direction_limit: float
@@ -123,6 +164,7 @@ class ReconstructionDiagnostics:
             "grid_shape": list(self.grid_shape),
             "sample_pitch_m": list(self.sample_pitch_m),
             "normalization": self.normalization,
+            "projection": self.projection,
             "perturbation": self.perturbation,
             "max_transverse_direction": self.max_transverse_direction,
             "grid_nyquist_direction_limit": self.grid_nyquist_direction_limit,
@@ -191,6 +233,7 @@ def ray_to_wave(
     sample_pitch_m: tuple[float, float],
     plane: ReferencePlane | None = None,
     normalization: Literal["none", "one_over_n"] = "none",
+    projection: Projection = Projection.ASM_CONSISTENT,
     perturbation: Perturbation = Perturbation(),
     enforce_grid_nyquist: bool = True,
 ) -> tuple[ComplexField, ReconstructionDiagnostics]:
@@ -235,12 +278,19 @@ def ray_to_wave(
 
     # Projection factor <n_hat, d_hat>. For the usual +z plane this is the
     # direction's z component; the general form keeps a tilted plane honest.
+    # Always computed so it can be reported, but applied only under the
+    # sensor convention -- see the module docstring for why the coupler
+    # default omits it.
     normal = np.asarray(plane.normal, dtype=np.float64)
-    projection = bundle.directions @ normal
-    if perturbation.apply_projection_factor:
-        weight = projection.astype(np.complex128)
-    else:
-        weight = np.ones(bundle.count, dtype=np.complex128)
+    projection_factor = bundle.directions @ normal
+    apply_factor = (
+        projection is Projection.SENSOR_OBLIQUITY and perturbation.apply_projection_factor
+    )
+    weight = (
+        projection_factor.astype(np.complex128)
+        if apply_factor
+        else np.ones(bundle.count, dtype=np.complex128)
+    )
 
     # Grid coordinates, origin at index n // 2 (M1 convention, implemented in
     # ComplexField.coordinates and mirrored here for the phase ramps).
@@ -276,20 +326,28 @@ def ray_to_wave(
         ny, nx = nx, ny
         dy, dx = dx, dy
 
-    transverse = np.linalg.norm(directions_xy, axis=1)
-    max_transverse = float(np.max(transverse)) if bundle.count else 0.0
-    nyquist_limit = min(
-        grid_nyquist_direction_limit(bundle.wavelength_m, dy),
-        grid_nyquist_direction_limit(bundle.wavelength_m, dx),
-    )
-    nyquist_satisfied = bool(max_transverse <= nyquist_limit)
+    # The Nyquist condition is per axis, not on the direction norm. A diagonal
+    # FFT bin has |d| = sqrt(2) * lambda / (2 * pitch) yet is exactly
+    # representable, because each component sits at its own axis limit. Testing
+    # the norm rejects the corner modes of any square spectrum -- which is how
+    # this was found: the CHE-26 round trip could not enumerate its own bins.
+    limit_x = grid_nyquist_direction_limit(bundle.wavelength_m, dx)
+    limit_y = grid_nyquist_direction_limit(bundle.wavelength_m, dy)
+    max_du = float(np.max(np.abs(directions_xy[:, 0]))) if bundle.count else 0.0
+    max_dv = float(np.max(np.abs(directions_xy[:, 1]))) if bundle.count else 0.0
+    # Reported as the worst per-axis utilisation, so a single number still says
+    # whether the grid is adequate.
+    max_transverse = max(max_du, max_dv)
+    nyquist_limit = min(limit_x, limit_y)
+    nyquist_satisfied = bool(max_du <= limit_x and max_dv <= limit_y)
     if enforce_grid_nyquist and not nyquist_satisfied:
         raise ContractError(
             ContractCode.SHAPE_MISMATCH,
             (
                 f"output grid cannot represent the steepest wavelet ramp: "
-                f"max transverse direction cosine {max_transverse:.6f} exceeds the "
-                f"grid limit lambda/(2*pitch) = {nyquist_limit:.6f}"
+                f"|d_u|max = {max_du:.6f} against limit {limit_x:.6f}, "
+                f"|d_v|max = {max_dv:.6f} against limit {limit_y:.6f} "
+                f"(lambda / (2 * pitch), per axis)"
             ),
             declaration="sample_pitch_m",
             remedy=(
@@ -310,11 +368,16 @@ def ray_to_wave(
         frame=Frame(),
         normalization=(
             "u is complex amplitude; discrete power = sum(|u|^2) * dy * dx; "
-            f"ray-sum normalization = {normalization}"
+            f"ray-sum normalization = {normalization}; projection = {projection}"
         ),
         provenance={
             "coupler": "C_RAY_TO_WAVE",
-            "equation": "ACS Photonics 2026 main text eq 2",
+            "equation": (
+                "ACS Photonics 2026 SI eq S5 (no obliquity factor)"
+                if projection is Projection.ASM_CONSISTENT
+                else "ACS Photonics 2026 main text eq 2 (with <n,d> obliquity)"
+            ),
+            "projection": str(projection),
             "ray_count": bundle.count,
             "perturbation": perturbation.describe(),
             "source_reference_plane": bundle.reference_plane.name,
@@ -328,12 +391,13 @@ def ray_to_wave(
         grid_shape=(ny, nx),
         sample_pitch_m=(dy, dx),
         normalization=normalization,
+        projection=str(projection),
         perturbation=perturbation.describe(),
         max_transverse_direction=max_transverse,
         grid_nyquist_direction_limit=nyquist_limit,
         grid_nyquist_satisfied=nyquist_satisfied,
-        max_projection_factor=float(np.max(projection)),
-        min_projection_factor=float(np.min(projection)),
+        max_projection_factor=float(np.max(projection_factor)),
+        min_projection_factor=float(np.min(projection_factor)),
         reconstructed_discrete_power=field.discrete_power(),
         incident_amplitude_power_sum=float(np.sum(np.abs(amplitude) ** 2)),
         ray_spacing_estimate_m=spacing,
