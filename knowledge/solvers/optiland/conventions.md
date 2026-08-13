@@ -112,9 +112,86 @@ the installed `Optic.trace` contract labels wavelength in micrometres.
 
 At the project boundary, convert geometry with `1e-3 m/mm` and wavelength
 with `1e-6 m/um`. The probe observes `rays.opd=12.0`, not the declared
-10 mm separation; its reference and piston convention remain unverified.
-Preserve that value as Optiland-native OPD and do not use it as a physical
-oracle until the reference convention has a dedicated test.
+10 mm separation. CHE-30 explains that observation exactly; see the section
+below.
+
+## `RealRays.opd` — established convention (CHE-30)
+
+**Superseded:** M1 recorded `opd_reference` and `opd_sign` as `unverified`,
+and the coupler contract layer refused a real trace as an optical path
+length on that basis. Both are now established. The machine-readable form is
+`opd_convention:` in `solver_card.yaml`; the probe is
+`probes/opd_convention_probe.py`, its recorded output is
+`expected/opd_convention_probe.json`, and `tests/test_optiland_opd_convention.py`
+asserts each claim **together with the competing hypothesis it rules out**.
+
+The accumulation site in the pinned install is
+`optiland/surfaces/standard_surface.py`:
+
+```python
+rays.opd = rays.opd + be.abs(t * self.material_pre.n(rays.w))
+```
+
+Four parts, each verified against a manufactured geometry with a closed-form
+answer, every case exact to float64 round-off:
+
+1. **Quantity — absolute accumulated *optical* path length.** Not an OPD
+   relative to a chief ray, despite the field name. `RealRays` seeds the
+   accumulator to zero at construction. An oblique free-space ray accumulates
+   `d / N` (the slant path), not `d`; a `n = 1.7`, 6 mm slab contributes
+   `10.2 mm`, not `6 mm`. The medium *preceding* a surface weights that
+   segment, so the glass index does not appear until the far surface is
+   crossed.
+2. **Sign — non-negative, larger means longer.** The `be.abs` makes the
+   accumulator non-decreasing under propagation and refraction. It is **not
+   monotonic in general**: `thin_lens_interaction_model` subtracts
+   `(x²+y²)/(2f)` and `phase_interaction_model` adds a signed `opd_shift`, so
+   monotonicity is a property of the purely refractive path.
+3. **Reference — the ray launch state, and for an infinite object that plane
+   is aperture-dependent.** `fields/field_types/angle.py::_get_starting_z_offset`
+   computes `offset = EPD - min(positions[1:-1])` and launches at
+   `positions[1] - offset`. So **changing the aperture moves the OPL zero**,
+   which is the reason an undeclared absolute Optiland OPL is dangerous: it is
+   only meaningful at a declared EPD. Verified across `EPD` = 2.0, 4.0, 7.5 mm,
+   where the observed OPL tracks `EPD + separation` exactly and the
+   "reference is the first surface" hypothesis is wrong by exactly `EPD`.
+   With a *finite* object the zero is the object plane and no offset applies.
+4. **Unit — millimetres**, the lens geometry unit. Scaling the prescription by
+   10 scales `opd` by exactly 10. Optiland's own wavefront code independently
+   converts with `(wavelength * 1e-3)` (µm → mm) when dividing an `opd`
+   difference to obtain waves.
+
+**M1's `opd = 12` for a 10 mm separation is fully explained:** the probe set
+`EPD = 2.0`, so the aimed launch plane sat at `z = -2 mm` and the ray
+accumulated `|2·1| + |10·1| = 12`. The value was correct; only the reference
+plane was unknown. Residual after the explanation: `0.0`.
+
+### Two traps this uncovered
+
+**Optiland's own wavefront sign is the reverse of L1-RAY-01's.**
+`wavefront/strategy.py` reports `opd_wv = (opd_ref - opd) / (wavelength * 1e-3)`
+with `opd_ref` from the chief ray — that is *chief minus ray*. L1-RAY-01
+declared *ray minus chief* for its evaluator (see the CHE-17 note below). The
+two differ by an overall sign, and a consumer that mixes them conjugates the
+wavefront. Neither is wrong; they must not be combined without a deliberate
+negation.
+
+**`surface_type="paraxial"` is not an admissible OPL source.** A plane wave
+through a perfect lens must reach the focus with equal optical path at every
+pupil height. The paraxial interaction model subtracts `(x²+y²)/(2f)`, which
+is exactly the paraxial excess of `sqrt(f²+h²)` — but it also sets
+`rays.N = copysign(1, N)` and leaves the direction un-normalized, so the
+following propagation adds the *axial* distance rather than the Euclidean one.
+The intended cancellation never happens and the subtraction survives in full:
+measured OPL at the focus is `f - h²/(2f)`, matching the bare lens term to
+`1e-12`. At `f = 50 mm`, `h = 6 mm` that is `0.36 mm`, about **655 waves** at
+550 nm — a defocus, not a rounding error. A real refractive singlet at the
+same heights spreads by `< 0.01 mm` and scales as `h⁴`, i.e. physical
+spherical aberration. Any system whose wavefront is handed to a coupler must
+therefore be built from real refractive surfaces.
+
+This does **not** invalidate L1-RAY-01's paraxial case, which gated centroids
+and spot sizes rather than OPL.
 
 ## CHE-13 standalone ray-state boundary
 

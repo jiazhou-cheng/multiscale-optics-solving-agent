@@ -3,7 +3,12 @@ validation_status: environment_verified
 validation_note: >
   CHE-12 verified Optiland 0.6.0 in the CPU container and established native
   geometry mm / wavelength um through an executable known-distance check.
-  The L1 analytic benchmark and OPD reference convention remain unverified.
+  CHE-30 establishes the RealRays.opd convention: absolute index-weighted
+  optical path length in mm, non-negative accumulation, referenced to the ray
+  launch state -- which for an infinite object is aperture-dependent, at
+  positions[1] - (EPD - min(positions[1:-1])). See
+  knowledge/solvers/optiland/solver_card.yaml::opd_convention for the
+  machine-readable form and conventions.md for the evidence.
 role: M_RAY_OPTILAND
 framework: numpy (default) / pytorch (optional, opt-in backend -- see below)
 official_docs: https://optiland.readthedocs.io/

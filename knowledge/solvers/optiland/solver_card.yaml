@@ -66,6 +66,65 @@ dtypes_validated_for_m1: [float64]
 input_output_artifacts:
   - optiland.rays.real_rays.RealRays (maps to project artifact `ray_bundle`)
 known_conventions: see conventions.md
+# CHE-30 (M3.1). Structured so a consumer can act on it; the prose version and
+# the reasoning live in conventions.md. Established against manufactured
+# geometries with closed-form answers, every case exact to float64 round-off:
+# knowledge/solvers/optiland/probes/opd_convention_probe.py, asserted with its
+# falsifiers in tests/test_optiland_opd_convention.py.
+opd_convention:
+  status: verified
+  verified_by: CHE-30
+  field: RealRays.opd
+  quantity: absolute_optical_path_length
+  # NOT an OPD relative to a chief ray, which is what the name suggests.
+  is_relative_to_chief_ray: false
+  index_weighted: true
+  unit: mm
+  unit_basis: lens geometry unit; scales exactly with the prescription
+  sign: >-
+    non-negative accumulation; larger means longer optical path. The
+    accumulator adds be.abs(t * n_pre) at every standard surface, so it never
+    decreases through propagation or refraction.
+  sign_is_monotonic: false
+  sign_monotonicity_exceptions:
+    # Both subtract, so monotonicity is a property of the purely refractive
+    # path rather than of RealRays.opd in general.
+    - interactions/thin_lens_interaction_model.py subtracts (x^2 + y^2) / (2 f)
+    - interactions/phase_interaction_model.py adds a signed opd_shift (DOE)
+  accumulation_site: >-
+    surfaces/standard_surface.py:
+    rays.opd = rays.opd + be.abs(t * self.material_pre.n(rays.w))
+  weighting_medium: material_pre  # the medium BEFORE each surface weights that segment
+  reference_plane: ray_launch_state  # where RealRays seeds the accumulator to zero
+  reference_plane_infinite_object:
+    expression: positions[1] - (EPD - min(positions[1:-1]))
+    source: fields/field_types/angle.py::_get_starting_z_offset
+    depends_on_aperture: true
+    # The consequence that matters: changing the aperture moves the OPL zero,
+    # so an absolute Optiland OPL is only meaningful at a declared EPD.
+    piston_is_aperture_dependent: true
+  reference_plane_finite_object:
+    expression: object surface sag + object surface z
+    depends_on_aperture: false
+  m1_anomaly_explained:
+    observation: opd = 12 for a declared 10 mm planar separation
+    explanation: EPD was 2.0 mm, so the aimed launch plane sat at z = -2 mm
+    residual_mm: 0.0
+  wavefront_sign_note: >-
+    Optiland's own wavefront code (wavefront/strategy.py) reports
+    (opd_ref - opd), i.e. chief-minus-ray, which is the REVERSE of the
+    ray-minus-chief evaluator convention L1-RAY-01 declared. A consumer that
+    mixes the two conjugates the wavefront.
+  inadmissible_sources:
+    - surface_type: paraxial
+      reason: >-
+        The paraxial interaction model subtracts (x^2+y^2)/(2f) but leaves the
+        direction un-normalized (rays.N = copysign(1, N)), so the following
+        propagation adds the axial distance instead of the Euclidean one and
+        the intended cancellation never happens. OPL to the focus is therefore
+        NOT flat: the bare lens term survives, measured at 0.36 mm (~655 waves
+        at 550 nm) for f = 50 mm at h = 6 mm. Use real refractive surfaces for
+        any wavefront handed to a coupler.
 cost_scaling: >-
   O(number_of_surfaces * number_of_rays) model; CHE-16 measured fixed-
   prescription CPU scaling at requested hexapolar sampling 8, 16, 32, and 64.
@@ -83,10 +142,14 @@ validated_probe_ids:
   - L1-RAY-01 scaling (CHE-16; ReverseTelephoto requested sampling 8/16/32/64,
     deterministic scientific hashes and survivor counts, raw timing and peak
     RSS evidence, with the CHE-17 analytic suite as a mandatory accuracy gate)
+  - opd_convention_probe (CHE-30; RealRays.opd quantity, sign, reference plane,
+    and unit established against manufactured geometries with closed-form
+    answers, each with the competing hypothesis it rules out; also establishes
+    that surface_type="paraxial" is not an admissible OPL source)
 not_yet_probed:
   - GPU device placement (no GPU in this environment)
-  - bundled-sample wavefront/OPD export convention (CHE-17 verifies accumulated
-    path and ray-minus-chief OPD only for explicitly constructed cases)
+  - pupil geometry export (exit-pupil position/diameter and a pupil boundary
+    representation; RealRays exposes no pupil mask -- CHE-32)
   - pupil power and coordinate orientation
   - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
 adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
@@ -96,7 +159,8 @@ validation_note: >
   units. CHE-13 stabilizes the standalone deterministic ray-state contract.
   CHE-17 adds L1 analytic accuracy evidence for free space, ideal paraxial
   focus, and one catalog plano-convex prescription. CHE-16 adds fixed-case
-  sampling, determinism, CPU runtime, and memory evidence. Registered M1
-  capability is NumPy CPU/float64 forward tracing only; GPU, float32,
-  gradients, broader prescriptions, and bundled-sample OPD coverage remain
-  unverified.
+  sampling, determinism, CPU runtime, and memory evidence. CHE-30 establishes
+  the RealRays.opd convention -- quantity, sign, reference plane, and unit --
+  see opd_convention above. Registered M1 capability is NumPy CPU/float64
+  forward tracing only; GPU, float32, gradients, and broader prescriptions
+  remain unverified.
