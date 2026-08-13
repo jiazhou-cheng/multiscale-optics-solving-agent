@@ -157,7 +157,34 @@ from multiscale_optics_agent.registry.loader import Registry
 MODEL_ID = "M_RAY_OPTILAND"
 
 _SUPPORTED_BACKENDS = ("numpy", "torch")
-_SUPPORTED_SAMPLES = ("ReverseTelephoto",)
+
+# CHE-32 (M3.3) adds exactly one system, and it is not a bundled sample because
+# no bundled sample qualifies: tmp_probes/optiland_exit_pupil_probe.py measures
+# every system in optiland.samples.objectives on axis at 550 nm and the best is
+# WideAngle100FOV at 0.36 waves peak-to-valley, against Rayleigh's 0.25. M3.2's
+# Airy oracle needs a system whose residual aberration is small compared with the
+# effect being measured, so the adapter owns one.
+#
+# This is NOT the custom-prescription path, which stays refused: the name must
+# still appear in this tuple, and `inputs['system']` is still rejected outright.
+# The difference is that an adapter-owned prescription is probed and pinned here
+# to the same M1 standard as a bundled one, rather than arriving unexamined from
+# a caller.
+_BUNDLED_SAMPLES = ("ReverseTelephoto",)
+_ADAPTER_OWNED_SAMPLES = ("M3SingletRef",)
+_SUPPORTED_SAMPLES = _BUNDLED_SAMPLES + _ADAPTER_OWNED_SAMPLES
+
+# M3-SINGLET-REF, frozen by M3.2 in benchmarks/slice_protocol.yaml. Plano-convex,
+# convex toward the collimated side (the low-aberration orientation), real
+# refractive surfaces because CHE-30 ruled out surface_type='paraxial' as an OPL
+# source. IdealMaterial keeps it independent of a glass catalog. Scaled to 1/10 of
+# a 25 mm-radius prescription -- since CHE-40 that is a cost choice rather than a
+# numerical necessity, but the frozen protocol still names these numbers.
+_SINGLET_REFRACTIVE_INDEX = 1.5168
+_SINGLET_RADIUS_MM = 2.5
+_SINGLET_CENTER_THICKNESS_MM = 0.2
+_SINGLET_F_NUMBER = 9.7
+
 _SUPPORTED_DEVICE = "cpu"
 _SUPPORTED_DTYPE = "float64"
 _DIRECTION_NORM_TOLERANCE = 1e-12
@@ -175,6 +202,13 @@ _DEFAULT_HX = 0.0
 _DEFAULT_HY = 0.0
 
 _MISSING_WAVEFRONT_METADATA = ["amplitude", "polarization", "pupil_mask"]
+
+# CHE-32: which plane the exported rays are referenced to. The default stays
+# "image_surface" so that L1-RAY-01's recorded scientific fingerprint
+# (43dab1ee...) reproduces bit-identically -- M3.3 adds a plane, it does not move
+# the existing one.
+_SUPPORTED_HANDOFF_PLANES = ("image_surface", "exit_pupil")
+_DEFAULT_HANDOFF_PLANE = "image_surface"
 
 _OPD_WARNING = (
     "RealRays.opd is preserved in Optiland-native values because its reference "
@@ -266,6 +300,151 @@ def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any, Any]:
             ) from exc
 
     return be, objectives, be_utils, torch_module
+
+
+class HandoffPlaneError(RuntimeError):
+    """The requested handoff plane could not be resolved from the system.
+
+    Carried as an exception rather than a sentinel so the caller cannot mistake
+    an unresolved plane for one at z = 0. `run()` converts it to a structured
+    failure; it is never allowed to reach the export.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _build_m3_singlet_ref(objectives_module: Any, be: Any) -> Any:
+    """The M3-SINGLET-REF prescription from `benchmarks/slice_protocol.yaml`.
+
+    Built here rather than imported because Optiland ships no diffraction-limited
+    sample (see the module-level note on `_ADAPTER_OWNED_SAMPLES`). Every number
+    comes from the frozen protocol; the aperture is derived from the f-number
+    rather than restated, so the two cannot drift apart silently.
+    """
+    from optiland.materials import IdealMaterial
+    from optiland.optic import Optic
+
+    del objectives_module  # resolved by name, not by attribute lookup
+
+    effective_focal_length_mm = _SINGLET_RADIUS_MM / (_SINGLET_REFRACTIVE_INDEX - 1.0)
+    back_focal_length_mm = (
+        effective_focal_length_mm - _SINGLET_CENTER_THICKNESS_MM / _SINGLET_REFRACTIVE_INDEX
+    )
+    entrance_pupil_diameter_mm = effective_focal_length_mm / _SINGLET_F_NUMBER
+
+    optic = Optic("M3SingletRef")
+    optic.surfaces.add(index=0, radius=be.inf, thickness=be.inf)
+    optic.surfaces.add(
+        index=1,
+        radius=_SINGLET_RADIUS_MM,
+        thickness=_SINGLET_CENTER_THICKNESS_MM,
+        material=IdealMaterial(n=_SINGLET_REFRACTIVE_INDEX),
+        is_stop=True,
+    )
+    # Rear vertex: glass -> air, then the image plane one back focal length on.
+    optic.surfaces.add(index=2, radius=be.inf, thickness=back_focal_length_mm)
+    optic.surfaces.add(index=3, radius=be.inf, thickness=0.0)
+    optic.set_aperture(aperture_type="EPD", value=entrance_pupil_diameter_mm)
+    optic.fields.set_type(field_type="angle")
+    optic.fields.add(y=0.0)
+    optic.wavelengths.add(value=_DEFAULT_WAVELENGTH, is_primary=True)
+    return optic
+
+
+def _resolve_lens(sample_name: str, objectives_module: Any, be: Any) -> Any:
+    """Build the named system, from the bundle or from this adapter's own set."""
+    if sample_name in _ADAPTER_OWNED_SAMPLES:
+        return _build_m3_singlet_ref(objectives_module, be)
+    return getattr(objectives_module, sample_name)()
+
+
+def _resolve_exit_pupil(lens: Any, be_utils: Any, image_plane_z_mm: float) -> dict[str, Any]:
+    """Read the exit pupil from the system, and say what the reading means.
+
+    `Paraxial.XPL()` is signed and measured **from the image surface**, not from
+    the global origin, so the plane is `image_z + XPL`
+    (tmp_probes/optiland_exit_pupil_probe.py).
+
+    The pupil is frequently *virtual* -- on `ReverseTelephoto` it lands at
+    z = 2.15 mm with five refracting surfaces beyond it. That does not make the
+    plane wrong, but it does change what a position at that plane is, and the
+    returned metadata says so rather than leaving a reader to assume.
+    """
+    import numpy as np
+
+    try:
+        location_from_image_mm = float(
+            np.asarray(be_utils.to_numpy(lens.paraxial.XPL())).ravel()[0]
+        )
+        diameter_mm = float(np.asarray(be_utils.to_numpy(lens.paraxial.XPD())).ravel()[0])
+    except Exception as exc:
+        raise HandoffPlaneError(
+            "OPTILAND_EXIT_PUPIL_UNRESOLVED",
+            "config['handoff_plane']='exit_pupil' was requested but Optiland's "
+            f"paraxial solver could not supply XPL()/XPD(): {type(exc).__name__}: {exc}. "
+            "The plane is read from the system, never guessed, so the run fails here "
+            "rather than exporting rays against an invented reference.",
+        ) from exc
+
+    if not (np.isfinite(location_from_image_mm) and np.isfinite(diameter_mm)):
+        raise HandoffPlaneError(
+            "OPTILAND_EXIT_PUPIL_UNRESOLVED",
+            "Optiland returned a non-finite exit pupil for this system "
+            f"(XPL={location_from_image_mm!r}, XPD={diameter_mm!r}); a telecentric or "
+            "degenerate configuration has no finite exit pupil plane, and this "
+            "adapter will not substitute one.",
+        )
+
+    pupil_z_mm = image_plane_z_mm + location_from_image_mm
+    surface_z = [
+        float(np.asarray(be_utils.to_numpy(surface.geometry.cs.z)).ravel()[0])
+        for surface in lens.surfaces.surfaces[:-1]
+    ]
+    beyond = [z for z in surface_z if np.isfinite(z) and z > pupil_z_mm]
+
+    return {
+        "z_mm": pupil_z_mm,
+        "location_from_image_mm": location_from_image_mm,
+        "diameter_mm": diameter_mm,
+        "is_virtual": bool(beyond),
+        "refracting_surfaces_beyond_pupil_z_mm": beyond,
+    }
+
+
+def _project_rays_to_plane(rays: Any, be_utils: Any, target_z_mm: float) -> dict[str, Any]:
+    """Advance each ray along its own image-space direction to `target_z_mm`.
+
+    Returns the ray's image-space **asymptote** at that plane, which is what the
+    exit pupil is defined by, not a physical intersection: for a virtual pupil the
+    line being extended passes back through glass the ray never travelled in that
+    state. See the probe for why that is nonetheless the right construction.
+
+    Directions are unchanged -- this is a reparameterization along each ray, not a
+    propagation, so no OPL is added or removed here. OPL is M3.4's.
+    """
+    import numpy as np
+
+    x = np.asarray(be_utils.to_numpy(rays.x), dtype=np.float64)
+    y = np.asarray(be_utils.to_numpy(rays.y), dtype=np.float64)
+    z = np.asarray(be_utils.to_numpy(rays.z), dtype=np.float64)
+    direction_z = np.asarray(be_utils.to_numpy(rays.N), dtype=np.float64)
+
+    if np.any(direction_z == 0.0):
+        raise HandoffPlaneError(
+            "OPTILAND_HANDOFF_PLANE_UNREACHABLE",
+            "at least one traced ray has N = 0 and therefore never reaches the "
+            "requested handoff plane; the projection is undefined for it.",
+        )
+
+    step_mm = (target_z_mm - z) / direction_z
+    return {
+        "x_mm": x + np.asarray(be_utils.to_numpy(rays.L), dtype=np.float64) * step_mm,
+        "y_mm": y + np.asarray(be_utils.to_numpy(rays.M), dtype=np.float64) * step_mm,
+        "z_mm": np.full_like(x, target_z_mm),
+        "max_abs_step_mm": float(np.max(np.abs(step_mm))),
+    }
 
 
 @lru_cache(maxsize=1)
@@ -531,6 +710,7 @@ class OptilandAdapter:
         hx = float(request.config.get("Hx", _DEFAULT_HX))
         hy = float(request.config.get("Hy", _DEFAULT_HY))
         num_rays = int(request.config.get("num_rays", _DEFAULT_NUM_RAYS))
+        handoff_plane = str(request.config.get("handoff_plane", _DEFAULT_HANDOFF_PLANE))
 
         be, objectives, be_utils, torch_module = _import_optiland(
             need_torch=backend_name == "torch"
@@ -557,8 +737,7 @@ class OptilandAdapter:
             )
 
         try:
-            sample_cls = getattr(objectives, sample_name)
-            lens = sample_cls()
+            lens = _resolve_lens(sample_name, objectives, be)
 
             design_parameter_tensors: dict[str, Any] = {}
             for name, value in request.design_parameters.items():
@@ -645,7 +824,15 @@ class OptilandAdapter:
                 run_dir = Path(str(configured_output))
                 run_dir.mkdir(parents=True, exist_ok=True)
             final_surface = lens.surfaces.surfaces[-1]
-            reference_plane_z_mm = float(be_utils.to_numpy(final_surface.geometry.cs.z))
+            image_plane_z_mm = float(be_utils.to_numpy(final_surface.geometry.cs.z))
+
+            if handoff_plane == "exit_pupil":
+                exit_pupil = _resolve_exit_pupil(lens, be_utils, image_plane_z_mm)
+                reference_plane_z_mm = exit_pupil["z_mm"]
+            else:
+                exit_pupil = None
+                reference_plane_z_mm = image_plane_z_mm
+
             rays_artifact = self._build_ray_bundle_artifact(
                 request,
                 rays,
@@ -658,9 +845,29 @@ class OptilandAdapter:
                 num_rays,
                 run_dir,
                 reference_plane_z_mm,
+                handoff_plane,
+                exit_pupil,
+                len(lens.surfaces.surfaces) - 1,
             )
             wavefront_artifact, wavefront_warnings = self._build_wavefront_artifact(
                 request, rays, be_utils, backend_name, sample_name, wavelength, run_dir
+            )
+        except HandoffPlaneError as exc:
+            # A plane that cannot be resolved is a structured failure, not a crash
+            # and not a silent fallback to the image surface: a caller that asked
+            # for the exit pupil and got the image plane back would be off by the
+            # whole pupil-to-focus distance with nothing to notice it by.
+            return ModelRunResult(
+                status=RunStatus.FAILED,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+                warnings=warnings,
+                diagnostics={
+                    **diagnostics,
+                    "code": exc.code,
+                    "stage": "handoff_plane_resolution",
+                    "requested_handoff_plane": handoff_plane,
+                },
             )
         except Exception as exc:
             return ModelRunResult(
@@ -769,6 +976,20 @@ class OptilandAdapter:
                 )
             )
 
+        handoff_plane = request.config.get("handoff_plane", _DEFAULT_HANDOFF_PLANE)
+        if handoff_plane not in _SUPPORTED_HANDOFF_PLANES:
+            problems.append(
+                (
+                    "OPTILAND_UNSUPPORTED_HANDOFF_PLANE",
+                    f"config['handoff_plane']={handoff_plane!r} is not one of "
+                    f"{_SUPPORTED_HANDOFF_PLANES!r}. A reference sphere in "
+                    "particular is not implemented: the ray-to-wave coupler "
+                    "accumulates onto a plane (M3.2). (The coupler is named here "
+                    "only in prose -- benchmarks/verify_m1_independence.py fails "
+                    "the ray branch if its identifier appears in this source.)",
+                )
+            )
+
         if "system" in request.inputs:
             problems.append(
                 (
@@ -810,6 +1031,9 @@ class OptilandAdapter:
         num_rays: int,
         run_dir: Path,
         reference_plane_z_mm: float,
+        handoff_plane: str = _DEFAULT_HANDOFF_PLANE,
+        exit_pupil: dict[str, Any] | None = None,
+        image_surface_index: int = 14,
     ) -> ArtifactRecord:
         import numpy as np
 
@@ -844,10 +1068,26 @@ class OptilandAdapter:
                 f"{_DIRECTION_NORM_TOLERANCE:.1e}."
             )
 
+        # At the image surface the exported coordinates are the traced ones,
+        # untouched -- which is what keeps L1-RAY-01's fingerprint bit-identical.
+        # At the exit pupil they are each ray's image-space asymptote evaluated at
+        # the pupil plane; directions are unchanged either way.
+        if handoff_plane == "exit_pupil":
+            projected = _project_rays_to_plane(rays, be_utils, reference_plane_z_mm)
+            position = {
+                "x": projected["x_mm"],
+                "y": projected["y_mm"],
+                "z": projected["z_mm"],
+            }
+            max_projection_step_mm = projected["max_abs_step_mm"]
+        else:
+            position = {"x": native["x"], "y": native["y"], "z": native["z"]}
+            max_projection_step_mm = 0.0
+
         arrays = {
-            "x_m": native["x"] * _GEOMETRY_M_PER_MM,
-            "y_m": native["y"] * _GEOMETRY_M_PER_MM,
-            "z_m": native["z"] * _GEOMETRY_M_PER_MM,
+            "x_m": position["x"] * _GEOMETRY_M_PER_MM,
+            "y_m": position["y"] * _GEOMETRY_M_PER_MM,
+            "z_m": position["z"] * _GEOMETRY_M_PER_MM,
             "L": native["L"],
             "M": native["M"],
             "N": native["N"],
@@ -918,6 +1158,35 @@ class OptilandAdapter:
                     "does not expose rejected input candidates, so invalid and "
                     "vignetted counts before survivor filtering are unavailable."
                 ),
+                # CHE-32: M3.3 must state how the pupil boundary is represented,
+                # and the answer is that Optiland does not represent it. RealRays
+                # carries no mask (probed: no `mask`/`pupil_mask`/`vignetted`
+                # attribute) and Optic.trace returns survivors only, so the
+                # boundary is implicit in WHICH rows exist. The measured extent
+                # below is derived from the survivors; it is emphatically not an
+                # Optiland pupil mask, and `survived` -- an all-true derived
+                # boolean -- must not be promoted into one.
+                "pupil_boundary": {
+                    "representation": "implicit_in_surviving_rays",
+                    "mask_available_from_optiland": False,
+                    "derived_from": "measured extent of the traced survivors",
+                    "measured_semi_extent_x_m": float(np.max(np.abs(arrays["x_m"]))),
+                    "measured_semi_extent_y_m": float(np.max(np.abs(arrays["y_m"]))),
+                    "paraxial_semi_diameter_m": (
+                        exit_pupil["diameter_mm"] / 2.0 * _GEOMETRY_M_PER_MM
+                        if exit_pupil is not None
+                        else None
+                    ),
+                    "warning": (
+                        "the measured extent is a property of the traced set, not of "
+                        "the aperture, and it does not bracket the paraxial diameter "
+                        "in a predictable direction: sampling density pulls it inward "
+                        "while pupil aberration pushes real marginal rays outward, and "
+                        "on both M3 systems the measured value lands slightly ABOVE "
+                        "the paraxial semi-diameter. A consumer needing the aperture "
+                        "must use the paraxial diameter, not this."
+                    ),
+                },
                 "sample": sample_name,
                 "backend": backend_name,
                 "scientific_array_sha256": scientific_hash,
@@ -926,8 +1195,48 @@ class OptilandAdapter:
                     "axes": "x,y,z right-handed Cartesian; propagation is +z",
                     "handedness": "right-handed",
                     "direction": "(L,M,N) direction cosines in the same frame",
-                    "reference_plane": "final traced image surface, surface index 14",
+                    "reference_plane": (
+                        f"exit pupil, read from Paraxial.XPL()/XPD() "
+                        f"({'virtual' if exit_pupil and exit_pupil['is_virtual'] else 'real'})"
+                        if handoff_plane == "exit_pupil"
+                        else (f"final traced image surface, surface index {image_surface_index}")
+                    ),
                     "reference_plane_z_m": reference_plane_z_mm * _GEOMETRY_M_PER_MM,
+                    "handoff_plane": handoff_plane,
+                    "exit_pupil": (
+                        {
+                            "source": "optic.paraxial.XPL() and XPD(), read not constructed",
+                            "location_from_image_m": (
+                                exit_pupil["location_from_image_mm"] * _GEOMETRY_M_PER_MM
+                            ),
+                            "z_m": exit_pupil["z_mm"] * _GEOMETRY_M_PER_MM,
+                            "diameter_m": exit_pupil["diameter_mm"] * _GEOMETRY_M_PER_MM,
+                            "is_virtual": exit_pupil["is_virtual"],
+                            "refracting_surfaces_beyond_pupil_z_m": [
+                                z * _GEOMETRY_M_PER_MM
+                                for z in exit_pupil["refracting_surfaces_beyond_pupil_z_mm"]
+                            ],
+                            "position_semantics": (
+                                "x_m/y_m are each ray's IMAGE-SPACE ASYMPTOTE evaluated "
+                                "at the pupil plane, not a physical intersection. The "
+                                "exit pupil is the image of the stop in image space and "
+                                "is frequently virtual -- when is_virtual is true the "
+                                "extended line passes back through glass the ray never "
+                                "travelled in that state. This is the construction the "
+                                "exit pupil is defined by, and it is what a "
+                                "wavefront-over-the-pupil calculation wants, but it is "
+                                "not 'where the ray is'."
+                            ),
+                            "max_projection_step_m": (max_projection_step_mm * _GEOMETRY_M_PER_MM),
+                            "directions_unchanged": (
+                                "the projection is a reparameterization along each ray, "
+                                "so (L,M,N) are the traced values and no optical path "
+                                "was added or removed; OPL handling is M3.4's (CHE-33)"
+                            ),
+                        }
+                        if exit_pupil is not None
+                        else None
+                    ),
                     "opd_field": "opd_native",
                     "opd_unit": "Optiland native value (geometry-scale mm expected)",
                     "opd_reference": "unverified",
