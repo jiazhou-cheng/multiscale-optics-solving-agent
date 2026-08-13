@@ -13,6 +13,7 @@ once real numbers arrive.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -145,14 +146,60 @@ def test_tolerance_budget_is_a_sum_of_sourced_terms() -> None:
             assert term["source"].strip()
 
 
-def test_chromatix_term_records_both_field_and_intensity_levels() -> None:
-    """They differ by ~10x, and quoting only one hides a real cost."""
+def test_chromatix_term_separates_three_precision_levels() -> None:
+    """CHE-40: absolute phase, piston-aligned field, and intensity are distinct.
+
+    M3.2 recorded two levels differing by 10x, because the common piston cancelled
+    under squaring. The conditioned path removes that piston up front, so the gap
+    does not carry over and the levels have to be stated separately rather than
+    derived from one another.
+    """
     terms = {t["name"]: t for t in _protocol()["tolerance_budget"]["terms"]}
     chromatix = terms["chromatix_complex64_truncation"]
 
     assert chromatix["level"].startswith("intensity")
-    assert chromatix["field_level_value"] > chromatix["value"]
-    assert "piston" in chromatix["field_versus_intensity_note"]
+    assert chromatix["applies_to_path"] == "carrier_conditioned"
+
+    levels = chromatix["levels"]
+    assert set(levels) == {"absolute_field_phase", "piston_aligned_field", "intensity"}
+
+    # Absolute optical phase is not a number here; it is explicitly not preserved,
+    # and stating it as a value would invite someone to claim it.
+    assert levels["absolute_field_phase"]["value"] is None
+    assert levels["absolute_field_phase"]["status"] == "not_preserved_by_the_required_path"
+    # But its cost on the unconditioned path is recorded, so the trade is visible.
+    assert levels["absolute_field_phase"]["cost_if_taken_from_the_absolute_path"] > 1e-3
+
+    # The intensity term is not a tenth of the field term any more.
+    assert levels["intensity"]["value"] == levels["piston_aligned_field"]["value"]
+    assert chromatix["value"] == levels["intensity"]["value"]
+
+    # M3.2's numbers survive as the fallback for an unconditioned path.
+    superseded = chromatix["superseded_absolute_phase_path"]
+    assert superseded["field"] > superseded["intensity"]
+
+
+def test_required_conditioning_covers_both_sides_of_the_coupler() -> None:
+    """CHE-40: form phase from a difference, on the wave side and the ray side.
+
+    The ray side is recorded rather than implemented -- M3.4 owns the reference
+    choice -- but it is recorded here so that M3.4 cannot reach the question
+    without meeting the rule.
+    """
+    conditioning = _protocol()["required_conditioning"]
+
+    wave = conditioning["wave_side"]
+    assert "k_z + k" in wave["rule"], "the exact identity, not a subtraction"
+    assert "paraxial approximation" in wave["is_not"]
+    assert "no term is dropped" in wave["is_not"]
+    assert wave["global_phase_policy"] == "retained_as_metadata_not_reapplied"
+    # No consumer may quietly assume absolute phase off the propagated field.
+    assert "No consumer may read absolute optical phase" in wave["global_phase_policy_detail"]
+
+    ray = conditioning["ray_side"]
+    assert "OPL_i - OPL_ref" in ray["rule"]
+    assert "CHE-33" in ray["owner"]
+    assert ray["status"] == "recorded_not_implemented"
 
 
 def test_residual_aberration_is_scoped_to_the_airy_gate_only() -> None:
@@ -185,33 +232,73 @@ def test_no_gate_may_be_satisfied_by_widening() -> None:
     assert "finding" in budget["widening_rule"]
 
 
-def test_feasibility_verdict_names_the_binding_constraint_and_the_rejection() -> None:
-    """The rejected configuration is part of the evidence, not a deleted draft."""
+def test_feasibility_verdict_records_the_superseded_constraint_and_the_rejection() -> None:
+    """The rejected configuration is part of the evidence, not a deleted draft.
+
+    CHE-40 reinstated it. Both facts have to stay legible: M3.2's measurement was
+    right for the propagation it had, and the propagation changed.
+    """
     feasibility = _protocol()["feasibility"]
     assert feasibility["verdict"] == "feasible_on_cpu_float64"
-    assert "float32" in feasibility["binding_constraint"]
+    assert "carrier_conditioned" in feasibility["binding_constraint"]
+    # The superseded constraint is kept rather than overwritten.
+    assert "float32" in feasibility["superseded_binding_constraint"]
+    assert "CHE-40" in feasibility["binding_constraint_amended_by"]
 
     rejected = feasibility["rejected_configuration"]
     assert rejected["measured_float32_field_error"] > 1e-2
     assert rejected["propagation_distance_mm"] > 40.0
+    assert rejected["status"] == "reinstated_as_admissible"
+    # Reinstated on measured evidence, and only on a conditioned path.
+    assert rejected["measured_carrier_conditioned_intensity_error"] < 1e-5
+    assert rejected["measured_absolute_phase_intensity_error"] > 3.5e-4
+    assert "cost, not precision" in rejected["not_selected_because"]
 
 
-def test_propagation_distance_stays_inside_the_measured_float32_regime() -> None:
-    """Both selected systems must sit where the float32 error is ~1e-3, not ~1e-1.
+def test_the_one_tenth_scaling_is_a_fallback_not_a_requirement() -> None:
+    """CHE-40 removed the numerical reason for it; the honest new reason is cost."""
+    scale = _system(_protocol(), "M3-SINGLET-REF")["scale_status"]
+    assert scale["value"] == "safe_fallback_configuration"
+    assert "CHE-40" in scale["amended_by"]
+    assert "required architecture constraint" in scale["was"]
+    assert "cost choice" in scale["now"]
+    # A later ticket may take the macroscopic system, but not unconditioned.
+    assert "may not take it on an unconditioned path" in scale["what_would_change_it"]
 
-    Guards the decision the rejection was made for: if a later ticket swaps in a
-    longer-focal-length system, this fails rather than silently degrading the PSF.
+
+def test_conditioned_complex64_term_covers_both_systems_represented_phase() -> None:
+    """The budget term must bound `eps32 * max|z(k_z - k)|` on each system's own grid.
+
+    Replaces the M3.2-era check that bounded `eps32 * k z` instead. That quantity
+    is no longer what the required path represents, so guarding it would guard the
+    wrong thing -- and would keep rejecting systems for a reason CHE-40 retired.
+    The rule this enforces still bites: a later ticket that raises NA or lengthens
+    the propagation without re-deriving the term fails here.
     """
     protocol = _protocol()
     eps32 = 1.1920929e-7
-    field_budget = 1e-2
+    terms = {t["name"]: t for t in protocol["tolerance_budget"]["terms"]}
+    budget = float(terms["chromatix_complex64_truncation"]["value"])
 
     for system_id in ("M3-SINGLET-REF", "M3-REVERSE-TELEPHOTO"):
         distance_m = (
             float(_system(protocol, system_id)["derived"]["propagation_distance_mm"]) * 1e-3
         )
-        projected = eps32 * 2.0 * 3.141592653589793 * distance_m / WAVELENGTH_M
-        assert projected < field_budget, f"{system_id} projected float32 error {projected:.3g}"
+        pitch_m = float(protocol["sampling"]["grids"][system_id]["sample_pitch_m"])
+
+        # Corner bin of the sampled band, where the relative phase excursion peaks.
+        frequency_squared = 2.0 * (1.0 / (2.0 * pitch_m)) ** 2
+        delay = math.sqrt(1.0 - WAVELENGTH_M**2 * frequency_squared)
+        excursion = 2.0 * math.pi * distance_m * WAVELENGTH_M * frequency_squared / (delay + 1.0)
+        projected = eps32 * excursion
+
+        assert projected <= budget, (
+            f"{system_id} represents {excursion:.4g} rad of relative phase, "
+            f"projecting {projected:.3g} against a {budget:.3g} budget term"
+        )
+        # And the conditioning must actually be buying something at this distance.
+        carrier_phase = 2.0 * math.pi * distance_m / WAVELENGTH_M
+        assert carrier_phase / excursion > 10.0
 
 
 def test_ray_count_is_a_tested_starting_point_not_a_frozen_answer() -> None:

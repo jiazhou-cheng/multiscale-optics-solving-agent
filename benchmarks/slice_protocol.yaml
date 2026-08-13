@@ -1,6 +1,24 @@
 schema_version: 1
 protocol_id: M3-SLICE-CPU-V1
 extends: M2-COUPLER-CPU-V1
+amendments:
+  - id: A1-carrier-conditioned-propagation
+    issue: CHE-40 (M3.2A)
+    supersedes: >-
+      the M3.2 finding that the optical system's absolute SIZE is a binding
+      numerical constraint
+    summary: >-
+      M3.2's measured error was real but its cause was misattributed. The ASM
+      transfer function factors exactly as exp(i k z) * exp(i z (k_z - k)), and
+      the first factor is a global piston that contributes nothing to a single-
+      path PSF. Evaluating only the second factor -- through the exact identity
+      k_z - k = -(k_x^2+k_y^2)/(k_z+k), not a paraxial expansion -- drops the
+      piston-aligned field error at 47 mm from 1.2e-2 to 6.5e-6 and the intensity
+      error from 8.2e-3 to 3.9e-6, with the prescription, NA, grid, oracle, and
+      input field all unchanged. Absolute optical-system scale is therefore NOT a
+      binding constraint on a carrier-conditioned path.
+    evidence: outputs/M3/carrier-phase/result.json
+    probe: benchmarks/probes/m3_carrier_phase.py
 scope:
   benchmark_ids: [L2-PSF-01]
   execution: end_to_end_graph
@@ -50,6 +68,54 @@ handoff_plane:
   propagation_method: angular_spectrum   # the M1-verified ASM, unchanged
 
 # ---------------------------------------------------------------------------
+# Required numerical conditioning (CHE-40, M3.2A)
+# ---------------------------------------------------------------------------
+# Both entries are the same rule applied on the two sides of the coupler: form
+# phase from a DIFFERENCE against a declared reference, never from an absolute
+# accumulated quantity. On the wave side the absolute quantity is k z; on the ray
+# side it is Optiland's accumulated OPL. Neither is wrong physically; both are
+# unrepresentable at the precision the rest of the budget assumes.
+required_conditioning:
+  wave_side:
+    rule: >-
+      phase-insensitive M3 PSF paths MUST propagate with the common carrier phase
+      removed: H = exp(i z (k_z - k)), evaluated through the exact identity
+      k_z - k = -(k_x^2 + k_y^2)/(k_z + k)
+    is_not: a paraxial approximation -- no term is dropped
+    implementation: ASM-CARRIER-REMOVED-V1
+    module: src/multiscale_optics_agent/adapters/chromatix_carrier_removed.py
+    global_phase_policy: retained_as_metadata_not_reapplied
+    global_phase_policy_detail: >-
+      the removed exp(i k z) is recorded in float64 on the result and is never
+      folded back into the complex64 field, because reapplying it there would
+      reintroduce exactly the rounding it was removed to avoid. A consumer
+      needing absolute optical phase calls reconstruct_absolute_phase; a consumer
+      needing intensity or single-path relative phase needs nothing. No consumer
+      may read absolute optical phase off the propagated field.
+    caller_must_supply_wavelength: >-
+      chromatix Field.spectrum is float32, so a carrier phase derived from the
+      field is good only to ~3e-8 relative -- about 0.02 rad at 47 mm. Pass the
+      float64 wavelength explicitly whenever absolute phase will be reconstructed.
+    evidence: outputs/M3/carrier-phase/result.json
+    regression_tests: tests/test_carrier_removed_asm.py
+  ray_side:
+    rule: >-
+      coherent phase MUST be formed as phi_i = (2*pi/lambda) * (OPL_i - OPL_ref),
+      never directly from absolute accumulated OPL
+    reason: >-
+      the same conditioning failure as the wave side. CHE-30 established that
+      RealRays.opd is absolute accumulated optical path from the ray launch
+      state, so at a few tens of millimetres it is ~1e5 waves; forming phase from
+      it directly spends the whole float budget on a piston that the PSF cannot
+      see.
+    owner: M3.4 (CHE-33)
+    owns_the_details: >-
+      the choice of OPL_ref, the sign convention, and global-phase provenance
+      belong to the M3.4 contract; this protocol fixes only that a reference
+      subtraction must happen before phase is formed
+    status: recorded_not_implemented
+
+# ---------------------------------------------------------------------------
 # Systems
 # ---------------------------------------------------------------------------
 systems:
@@ -57,9 +123,24 @@ systems:
     role: primary_verification_vehicle
     description: >-
       Plano-convex singlet, convex toward the collimated side, built from real
-      refractive surfaces. Scaled to 1/10 of a 25 mm-radius prescription so its
-      pupil-to-focus distance stays inside the regime where Chromatix's float32
-      cast is not the dominant error. Admits an analytic Airy oracle.
+      refractive surfaces, scaled to 1/10 of a 25 mm-radius prescription. Admits
+      an analytic Airy oracle.
+    scale_status:
+      value: safe_fallback_configuration
+      amended_by: CHE-40 (M3.2A)
+      was: >-
+        a required architecture constraint -- M3.2 scaled the prescription to
+        keep the pupil-to-focus distance inside the regime where Chromatix's
+        float32 cast is not the dominant error
+      now: >-
+        a cost choice. CHE-40 showed the distance limit was representational, so
+        the 1/10 scaling is no longer load-bearing for accuracy. It is kept
+        because at 188^2 it is ~120x cheaper than the unscaled system for the
+        same physics, and because it is already frozen and verified.
+      what_would_change_it: >-
+        a ticket that needs a macroscopic system may take the unscaled variant
+        under feasibility.rejected_configuration, which is now admissible, and
+        pay the grid cost. It may not take it on an unconditioned path.
     construction:
       surface_type: standard        # NOT "paraxial" -- see inadmissible_sources
       refractive_index: 1.5168      # IdealMaterial, so no glass catalog dependency
@@ -157,24 +238,58 @@ tolerance_budget:
         16x16; the bound scales with accumulated phase over the output grid and
         with ray count, so 1e-12 is a headroom-carrying restatement
       dominates: nothing at this grid size
+    # Amended by CHE-40 (M3.2A). M3.2's 3.5e-4 / 3.4e-3 pair was correct for the
+    # absolute-phase path and is retained below as the fallback. On the
+    # carrier-conditioned path now required by this protocol, the phase the
+    # transfer function must represent is max|z(k_z - k)| rather than k z, and the
+    # budget is derived from that instead.
     - name: chromatix_complex64_truncation
-      value: 3.5e-4
+      value: 1.0e-4
       level: intensity, relative
+      applies_to_path: carrier_conditioned
       source: >-
-        measured in benchmarks/probes/m3_slice_feasibility.py against an
-        independent float64 angular-spectrum reference, at each system's own
-        propagation distance and numerical aperture
-      field_level_value: 3.4e-3
-      field_versus_intensity_note: >-
-        the field-level error is ~10x larger because most of the float32 phase
-        error is common to every spectral component and therefore acts as a
-        piston that cancels when the field is squared. The PSF is an intensity,
-        so the intensity figure is the budget term; the field figure is recorded
-        because anyone consuming the complex field pays it
+        eps32 * max|z(k_z - k)| evaluated on each system's own grid: 6.89e-5 for
+        M3-SINGLET-REF and 9.55e-5 for M3-REVERSE-TELEPHOTO, so 1.0e-4 covers
+        both. Derived from the represented phase, not read off a run -- the
+        measured errors in outputs/M3/carrier-phase/result.json sit 20-50x below
+        this bound, and M3.8 tests against the bound.
+      levels:
+        absolute_field_phase:
+          value: null
+          status: not_preserved_by_the_required_path
+          note: >-
+            the carrier-conditioned path discards exp(i k z) as an explicit
+            global piston. A consumer that needs absolute optical phase must
+            reconstruct it in float64 from the recorded carrier; it may not read
+            it off the complex64 field.
+          cost_if_taken_from_the_absolute_path: 6.4e-3
+          cost_source: eps32 * k z at M3-SINGLET-REF's 4.706 mm
+        piston_aligned_field:
+          value: 1.0e-4
+          source: eps32 * max|z(k_z - k)|, worst of the two systems
+          note: >-
+            this is the field-level metric that means something once the carrier
+            is gone: it measures spatially varying wavefront error, which is what
+            a PSF is actually made of.
+        intensity:
+          value: 1.0e-4
+          source: >-
+            bounded AT the piston-aligned field term rather than at a tenth of
+            it. M3.2's 10x field-to-intensity gap came from the common piston
+            cancelling under squaring; the conditioned path has already removed
+            that piston, so the remaining per-bin error does not cancel and the
+            gap does not carry over.
+      superseded_absolute_phase_path:
+        intensity: 3.5e-4
+        field: 3.4e-3
+        source: >-
+          M3.2, measured against the same float64 reference at each system's own
+          distance and NA. Still the correct budget for any path that propagates
+          the absolute carrier, which is why it is kept rather than deleted.
+        independent_agreement: >-
+          M1 declared 3.00e-04 for this engine from 5*eps32 per radian, derived
+          independently of that measurement
       dominates: the numerical budget
-      independent_agreement: >-
-        M1 declared 3.00e-04 for this engine from 5*eps32 per radian, derived
-        independently of this measurement
     - name: reference_system_residual_aberration
       value: 9.1e-4
       level: Strehl deficit
@@ -204,7 +319,14 @@ tolerance_budget:
       applies_to: [M3-SINGLET-REF]
     fft_oracle_intensity_relative_l2:
       value: 1.0e-3
-      composition: 3.5e-4 float32 + margin; no aberration term, same wavefront
+      composition: >-
+        1.0e-4 carrier-conditioned complex64 + margin; no aberration term,
+        because the oracle is built from the same wavefront
+      not_tightened_because: >-
+        CHE-40 cut the complex64 term from 3.5e-4 to 1.0e-4, but ray_sampling_error
+        and grid_truncation_and_padding are still unmeasured and must fit inside
+        this same gate. Tightening it now would be setting a tolerance against
+        terms nobody has measured yet.
       applies_to: [M3-SINGLET-REF, M3-REVERSE-TELEPHOTO]
     energy_accounting_unexplained_residual:
       value: 1.0e-3
@@ -223,8 +345,18 @@ tolerance_budget:
 feasibility:
   verdict: feasible_on_cpu_float64
   evidence: benchmarks/probes/m3_slice_feasibility.py
-  binding_constraint: chromatix_float32_cast_versus_propagation_distance
-  binding_constraint_detail: >-
+  binding_constraint: none_of_the_candidates_binds_on_a_carrier_conditioned_path
+  binding_constraint_amended_by: CHE-40 (M3.2A)
+  binding_constraint_amendment: >-
+    M3.2 named Chromatix's complex64 cast against propagation distance as the
+    binding constraint. CHE-40 showed that constraint was an artefact of
+    propagating the absolute carrier phase, not of the dtype: with the carrier
+    removed, the same complex64 engine holds 2.7e-4 relative intensity error at
+    470 mm, ten times beyond the distance that rejected the first system. The
+    dtype still costs something -- see the tolerance budget -- but it no longer
+    bounds the system's absolute size.
+  superseded_binding_constraint: chromatix_float32_cast_versus_propagation_distance
+  superseded_binding_constraint_detail: >-
     C_RAY_TO_WAVE cost is rays x pixels and measured ~5.5e8 ray-pixel products
     per second, so both selected grids reconstruct in under a second. Neither
     memory nor the coupler is binding. What binds is Chromatix's unconditional
@@ -234,16 +366,34 @@ feasibility:
     confirmed rather than fitted.
   rejected_configuration:
     id: unscaled 25 mm-radius singlet
+    status: reinstated_as_admissible
+    reinstated_by: CHE-40 (M3.2A)
     efl_mm: 48.37
     propagation_distance_mm: 47.06
     measured_float32_field_error: 6.3e-2
-    reason: >-
+    original_reason_for_rejection: >-
       200x over M1's own float32 figure for this engine. A pupil-to-focus
       distance is set by the lens focal length, so this made the reference
       system's absolute SIZE a protocol decision rather than only its
       f-number. Scaling to 1/10 at fixed f-number shortens the propagation,
       reduces the aberration in waves by the same factor, and leaves the
       numerical aperture -- hence the Nyquist pitch -- unchanged.
+    why_reinstated: >-
+      CHE-40 propagated this system's own 4.987 mm exit pupil the full 47.06 mm
+      to focus on a 2048^2 grid at its own 2.659 um pitch. Under the
+      absolute-phase path it still fails, at 4.49e-4 relative intensity error
+      against M3.2's own 3.5e-4 term -- so M3.2's rejection was correct for the
+      propagation it had. Under the carrier-conditioned path the same geometry
+      gives 2.21e-7, and the resulting Airy pattern agrees with the float64
+      oracle's to within 1e-4 relative. Nothing about the system was changed.
+    measured_carrier_conditioned_intensity_error: 2.2117405336498536e-07
+    measured_absolute_phase_intensity_error: 4.4879159803374615e-04
+    not_selected_because: >-
+      cost, not precision. At 2048^2 it is ~120x the pixels of the scaled system
+      for the same physics, and M3.9's convergence study sweeps grid and ray
+      count on top of that. The scaled system stays the frozen primary; this one
+      is available to any later ticket that wants a macroscopic case, and the
+      choice is now a budget decision rather than a numerical impossibility.
   measured_coupler_throughput_ray_pixels_per_second: 5.5e8
   projected_reconstruction_seconds:
     M3-SINGLET-REF: 0.27

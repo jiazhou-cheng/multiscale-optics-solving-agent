@@ -354,6 +354,16 @@ def case_chromatix_float32_vs_distance() -> dict[str, Any]:
     import jax.numpy as jnp
     from chromatix import functional as cf
 
+    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+        pin_wave_engine_precision,
+    )
+
+    # CHE-40: jax_enable_x64 is process-global and sax turns it on as an import
+    # side effect. Under x64 these FFTs promote to complex128 and the float32
+    # figures below become meaningless. Pinned here for the same reason
+    # chromatix_adapter has pinned it since M1.
+    pin_wave_engine_precision()
+
     grid = 128
     pitch_m = 4.0e-6
     wavelength_m = WAVELENGTH_UM * 1e-6
@@ -477,6 +487,12 @@ def _measure_float32_intensity_error(*, z_mm: float, numerical_aperture: float) 
     """
     import jax.numpy as jnp
     from chromatix import functional as cf
+
+    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+        pin_wave_engine_precision,
+    )
+
+    pin_wave_engine_precision()  # CHE-40; see case_chromatix_float32_vs_distance
 
     grid = 128
     wavelength_m = WAVELENGTH_UM * 1e-6
