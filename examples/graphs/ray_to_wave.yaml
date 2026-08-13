@@ -1,3 +1,13 @@
+# L2-PSF-01, the end-to-end ray -> wave -> PSF slice.
+#
+# CHE-31 (M3.2) reconciled this file with what M3 actually executes. It was
+# written before any of it was implemented and declared several things nothing
+# in the repository does; those are now marked M4 rather than left to read as
+# capability. The frozen configuration lives in benchmarks/slice_protocol.yaml
+# (M3-SLICE-CPU-V1) and is the source of truth for the numbers below.
+#
+# Executes in M3:  M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX -> C_FIELD_TO_PSF
+# Deferred to M4:  every gradient, and the reference-sphere pupil variant.
 schema_version: 0.1.0
 task_id: L2-PSF-01
 nodes:
@@ -5,11 +15,19 @@ nodes:
     model: M_RAY_OPTILAND
     config:
       wavelength_m: 5.5e-7
+      # Hexapolar DENSITY request, not an output ray count -- Optiland returns
+      # the survivor count, which is what the protocol's ray criterion applies
+      # to. Tested by CHE-38 rather than assumed.
       pupil_samples: 256
   - id: wave
     model: M_WAVE_CHROMATIX
     config:
       propagation: angular_spectrum
+      # Pupil-to-focus distance of M3-SINGLET-REF. Kept short deliberately:
+      # Chromatix casts to complex64 unconditionally, so the ASM transfer-phase
+      # error grows as eps32 * 2*pi*z/lambda. A 47 mm version of this system
+      # measured 6.3e-2 relative field error and was rejected in M3.2.
+      z_m: 4.70560476022521e-3
 edges:
   - id: pupil_reconstruction
     coupler: C_RAY_TO_WAVE
@@ -21,30 +39,59 @@ edges:
       port: input_field
     config:
       interpolation: conservative_scattered_to_grid
-      reference_sphere: exit_pupil
-      target_sample_pitch_m: 2.0e-6
-design_variables:
-  - name: asphere_coefficient
-    node: lens
-    parameter: surfaces[2].asphere.a4
-    bounds: [-0.01, 0.01]
-    requires_gradient: true
+      # A PLANE, read from optic.paraxial.XPL()/XPD(). The earlier
+      # `reference_sphere: exit_pupil` here was aspirational: C_RAY_TO_WAVE
+      # accumulates plane wavelets onto a plane, and nothing in this repository
+      # implements a reference-sphere pupil. That variant is M4 scope.
+      reference_plane: exit_pupil
+      target_sample_pitch_m: 2.6587352810843895e-06
+      grid_n: 188
+# C_FIELD_TO_PSF is deliberately NOT an edge here, and the reason is a
+# constraint on the graph model rather than a scope choice: every edge needs a
+# target NODE, and the only registered consumer of a `psf` artifact is
+# M_SENSOR_IDEAL, which M3 excludes (no pixel integration, no noise model). A
+# terminal coupler therefore has nothing to point at.
+#
+# CHE-36 (M3.7) owns the resolution and has two honest options: add a minimal
+# sink node for the PSF, or run the reduction in the benchmark driver after the
+# graph and record it in provenance. Until then the graph ends at the wave
+# node's output field, which is what actually executes.
+design_variables: []
+# M4 scope, not M3. Kept here as a comment rather than as a declaration,
+# because a declared design variable with requires_gradient reads as a
+# capability claim and no gradient through either coupler is verified:
+# derivative.verified is false for both, asserted by a test.
+#
+#  - name: asphere_coefficient
+#    node: lens
+#    parameter: surfaces[2].asphere.a4
+#    bounds: [-0.01, 0.01]
+#    requires_gradient: true
 objectives:
   - name: focal_peak
     node: wave
     port: output_field
     metric: normalized_peak_intensity
-    requires_gradient: true
+    requires_gradient: false
 verification:
   - id: pupil_power
     kind: conservation
     target: pupil_reconstruction
     tolerance: 0.001
-  - id: directional_gradient
-    kind: directional_derivative
-    target: asphere_coefficient
-    tolerance: 0.01
+# M4 scope: needs a custom derivative across the PyTorch -> JAX boundary plus a
+# directional finite-difference test before it can be asserted.
+#
+#  - id: directional_gradient
+#    kind: directional_derivative
+#    target: asphere_coefficient
+#    tolerance: 0.01
 require_verified_gradients: false
 allow_cycles: false
 metadata:
-  description: Minimal graph used to characterize the existing ray-wave bridge.
+  description: >-
+    End-to-end forward slice: real Optiland trace, coherent reconstruction at the
+    declared exit pupil, M1-verified Chromatix angular-spectrum propagation to
+    focus, normalized PSF. Forward-only in M3.
+  protocol_id: M3-SLICE-CPU-V1
+  protocol_path: benchmarks/slice_protocol.yaml
+  m3_issue: CHE-31

@@ -1,0 +1,299 @@
+schema_version: 1
+protocol_id: M3-SLICE-CPU-V1
+extends: M2-COUPLER-CPU-V1
+scope:
+  benchmark_ids: [L2-PSF-01]
+  execution: end_to_end_graph
+  graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX, C_FIELD_TO_PSF]
+  # M2 forbade engine imports in the coupler *core* and that rule is inherited
+  # unchanged. M3 is an end-to-end slice, so the benchmark driver necessarily
+  # imports both engines; the constraint is that they never reach the core.
+  forbidden_import_prefixes:
+    coupler_core: [optiland, chromatix]
+  excluded_from_scope:
+    - M_SENSOR_IDEAL          # no pixel integration or noise model in M3
+    - C_WAVE_TO_RAY           # the slice is one-directional
+    - any gradient claim      # forward-only; deferred to M4
+  rationale: >-
+    M2 verified both coupler directions against analytic oracles while
+    deliberately never touching a real engine. M3 closes that gap: a real
+    Optiland trace, reconstructed at a declared exit pupil, propagated by the
+    M1-verified Chromatix ASM, reduced to a normalized PSF.
+
+execution:
+  entrypoint: ./run.sh
+  device: cpu
+  dtype_coupler: complex128
+  dtype_wave_engine: complex64      # forced by Chromatix; see tolerance_budget
+  wavelength_m: 5.5e-7
+  seed: 20260812
+  # Inherited from M2-COUPLER-CPU-V1 unless restated.
+
+# ---------------------------------------------------------------------------
+# Handoff plane
+# ---------------------------------------------------------------------------
+handoff_plane:
+  name: exit_pupil
+  source: optic.paraxial.XPL() and optic.paraxial.XPD()
+  constructed: false
+  rationale: >-
+    Optiland exposes exit pupil location and diameter directly, so the plane is
+    read from the system rather than constructed. Rays travel in air after the
+    last surface, so projecting each ray from the image plane to the pupil plane
+    along its own direction is exact, not an approximation.
+  is_a_plane_not_a_sphere: true
+  plane_not_sphere_note: >-
+    C_RAY_TO_WAVE accumulates plane wavelets onto a PLANE. The
+    `reference_sphere: exit_pupil` in examples/graphs/ray_to_wave.yaml was
+    aspirational text that nothing implements; it is marked as M4 scope there.
+  propagation_target: paraxial focus / image plane
+  propagation_method: angular_spectrum   # the M1-verified ASM, unchanged
+
+# ---------------------------------------------------------------------------
+# Systems
+# ---------------------------------------------------------------------------
+systems:
+  - id: M3-SINGLET-REF
+    role: primary_verification_vehicle
+    description: >-
+      Plano-convex singlet, convex toward the collimated side, built from real
+      refractive surfaces. Scaled to 1/10 of a 25 mm-radius prescription so its
+      pupil-to-focus distance stays inside the regime where Chromatix's float32
+      cast is not the dominant error. Admits an analytic Airy oracle.
+    construction:
+      surface_type: standard        # NOT "paraxial" -- see inadmissible_sources
+      refractive_index: 1.5168      # IdealMaterial, so no glass catalog dependency
+      radius_mm: 2.5
+      center_thickness_mm: 0.2
+      stop: surface 1
+    derived:
+      efl_mm: 4.837461300309598
+      bfl_mm: 4.70560476022521
+      f_number: 9.7
+      semi_aperture_mm: 0.2494
+      numerical_aperture: 0.05171631827291936
+      exit_pupil_z_mm: 0.06814345991561233
+      exit_pupil_diameter_mm: 0.4987073505473812
+      image_plane_z_mm: 4.90560476022521
+      propagation_distance_mm: 4.70560476022521
+    diffraction_limited_evidence:
+      criterion: Rayleigh quarter wave, peak-to-valley
+      peak_to_valley_waves: 0.01699595356250618
+      rms_waves: 0.004794729150396517
+      marechal_strehl_estimate: 0.9990928255075161
+      method: >-
+        optical path to a reference sphere centred on the nominal focus, not to
+        the image plane, so plane-versus-sphere geometry is not mistaken for
+        aberration
+    airy_radius_um: 12.974628171691823
+  - id: M3-REVERSE-TELEPHOTO
+    role: real_aberrated_case
+    description: >-
+      The bundled Optiland sample already validated in M1 (L1-RAY-01). No
+      analytic oracle exists for it, so it is verified against the independent
+      FFT/Fraunhofer PSF built from the same traced OPD map.
+    derived:
+      numerical_aperture: 0.07530880176185195
+      exit_pupil_z_mm: 2.1547825721481666
+      exit_pupil_diameter_mm: 0.46053493637581633
+      image_plane_z_mm: 5.209361469999999
+      propagation_distance_mm: 3.0545788978518327
+    analytic_oracle_available: false
+    analytic_oracle_absent_because: >-
+      a real multi-surface objective is not aberration-free, so an Airy pattern
+      is not its expected PSF; only an independent implementation over the same
+      wavefront can bound it
+
+# ---------------------------------------------------------------------------
+# Sampling
+# ---------------------------------------------------------------------------
+sampling:
+  # The limit is PER AXIS. M2 fixed this after CHE-24 tested the direction norm:
+  # a diagonal FFT bin has |d| = sqrt(2)*lambda/(2*pitch) yet is exactly
+  # representable, so a norm test both over- and under-constrains.
+  nyquist_rule: pitch_axis <= wavelength / (2 * max_over_rays(abs(direction_cosine_axis)))
+  nyquist_evaluated_over: marginal rays of an actual trace, not a paraxial estimate
+  oversampling_factor: 2
+  oversampling_rationale: >-
+    At the critically admissible pitch the Airy radius spans only ~2.44 pixels,
+    which is enough to locate a peak and a first null but not to compare a
+    profile. At 2x it spans ~4.9 pixels.
+  grids:
+    M3-SINGLET-REF:
+      nyquist_pitch_max_m: 5.317470562168779e-06
+      sample_pitch_m: 2.6587352810843895e-06
+      pupil_extent_m: 0.000499568295573393
+      grid_n: 188
+      airy_radius_in_pixels: 4.88
+    M3-REVERSE-TELEPHOTO:
+      nyquist_pitch_max_m: 3.651631596391999e-06
+      sample_pitch_m: 1.8258157981959995e-06
+      pupil_extent_m: 0.0004619720213998758
+      grid_n: 254
+  ray_count_criterion:
+    rule: >-
+      at least one traced ray per Nyquist cell of the pupil field, i.e.
+      ray_count >= (pupil_extent / sample_pitch)^2 / oversampling^2, evaluated
+      as a starting point and then tested rather than assumed
+    starting_value: 4096
+    tested_by: M3.9 (CHE-38) convergence study
+    note: >-
+      Optiland's `num_rays` is a hexapolar density request, not an output count;
+      the traced survivor count is what this criterion applies to.
+
+# ---------------------------------------------------------------------------
+# Tolerance budget
+# ---------------------------------------------------------------------------
+# Derived from named error sources, each with a measurement or a citation. Not
+# read off a passing run: M3.8 tests against these numbers, so setting them from
+# observed output would make the comparison circular.
+tolerance_budget:
+  terms:
+    - name: coupler_float64_roundoff
+      value: 1.0e-12
+      level: field, relative
+      source: >-
+        M2 measured 7.82e-14 max abs error on the plane-wave analytic oracle at
+        16x16; the bound scales with accumulated phase over the output grid and
+        with ray count, so 1e-12 is a headroom-carrying restatement
+      dominates: nothing at this grid size
+    - name: chromatix_complex64_truncation
+      value: 3.5e-4
+      level: intensity, relative
+      source: >-
+        measured in benchmarks/probes/m3_slice_feasibility.py against an
+        independent float64 angular-spectrum reference, at each system's own
+        propagation distance and numerical aperture
+      field_level_value: 3.4e-3
+      field_versus_intensity_note: >-
+        the field-level error is ~10x larger because most of the float32 phase
+        error is common to every spectral component and therefore acts as a
+        piston that cancels when the field is squared. The PSF is an intensity,
+        so the intensity figure is the budget term; the field figure is recorded
+        because anyone consuming the complex field pays it
+      dominates: the numerical budget
+      independent_agreement: >-
+        M1 declared 3.00e-04 for this engine from 5*eps32 per radian, derived
+        independently of this measurement
+    - name: reference_system_residual_aberration
+      value: 9.1e-4
+      level: Strehl deficit
+      source: measured, 1 - 0.9990928 for M3-SINGLET-REF
+      applies_to: the Airy comparison only
+      is_an_error: false
+      note: >-
+        a physical property of a real singlet, not a defect. It must appear in
+        the Airy tolerance because Airy is the perfect-lens limit, and it must
+        NOT appear in the FFT-oracle tolerance because that oracle shares the
+        same wavefront.
+    - name: ray_sampling_error
+      value: null
+      level: intensity, relative
+      status: to_be_measured
+      owner: M3.9 (CHE-38)
+    - name: grid_truncation_and_padding
+      value: null
+      level: intensity, relative
+      status: to_be_measured
+      owner: M3.6 (CHE-35)
+      diagnostic: edge_energy_fraction
+  gates:
+    airy_peak_intensity_relative:
+      value: 2.0e-3
+      composition: 9.1e-4 residual aberration + 3.5e-4 float32 + margin
+      applies_to: [M3-SINGLET-REF]
+    fft_oracle_intensity_relative_l2:
+      value: 1.0e-3
+      composition: 3.5e-4 float32 + margin; no aberration term, same wavefront
+      applies_to: [M3-SINGLET-REF, M3-REVERSE-TELEPHOTO]
+    energy_accounting_unexplained_residual:
+      value: 1.0e-3
+      rule: >-
+        every loss between traced ray power and PSF integral must be attributed
+        to a named mechanism; this bounds the UNATTRIBUTED remainder, not the
+        total loss
+  no_gate_may_be_satisfied_by_widening: true
+  widening_rule: >-
+    A gate that fails is a finding to diagnose and report. M2 exited with no
+    gate satisfied by loosening a tolerance; M3 inherits that rule.
+
+# ---------------------------------------------------------------------------
+# Feasibility verdict
+# ---------------------------------------------------------------------------
+feasibility:
+  verdict: feasible_on_cpu_float64
+  evidence: benchmarks/probes/m3_slice_feasibility.py
+  binding_constraint: chromatix_float32_cast_versus_propagation_distance
+  binding_constraint_detail: >-
+    C_RAY_TO_WAVE cost is rays x pixels and measured ~5.5e8 ray-pixel products
+    per second, so both selected grids reconstruct in under a second. Neither
+    memory nor the coupler is binding. What binds is Chromatix's unconditional
+    complex64 cast: the ASM transfer-function phase is 2*pi*z/lambda, so the
+    relative field error grows as eps32 * 2*pi*z/lambda. Measured 6.3e-2 at
+    z = 47 mm against a predicted 6.4e-2 -- a ratio of 0.98, so the model is
+    confirmed rather than fitted.
+  rejected_configuration:
+    id: unscaled 25 mm-radius singlet
+    efl_mm: 48.37
+    propagation_distance_mm: 47.06
+    measured_float32_field_error: 6.3e-2
+    reason: >-
+      200x over M1's own float32 figure for this engine. A pupil-to-focus
+      distance is set by the lens focal length, so this made the reference
+      system's absolute SIZE a protocol decision rather than only its
+      f-number. Scaling to 1/10 at fixed f-number shortens the propagation,
+      reduces the aberration in waves by the same factor, and leaves the
+      numerical aperture -- hence the Nyquist pitch -- unchanged.
+  measured_coupler_throughput_ray_pixels_per_second: 5.5e8
+  projected_reconstruction_seconds:
+    M3-SINGLET-REF: 0.27
+    M3-REVERSE-TELEPHOTO: 0.48
+  timing_caveat: >-
+    shared, unpinned machine, as in M1 and M2. These figures exist to reject
+    infeasible configurations, not as a regression envelope.
+
+# ---------------------------------------------------------------------------
+# Inadmissible sources
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Known structural constraints handed to later tickets
+# ---------------------------------------------------------------------------
+open_structural_items:
+  - id: terminal_coupler_has_no_target_node
+    found_by: CHE-31
+    owner: CHE-36 (M3.7)
+    description: >-
+      Every graph edge requires a target NODE, and the only registered consumer
+      of a `psf` artifact is M_SENSOR_IDEAL, which M3 excludes. So C_FIELD_TO_PSF
+      as the final step cannot be expressed as an edge. examples/graphs/
+      ray_to_wave.yaml therefore ends at the wave node's output field.
+    honest_options:
+      - add a minimal sink node for the PSF
+      - run the reduction in the benchmark driver and record it in provenance
+    not_an_option: >-
+      pulling M_SENSOR_IDEAL into M3 to make the graph close, which would widen
+      the milestone to make its diagram tidier
+  - id: no_runnable_coupler_exists_yet
+    found_by: CHE-31 (confirmed at M3 open)
+    owner: CHE-34 (M3.5)
+    description: >-
+      couplers/base.py declares Coupler.transform and nothing defines it, so
+      GraphValidator currently validates edges that cannot execute.
+
+inadmissible_sources:
+  - id: optiland_paraxial_surface
+    applies_to: any wavefront or OPL handed to a coupler
+    rule: surface_type "paraxial" must not be used
+    evidence: CHE-30, knowledge/solvers/optiland/conventions.md
+    reason: >-
+      The paraxial interaction model subtracts (x^2+y^2)/(2f) but leaves the
+      direction un-normalized, so the following propagation adds the axial
+      distance rather than the Euclidean one and the intended cancellation never
+      happens. Measured OPL at the focus is f - h^2/(2f): 0.36 mm, about 655
+      waves, at f = 50 mm and h = 6 mm. That is a defocus, not a rounding error.
+  - id: undeclared_optiland_opl
+    rule: >-
+      ContractCode.OPL_REFERENCE_UNVERIFIED stays enforced. An OPL is admissible
+      only when its reference is declared, and for an infinite object that
+      reference is aperture-dependent, so the declaration must record the EPD.
+    evidence: CHE-30
