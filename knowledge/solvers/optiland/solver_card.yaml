@@ -34,6 +34,10 @@ supported_regimes:
   - manufactured free-space and ideal paraxial cases
   - a spherical plano-convex catalog prescription with aperture classification
   - the bundled ReverseTelephoto sample at one field and wavelength
+  - the adapter-owned M3SingletRef system at one field and wavelength (see
+    adapter_owned_systems)
+  - ray export at the paraxial exit pupil as well as the image surface (see
+    exit_pupil_handoff)
 package_reported_unverified_regimes:
   - optional PyTorch backend, GPU execution, and native autodiff
   - wavefront/PSF/MTF/Zernike analysis modules
@@ -125,6 +129,151 @@ opd_convention:
         NOT flat: the bare lens term survives, measured at 0.36 mm (~655 waves
         at 550 nm) for f = 50 mm at h = 6 mm. Use real refractive surfaces for
         any wavefront handed to a coupler.
+# CHE-32 (M3.3). Where the adapter hands rays off, and what a position at that
+# plane means. Probed first (tmp_probes/optiland_exit_pupil_probe.py), then
+# recorded through the export path itself
+# (probes/exit_pupil_handoff.py -> expected/exit_pupil_handoff.json) and
+# asserted in tests/test_optiland_adapter.py.
+exit_pupil_handoff:
+  status: exercised
+  exercised_by: CHE-32
+  config_key: config['handoff_plane']
+  supported_values: [image_surface, exit_pupil]
+  default: image_surface
+  default_is_unchanged_by_che32: true
+  default_evidence: >-
+    omitting config['handoff_plane'] reproduces CHE-13's frozen
+    scientific_array_sha256 e494af41... bit-identically, and naming
+    'image_surface' explicitly gives the same hash. Regression-locked in
+    tests/test_optiland_adapter.py; L1-RAY-01 re-run and its bundle
+    fingerprint 43dab1ee... unchanged.
+  plane_is_read_not_constructed: true
+  source_api: optic.paraxial.XPL() and optic.paraxial.XPD()
+  xpl_reference_frame: image_surface
+  # The one fact the export depends on. Treating XPL as an absolute coordinate
+  # would put the plane a whole focal length away and still look plausible.
+  plane_expression: exit_pupil_z = image_surface_z + XPL
+  protocol_agreement:
+    against: benchmarks/slice_protocol.yaml (M3-SLICE-CPU-V1, frozen by M3.2)
+    M3-REVERSE-TELEPHOTO:
+      exit_pupil_z_mm: 2.1547825721481666
+      exit_pupil_diameter_mm: 0.46053493637581633
+      relative_error: 0.0            # both quantities
+    M3-SINGLET-REF:
+      exit_pupil_z_mm: 0.06814345991561233
+      exit_pupil_diameter_mm: 0.4987073505473812
+      relative_error: 0.0            # both quantities
+  pupil_is_virtual_on_both_m3_systems: true
+  virtuality_detail: >-
+    ReverseTelephoto's exit pupil lands at z = 2.155 mm with five refracting
+    surfaces beyond it; M3SingletRef's at z = 0.0681 mm with one. So the
+    comfortable justification -- "rays are in air after the last surface,
+    therefore back-projection is exact geometry" -- is false for both: the line
+    being extended passes back through glass the ray never travelled in.
+  position_semantics: image_space_asymptote_at_the_pupil_plane
+  position_semantics_detail: >-
+    NOT a physical ray intersection. The exit pupil is defined by where
+    image-space rays appear to come from, so advancing each ray along its own
+    image-space direction to the pupil z evaluates that apparent origin exactly.
+    That is what a wavefront-over-the-pupil calculation wants; "where the ray is"
+    is not what x_m/y_m mean at this plane, and the exported metadata says so.
+  projection_is_a_reparameterization: true
+  projection_evidence:
+    collinearity_residual_max: 2.5e-17   # ||d x (P_pupil - P_image)|| / step, worst of the two systems
+    directions_bitwise_identical: true
+    opd_and_intensity_bitwise_identical: true
+    note: >-
+      no optical path is added or removed by the projection; OPL handling at the
+      pupil is M3.4 (CHE-33), not this.
+  pupil_boundary:
+    representation: implicit_in_surviving_rays
+    mask_available_from_optiland: false
+    reason: >-
+      RealRays carries no mask attribute and Optic.trace returns survivors only,
+      so a vignetted candidate is absent rather than flagged.
+    exported_instead: measured extent of the traced survivors, labelled derived
+    survived_field_is_not_a_mask: >-
+      the `survived` array is an all-true derived boolean stating the membership
+      of each exported row; it must not be promoted into an Optiland pupil mask.
+    measured_extent_does_not_bracket_the_paraxial_value: >-
+      sampling density pulls the measured extent inward while pupil aberration
+      pushes real marginal rays outward. On both M3 systems the measured
+      semi-extent lands slightly ABOVE the paraxial semi-diameter
+      (2.4978e-4 m vs 2.4935e-4 m for M3-SINGLET-REF; 2.3099e-4 m vs 2.3027e-4 m
+      for M3-REVERSE-TELEPHOTO). A consumer needing the aperture must use the
+      paraxial diameter.
+  structured_failures:
+    - code: OPTILAND_EXIT_PUPIL_UNRESOLVED
+      when: XPL()/XPD() raise, or return a non-finite value
+      behaviour: >-
+        RunStatus.FAILED with the code in diagnostics; never a silent fallback to
+        the image surface, which would be wrong by the whole pupil-to-focus
+        distance with nothing to notice it by
+    - code: OPTILAND_HANDOFF_PLANE_UNREACHABLE
+      when: a traced ray has N = 0 and so never reaches the requested plane
+    - code: OPTILAND_UNSUPPORTED_HANDOFF_PLANE
+      when: any other plane is requested
+      eager: true      # rejected before optiland is imported
+      not_implemented_in_particular: >-
+        a reference SPHERE. The ray-to-wave coupler accumulates onto a plane.
+  not_exercised:
+    - off-axis fields (only Hx=Hy=0 was run at this plane)
+    - a system whose exit pupil is real rather than virtual
+    - the torch backend at the exit-pupil plane
+
+# CHE-32 (M3.3). One system, owned by the adapter rather than bundled, because
+# no bundled sample qualifies.
+adapter_owned_systems:
+  - id: M3SingletRef
+    protocol_id: M3-SINGLET-REF
+    added_by: CHE-32
+    is_not_the_custom_prescription_path: >-
+      the name must appear in the adapter's _SUPPORTED_SAMPLES and
+      inputs['system'] is still refused. The difference from a bundled system is
+      only where the prescription is written down, not how loosely it is
+      admitted; both are probed and pinned to the same M1 standard.
+    prescription_source: benchmarks/slice_protocol.yaml, systems[M3-SINGLET-REF]
+    construction:
+      plano_convex_singlet: convex toward the collimated side
+      surface_type: standard          # NOT paraxial -- CHE-30 ruled that out as an OPL source
+      refractive_index: 1.5168        # IdealMaterial, so no glass-catalog dependency
+      radius_mm: 2.5
+      center_thickness_mm: 0.2
+      f_number: 9.7
+      aperture: derived from the f-number rather than restated, so the two cannot drift
+    why_not_a_bundled_sample: >-
+      tmp_probes/optiland_exit_pupil_probe.py measured all fourteen systems in
+      optiland.samples.objectives on axis at 550 nm, peak-to-valley optical path
+      to a sphere centred on the image point. The best is WideAngle100FOV at 0.36
+      waves against Rayleigh's 0.25, and ReverseTelephoto is 1.02. None is
+      diffraction-limited, so M3.2's Airy oracle has no bundled vehicle.
+    diffraction_limited_evidence:
+      measured_by: M3.2, recorded in benchmarks/slice_protocol.yaml
+      not_measured_by: CHE-32
+      peak_to_valley_waves: 0.01699595356250618
+      criterion: Rayleigh quarter wave, peak-to-valley
+    m1_standard_evidence:
+      probe: knowledge/solvers/optiland/probes/exit_pupil_handoff.py
+      expected: knowledge/solvers/optiland/expected/exit_pupil_handoff.json
+      request: numpy/cpu/float64, 550 nm, Hx=Hy=0, num_rays=16
+      surviving_ray_count: 817
+      deterministic: true
+      scientific_array_sha256:
+        image_surface: fbe6f86e49f5db6b64553956017b0b54d80f8b6174d47a15b5b86a54d4960864
+        exit_pupil: b24794af2c1a6481d46ef64efe69ca0bf45f5e4019234aeb4a754bc63e16c94d
+      all_finite: true
+      max_direction_norm_error: 6.661338147750939e-16
+      direction_norm_tolerance: 1.0e-12
+      image_plane_z_mm: 4.90560476022521    # matches the frozen protocol exactly
+      intensity: >-
+        exactly 1.0 for every survivor at this field and aperture -- no
+        vignetting or Fresnel loss is modelled on this path
+    not_exercised:
+      - off-axis fields
+      - any wavelength other than 550 nm
+      - the torch backend and gradients on this system
+      - an independent PSF or Airy comparison (that is M3.8's, not this ticket's)
+
 cost_scaling: >-
   O(number_of_surfaces * number_of_rays) model; CHE-16 measured fixed-
   prescription CPU scaling at requested hexapolar sampling 8, 16, 32, and 64.
@@ -146,11 +295,16 @@ validated_probe_ids:
     and unit established against manufactured geometries with closed-form
     answers, each with the competing hypothesis it rules out; also establishes
     that surface_type="paraxial" is not an admissible OPL source)
+  - exit_pupil_handoff (CHE-32; exit-pupil plane read from Paraxial.XPL()/XPD()
+    and reproduced against the frozen M3-SLICE-CPU-V1 geometry for both M3
+    systems, projection checked as collinearity along each traced ray, and
+    M3SingletRef pinned at the M1 standard at both handoff planes)
 not_yet_probed:
   - GPU device placement (no GPU in this environment)
-  - pupil geometry export (exit-pupil position/diameter and a pupil boundary
-    representation; RealRays exposes no pupil mask -- CHE-32)
   - pupil power and coordinate orientation
+  - a system whose exit pupil is real rather than virtual (both M3 systems are
+    virtual -- CHE-32)
+  - off-axis fields at the exit-pupil handoff plane (only Hx=Hy=0 -- CHE-32)
   - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
 adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
 validation_status: environment_verified
@@ -161,6 +315,9 @@ validation_note: >
   focus, and one catalog plano-convex prescription. CHE-16 adds fixed-case
   sampling, determinism, CPU runtime, and memory evidence. CHE-30 establishes
   the RealRays.opd convention -- quantity, sign, reference plane, and unit --
-  see opd_convention above. Registered M1 capability is NumPy CPU/float64
+  see opd_convention above. CHE-32 adds the exit-pupil handoff plane and the
+  adapter-owned M3SingletRef system, both pinned at the M1 standard -- see
+  exit_pupil_handoff and adapter_owned_systems above -- without moving the
+  default image-surface export. Registered M1 capability is NumPy CPU/float64
   forward tracing only; GPU, float32, gradients, and broader prescriptions
   remain unverified.

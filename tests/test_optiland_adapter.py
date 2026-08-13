@@ -13,11 +13,14 @@ nothing here is a re-derived or assumed oracle.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
 
 optiland = pytest.importorskip("optiland")
 
@@ -337,7 +340,13 @@ def test_standalone_missing_dependency_is_structured(tmp_path) -> None:
     assert result.arrays_path is None
 
 
-def _fake_optiland_import(values):
+def _fake_optiland_import(values, *, paraxial=None):
+    """A stand-in optiland whose trace returns exactly `values`.
+
+    `paraxial` is left absent by default so that a test which does not opt into
+    the exit-pupil path cannot accidentally depend on a fabricated pupil.
+    """
+
     class Backend:
         @staticmethod
         def set_backend(name):
@@ -355,6 +364,9 @@ def _fake_optiland_import(values):
 
         def trace(self, **kwargs):
             return values
+
+    if paraxial is not None:
+        Lens.paraxial = paraxial
 
     return Backend, SimpleNamespace(ReverseTelephoto=Lens), BackendUtils, None
 
@@ -382,3 +394,381 @@ def test_standalone_empty_or_nonfinite_output_is_structured(tmp_path, bad_value)
     assert result.failure is not None
     assert result.failure.code == "OPTILAND_INVALID_OR_EMPTY_OUTPUT"
     assert result.arrays_path is None
+
+
+# ---------------------------------------------------------------------------
+# CHE-32 (M3.3): the exit-pupil handoff plane, and the adapter-owned
+# M3SingletRef system.
+#
+# Two oracles are used deliberately, and they are independent of each other:
+#
+#   * benchmarks/slice_protocol.yaml -- M3.2's frozen exit-pupil geometry.
+#     Read here from the protocol file, not from the probe fixture, so the
+#     export is checked against the milestone's own declared numbers.
+#   * knowledge/solvers/optiland/expected/exit_pupil_handoff.json -- recorded by
+#     knowledge/solvers/optiland/probes/exit_pupil_handoff.py against the pinned
+#     install; this is the M1-standard determinism/hash evidence.
+#
+# Everything below drives the ordinary export path (OptilandAdapter.run ->
+# _build_ray_bundle_artifact) and asserts on the exported artifact and its
+# metadata. Calling Paraxial.XPL()/XPD() directly in a test would prove that
+# Optiland has an exit pupil, not that this adapter hands rays off at it.
+# ---------------------------------------------------------------------------
+
+_M3_SYSTEMS = [
+    ("ReverseTelephoto", "M3-REVERSE-TELEPHOTO"),
+    ("M3SingletRef", "M3-SINGLET-REF"),
+]
+
+
+def _frozen_protocol_system(protocol_system_id: str) -> dict:
+    """The `derived` block M3.2 froze for one system in benchmarks/slice_protocol.yaml."""
+    import yaml
+
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    for entry in protocol["systems"]:
+        if entry["id"] == protocol_system_id:
+            return entry["derived"]
+    raise AssertionError(f"{protocol_system_id!r} is not in benchmarks/slice_protocol.yaml")
+
+
+def _exported(sample: str, handoff_plane: str | None, output_directory) -> tuple:
+    """Run the adapter and return (ray artifact, loaded arrays).
+
+    `handoff_plane=None` omits the key entirely rather than passing the default
+    explicitly -- the backward-compatibility test below depends on that
+    difference being real.
+    """
+    config = {"sample": sample, "output_directory": str(output_directory)}
+    if handoff_plane is not None:
+        config["handoff_plane"] = handoff_plane
+
+    result = OptilandAdapter().run(_smoke_request(**config))
+    assert result.status is RunStatus.SUCCEEDED, result.error_message
+    artifact = result.outputs["rays"]
+    return artifact, np.load(artifact.uri)
+
+
+@pytest.mark.parametrize(("sample", "protocol_system_id"), _M3_SYSTEMS)
+def test_exit_pupil_handoff_reproduces_the_frozen_protocol_plane(
+    tmp_path, sample, protocol_system_id
+) -> None:
+    """The exported reference plane is M3.2's frozen exit pupil, in SI."""
+    frozen = _frozen_protocol_system(protocol_system_id)
+    artifact, arrays = _exported(sample, "exit_pupil", tmp_path / "pupil")
+
+    conventions = artifact.metadata["conventions"]
+    exit_pupil = conventions["exit_pupil"]
+    assert conventions["handoff_plane"] == "exit_pupil"
+    assert "exit pupil" in conventions["reference_plane"]
+
+    frozen_pupil_z_m = frozen["exit_pupil_z_mm"] * 1e-3
+    frozen_diameter_m = frozen["exit_pupil_diameter_mm"] * 1e-3
+    frozen_image_z_m = frozen["image_plane_z_mm"] * 1e-3
+
+    assert conventions["reference_plane_z_m"] == pytest.approx(frozen_pupil_z_m, rel=1e-12)
+    assert exit_pupil["z_m"] == pytest.approx(frozen_pupil_z_m, rel=1e-12)
+    assert exit_pupil["diameter_m"] == pytest.approx(frozen_diameter_m, rel=1e-12)
+
+    # XPL is signed and measured FROM THE IMAGE SURFACE, not from the origin --
+    # the single fact the plane depends on. Recovering the frozen image plane by
+    # subtracting it back out is what distinguishes a correct reading from one
+    # that treated XPL as an absolute coordinate and happened to look plausible.
+    assert exit_pupil["z_m"] - exit_pupil["location_from_image_m"] == pytest.approx(
+        frozen_image_z_m, rel=1e-12
+    )
+    assert exit_pupil["z_m"] != pytest.approx(frozen_image_z_m, rel=1e-6)
+
+    # The pupil is virtual on both M3 systems; the metadata must say so rather
+    # than let a consumer assume the rays physically pass through this plane.
+    assert exit_pupil["is_virtual"] is True
+    assert exit_pupil["refracting_surfaces_beyond_pupil_z_m"]
+    assert "ASYMPTOTE" in exit_pupil["position_semantics"]
+
+    # The exported rays are actually on the declared plane, exactly.
+    assert np.all(arrays["z_m"] == conventions["reference_plane_z_m"])
+
+    # Paraxial aperture is reported from XPD; the measured survivor extent is
+    # kept separate and labelled derived (it must not be read as an aperture).
+    boundary = artifact.metadata["pupil_boundary"]
+    assert boundary["paraxial_semi_diameter_m"] == pytest.approx(frozen_diameter_m / 2.0, rel=1e-12)
+    assert boundary["mask_available_from_optiland"] is False
+    assert boundary["representation"] == "implicit_in_surviving_rays"
+
+
+@pytest.mark.parametrize(("sample", "protocol_system_id"), _M3_SYSTEMS)
+def test_exit_pupil_projection_moves_each_ray_along_its_own_line(
+    tmp_path, sample, protocol_system_id
+) -> None:
+    """The projection is a reparameterization along each ray, not a propagation."""
+    del protocol_system_id
+    image_artifact, at_image = _exported(sample, "image_surface", tmp_path / "image")
+    pupil_artifact, at_pupil = _exported(sample, "exit_pupil", tmp_path / "pupil")
+
+    direction = np.stack([at_image["L"], at_image["M"], at_image["N"]], axis=1)
+    start = np.stack([at_image["x_m"], at_image["y_m"], at_image["z_m"]], axis=1)
+    end = np.stack([at_pupil["x_m"], at_pupil["y_m"], at_pupil["z_m"]], axis=1)
+    displacement = end - start
+    step = np.linalg.norm(displacement, axis=1)
+
+    # Collinearity, not a re-run of x + L*(z_target - z)/N: recomputing the
+    # implementation's own formula would restate it rather than test it.
+    residual = np.linalg.norm(np.cross(direction, displacement), axis=1) / step
+    assert float(np.max(residual)) < 1e-12
+
+    # The projection has to actually do something, or collinearity is vacuous.
+    assert float(np.min(step)) > 1e-4
+    assert not np.allclose(at_pupil["x_m"], at_image["x_m"])
+    assert (
+        pupil_artifact.metadata["scientific_array_sha256"]
+        != image_artifact.metadata["scientific_array_sha256"]
+    )
+
+    # Directions, intensity and OPD are carried across untouched: no optical
+    # path is added or removed here (OPL handling is M3.4/CHE-33).
+    for field in ("L", "M", "N", "intensity", "opd_native", "wavelength_m", "survived"):
+        assert np.array_equal(at_pupil[field], at_image[field]), field
+
+    exit_pupil = pupil_artifact.metadata["conventions"]["exit_pupil"]
+    assert exit_pupil["max_projection_step_m"] == pytest.approx(float(np.max(step)), rel=1e-9)
+    assert at_pupil["z_m"].shape == at_image["z_m"].shape
+
+
+def test_m3_singlet_ref_matches_recorded_m1_standard_evidence(tmp_path) -> None:
+    """M3SingletRef is pinned to the same standard as every bundled system.
+
+    Deterministic trace, finite output, unit-norm direction cosines, a stable
+    scientific-array hash, and a survivor count -- at both handoff planes,
+    compared against knowledge/solvers/optiland/expected/exit_pupil_handoff.json,
+    which was recorded by running the probe against the pinned install.
+    """
+    expected = load_probe_expected("optiland", "exit_pupil_handoff")
+    assert expected["status"] == "passed"
+    assert expected["package_version"] == "0.6.0"
+    frozen_planes = expected["systems"]["M3SingletRef"]["planes"]
+    assert set(frozen_planes) == {"image_surface", "exit_pupil"}
+
+    for plane, frozen in frozen_planes.items():
+        assert frozen["deterministic"] is True
+
+        first, first_arrays = _exported("M3SingletRef", plane, tmp_path / plane / "a")
+        second, _ = _exported("M3SingletRef", plane, tmp_path / plane / "b")
+
+        # Deterministic in this process, and identical to the recorded evidence.
+        first_hash = first.metadata["scientific_array_sha256"]
+        assert first_hash == second.metadata["scientific_array_sha256"], plane
+        assert first_hash == frozen["scientific_array_sha256"], plane
+        assert first.metadata["summary_metrics"] == frozen["summary_metrics"], plane
+        assert int(first.shape[0]) == frozen["surviving_ray_count"]
+        assert first.dtype == frozen["dtype"] == "float64"
+        assert first.metadata["conventions"]["handoff_plane"] == plane
+        assert first.metadata["conventions"]["reference_plane_z_m"] == pytest.approx(
+            frozen["reference_plane_z_m"], rel=1e-12
+        )
+
+        # The M1 invariants, re-derived from the persisted arrays rather than
+        # taken from the adapter's own summary of them.
+        scientific = {name: first_arrays[name] for name in first_arrays.files}
+        assert set(scientific) == {
+            "x_m",
+            "y_m",
+            "z_m",
+            "L",
+            "M",
+            "N",
+            "intensity",
+            "wavelength_m",
+            "opd_native",
+            "survived",
+        }
+        for name, array in scientific.items():
+            if name == "survived":
+                assert np.all(array)
+                continue
+            assert np.all(np.isfinite(array)), (plane, name)
+        norm = np.sqrt(scientific["L"] ** 2 + scientific["M"] ** 2 + scientific["N"] ** 2)
+        assert float(np.max(np.abs(norm - 1.0))) <= 1e-12
+        assert np.all(scientific["wavelength_m"] == pytest.approx(0.55e-6))
+
+
+def test_m3_singlet_ref_is_a_supported_sample_not_a_custom_prescription(tmp_path) -> None:
+    """Adding the system did not open the custom-prescription path."""
+    adapter = OptilandAdapter()
+
+    # A prescription arriving through the input port stays refused even when the
+    # named sample is the adapter-owned one.
+    from multiscale_optics_agent.core.artifacts import ArtifactRecord
+
+    request = ModelRunRequest(
+        run_id="test-run",
+        node_id="lens",
+        inputs={
+            "system": ArtifactRecord(
+                id="custom-system", kind=ArtifactKind.OPTICAL_SYSTEM, uri="memory://custom-lens"
+            )
+        },
+        config={"sample": "M3SingletRef"},
+        design_parameters={},
+        require_gradients=False,
+    )
+    with pytest.raises(UnsupportedCapabilityError, match="system"):
+        adapter.run(request)
+
+    # And an unprobed name is still rejected by the same gate.
+    with pytest.raises(UnsupportedCapabilityError, match="validated"):
+        adapter.run(_smoke_request(sample="M3SingletRefV2"))
+
+    report = adapter.validate_request(_smoke_request(sample="M3SingletRefV2"))
+    assert not report.valid
+    assert any(issue.code == "OPTILAND_UNSUPPORTED_SAMPLE" for issue in report.errors)
+
+    # The supported one runs.
+    artifact, _ = _exported("M3SingletRef", "image_surface", tmp_path / "ok")
+    assert artifact.metadata["sample"] == "M3SingletRef"
+
+
+# ---------------------------------------------------------------------------
+# CHE-32: structured failures. An unresolvable or unreachable plane must be a
+# reported code, never a crash and never a silent fallback to the image
+# surface -- that fallback would be wrong by the whole pupil-to-focus distance
+# with nothing to notice it by.
+# ---------------------------------------------------------------------------
+
+
+def _unit_norm_fake_rays(*, n_values) -> SimpleNamespace:
+    """Finite, unit-norm rays so a failure cannot be blamed on the earlier gates."""
+    n = np.asarray(n_values, dtype=float)
+    count = n.size
+    return SimpleNamespace(
+        x=np.zeros(count),
+        y=np.zeros(count),
+        z=np.zeros(count),
+        L=np.sqrt(1.0 - n**2),
+        M=np.zeros(count),
+        N=n,
+        i=np.ones(count),
+        w=np.full(count, 0.55),
+        opd=np.zeros(count),
+    )
+
+
+def _run_with_fake_optiland(tmp_path, rays, *, paraxial, handoff_plane="exit_pupil"):
+    with patch(
+        "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
+        return_value=_fake_optiland_import(rays, paraxial=paraxial),
+    ):
+        return OptilandAdapter().run(
+            _smoke_request(handoff_plane=handoff_plane, output_directory=str(tmp_path / "out"))
+        )
+
+
+def _raises():
+    """A paraxial accessor that fails the way an unsolvable system would."""
+
+    def _call():
+        raise RuntimeError("paraxial solve did not converge")
+
+    return _call
+
+
+@pytest.mark.parametrize(
+    ("paraxial", "why"),
+    [
+        (SimpleNamespace(XPL=_raises(), XPD=lambda: 2.0), "paraxial solver raised"),
+        (SimpleNamespace(XPL=lambda: np.inf, XPD=lambda: 2.0), "XPL is non-finite"),
+        (SimpleNamespace(XPL=lambda: -1.0, XPD=lambda: np.nan), "XPD is non-finite"),
+    ],
+)
+def test_unresolvable_exit_pupil_is_a_structured_failure(tmp_path, paraxial, why) -> None:
+    result = _run_with_fake_optiland(
+        tmp_path, _unit_norm_fake_rays(n_values=[1.0, 0.8]), paraxial=paraxial
+    )
+
+    assert result.status is RunStatus.FAILED, why
+    assert result.diagnostics["code"] == "OPTILAND_EXIT_PUPIL_UNRESOLVED"
+    assert result.diagnostics["stage"] == "handoff_plane_resolution"
+    assert result.diagnostics["requested_handoff_plane"] == "exit_pupil"
+    assert not result.outputs
+    # Never a silent fallback to the image surface.
+    assert "reference_plane_z_m" not in result.diagnostics
+
+
+def test_ray_that_never_reaches_the_handoff_plane_is_a_structured_failure(tmp_path) -> None:
+    """N = 0 means the ray is parallel to the plane; the projection is undefined."""
+    result = _run_with_fake_optiland(
+        tmp_path,
+        _unit_norm_fake_rays(n_values=[1.0, 0.0]),
+        paraxial=SimpleNamespace(XPL=lambda: -1.0, XPD=lambda: 2.0),
+    )
+
+    assert result.status is RunStatus.FAILED
+    assert result.diagnostics["code"] == "OPTILAND_HANDOFF_PLANE_UNREACHABLE"
+    assert result.diagnostics["stage"] == "handoff_plane_resolution"
+    assert not result.outputs
+
+    # The same rays at the default plane are exported normally, which is what
+    # makes this a property of the requested plane rather than of the rays.
+    ok = _run_with_fake_optiland(
+        tmp_path,
+        _unit_norm_fake_rays(n_values=[1.0, 0.0]),
+        paraxial=SimpleNamespace(XPL=lambda: -1.0, XPD=lambda: 2.0),
+        handoff_plane="image_surface",
+    )
+    assert ok.status is RunStatus.SUCCEEDED, ok.error_message
+
+
+@pytest.mark.parametrize("plane", ["reference_sphere", "entrance_pupil", "", None])
+def test_unsupported_handoff_plane_is_rejected_eagerly(plane) -> None:
+    adapter = OptilandAdapter()
+    request = _smoke_request(handoff_plane=plane)
+
+    with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
+        mock_import.side_effect = AssertionError("optiland must not be imported for a bad plane")
+        with pytest.raises(UnsupportedCapabilityError, match="handoff_plane"):
+            adapter.run(request)
+    mock_import.assert_not_called()
+
+    report = adapter.validate_request(request)
+    assert not report.valid
+    assert any(issue.code == "OPTILAND_UNSUPPORTED_HANDOFF_PLANE" for issue in report.errors)
+
+
+# ---------------------------------------------------------------------------
+# CHE-32: backward compatibility. M3.3 adds a plane; it does not move the
+# existing one.
+# ---------------------------------------------------------------------------
+
+
+def test_omitting_handoff_plane_preserves_the_default_image_surface_fingerprint(tmp_path) -> None:
+    """No `handoff_plane` key at all must still be the L1 default-path export.
+
+    The expected hash is the one already frozen by CHE-13 in
+    knowledge/solvers/optiland/expected/standalone_baseline.json -- the same
+    value L1-RAY-01 is built on -- not a value re-recorded for this ticket.
+    """
+    frozen_hash = load_probe_expected("optiland", "standalone_baseline")["stable_result"][
+        "scientific_array_sha256"
+    ]
+
+    omitted_request = _smoke_request(output_directory=str(tmp_path / "omitted"))
+    assert "handoff_plane" not in omitted_request.config  # the point of the test
+
+    result = OptilandAdapter().run(omitted_request)
+    assert result.status is RunStatus.SUCCEEDED, result.error_message
+    artifact = result.outputs["rays"]
+    conventions = artifact.metadata["conventions"]
+
+    assert conventions["handoff_plane"] == "image_surface"
+    assert conventions["reference_plane"] == "final traced image surface, surface index 14"
+    assert conventions["exit_pupil"] is None
+    assert artifact.metadata["pupil_boundary"]["paraxial_semi_diameter_m"] is None
+    assert artifact.metadata["scientific_array_sha256"] == frozen_hash
+
+    # Naming the default explicitly is the same run, byte for byte...
+    explicit, _ = _exported("ReverseTelephoto", "image_surface", tmp_path / "explicit")
+    assert explicit.metadata["scientific_array_sha256"] == frozen_hash
+
+    # ...and the new plane really is a different export, so the two assertions
+    # above are not both passing for the trivial reason.
+    pupil, _ = _exported("ReverseTelephoto", "exit_pupil", tmp_path / "pupil")
+    assert pupil.metadata["scientific_array_sha256"] != frozen_hash

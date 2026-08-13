@@ -13,6 +13,12 @@ pytestmark = [pytest.mark.integration, pytest.mark.jax]
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Published by M1 in benchmarks/M1_BASELINE_REPORT.md ("Ray branch -- L1-RAY-01")
+# and cited by M2 in benchmarks/M2_COUPLER_REPORT.md. Not re-recorded here: the
+# assertion below checks that this literal is still the one the report states,
+# so the lock cannot drift away from the document it comes from.
+L1_RAY_SCIENTIFIC_FINGERPRINT = "43dab1eedf5ca8fcd6a2674bcc6fb58020933aec8ad8618ad49583826cfc7236"
+
 
 def _run_branch(script: str, output: Path) -> dict:
     completed = subprocess.run(
@@ -72,6 +78,24 @@ def test_each_branch_rejects_corruption_and_emits_complete_bundle(
             "accuracy_plot.png",
         }
         assert required <= {path.name for path in bundle.iterdir()}
+
+
+def test_ray_branch_still_carries_its_published_m1_fingerprint(reproduced_branches) -> None:
+    """The default Optiland export path must stay where M1 left it.
+
+    CHE-32 (M3.3) added ``config['handoff_plane']`` to the ray adapter, with
+    ``exit_pupil`` as a new option and ``image_surface`` as the unchanged
+    default. The test above only proves the branch agrees with *itself*, which a
+    moved-but-consistent export would also satisfy. This one pins it to the
+    value M1 published, so adding a plane cannot silently move the existing one.
+    """
+    assert (
+        L1_RAY_SCIENTIFIC_FINGERPRINT in (ROOT / "benchmarks" / "M1_BASELINE_REPORT.md").read_text()
+    )
+
+    _, branches = reproduced_branches
+    for result in branches["ray"]:
+        assert result["reproducibility"]["scientific_fingerprint"] == L1_RAY_SCIENTIFIC_FINGERPRINT
 
 
 def test_executable_independence_and_claim_audit(reproduced_branches) -> None:
