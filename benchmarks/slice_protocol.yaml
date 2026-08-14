@@ -51,6 +51,36 @@ amendments:
       independently and all still agree with the trace.
     evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
     probe: knowledge/couplers/ray_to_wave/probes/coherent_handoff.py
+  - id: A3-ray-refinement-does-not-close-the-oracle-gate
+    issue: CHE-38 (M3.9)
+    supersedes: >-
+      the M3.8 reading that the fft_oracle_intensity_relative_l2 residual FLATTENS
+      at ~6.7e-3, and its attribution of the whole excess to ray_sampling_error
+    summary: >-
+      M3.8's six-point sweep stopped at 27937 traced rays, which is where the
+      residual is at its MINIMUM. Continued to 787969 rays it turns around and
+      rises: 6.67e-3 / 6.82e-3 / 7.24e-3 / 7.67e-3 / 8.04e-3 / 8.32e-3 at 27937 /
+      49537 / 98827 / 197377 / 394219 / 787969, a monotone rise fitted at
+      N^+0.070 +/- 0.003 over that range against N^-0.455 +/- 0.034 below the
+      minimum. So the trend does not flatten and does not extrapolate to the gate;
+      two error terms of opposite sign cancel near the middle of the sweep. Ray
+      sampling is the term that falls, measured against a ray-refined reference at
+      N^-0.609 +/- 0.035, and it is NOT the term that dominates at the frozen
+      configuration's own best case.
+    what_dominates_instead: >-
+      the aperture function. C_RAY_TO_WAVE sums plane wavelets, each an infinite
+      plane wave, so the sum is a stationary-phase estimate of the pupil field and
+      cannot represent a hard stop. Measured on a window wider than the pupil, the
+      reconstructed amplitude at the geometric rim is 0.50 of the interior plateau
+      -- the knife-edge value -- with an overshoot fringe inside it and a
+      transition whose slope tracks 1/sqrt(lambda R). See
+      open_structural_items.wavelet_sum_cannot_represent_a_hard_aperture_edge.
+    no_tolerance_was_widened: >-
+      the gate stays at 1.0e-3 and stays failing. The aperture term is entered in
+      the budget as a named error source that exceeds it, which is the opposite of
+      widening: it makes the budget state that it does not close.
+    evidence: benchmarks/probes/records/m3_convergence.json
+    probe: benchmarks/probes/m3_convergence.py
 scope:
   benchmark_ids: [L2-PSF-01]
   execution: end_to_end_graph
@@ -180,6 +210,29 @@ required_conditioning:
       no per-ray area weight is applied, so the reconstructed field amplitude
       scales with ray density. The PSF is convergent in shape but not in scale
       under ray refinement. Recorded rather than hidden; CHE-38 owns it.
+    known_consequence_measured_by: CHE-38 (M3.9)
+    known_consequence_measurement: >-
+      the reconstructed pupil discrete power grows as (traced rays)^2.0024 +/-
+      0.0002 over 27937 to 787969 rays, r^2 = 0.9999999 -- amplitude exactly linear
+      in ray count, as the missing dA factor implies. Below ~28000 rays the fitted
+      exponent is lower (1.63 over the whole sweep) because the sum is not yet a
+      quadrature of the aperture at all.
+    known_consequence_for_a_convergence_study: >-
+      no absolute-scale metric can converge, so every metric in the M3.9 study is a
+      ratio: peak-normalized intensity residuals, and peak-over-energy ratios for
+      the Strehl-like ones. That is demonstrated rather than asserted -- the
+      peak-normalized PSF is bit-identical under an exact power-of-two rescale of
+      every ray amplitude, while the raw peak moves by exactly the square. A raw
+      peak intensity or raw window energy compared against a fixed tolerance would
+      diverge under refinement for a reason that is a property of the missing weight
+      and not of the physics.
+    known_consequence_hexapolar_note: >-
+      hexapolar ring j carries 6j rays over an annulus of area proportional to j, so
+      the area per ray is constant except at the centre. A uniform per-ray weight is
+      close to the correct quadrature weight, which is why the SHAPE converges at
+      all; it is the missing dA, not a bad distribution, that makes the scale
+      diverge. A per-ray area model is therefore a smaller change than CHE-33
+      feared, but it is still unverified physics and still needs its own ticket.
     evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
     regression_tests: tests/test_optiland_coherent_handoff.py
 
@@ -267,10 +320,27 @@ sampling:
   nyquist_rule: pitch_axis <= wavelength / (2 * max_over_rays(abs(direction_cosine_axis)))
   nyquist_evaluated_over: marginal rays of an actual trace, not a paraxial estimate
   oversampling_factor: 2
+  oversampling_factor_reviewed_and_retained_by: CHE-38 (M3.9)
   oversampling_rationale: >-
+    Measured, not argued from pixel counts. Across a grid sweep at fixed physical
+    extent the PSF metrics stop moving at 2x: doubling again to 4x (grid 376)
+    changes the FFT-oracle residual and the Airy peak deficit by less than the
+    convergence threshold while costing 4x the pixels. Below 2x there is no margin
+    at all -- at 1x the pitch sits exactly on the per-axis Nyquist limit of the
+    marginal ray, and the next coarser grid in the sweep is refused outright.
+  oversampling_rationale_superseded: >-
     At the critically admissible pitch the Airy radius spans only ~2.44 pixels,
     which is enough to locate a peak and a first null but not to compare a
     profile. At 2x it spans ~4.9 pixels.
+  oversampling_rationale_superseded_because: >-
+    both figures counted the Airy DIAMETER as a radius (see
+    open_structural_items.airy_radius_entry_is_a_diameter). The true radius spans
+    1.22 pixels at the critical pitch and 2.44 at the frozen 2x. The corrected
+    numbers also undercut the old argument rather than rescuing it: 2.44 pixels per
+    radius is NOT enough to compare a profile -- M3.8 had to run its first-null
+    estimator over the analytic pattern on the same grid because at 2.44 px/radius
+    the estimator reads an exactly known null 11% high. 2x is retained on the
+    measured grounds above, not on the pixel count.
   grids:
     M3-SINGLET-REF:
       nyquist_pitch_max_m: 5.317470562168779e-06
@@ -293,6 +363,34 @@ sampling:
     note: >-
       Optiland's `num_rays` is a hexapolar density request, not an output count;
       the traced survivor count is what this criterion applies to.
+    tested_result:
+      by: CHE-38 (M3.9)
+      verdict: refuted_as_an_accuracy_criterion
+      internal_inconsistency: >-
+        the rule as written evaluates to (499.568e-6 / 2.6587e-6)^2 / 2^2 = 188^2
+        / 4 = 8836 traced rays at the frozen grid, not to the frozen
+        starting_value of 4096 -- a factor of 2.157. The two numbers in this block
+        do not agree with each other, and neither is edited here: which one was
+        meant is recorded as unknown rather than guessed.
+      measured: >-
+        neither count reaches any gate. The FFT-oracle residual is 9.13e-3 at 7057
+        traced rays and 7.40e-3 at 12481, bracketing both candidate values, against
+        a 1.0e-3 gate. Ray refinement to 787969 rays never reaches it either.
+      the_uncomfortable_part: >-
+        the criterion's value lands close to where the falling ray-sampling term
+        and the flat aperture term cancel, so it looks better than the counts on
+        either side of it for a reason that has nothing to do with sampling
+        adequacy. A criterion that is accidentally near an optimum is more
+        dangerous than one that is plainly wrong.
+      what_it_is_good_for: >-
+        it remains a sensible LOWER bound: below it the reconstruction carries a
+        large sampling pedestal -- at 3169 rays only 52% of the propagated power
+        lands in the frozen observation window, against 99.9% by 27937 -- so the
+        criterion screens out configurations that are obviously inadequate. It
+        certifies nothing above that.
+      converged_ray_count_measured_instead: >-
+        see m3_9_convergence.converged_configuration, which states the count at
+        which the peak-normalized PSF stops moving under further refinement.
 
 # ---------------------------------------------------------------------------
 # Tolerance budget
@@ -374,12 +472,47 @@ tolerance_budget:
         NOT appear in the FFT-oracle tolerance because that oracle shares the
         same wavefront.
     - name: ray_sampling_error
-      value: null
+      value: 1.0e-3
       level: intensity, relative
-      status: to_be_measured
+      status: measured
+      measured_by: CHE-38 (M3.9)
       owner: M3.9 (CHE-38)
-      # CHE-35 did not measure this term, but its energy accounting located it and
-      # the finding is large enough that CHE-38 should not meet it cold.
+      applies_at: >-
+        the converged configuration, 394219 traced rays. At the frozen 3169-ray
+        configuration this term is 1.83e-2, which is 18x the FFT gate on its own.
+      definition: >-
+        relative L2 of the peak-normalized PSF against the RAY-REFINED PSF at the
+        same configuration -- 787969 traced rays -- inside 5 Airy radii. Measured
+        against the refined result rather than against an oracle deliberately: an
+        oracle residual mixes this term with wavelet_aperture_edge_error below, and
+        that mixing is what made M3.8 over-read its sweep.
+      source: >-
+        measured and fitted, not read off a point: 2.10 * N^(-0.609 +/- 0.035) over
+        217 to 394219 traced rays with r^2 = 0.972, and 6.79 * N^(-0.715 +/- 0.042)
+        over 3169 to 394219 with r^2 = 0.980. The two exponents differ by 0.107,
+        which is three times either standard error and is the honest error bar on
+        the exponent -- M2's carried-forward lesson, in the form this study can
+        exhibit it. Measured 4.90e-4 at 394219 traced rays, so the entered 1.0e-3
+        carries headroom and is also the refinement threshold the converged
+        configuration was chosen against.
+      sweep:
+        # traced rays -> relative L2 against the 787969-ray PSF
+        217: 5.45e-2
+        817: 3.67e-2
+        1801: 2.01e-2
+        3169: 1.83e-2
+        7057: 1.12e-2
+        12481: 8.15e-3
+        27937: 5.08e-3
+        49537: 3.53e-3
+        98827: 2.16e-3
+        197377: 1.18e-3
+        394219: 4.90e-4
+      does_not_dominate: >-
+        the refined configuration. Past ~28000 traced rays it drops below
+        wavelet_aperture_edge_error and the total stops improving; past that point
+        adding rays makes the agreement with both oracles WORSE, because the two
+        terms had been partially cancelling. See amendments A3.
       che35_finding: >-
         the reconstructed pupil field is nowhere near ray-converged at the counts
         tried. Propagated to focus on the frozen grid with the declared padding,
@@ -388,11 +521,65 @@ tolerance_budget:
         geometry untouched, while the coupler's own max adjacent-ray phase step
         falls 2.53 / 0.63 / 0.28 rad. The protocol's 4096-ray starting value has
         not been reached and the trend has not flattened.
+      che35_finding_confirmed_and_extended: >-
+        confirmed by CHE-38 and continued: the same series reads 0.958 by 12481
+        traced rays and saturates there. CHE-35's companion claim that ~40% of the
+        power leaves the window 'regardless of ray count' is refuted -- that was the
+        sampling pedestal, and the window share goes from 0.52 at 3169 rays to
+        0.9987 by 27937. See
+        open_structural_items.the_frozen_window_is_the_pupil_diameter_rounded_up.
       che35_caution: >-
         the coupler's ray_density_status reports wavelet_approximation_holds at
         all three counts, because its criterion is a phase step below pi. That
         criterion is satisfied long before the reconstruction is accurate, so it
         must not be read as a convergence certificate.
+      che35_caution_confirmed: >-
+        it reports wavelet_approximation_holds at every count in CHE-38's sweep,
+        including counts whose PSF is 50x outside the gate, and reports
+        not_computed_above_scan_limit above 4096 rays -- where it would matter most.
+        It is a validity check on the wavelet picture and nothing more.
+      evidence: benchmarks/probes/records/m3_convergence.json (ray_count_convergence)
+
+    - name: wavelet_aperture_edge_error
+      value: 7.1e-3
+      level: intensity, relative
+      status: measured
+      measured_by: CHE-38 (M3.9)
+      owner: >-
+        unassigned. The measurement is CHE-38's; the defect is a follow-up. See
+        open_structural_items.wavelet_sum_cannot_represent_a_hard_aperture_edge.
+      source: >-
+        relative L2 of the peak-normalized PSF against an analytic HARD-MASK pupil
+        of the same radius carrying the exact spherical optical path, propagated
+        through the same ASM at the same padding and measured the same way: 7.10e-3
+        at 197377 traced rays, where ray_sampling_error is 1.18e-3, i.e. six times
+        smaller. A synthetic bundle with the exact optical path to the focus
+        reproduces it (6.34e-3), so it is a property of the reconstruction operator
+        and not of the trace.
+      mechanism: >-
+        C_RAY_TO_WAVE sums plane wavelets, each an infinite plane wave, so the sum
+        is a stationary-phase estimate of the pupil field and resolves it only over
+        a Fresnel zone of the bundle's own convergence. A hard stop comes back as a
+        knife-edge diffraction profile: amplitude 0.50 of the interior plateau at
+        the geometric rim, an overshoot fringe inside it, and a transition whose
+        slope follows sqrt(lambda R)^(-1.02 +/- 0.04), r^2 = 0.995.
+      refines_away_with_ray_count: false
+      refines_away_with_grid: false
+      refines_away_with_padding: false
+      scales_with: >-
+        the pupil Fresnel number a^2 / (lambda R), as N_f^(-0.752 +/- 0.011),
+        r^2 = 0.999 over N_f from 7.8 to 39.1. M3-SINGLET-REF sits at N_f = 23.45.
+      this_is_not_a_tolerance_widening: >-
+        no gate moved. This term is entered because the budget is composed of named
+        error sources and its largest one was missing; the consequence is that the
+        budget now states explicitly that it does NOT close at 1.0e-3, rather than
+        leaving the excess unattributed. Entering a measured error source is the
+        opposite of relaxing a tolerance to accommodate it.
+      exceeds: fft_oracle_intensity_relative_l2 (1.0e-3) by 7.1x, on its own
+      dominates: >-
+        every M3 result once the ray count is above ~28000, and roughly half of the
+        frozen configuration's residual in quadrature
+      evidence: benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis)
     - name: grid_truncation_and_padding
       value: 2.0e-5
       level: intensity, relative
@@ -519,6 +706,260 @@ m3_8_verification:
       is reported as a measure conversion and is not compared to unity.
     every_step_has_a_named_mechanism: true
     unattributed_remainder: 7.5e-7
+
+# ---------------------------------------------------------------------------
+# M3.9 convergence study -- CHE-38
+# ---------------------------------------------------------------------------
+# Evidence: benchmarks/probes/m3_convergence.py ->
+# benchmarks/probes/records/m3_convergence.json, pinned by
+# tests/test_m3_convergence.py. On axis throughout: CHE-41 owns the off-axis
+# handoff and it is recorded unverified, so no convergence evidence here is built
+# on an off-axis field point.
+m3_9_convergence:
+  verdict: >-
+    all three discretizations converge, and the answer they converge to is 8x
+    outside the gate. Ray count, grid and padding each reach the point where
+    refining them further does not move the peak-normalized PSF; the residual
+    against the independent FFT oracle then sits at 8.0e-3 against a 1.0e-3 gate,
+    because the dominant error is not a discretization error at all. Convergence
+    and correctness are separate claims here and both are reported.
+  the_finding_that_changed_a_conclusion: >-
+    the ray trend is NOT monotone. See amendments A3: M3.8's sweep ended at its own
+    minimum, and past 27937 traced rays the residual rises. More rays make the
+    agreement worse.
+  ray_count:
+    swept: 217 to 787969 traced rays, 12 points, everything else frozen
+    oracle_residual:
+      # traced rays -> relative L2 against the FFT oracle, inside 5 Airy radii
+      217: 5.09e-2
+      817: 3.29e-2
+      1801: 1.75e-2
+      3169: 1.51e-2
+      7057: 9.13e-3
+      12481: 7.40e-3
+      27937: 6.67e-3
+      49537: 6.82e-3
+      98827: 7.24e-3
+      197377: 7.67e-3
+      394219: 8.04e-3
+      787969: 8.32e-3
+    reproduces_m3_8: >-
+      the six counts M3.8 also ran agree to every digit M3.8 quoted, with a
+      different probe and a different oracle grid factor. That is a cross-probe
+      reproduction, not a re-report.
+    the_second_oracle_turns_around_too: >-
+      the residual against the ANALYTIC AIRY pattern, which shares no code, no grid
+      and no traced data with the FFT oracle, is non-monotone in the same way: 4.82e-2
+      / 1.28e-2 / 7.23e-3 / 7.82e-3 / 1.00e-2 / 1.09e-2 at 217 / 3169 / 12481 / 27937
+      / 197377 / 787969 traced rays, with its minimum at 12481. Airy is the textbook
+      answer for a diffraction-limited circular pupil, so ray refinement moves the
+      slice AWAY from the accepted answer. That is the strongest single statement
+      available that the converged reconstruction is the thing that is wrong.
+    fitted_below_the_minimum: N^(-0.455 +/- 0.034), r^2 = 0.973, 217 to 27937 rays
+    fitted_above_the_minimum: N^(+0.070 +/- 0.003), r^2 = 0.991, 27937 to 787969 rays
+    minimum_at: 27937 traced rays, 6.67e-3
+    airy_peak_deficit:
+      # traced rays -> signed peak/energy deficit against the analytic Airy
+      3169: -1.22e-2
+      12481: -2.9e-4
+      27937: +3.3e-3
+      787969: +9.1e-3
+      note: >-
+        the metric changes SIGN inside the sweep, so a count near the crossing
+        satisfies the 2.0e-3 gate for no physical reason. M3.8's "best over the
+        sweep" reading of it was that crossing. Read at the refined end it is
+        9.1e-3, which FAILS the gate by 4.6x.
+  grid:
+    swept: grid_n 64 to 376 at fixed physical extent 4.9984e-4 m, so pitch = extent / grid_n
+    extent_is_the_pupil_diameter_to_0_055_percent: >-
+      the frozen sampling.grids.M3-SINGLET-REF.pupil_extent_m of 4.995683e-4 m is
+      twice the largest traced pupil radius, i.e. the measured pupil diameter, and
+      grid_n = 188 is that divided by the pitch (187.897) rounded up. So the window
+      exceeds the pupil by 0.055% and the pupil is inscribed in it, which is why the
+      reconstruction's soft edge is clipped on this grid. Stated as a ceiling
+      relation rather than an identity because it is one.
+    measured_max_per_axis_direction_cosine: 0.05171631827291936
+    measured_admissible_pitch_m: 5.317470562168779e-06
+    agrees_with_the_frozen_value: exactly
+    smallest_admissible_grid_n: 94
+    refused: >-
+      grid_n 64, 80, 90 and 93 are refused by C_RAY_TO_WAVE with SHAPE_MISMATCH and
+      a remedy, on REAL traced data rather than a synthetic bundle -- M3.5's
+      precondition firing where M3.2's rule predicts, with the boundary bracketed at
+      93 and 94.
+    the_guard_guards_something_real: >-
+      the refusal firing is evidence about the refusal, not about the condition, so
+      the guard was switched off and the same rays reconstructed anyway through the
+      core's enforce_grid_nyquist=False. At an inadmissible pitch the steepest
+      wavelet ramps fold back into the grid and the PSF disagrees with both oracles
+      by several times what the same configuration one pixel above the limit gives,
+      with the Airy peak deficit an order of magnitude worse. The degradation is NOT
+      monotone in how badly the limit is violated -- aliasing folds a frequency to
+      wherever it lands -- so the condition is a threshold and not a quality scale.
+      RayToWaveCoupler has no such switch and cannot be bypassed, which is the right
+      default; the core's flag exists for this kind of characterization.
+    stabilizes_at: >-
+      grid_n 188. The FFT-oracle residual reads 6.72e-3 / 6.82e-3 / 6.95e-3 /
+      7.01e-3 and the Airy peak deficit 6.4e-3 / 5.05e-3 / 4.89e-3 / 4.91e-3 at
+      grids 128 / 188 / 256 / 376.
+    how_to_read_it: >-
+      the FFT-oracle residual is not comparable in absolute value across grids --
+      each grid gets its own oracle at its own pupil sampling, and the pixel count
+      inside the comparison disc changes with the pitch -- so what the sweep tests
+      is stabilization. The Airy peak deficit IS comparable, and at grid 94 it reads
+      6.6e-4, which is a coarse-grid bias in a peak-over-energy ratio rather than
+      accuracy.
+  padding:
+    swept: pad_width 0 to 1132 from the SAME reconstructed pupil field
+    reference: pad_width 1132, twice the frozen value
+    wraparound_appears_first_in_the_wings: >-
+      at pad_width 0 the core inside one Airy radius moves by 7.0e-4 while the 3-5
+      Airy-radius annulus moves by 2.8e-2 and the 5-30 annulus by 8.6e-2 -- a factor
+      of 40 and 120. An unpadded run looks plausible in the core.
+    unpadded_power_ratio_reads_unity: >-
+      0.999999 at pad_width 0, which is CHE-35's trap intact: wraparound recirculates
+      the light that should have left the window.
+    edge_energy_indicator_fails_again: >-
+      from pad_width 0 to 47 the output edge-energy fraction improves 2.4x (7.8e-5
+      to 3.3e-5) while the wing error improves 1.1x (2.80e-2 to 2.52e-2). CHE-35
+      demoted it from gate to indicator on synthetic data; it fails the same way on
+      real reconstructed data.
+    gate_metric_is_nearly_blind_to_padding: >-
+      6.74e-3 to 6.82e-3 across the whole sweep, because it is taken inside 5 Airy
+      radii where the aperture term dominates. Padding needed its own wing metric.
+    frozen_566_retained: >-
+      this study's own threshold (wing residual below 1.0e-3 against twice the
+      padding) is first met at pad_width 188, at 4.6e-4. It is NOT adopted: CHE-35
+      declared 566 against a stricter float64-referenced criterion, and relaxing a
+      frozen value on a looser test is the move the widening rule forbids even when
+      the value is not a tolerance.
+  converged_configuration:
+    definition: >-
+      each discretization refined independently until the peak-normalized PSF stops
+      moving by more than 1.0e-3, which is the tightest gate in this budget and was
+      declared before the sweep rather than chosen from it. This is a
+      DISCRETIZATION-INDEPENDENCE claim and nothing more.
+    system: M3-SINGLET-REF, on axis, 550 nm
+    traced_rays: 394219
+    hexapolar_rings_requested: 362
+    grid_n: 188
+    sample_pitch_m: 2.6587352810843895e-06
+    pad_width: 566
+    observation_plane_z_m: 4.90560476022521e-3
+    propagation_method: asm_carrier_removed
+    evidence_for_calling_it_converged: >-
+      the ray-refinement ladder falls monotonically to 4.90e-4 at this count against
+      the 787969-ray PSF; doubling the grid changes the FFT-oracle residual by 1.9%
+      and the Airy peak deficit by 1.6e-4; doubling the padding changes the wing
+      residual by less than 5e-4.
+    residual_against_the_fft_oracle_there: 8.04e-3
+    gate: 1.0e-3
+    the_warning_that_goes_with_it: >-
+      converged is not correct. At this configuration the slice reproduces itself
+      under refinement of all three discretizations and still disagrees with the
+      independent oracle by 8x the gate, because wavelet_aperture_edge_error is not
+      a discretization error. Stating a converged configuration without that
+      sentence would be the most misleading thing this study could do.
+    cost:
+      wall_seconds: 17.7 and 18.8 over two runs, of which 9.3-9.5 is the reconstruction
+      peak_rss_bytes: 4.075e9 and 4.070e9
+      peak_rss_method: >-
+        /proc/<pid>/status VmRSS sampled every 20 ms from OUTSIDE the child, max
+        over the run. Not ru_maxrss inside it; see peak_rss_measurement_note.
+      at_the_frozen_3169_ray_configuration: >-
+        7.70 s and 8.34 s, peak RSS 0.924e9 and 0.918e9 bytes. This is the closer
+        analogue of M2's 0.622 s / 843 MiB 4096-ray figure, and it is still not
+        comparable: M2's is a coupler round trip on a 16x16 grid, while this is a
+        trace plus a 188^2 reconstruction plus a 1320^2 padded ASM under JAX plus a
+        measurement, so the resident set is dominated by the JAX runtime and the
+        padded field rather than by the coupler.
+      where_the_cost_goes: >-
+        the reconstruction, and it is the ray count that drives it: 0.6 s at 3169
+        rays against 9.4 s at 394219, because C_RAY_TO_WAVE materializes two
+        rays-by-grid ramp arrays. The same structure sets the memory. A chunked
+        accumulation would cut both by an order of magnitude at the same answer up
+        to summation order; not attempted here, because it changes shipping code for
+        a study's convenience.
+      machine: >-
+        shared, unpinned 80-core CPU host inside the agent_solver container. No GPU
+        was used or requested.
+  peak_rss_measurement_note:
+    found_by: CHE-38 (M3.9)
+    what: >-
+      benchmarks/protocol.yaml names resource.getrusage(RUSAGE_SELF).ru_maxrss as
+      the preferred memory method. That is correct for a top-level benchmark driver,
+      which is how M1 and M2 used it, and wrong for a CHILD process: the child's
+      high-water mark starts at the parent's. Verified in the record with a trivial
+      child that allocates nothing and still reports the parent's peak.
+    consequence_here: >-
+      this study's first cost measurement reported 8.8 GiB for the 3169-ray
+      configuration -- the whole sweep's peak, not the configuration's. The figures
+      above are sampled from OUTSIDE the child, from /proc/<pid>/status VmRSS every
+      20 ms, and sampling begins only after the child's post-exec handshake so no
+      post-fork transient is counted. The child self-reports 9.42e9 bytes for every
+      configuration -- exactly the probe's own peak -- against measured 4.07e9 at
+      394219 rays and 0.92e9 at 3169.
+    not_changed_here: >-
+      benchmarks/protocol.yaml is M1's and is not amended by an M3 ticket. The
+      distinction is recorded here and is worth a follow-up.
+  determinism:
+    result: bit-identical
+    method: >-
+      two separate PROCESSES, compared by sha256 of the float64 PSF intensity array
+      and by the retained raw peak and raw window energy. Separate processes rather
+      than two calls, because two calls in one interpreter share caches, JAX state
+      and warmed allocators and can agree for reasons unrelated to determinism.
+    checked_at: both the frozen 3169-ray configuration and the converged one
+    why_it_is_pass_fail: >-
+      the slice has no RNG. Optiland's hexapolar sampler is deterministic, the
+      coupler draws nothing, the ASM is a fixed transform. Any variation would be a
+      defect, not noise, so this is not a tolerance.
+  regression_envelope:
+    accuracy: declared
+    accuracy_bounds: >-
+      the frozen configuration's FFT-oracle residual to +/- 2%, the non-ray floor to
+      +/- 5%, the rim amplitude at 0.50 +/- 0.02, the PSF bit-identical across
+      processes, and the ray sweep asserted NON-monotone. Enforced by
+      tests/test_m3_convergence.py.
+    accuracy_rationale: >-
+      M2's L6 recorded timings as observations with nothing to regress against. The
+      part of that gap this ticket can honestly close is the numbers: the slice is
+      deterministic, so its metrics have no run-to-run spread at all and an envelope
+      on them is a real regression test.
+    timing: NOT declared, deliberately
+    timing_rationale: >-
+      the container runs on a shared, unpinned 80-core host with no CPU affinity and
+      no reserved memory, and this study has two timing samples per configuration.
+      Two samples on an uncontrolled machine cannot bound a distribution, and a
+      timing gate built from them would fail for reasons unrelated to this code. M1
+      and M2's disclaimer is repeated on purpose, with the reason stated.
+    what_would_make_a_timing_envelope_declarable: >-
+      a pinned machine, or a normalized cost unit -- ray-pixel products per second,
+      which feasibility already measures -- plus enough repetitions to characterize
+      the spread.
+  gates:
+    fft_oracle_intensity_relative_l2: >-
+      FAIL, and it cannot be closed by refinement. 1.51e-2 at the frozen
+      configuration, 6.67e-3 at the sweep's best point, 8.04e-3 at the converged
+      one, against 1.0e-3. No tolerance was widened.
+    airy_peak_intensity_relative: >-
+      FAIL, 9.1e-3 at the refined end against 2.0e-3. It passes only near the count
+      where the signed metric crosses zero.
+    energy_accounting_unexplained_residual: not re-measured here; M3.8's pass stands
+  what_would_close_the_fft_gate:
+    not_more_rays: measured, over a 3600x range of ray count
+    not_a_finer_grid: measured, over a 6x range at fixed extent
+    not_more_padding: measured, over the whole admissible range
+    an_aperture_aware_reconstruction: >-
+      the actual fix. New physics in the coupler, needing its own ticket. See
+      open_structural_items.wavelet_sum_cannot_represent_a_hard_aperture_edge.
+    or_a_larger_fresnel_number: >-
+      the aperture term falls as N_f^(-0.752 +/- 0.011). Extrapolating to the
+      unscaled 25 mm singlet's N_f = 234.5 projects 1.1e-3 for that term, which
+      would leave the 1.25e-3 non-ray floor as the dominant one and the gate still
+      missed, by ~1.7x rather than 8x. That projection is an extrapolation one decade
+      beyond the measured range, obtained by varying R at fixed aperture rather than
+      by scaling the system, and the unscaled system was not run.
 
 # ---------------------------------------------------------------------------
 # PSF measurement semantics -- frozen by CHE-36 (M3.7)
@@ -667,6 +1108,20 @@ feasibility:
       count on top of that. The scaled system stays the frozen primary; this one
       is available to any later ticket that wants a macroscopic case, and the
       choice is now a budget decision rather than a numerical impossibility.
+    cost_only_claim_qualified_by: CHE-38 (M3.9)
+    cost_only_claim_qualification: >-
+      the choice is not purely a cost decision. CHE-40 was right about the term it
+      was arguing over -- complex64 truncation no longer bounds the system's size --
+      but scaling also divides the pupil Fresnel number a^2 / (lambda R) by 10, and
+      wavelet_aperture_edge_error falls as N_f^(-0.752 +/- 0.011). The 1/10 scaling
+      therefore costs a factor of ~5.6 on the dominant error in the slice: 6.3e-3 at
+      the scaled system's N_f = 23.45 against a projected 1.1e-3 at the unscaled
+      system's 234.5. Cheaper in pixels, worse in physics, and the two were not
+      weighed against each other because the term did not exist yet.
+    cost_only_claim_qualification_caveat: >-
+      the projection is an extrapolation one decade beyond the measured range, and it
+      was obtained by varying the convergence distance at fixed aperture rather than
+      by scaling the system. Running the unscaled singlet remains unmeasured.
   measured_coupler_throughput_ray_pixels_per_second: 5.5e8
   projected_reconstruction_seconds:
     M3-SINGLET-REF: 0.27
@@ -734,6 +1189,17 @@ open_structural_items:
       correctly; CHE-37 owns the Airy oracle that consumes the radius directly,
       where using a diameter as a radius would be a factual error in the oracle.
     measured: 0.61 * 0.55 um / 0.05171631827291936 = 6.4873 um
+    sampling_half_resolved_by: CHE-38 (M3.9)
+    sampling_half_resolution: >-
+      the factor of 2 is confirmed -- the Airy RADIUS spans 1.22 pixels at the
+      critically admissible pitch and 2.44 at the frozen 2x -- and
+      oversampling_factor stays 2 with its rationale replaced rather than repaired,
+      because the corrected pixel count does not support the old argument. See
+      sampling.oversampling_rationale and its _superseded pair. The frozen fields
+      airy_radius_um and airy_radius_in_pixels are still left as they are, since
+      nothing reads them: the oracle computes the radius from the first zero of J1
+      and tests/test_m3_psf_verification.py asserts the factor of 2 against this
+      file, so a later correction still surfaces there rather than silently.
     oracle_half_status: resolved
     oracle_half_resolved_by: CHE-37 (M3.8)
     oracle_half_resolution: >-
@@ -743,7 +1209,7 @@ open_structural_items:
       The frozen fields are left as they are and the correction is recorded;
       tests/test_m3_psf_verification.py asserts the factor of 2 against this file,
       so correcting the fields later will surface here rather than silently.
-    sampling_half_status: still open, owner CHE-38
+    sampling_half_status: resolved by CHE-38 (M3.9)
   - id: off_axis_handoff_omits_the_pupil_tilt
     found_by: CHE-37 (M3.8)
     owner: unassigned; a follow-up, not M3.8
@@ -822,6 +1288,52 @@ open_structural_items:
   - id: fft_oracle_gate_fails_with_an_unattributed_floor
     found_by: CHE-37 (M3.8)
     owner: CHE-38 (M3.9) for the ray-sampling part; the floor is unassigned
+    status: attributed by CHE-38 (M3.9); the gate still fails
+    attribution:
+      by: CHE-38 (M3.9)
+      the_floor_was_not_a_floor: >-
+        M3.8's sweep ended at its own minimum. Past 27937 traced rays the residual
+        RISES -- 6.82e-3 / 7.24e-3 / 7.67e-3 / 8.04e-3 / 8.32e-3 at 49537 / 98827 /
+        197377 / 394219 / 787969 -- so there is no floor to attribute; there is a
+        cancellation at the middle of the sweep between a falling term and a flat
+        one. See amendments A3.
+      three_terms_that_add_up:
+        non_ray_floor: >-
+          1.25e-3, measured by removing the ray leg entirely: an analytic
+          hard-mask pupil through the same ASM, the same pad_width 566, the same
+          window, the same measurement and the same resampled comparison. This
+          bounds what any ray refinement could achieve, and it is already 1.25x the
+          gate, which the gate's composition (1.0e-4 complex64 + margin) does not
+          account for. It is NOT decomposed further, and the leading unmeasured
+          candidate inside it is the oracle's own paraxial image mapping: a single
+          FFT with pixel scale lambda*R/(N dx) is the Fraunhofer limit of a
+          PARABOLIC converging wave, while the field it is compared against carries
+          the exact sphere, and the difference rho^4/(8 R^3) is 0.0078 waves at the
+          rim of this pupil. That is an oracle-side term of the same order as the
+          system's own residual aberration and it is owed a measurement.
+        ray_sampling_error: >-
+          1.83e-2 at the frozen 3169 rays, falling as N^-0.609 +/- 0.035 against a
+          ray-refined reference. Measured against the refined PSF rather than
+          against an oracle, so it is separable from the term below.
+        wavelet_aperture_edge_error: >-
+          7.1e-3 and flat in ray count. This is the term M3.8 hypothesized and did
+          not test.
+      hypothesis_verdict: >-
+        M3.8's leading hypothesis is CONFIRMED in kind and refuted in scale. The
+        pupil edge is soft and the oracle's hard mask is the better model of a real
+        stop, but the softness is not 'roughly one ray spacing': it is a Fresnel
+        scale, sqrt(lambda R) = 51.6 um = 19.4 pixels = 0.21 of the pupil radius,
+        and it does not shrink with ray count.
+      localized_to_the_pupil_plane: >-
+        comparing the shipping PSF against the analytic hard-mask pupil propagated
+        the same way reproduces its disagreement with the oracle (7.10e-3 against
+        7.67e-3 at 197377 rays), so neither the propagation nor the oracle is
+        implicated. A synthetic bundle carrying the exact optical path to the focus
+        reproduces it too, which exonerates Optiland, the OPL declaration and the
+        0.017-wave residual aberration.
+      still_open: >-
+        the defect itself. See
+        open_structural_items.wavelet_sum_cannot_represent_a_hard_aperture_edge.
     description: >-
       The fft_oracle_intensity_relative_l2 gate of 1.0e-3 is missed by 15x at the
       frozen configuration (1.509e-2). Varying ONLY the ray count, with grid,
@@ -844,6 +1356,82 @@ open_structural_items:
       without someone saying what changed.
     same_cause_as: airy_peak_intensity_relative, which fails 6.1x and whose
       full-window peak deficit collapses from 0.886 at 817 rays to -0.007 at 12481
+
+  - id: wavelet_sum_cannot_represent_a_hard_aperture_edge
+    found_by: CHE-38 (M3.9)
+    owner: unassigned; a follow-up, and the largest open item in the slice
+    severity: >-
+      high. It is the dominant error in the M3 forward path and it makes
+      fft_oracle_intensity_relative_l2 unreachable at the frozen system, at any ray
+      count.
+    description: >-
+      C_RAY_TO_WAVE reconstructs U(x, y) as a sum of plane wavelets, one per ray,
+      each an infinite plane wave over the whole grid. That sum is a
+      stationary-phase estimate of the pupil field: it is accurate where the field
+      varies slowly over a Fresnel zone of the converging curvature, and a hard stop
+      does not. The reconstruction therefore returns the aperture edge as a
+      knife-edge diffraction profile rather than as a truncation.
+    measured:
+      amplitude_at_the_geometric_rim: >-
+        0.50 of the interior plateau, the knife-edge value, at every ray count from
+        12481 up. Not fitted -- predicted, then measured.
+      overshoot_fringe_inside_the_rim: ~1.12 of the plateau
+      fresnel_scale: sqrt(lambda R) = 5.158e-5 m = 19.4 pixels = 0.207 * pupil radius
+      pupil_fresnel_number: a^2 / (lambda R) = 23.45
+      rim_slope_scaling: >-
+        the slope of the transition at rho = a, measured on synthetic bundles with R
+        varied at fixed aperture, fixed grid, fixed pitch and fixed ray count,
+        tracks 1 / sqrt(lambda R) and agrees with the value computed from the
+        Fresnel integrals.
+      ray_count_dependence: none
+      psf_level_cost: >-
+        7.1e-3 relative intensity L2 against the analytic hard-mask pupil through
+        the same propagation, at a ray count where the ray-sampling term is 5x
+        smaller.
+    why_the_hard_mask_is_the_reference_and_not_the_reconstruction: >-
+      a real stop truncates the beam, so the physical exit-pupil field of this
+      system is hard-edged to a very good approximation, and the analytic Airy
+      pattern -- an independent oracle that shares nothing with either
+      implementation -- assumes the same hard aperture. Both oracles disagree with
+      the reconstruction in the same direction and by the same order.
+    not_fixed_here_because: >-
+      an aperture-aware reconstruction is new physics in the coupler: it needs an
+      explicit aperture function on the ray side (which RealRays does not carry --
+      CHE-32 recorded that Optiland represents no pupil boundary and the survivor
+      list is the only evidence of one), a decision about how to combine it with the
+      wavelet sum, and its own verification against a case with a known answer.
+      CHE-38 is a convergence study and must not both invent and verify a path.
+    what_would_reduce_it: >-
+      a larger pupil Fresnel number. The term falls as a^2 / (lambda R) grows, so a
+      macroscopic system carries less of it than the 1/10-scaled reference does; see
+      feasibility.rejected_configuration.cost_only_claim_qualified_by. It cannot be
+      reduced by rays, by grid, or by padding.
+    evidence: benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis)
+
+  - id: the_frozen_window_is_the_pupil_diameter_rounded_up
+    found_by: CHE-38 (M3.9)
+    owner: unassigned; recorded, with its consequence already resolved
+    severity: low for the frozen result, high for anyone diagnosing on this grid
+    description: >-
+      sampling.grids.M3-SINGLET-REF has grid_n * sample_pitch_m = 4.99842e-4 m,
+      against a frozen pupil_extent_m of 4.99568e-4 m which is twice the largest
+      traced pupil radius. grid_n = 188 is that extent divided by the pitch, 187.897,
+      rounded up -- so the window exceeds the measured pupil by 0.055% and the pupil
+      is inscribed in it. Any structure the reconstruction puts outside the rim --
+      the Fresnel edge tail, and at low ray counts a large sampling pedestal -- is
+      clipped by the window and is invisible on this grid. The aperture diagnostic
+      above had to be run on a 376^2 window at the same pitch to see the edge at all.
+    consequence_already_resolved: >-
+      CHE-35's window-power figure. It read ~0.6 at the frozen grid and was recorded
+      as ~40% of the pupil power leaving the window 'regardless of ray count'. It is
+      not ray-count-independent: the share of propagated power inside the frozen
+      observation window reads 0.586 / 0.631 / 0.578 / 0.520 at 217 / 817 / 1801 /
+      3169 traced rays and 0.9955 / 0.9980 / 0.9987 at 12481 / 27937 / 787969. The
+      0.6 was the sampling pedestal of an unconverged reconstruction. CHE-35's
+      companion series reproduces exactly once the denominator is matched -- its
+      0.043 / 0.166 / 0.388 are this probe's within-3-Airy-radii fractions divided
+      by the window share, to three digits -- and it saturates at 0.958.
+    evidence: benchmarks/probes/records/m3_convergence.json (ray_count_convergence)
 
   - id: airy_gate_residual_aberration_term_was_derived_at_best_focus
     found_by: CHE-37 (M3.8)

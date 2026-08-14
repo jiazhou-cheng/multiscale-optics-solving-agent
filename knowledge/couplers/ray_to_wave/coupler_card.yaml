@@ -98,6 +98,35 @@ validity_conditions:
   - id: plane_not_surface
     statement: Equation 2 reconstructs onto a plane with one normal n_hat.
     enforcement: contract validation
+  - id: aperture_edge_is_resolved_only_to_a_fresnel_scale
+    statement: >
+      Each ray contributes an infinite plane wave, so the sum is a stationary-phase
+      estimate of the field on the plane and resolves it only over a Fresnel zone
+      of the bundle's own convergence, sqrt(lambda R). A hard aperture edge
+      therefore comes back as a knife-edge diffraction profile -- amplitude 1/2 at
+      the geometric rim, an overshoot fringe inside it, a tail outside -- and NOT
+      as a truncation. The resulting error is set by the pupil Fresnel number
+      a^2 / (lambda R) and does not fall with ray count, grid or padding.
+    enforcement: >
+      documented only, and it is the one validity condition here that nothing can
+      measure at run time: the coupler is never told where the aperture is. RealRays
+      carries no mask and Optic.trace returns survivors only (CHE-32), so the
+      boundary is implicit in which rays exist, and a reconstruction cannot
+      distinguish "the beam ends here" from "the stop is here".
+    measured_by: >
+      CHE-38 (M3.9). On M3-SINGLET-REF, sqrt(lambda R) = 51.6 um = 19.4 pixels =
+      0.21 of the pupil radius at a Fresnel number of 23.45, and the rim amplitude
+      settles at 0.50 for every ray count above 12481. At the PSF level it costs
+      7.1e-3 relative intensity L2 against an analytic hard-mask pupil propagated
+      the same way, against a 1.0e-3 gate. Evidence:
+      benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis).
+    consequence: >
+      C_RAY_TO_WAVE is not a substitute for an aperture model. Any comparison
+      against an oracle that assumes a hard stop -- the analytic Airy pattern, or a
+      Fourier transform of a masked pupil -- carries this term. Adding rays makes the
+      TOTAL disagreement worse once the ray-sampling term has fallen below this one,
+      because the two had been partially cancelling; measured on M3-SINGLET-REF, the
+      turnaround is near 28000 traced rays.
 
 derivative:
   mode: not_applicable_yet
