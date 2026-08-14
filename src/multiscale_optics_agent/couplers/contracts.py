@@ -109,6 +109,17 @@ class ContractCode(StrEnum):
     #: constant nobody can see. Distinct from SHAPE_MISMATCH, which is about array
     #: extent rather than the physical size of a sample.
     SAMPLE_PITCH_MISMATCH = "SAMPLE_PITCH_MISMATCH"
+    #: The record carries no object-space reference for its optical path, and the
+    #: field it was traced at makes that omission a TILT rather than a piston.
+    #: Added by CHE-41. Optiland seeds its OPD accumulator on a plane
+    #: perpendicular to z, so for an off-axis collimated bundle the accumulated
+    #: path is measured from a surface that is not a wavefront; the difference is
+    #: `n_object * d0 . r_launch`, linear in the launch coordinate. On axis it is
+    #: a constant and cancels in the chief-ray subtraction, which is why the
+    #: defect survived CHE-30/32/33. Distinct from OPL_REFERENCE_UNVERIFIED: the
+    #: reference here is known and stated, and the missing quantity is the
+    #: object-space information needed to move it onto a wavefront.
+    OBJECT_SPACE_REFERENCE_MISSING = "OBJECT_SPACE_REFERENCE_MISSING"
 
 
 class ContractError(ValueError):
@@ -594,6 +605,22 @@ class RayBundle:
                     "path length until its sign and reference are characterized."
                 ),
             }
+        # CHE-41: the object-space term that moves opd_native's reference from the
+        # launch PLANE onto a WAVEFRONT of the incoming bundle. Carried, never
+        # applied here -- applying it is a declaration, and this classmethod makes
+        # none. Absent for a record written before CHE-41 or by a launch geometry
+        # the ray adapter declined to characterize; the consumer decides whether
+        # that absence is a piston it can ignore or a tilt it must refuse.
+        if "object_space_reference_offset_m" in data:
+            provenance["object_space_reference_offset_m"] = np.asarray(
+                data["object_space_reference_offset_m"], dtype=np.float64
+            )
+        if isinstance(conventions.get("object_space_reference"), dict):
+            provenance["object_space_reference"] = dict(conventions["object_space_reference"])
+        provenance["requested_field"] = {
+            "Hx": metadata.get("requested_Hx"),
+            "Hy": metadata.get("requested_Hy"),
+        }
 
         return cls(
             positions_m=positions,

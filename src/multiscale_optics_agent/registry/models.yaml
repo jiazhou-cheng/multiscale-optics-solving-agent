@@ -61,6 +61,16 @@ models:
           launch plane -- and CHE-33 declares it into an OPL; the raw value is
           still not admissible as a phase on its own.
         - >-
+          CHE-41: that launch plane is perpendicular to Z, which is a WAVEFRONT
+          only for a bundle travelling along z. Off axis the accumulated path
+          therefore falls short of a wavefront-referenced one by
+          n_object * (d0 . r_launch), and that term is the entire convergence
+          tilt: only 0.13% of the required tilt survived without it on
+          M3-REVERSE-TELEPHOTO at Hy = 0.2. The adapter now exports the term per
+          ray as `object_space_reference_offset_m`, measured from the launch
+          state Optic.trace discards, and the coupler REFUSES an off-axis record
+          that lacks it. On axis the term is a piston and nothing changes.
+        - >-
           CONTRACT GAP found 2026-07-30, RESOLVED by CHE-34 (M3.5) for the
           `rays` port. optiland.rays.real_rays.RealRays (pinned 0.6.0) exposes
           only x, y, z, L, M, N, intensity, opd -- no polarization state and no

@@ -178,6 +178,45 @@ coherent_handoff_from_a_ray_trace:
         the traced chief ray, sign 'ray minus chief'. The aperture-dependent
         launch-plane zero CHE-30 warned about is common to every ray in the trace
         and cancels exactly in this subtraction.
+      # CHE-41 versions this declaration, because a handoff convention is part of
+      # the coupler contract and a change to it is not an edit.
+      version: C_RAY_TO_WAVE opl_reference v2 (CHE-41)
+      reference_surface: >-
+        the plane WAVEFRONT of the incoming collimated bundle, not Optiland's
+        launch plane. RealRays.opd accumulates from a plane perpendicular to z,
+        which is a wavefront only along z; the difference is
+        n_object * (d0 . r_launch), exported per ray by the ray adapter as
+        object_space_reference_offset_m and added here. When that term is constant
+        across the bundle it is NOT added: a constant cannot survive the chief-ray
+        subtraction, and skipping it is what makes every on-axis declared OPL
+        bit-identical to v1's.
+      why_the_wavefront_and_not_a_chief_ray_frame: >-
+        both are defensible and the choice is stated rather than defaulted. The
+        wavefront is a physical surface the bundle defines identically at every
+        field; a chief-ray-referenced frame is chosen per field, makes the oracle
+        circular (the PSF lands at the window centre by declaration), and has no
+        exact form that does not re-introduce a reference sphere aimed at a chosen
+        image point -- whose approximate form, a least-squares linear ramp,
+        manufactured a 1.0-wave false aberration finding in M3.8. It is also the
+        more general choice: a chief-ray frame can be layered on a
+        wavefront-referenced OPL, while recovering the tilt from a chief-ray frame
+        needs object-space data the exit-pupil export does not carry. Full
+        reasoning: benchmarks/slice_protocol.yaml amendment A3.
+      sampling_consequence: >-
+        the pupil field carries the tilt, so pitch <= lambda /
+        (2 max|transverse direction cosine|). On M3-REVERSE-TELEPHOTO the frozen
+        pitch is 94.6% of admissible at Hy = 0.2, inadmissible from Hy ~ 0.25, and
+        needs 2.58x refinement at full field.
+      superseded:
+        version: C_RAY_TO_WAVE opl_reference v1 (CHE-33)
+        reference_surface: Optiland's ray launch state, used as though it were a wavefront
+        numerically_identical_for: >-
+          every field whose object-space term is constant across the bundle, i.e.
+          every configuration M3.4-M3.8 verified
+        wrong_for: >-
+          any off-axis field. At Hy = 0.2 it retained 0.13% of the required tilt
+          (slope 8.7e-5 against 0.0684) and converged 209 um from the traced
+          chief-ray intersection with a healthy-looking 0.072-wave-P-V residual.
       global_phase_policy: retained_as_metadata_not_reapplied
     amplitude:
       mapping: a_i = sqrt(intensity_i)
@@ -213,9 +252,80 @@ coherent_handoff_from_a_ray_trace:
     - OPL_REFERENCE_UNVERIFIED when no declaration was made, which is still the
       behaviour for a bare adapter record
     - MISSING_DECLARATION when the record carries no image-space refractive index
+    - OBJECT_SPACE_REFERENCE_MISSING (CHE-41) when the record was traced off axis
+      and carries no object-space reference term. Deliberately NOT a warning and
+      not a silent zero, because the missing quantity cannot be reconstructed
+      downstream and its absence produces a converging sphere aimed at the axis.
+      An on-axis record without the term is still accepted, because there the
+      omission is a piston.
+
+# CHE-41 (M3.9). The off-axis half of the handoff, which CHE-33 left unprobed and
+# CHE-37 found broken. Same implementation module; the OPL reference is versioned.
+off_axis_handoff:
+  status: verified at one field
+  verified_by: CHE-41
+  probe: benchmarks/probes/m3_off_axis_handoff.py
+  evidence: benchmarks/probes/records/m3_off_axis_handoff.json
+  tests: tests/test_m3_off_axis_handoff.py
+  field_verified: M3-REVERSE-TELEPHOTO, Hx = 0, Hy = 0.2
+  geometric_oracle:
+    what_it_is: >-
+      the reconstructed field's PSF must land at the TRACED CHIEF-RAY INTERSECTION
+      and the fitted reference sphere's centre must be there too. Both are
+      geometry, computed from the ray bundle, and neither is satisfiable by a
+      convention that is self-consistent but aimed at the wrong place.
+    psf_peak_pixels: [114, 0]
+    psf_peak_predicted_pixels: 114.41892625675855
+    psf_error_in_airy_radii: 0.17173756200504023
+    fitted_sphere_centre_error_m: 5.717799865452328e-07
+    fitted_sphere_centre_error_improvement_over_v1: 367.1362751001203
+    pupil_wavefront_pv_waves_against_the_chief_ray_point: 0.04424271330843872
+    superseded_pupil_wavefront_pv_waves: 57.01174774014233
+    reference_sphere_free_cross_check: >-
+      geometric RMS ray radius about the chief-ray point 0.082 Airy radii, max
+      0.105. Fits no sphere, so it cannot inherit a sphere-centre error -- which is
+      the M3.8 method note that caught a 1.0-wave false finding.
+    negative_control: >-
+      the superseded declaration re-run through HandoffPerturbation(
+      reference_incoming_wavefront=False) moves the PSF 115 pixels back onto the
+      axis. A fix whose omission changes nothing is not a fix.
+  axis_transpose_control:
+    margin_before: 1.0000066 (CHE-37, and unfailable on any frozen configuration)
+    margin_after_che37_metric_unchanged: 0.99999978
+    margin_after_che37_metric_recentred: 233.63715040771217
+    margin_after_window_metric_no_azimuthal_average: 12.4293824456337
+    margin_in_m3_psf_verification_off_axis_controls: 674.878
+    finding: >-
+      the off-axis field was necessary and not sufficient. CHE-37's metric
+      azimuthally averages about the grid CENTRE, and such an average cannot
+      distinguish a peak at (114, 0) from one at (0, 114) for ANY configuration --
+      a second, independent blind spot that the single number 1.0000066 was
+      hiding. Two repairs, both reported. Centring the analytic reference and the
+      azimuthal average on the traced image point detects the transpose at 233.6x
+      here and 674.9x in m3_psf_verification's off_axis_negative_controls, where
+      it also lifts the OPL-sign, phase-sign, oblique-ramp and distance-sign
+      margins from within 2.6x of 1.0 to 651x-1400x. Scoring with no azimuthal
+      average at all detects it at 12.4x. The peak moves 161 pixels, 66 Airy
+      radii, from y to x.
+    still_undetected: >-
+      the amplitude control, at 1.00005. That is the standing amplitude blind spot
+      (amplitude_path_is_not_exercised_by_any_m3_configuration) and not this
+      handoff's -- though note it is no longer EXACTLY 1.0 as it is on axis, so
+      ReverseTelephoto's off-axis ray weights are not perfectly uniform.
+  on_axis_impact: >-
+    none, bit-identically. The object-space term is constant across an on-axis
+    bundle and is therefore not applied; the declared OPL array compares equal
+    under numpy.array_equal, and the frozen 0.016999-wave residual is unmoved.
 
 not_yet_probed:
-  - off-axis fields at the exit-pupil handoff (CHE-33 exercised Hx=Hy=0 only)
+  - off-axis fields beyond Hy = 0.2, where the frozen pitch stops admitting the
+    tilt the declared reference puts in the pupil (limit Hy ~ 0.25, 2.58x
+    refinement needed at full field). CHE-41 verified one field, not a field scan.
+  - off-axis fields in x, or in both axes at once. CHE-41 used a one-axis field
+    deliberately, because that is what makes the transpose control non-vacuous.
+  - a finite-object (non-collimated) launch, where the object-space reference is a
+    point rather than a plane. The ray adapter refuses to supply a term there
+    rather than supplying a zero it has not tested.
   - a system whose image space is not air, where the plane transfer's n_image
     stops being 1 (both M3 systems are in air; the value is read, so this is a
     coverage gap rather than a correctness one)

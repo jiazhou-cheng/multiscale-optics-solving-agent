@@ -138,8 +138,13 @@ def test_the_emitted_record_declares_everything_the_wave_node_reads(coupler, ray
     assert metadata["pad_width"] == 0
     assert metadata["padded"] is False
     assert "projection = asm_consistent" in metadata["normalization"]
-    # The declarations made upstream travel with the result.
-    assert result.diagnostics["declarations"]["issue"] == "CHE-33 (M3.4)"
+    # The declarations made upstream travel with the result, including the versioned
+    # OPL reference CHE-41 added: a consumer must be able to tell v1's declared path
+    # from v2's, because off axis they differ by the whole convergence tilt.
+    declarations = result.diagnostics["declarations"]
+    assert declarations["issue"].startswith("CHE-33 (M3.4)")
+    assert declarations["opl_reference_version"].endswith("v2 (CHE-41)")
+    assert declarations["superseded_opl_reference"]["version"].endswith("v1 (CHE-33)")
     assert "none" in result.diagnostics["gradient_claim"]
 
 

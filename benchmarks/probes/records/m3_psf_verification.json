@@ -455,7 +455,7 @@
     "detection_margin": 1.000006568159038,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
     "max_abs_difference_vs_unperturbed": 0.0018370115987712543,
-    "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition. The off-axis configuration is the one that can see it, and this entry exists to show the blind spot rather than to claim a pass.",
+    "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition, and this entry exists to show the blind spot rather than to claim a pass. CHE-41 established that the off-axis configuration does not rescue it either, and why: this SCORE azimuthally averages about the grid centre, which cannot tell a peak at (114, 0) from one at (0, 114) for any configuration. See benchmarks/probes/records/m3_off_axis_handoff.json.",
     "outcome": "ran",
     "peak_index": [
      660,
@@ -556,7 +556,7 @@
    "grid_n": 254,
    "hy": 0.2,
    "pitch_m": 1.8258157981959995e-06,
-   "purpose": "excite the x/y degree of freedom. A circular pupil with an on-axis PSF cannot detect a transpose, and both other configurations are exactly that.",
+   "purpose": "excite the x/y degree of freedom. A circular pupil with an on-axis PSF cannot detect a transpose, and both other configurations are exactly that. Since CHE-41 this vehicle does put the PSF off centre in y only; see off_axis_handoff.",
    "sample": "ReverseTelephoto"
   },
   "energy_ledger": {
@@ -566,80 +566,80 @@
     "psf_integral_over_propagated_out": "must be 1 to float rounding: the measurement is |u|^2 on the same grid with the same pitch. A deviation is a measurement-layer defect, not physics.",
     "pupil_over_traced": "NOT a conservation law and not expected to be 1. The two sides measure different things: a sum of dimensionless ray weights versus sum(|u|^2)*dy*dx over a grid. The bundle declares reconstruction_normalization='none', so this ratio is the measure conversion of the wavelet sum, reported rather than compared to unity."
    },
-   "measured_psf_integral": 0.0006788367259883561,
+   "measured_psf_integral": 0.0007115949517974757,
    "padding": {
     "edge_energy_is_a_weak_indicator": "CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 relative intensity error from wraparound and a correctly padded one. Use it to notice window truncation, not to certify padding.",
-    "input_edge_energy_fraction": 0.022015912822664463,
-    "output_edge_energy_fraction": 1.905091519566669e-09,
+    "input_edge_energy_fraction": 0.028035414579929998,
+    "output_edge_energy_fraction": 3.363248128648037e-09,
     "pad_width": 762
    },
-   "propagated_power_in": 0.0006788370665162802,
-   "propagated_power_out": 0.0006788361351937056,
-   "psf_border_energy_fraction": 1.9050898284404717e-09,
+   "propagated_power_in": 0.0007115953485481441,
+   "propagated_power_out": 0.0007115941261872649,
+   "psf_border_energy_fraction": 3.363245336246218e-09,
    "ratios": {
-    "propagated_in_over_pupil": 1.0000000199404206,
-    "propagated_out_over_in": 0.9999986280616947,
-    "psf_integral_over_propagated_out": 1.0000008703052472,
-    "pupil_over_traced": 2.1424923284543875e-07
+    "propagated_in_over_pupil": 1.0000000637760373,
+    "propagated_out_over_in": 0.999998282224748,
+    "psf_integral_over_propagated_out": 1.0000011602262868,
+    "pupil_over_traced": 2.2458813515016402e-07
    },
-   "reconstructed_pupil_power": 0.0006788370529799838,
+   "reconstructed_pupil_power": 0.0007115953031654155,
    "traced_ray_power": 3168.4456647259167,
    "traced_ray_power_units": "sum of Optiland per-ray intensity weights over survivors. A COUNT-like weight, not watts, and not an area integral"
   },
   "psf": {
-   "border_energy_fraction": 1.9050898284404717e-09,
+   "border_energy_fraction": 3.363245336246218e-09,
    "grid_center_index": [
     889,
     889
    ],
    "peak_index": [
-    888,
+    1003,
     889
    ],
    "peak_is_off_axis_in_y_only": true,
    "peak_position_m": [
-    -1.8258158434036886e-06,
+    0.0002081430061480205,
     0.0
    ]
   },
   "pupil_wavefront_at_best_focus": {
-   "marechal_strehl": 0.990860423436368,
+   "marechal_strehl": 0.9997511218780772,
    "marechal_valid_regime": true,
    "marechal_validity_note": "exp(-(2 pi sigma)^2) is a small-aberration expansion. Below ~0.1 waves RMS it tracks the diffraction integral to a few percent; above it, it falls too fast and is an ordering only.",
-   "peak_to_valley_waves": 0.07187252771390978,
+   "peak_to_valley_waves": 0.009044914096425796,
    "pupil_radius_m": 0.00023101269676801506,
    "ray_count": 3169,
    "rayleigh_quarter_wave_limited": true,
    "reference_sphere": {
     "center_m": [
-     1.2120301927892371e-19,
-     -1.013286092185631e-06,
-     0.005207808161189373
+     1.790497225778629e-19,
+     0.00020947966833137317,
+     0.005217592276783201
     ],
     "initial_center_m": [
      -1.6352627236673428e-21,
      0.0002089232631081093,
      0.005209361469999999
     ],
-    "initial_residual_rms_waves": 14.473111043241566,
-    "iterations": 5,
-    "residual_rms_waves": 0.015250331564643527,
+    "initial_residual_rms_waves": 0.01272330573638418,
+    "iterations": 4,
+    "residual_rms_waves": 0.002510964174867823,
     "shift_m": [
-     1.2283828200259105e-19,
-     -0.00020993654920029492,
-     -1.5533088106260001e-06
+     1.8068498530153022e-19,
+     5.56405223263879e-07,
+     8.230806783201573e-06
     ]
    },
-   "rms_waves": 0.015250331564643527
+   "rms_waves": 0.002510964174867823
   },
   "pupil_wavefront_at_observation_plane": {
-   "marechal_strehl": 0.0,
-   "marechal_valid_regime": false,
+   "marechal_strehl": 0.9936295128574504,
+   "marechal_valid_regime": true,
    "marechal_validity_note": "exp(-(2 pi sigma)^2) is a small-aberration expansion. Below ~0.1 waves RMS it tracks the diffraction integral to a few percent; above it, it falls too fast and is an ordering only.",
-   "peak_to_valley_waves": 57.01590386063586,
+   "peak_to_valley_waves": 0.04330921193091495,
    "pupil_radius_m": 0.00023101269676801506,
    "ray_count": 3169,
-   "rayleigh_quarter_wave_limited": false,
+   "rayleigh_quarter_wave_limited": true,
    "reference_sphere": {
     "center_m": [
      -1.6352627236673428e-21,
@@ -653,171 +653,187 @@
     ],
     "initial_residual_rms_waves": NaN,
     "iterations": 0,
-    "residual_rms_waves": 14.473111043241566,
+    "residual_rms_waves": 0.01272330573638418,
     "shift_m": [
      0.0,
      0.0,
      0.0
     ]
    },
-   "rms_waves": 14.473111043241566
+   "rms_waves": 0.01272330573638418
   }
+ },
+ "off_axis_handoff": {
+  "cause_established_by_che41": "for an object at infinity Optiland seeds the OPD accumulator on a plane perpendicular to z, not on the incoming wavefront. This probe's guess at the difference, sin(theta) * y, was right in mechanism and wrong in form: it is n_object * (d0 . r_launch), evaluated at the LAUNCH coordinate, which is why no downstream arithmetic could repair it and the ray adapter had to export it. CHE-30 recorded the PISTON consequence of that launch plane; the TILT consequence is invisible on axis, and CHE-30, CHE-32 and CHE-33 all validated on axis only.",
+  "consequence_for_this_ticket": "M3.8's blind-spot audit found no frozen configuration could detect an x/y transpose, and named this configuration's on-axis PSF as the reason. That reason is gone -- the PSF is now 114 pixels off axis in y only -- but the transpose control below STILL reads a margin of ~1.0, because its metric azimuthally averages about the grid centre and cannot tell (114, 0) from (0, 114). See CHE-41's axis_transpose_control for the scoring that does detect it, and orientation_control below for the synthetic-tilt control that was M3.8's mitigation.",
+  "declared_opl_linear_slope_y": 0.06851966739542231,
+  "diagnosis": "the declared pupil OPL now carries the linear tilt the field requires, and the shipping PSF lands at the traced chief-ray intersection. The fitted least-squares slope reads ~0.19% above the y_image / R the geometry names because a converging sphere's slope is not constant across the pupil -- the sphere fit, not the slope, is the oracle. CHE-41's own record carries that fit and a reference-sphere-free geometric spot check.",
+  "fitted_centre_distance_from_axis_m": 0.00020947966833137317,
+  "fitted_centre_distance_from_geometric_point_m": 5.56405223263879e-07,
+  "fitted_sphere_centre_y_m": 0.00020947966833137317,
+  "fixed_by": "CHE-41, under slice_protocol amendment A3: the declared off-axis OPL reference is the incoming tilted wavefront. Evidence: benchmarks/probes/records/m3_off_axis_handoff.json.",
+  "geometric_image_height_m": 0.0002089232631081093,
+  "geometric_image_height_pixels": 114.42734985343883,
+  "measured_psf_peak_offset_pixels": 114,
+  "opl_slope_required_to_reach_the_geometric_point": 0.06839674799529223,
+  "slope_present_as_fraction_of_required": 1.001797152697063,
+  "superseded_finding": {
+   "declared_opl_linear_slope_y": 8.732361728171059e-05,
+   "fitted_centre_distance_from_geometric_point_m": 0.00020993654920029492,
+   "fitted_sphere_centre_y_m": -1.013286092185631e-06,
+   "measured_psf_peak_offset_pixels": -1,
+   "retained_because": "M3.8's report, the M3 protocol's open_structural_items entry and CHE-41's own ticket all quote these numbers. They were correct measurements of a wrong declaration.",
+   "slope_present_as_fraction_of_required": 0.0012767217717386374,
+   "verdict": "the off-axis handoff is NOT verified, and this vehicle cannot serve -- as measured by M3.8 before CHE-41",
+   "wavefront_pv_waves_against_the_fitted_centre": 0.07187252771390978,
+   "wavefront_pv_waves_against_the_geometric_point": 57.01590386063586
+  },
+  "verdict": "verified at Hy = 0.2 by CHE-41, and re-measured here through M3.8's own path. The block this replaces recorded the defect; its numbers are retained below under superseded_finding, because five records were measured while they were true.",
+  "wavefront_pv_waves_against_the_fitted_centre": 0.009044914096425796,
+  "wavefront_pv_waves_against_the_geometric_point": 0.04330921193091495
  },
  "off_axis_negative_controls": {
   "controls": [
    {
-    "border_energy_fraction": 2.195912412328291e-09,
+    "border_energy_fraction": 1.92085508268724e-09,
     "control": "opl_sign_flip",
     "description": "HandoffPerturbation(opl_sign=-1): conjugates the wavefront, so the converging pupil field diverges instead.",
-    "detected": false,
-    "detection_margin": 4.403248710584096,
+    "detected": true,
+    "detection_margin": 651.3174028886127,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.8604596898249024,
+    "max_abs_difference_vs_unperturbed": 0.999984408722563,
     "note": "",
     "outcome": "ran",
     "peak_index": [
-     885,
-     889
+     1022,
+     914
     ],
-    "raw_peak_intensity": 48424.92509450209,
-    "raw_peak_ratio_vs_control": 0.016108674179042565,
-    "raw_window_energy": 0.0006810408835685714,
-    "relative_l2_vs_airy": 1.0725023510792957,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 40741.75146830977,
+    "raw_peak_ratio_vs_control": 0.004681051185507306,
+    "raw_window_energy": 0.0006757486826090373,
+    "relative_l2_vs_airy": 0.9650804968633797,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    },
    {
-    "border_energy_fraction": 1.9039487826895027e-09,
+    "border_energy_fraction": 3.35973166727943e-09,
     "control": "reconstruction_phase_sign_flip",
     "description": "Perturbation(phase_sign=-1): the same conjugation, applied one stage later, inside the wavelet sum.",
-    "detected": false,
-    "detection_margin": 4.049264196727023,
+    "detected": true,
+    "detection_margin": 670.7682420756847,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999792952700836,
+    "max_abs_difference_vs_unperturbed": 0.9999889528081389,
     "note": "",
     "outcome": "ran",
     "peak_index": [
-     662,
+     776,
      889
     ],
-    "raw_peak_intensity": 57328.55921054935,
-    "raw_peak_ratio_vs_control": 0.019070490654853632,
-    "raw_window_energy": 0.0006788367307202557,
-    "relative_l2_vs_airy": 0.9862820968281995,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 102925.68954148327,
+    "raw_peak_ratio_vs_control": 0.011825716953334148,
+    "raw_window_energy": 0.0007115949727871456,
+    "relative_l2_vs_airy": 0.9939015071170845,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    },
    {
-    "border_energy_fraction": 1.9050519715615156e-09,
+    "border_energy_fraction": 3.3632625771550473e-09,
     "control": "axis_transpose",
     "description": "Perturbation(transpose_axes=True): the output grid's axes swapped.",
-    "detected": false,
-    "detection_margin": 1.0000001863041643,
+    "detected": true,
+    "detection_margin": 674.8780140231794,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.8175448090550672,
-    "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition. The off-axis configuration is the one that can see it, and this entry exists to show the blind spot rather than to claim a pass.",
+    "max_abs_difference_vs_unperturbed": 0.9999982197650873,
+    "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition, and this entry exists to show the blind spot rather than to claim a pass. CHE-41 established that the off-axis configuration does not rescue it either, and why: this SCORE azimuthally averages about the grid centre, which cannot tell a peak at (114, 0) from one at (0, 114) for any configuration. See benchmarks/probes/records/m3_off_axis_handoff.json.",
     "outcome": "ran",
     "peak_index": [
      889,
-     888
+     1003
     ],
-    "raw_peak_intensity": 3006139.7081023008,
-    "raw_peak_ratio_vs_control": 1.0,
-    "raw_window_energy": 0.0006788367232573976,
-    "relative_l2_vs_airy": 0.24357074091976086,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 8703549.125517087,
+    "raw_peak_ratio_vs_control": 1.0000001836890364,
+    "raw_window_energy": 0.0007115949695651567,
+    "relative_l2_vs_airy": 0.9999911045015439,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    },
    {
-    "border_energy_fraction": 1.9050650462832376e-09,
+    "border_energy_fraction": 3.363207262326456e-09,
     "control": "amplitude_weight_omitted",
     "description": "Every ray's declared amplitude replaced by 1, through the RayBundle contract, leaving the OPL untouched.",
     "detected": false,
-    "detection_margin": 1.0000007429279487,
+    "detection_margin": 1.00005044181449,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 4.6352741425725874e-07,
+    "max_abs_difference_vs_unperturbed": 4.461232340768895e-07,
     "note": "Expected WEAK: hexapolar weights on this configuration are near uniform, so the omission is close to an exact constant scale, and the frozen peak normalization cannot see a constant. The raw scale is what shows it -- compare raw_peak_intensity against the control.",
     "outcome": "ran",
     "peak_index": [
-     888,
+     1003,
      889
     ],
-    "raw_peak_intensity": 3006664.4729799335,
-    "raw_peak_ratio_vs_control": 1.0001745643677897,
-    "raw_window_energy": 0.0006789553904181115,
-    "relative_l2_vs_airy": 0.24357087649700315,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 8705072.582838656,
+    "raw_peak_ratio_vs_control": 1.000175222351936,
+    "raw_window_energy": 0.0007117193640884138,
+    "relative_l2_vs_airy": 0.0014818108237157378,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    },
    {
-    "border_energy_fraction": 1.4917496238519612e-15,
+    "border_energy_fraction": 1.4768092271675203e-15,
     "control": "oblique_ramp_omitted",
     "description": "Perturbation(apply_oblique_ramp=False): off-axis rays deposit a piston instead of a ramp.",
     "detected": true,
-    "detection_margin": 10.363815862942467,
+    "detection_margin": 1400.0087798474528,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999939511027649,
+    "max_abs_difference_vs_unperturbed": 0.999995199882743,
     "note": "M2 found this inert for a single centred on-axis ray. Here the bundle fills the pupil, so it should bite.",
     "outcome": "ran",
     "peak_index": [
      996,
-     781
+     996
     ],
-    "raw_peak_intensity": 480741.9185216959,
-    "raw_peak_ratio_vs_control": 0.1599200187622604,
-    "raw_window_energy": 0.05103558833388015,
-    "relative_l2_vs_airy": 2.524321838201197,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 2660.5021513766405,
+    "raw_peak_ratio_vs_control": 0.0003056802003083603,
+    "raw_window_energy": 0.0002824390072056153,
+    "relative_l2_vs_airy": 2.0744435245795825,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    },
    {
-    "border_energy_fraction": 1.9039535046746993e-09,
+    "border_energy_fraction": 3.3598059446732486e-09,
     "control": "propagation_distance_sign",
     "description": "Propagate -z instead of +z: away from focus rather than to it.",
-    "detected": false,
-    "detection_margin": 4.049264133859724,
+    "detected": true,
+    "detection_margin": 670.768240972951,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999792952700836,
+    "max_abs_difference_vs_unperturbed": 0.9999889528081389,
     "note": "",
     "outcome": "ran",
     "peak_index": [
-     662,
+     776,
      889
     ],
-    "raw_peak_intensity": 57328.55123778369,
-    "raw_peak_ratio_vs_control": 0.01907048800269291,
-    "raw_window_energy": 0.0006788367453857319,
-    "relative_l2_vs_airy": 0.9862820815155677,
-    "unperturbed_relative_l2_vs_airy": 0.24357069554152597
+    "raw_peak_intensity": 102925.71760909446,
+    "raw_peak_ratio_vs_control": 0.011825720178181382,
+    "raw_window_energy": 0.0007115949765963539,
+    "relative_l2_vs_airy": 0.9939015054831243,
+    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
    }
   ],
   "detection_threshold": "detection_margin > 10x the unperturbed residual",
   "method": "perturbations are applied through couplers.optiland_handoff.HandoffPerturbation and couplers.ray_to_wave.Perturbation -- the hooks the shipping code already carries -- and the pupil field is built by the same ray_to_wave call the graph node wraps. CHE-34 pinned that node as bit-identical to this call.",
+  "scoring_centre_m_y_x": [
+   0.0002089232631081093,
+   0.0
+  ],
+  "scoring_note": "the analytic Airy reference and the azimuthal average are both centred on the traced geometric image point, not on the grid origin. Measured with them at the origin instead, all six controls score within 2.6x of 1.0 -- including an x/y transpose that visibly moves the peak from (1003, 889) to (889, 1003) -- because an azimuthal average about a point the PSF is not at is nearly invariant under anything a perturbation can do. CHE-41's own record scores the transpose a second way, with no azimuthal average at all.",
   "status": "ran",
   "unperturbed_control": {
-   "border_energy_fraction": 1.9050898284404717e-09,
+   "border_energy_fraction": 3.363245336246218e-09,
    "max_abs_difference_vs_unperturbed": 0.0,
    "peak_index": [
-    888,
+    1003,
     889
    ],
-   "raw_peak_intensity": 3006139.7081023008,
-   "raw_window_energy": 0.0006788367259883561,
-   "relative_l2_vs_airy": 0.24357069554152597
+   "raw_peak_intensity": 8703547.526770828,
+   "raw_window_energy": 0.0007115949517974757,
+   "relative_l2_vs_airy": 0.0014817360822591535
   }
- },
- "off_axis_tilt_finding": {
-  "consequence_for_this_ticket": "no M3 configuration can detect an x/y transpose: both on-axis cases are rotationally symmetric and this one forms its PSF on axis as well. See orientation_control for the synthetic-tilt control added to cover the degree of freedom.",
-  "declared_opl_linear_slope_y": 8.732361728171059e-05,
-  "diagnosis": "the declared pupil OPL carries essentially none of the linear tilt an off-axis field requires: the slope present is 0.13% of the slope needed to reach the geometric image point. Fitting the reference sphere finds its centre ON AXIS, within 1 um of y = 0, where the residual drops from 57.0 to 0.072 waves P-V -- so the reconstructed wave is a clean converging sphere aimed at the wrong place. The shipping PSF lands there too, 1 pixel from the axis instead of 114.",
-  "fitted_centre_distance_from_axis_m": 1.013286092185631e-06,
-  "fitted_centre_distance_from_geometric_point_m": 0.00020993654920029492,
-  "fitted_sphere_centre_y_m": -1.013286092185631e-06,
-  "geometric_image_height_m": 0.0002089232631081093,
-  "geometric_image_height_pixels": 114.42734985343883,
-  "measured_psf_peak_offset_pixels": -1,
-  "not_fixed_here_because": "referencing the OPD to the incoming tilted wavefront is a change to the handoff convention, and M3.8 must not both invent and verify a path. It is a follow-up.",
-  "opl_slope_required_to_reach_the_geometric_point": 0.06839674799529223,
-  "probable_cause": "for an object at infinity Optiland seeds the OPD accumulator on a plane perpendicular to z, not on the incoming wavefront. For an off-axis parallel bundle those differ by exactly a linear term sin(theta) * y, which cancels the convergence tilt. CHE-30 characterized this launch plane and recorded that its zero moves with the aperture -- the PISTON consequence -- but the TILT consequence is invisible on axis, and CHE-30, CHE-32 and CHE-33 all validated on axis only. conventions.opd_is_relative_to_chief_ray reads False, which on axis is untestable.",
-  "slope_present_as_fraction_of_required": 0.0012767217717386374,
-  "verdict": "the off-axis handoff is NOT verified, and this vehicle cannot serve",
-  "wavefront_pv_waves_against_the_fitted_centre": 0.07187252771390978,
-  "wavefront_pv_waves_against_the_geometric_point": 57.01590386063586
  },
  "orientation_control": {
   "baseline_peak_offset_pixels": [

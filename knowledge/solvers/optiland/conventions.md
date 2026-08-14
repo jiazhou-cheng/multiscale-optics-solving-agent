@@ -193,6 +193,57 @@ therefore be built from real refractive surfaces.
 This does **not** invalidate L1-RAY-01's paraxial case, which gated centroids
 and spot sizes rather than OPL.
 
+### The launch plane's orientation (CHE-41), and why point 3 was incomplete
+
+Point 3 above located the launch plane and recorded the consequence of its
+*position*: the OPL zero moves with the aperture. It said nothing about the
+plane's *orientation*, and every case that established it was on axis, where a
+plane perpendicular to z and a wavefront of the incoming bundle are the same
+surface. They are not the same surface off axis.
+
+`angle.py` computes one `z0` for the whole bundle (`z0 = be.full_like(Px, z)`) and
+one direction, so the seeded surface is a **plane perpendicular to z** carrying a
+tilted collimated bundle. Measured at `Hy = 0.2` on `ReverseTelephoto`: launch `z`
+spread exactly `0.0` and launch direction spread `2.8e-17` across 3169 rays,
+against the `tan(theta) · EPD = 0.031531 mm` spread a wavefront-seeded launch
+would show. The launch direction is `(0, sin theta, cos theta)` to `1.4e-17`.
+
+An accumulated path measured from that plane differs from one measured from a
+wavefront by
+
+    n_object * (d0 . r_launch)
+
+which is **linear in the launch coordinate**: a constant on axis, and the entire
+convergence tilt off axis. Omitting it leaves a pupil OPL that is a clean
+converging sphere aimed at the *axis* whatever the field angle — on
+`M3-REVERSE-TELEPHOTO` at `Hy = 0.2`, 209 µm from where the rays go, with a
+0.072-wave-peak-to-valley residual against its own fitted sphere. That is the
+worst possible failure mode: internally consistent, diffraction-limited-looking,
+and wrong. It survived CHE-30, CHE-32 and CHE-33 because all three validated on
+axis, and it was found by CHE-37 and fixed by CHE-41.
+
+The term cannot be recovered from an exit-pupil export, because it is evaluated at
+the launch coordinate and no object-space coordinate survives the export. The
+adapter therefore regenerates the launch state through
+`ray_tracer.ray_generator.generate_rays` over the same hexapolar distribution
+`Optic.trace` builds, and exports the term as `object_space_reference_offset_m`. A
+re-trace of the regenerated state reproduces `Optic.trace` exactly (max `|dx|`,
+`|dy|`, `|d opd|` all `0.0`), which is what makes a per-ray term measured from it
+admissible.
+
+One consequence worth stating plainly, because it is what made the defect
+invisible: `opd_is_relative_to_chief_ray: false` is **correct**, and on axis it is
+also untestable in the way that matters. A genuinely chief-ray-referenced OPD and
+a plane-referenced absolute OPL both predict a tilt-free pupil wavefront off axis;
+they differ in whether `opd[chief]` is zero. Off axis it is `11051.3` waves, so the
+flag stands — but the flag was never the question. The question was which surface
+the accumulation starts from, and that is now declared
+(`opd_reference_surface`, `opd_omits_incoming_wavefront_tilt`).
+
+Evidence: `knowledge/solvers/optiland/probes/off_axis_opd_reference.py` and its
+recorded output, plus `benchmarks/probes/m3_off_axis_handoff.py` for the
+downstream consequence.
+
 ## CHE-13 standalone ray-state boundary
 
 `OptilandRayRequest` selects exactly the `ReverseTelephoto` prescription,

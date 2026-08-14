@@ -31,6 +31,14 @@ Configurations
     exactly that. This one puts the PSF off centre along +y only, at a field where
     the frozen grid is still admissible (94.6% of the Nyquist pitch) and the PSF
     is still inside the observation window (209 um of 232 um).
+
+    As M3.8 ran, this vehicle failed at its own purpose: the declared OPL carried
+    none of the field's tilt, so its PSF formed on axis like the other two. CHE-41
+    fixed the handoff (slice_protocol amendment A3), and the PSF now lands 114
+    pixels off axis in y. The ``off_axis_handoff`` block below re-measures that
+    through this probe's own path and retains M3.8's numbers as
+    ``superseded_finding``. The transpose control still reads a margin of ~1.0 --
+    for a second reason, documented there and owned by CHE-41.
 """
 
 from __future__ import annotations
@@ -260,12 +268,19 @@ def _profile_residual(
     reference_pitch: tuple[float, float],
     max_radius_m: float,
     measured_center_m: tuple[float, float] = (0.0, 0.0),
+    reference_center_m: tuple[float, float] = (0.0, 0.0),
 ) -> dict[str, Any]:
     """Compare two PSFs sampled differently, on a common radial grid.
 
     Both are peak-normalized first, which is the frozen M3 oracle normalization,
-    and both are azimuthally averaged, which is only meaningful for a
-    rotationally symmetric PSF -- so this is not used on the off-axis case.
+    and both are azimuthally averaged about a STATED centre. An azimuthal average
+    is only meaningful for a pattern that is rotationally symmetric *about that
+    centre*, which is why the centre is a parameter rather than the grid origin:
+    since CHE-41 the off-axis PSF forms 114 pixels off axis, and averaging it about
+    the origin turns an Airy pattern into a smeared annulus whose profile is nearly
+    invariant under anything a control can do to it. That is measurable: with the
+    centre left at the origin, all six off-axis controls score a margin within 2.6x
+    of 1.0, including an x/y transpose that visibly moves the peak.
     """
     from multiscale_optics_agent.evaluation.psf_oracles import azimuthal_profile
 
@@ -280,6 +295,7 @@ def _profile_residual(
     radii_r, profile_r = azimuthal_profile(
         reference / float(np.max(reference)),
         sample_pitch_m=reference_pitch,
+        center_m=reference_center_m,
         max_radius_m=max_radius_m,
         radial_samples=400,
         azimuthal_samples=256,
@@ -554,6 +570,7 @@ def _negative_controls(
     baseline_psf: np.ndarray[Any, Any],
     max_radius_m: float,
     airy_na: float,
+    psf_center_m: tuple[float, float] = (0.0, 0.0),
 ) -> dict[str, Any]:
     """Every perturbation through the shipping code, with a detection margin.
 
@@ -563,6 +580,15 @@ def _negative_controls(
     not move the answer further than the oracle disagreement it has to beat, and is
     reported as undetected -- which is the M2 lesson: a control that cannot be made
     to fail validates nothing.
+
+    ``psf_center_m`` is ``(y, x)`` and defaults to the grid origin, which is where
+    the two on-axis configurations put their PSF. Added by CHE-41: once the
+    off-axis handoff was fixed, the off-axis PSF moved 114 pixels off axis, and
+    scoring it against an Airy pattern centred on the ORIGIN made all six controls
+    read a margin within 2.6x of 1.0 -- the oracle was then measuring the offset
+    rather than the perturbation. Placing both the reference and the azimuthal
+    average at the traced image point restores the meaning of the margin. The
+    default keeps the on-axis block bit-identical.
     """
     from multiscale_optics_agent.couplers.optiland_handoff import HandoffPerturbation
     from multiscale_optics_agent.couplers.ray_to_wave import Perturbation
@@ -578,10 +604,13 @@ def _negative_controls(
             sample_pitch_m=measurement.sample_pitch_m,
             wavelength_m=WAVELENGTH_M,
             numerical_aperture=airy_na,
+            center_m=psf_center_m,
         )
         residual = _profile_residual(
             psf,
             analytic,
+            measured_center_m=psf_center_m,
+            reference_center_m=psf_center_m,
             measured_pitch=measurement.sample_pitch_m,
             reference_pitch=measurement.sample_pitch_m,
             max_radius_m=max_radius_m,
@@ -625,9 +654,12 @@ def _negative_controls(
             "Perturbation(transpose_axes=True): the output grid's axes swapped.",
             {"core_perturbation": Perturbation(transpose_axes=True)},
             "Expected INVISIBLE here: a circular pupil and an on-axis PSF are "
-            "symmetric under transposition. The off-axis configuration is the one "
-            "that can see it, and this entry exists to show the blind spot rather "
-            "than to claim a pass.",
+            "symmetric under transposition, and this entry exists to show the "
+            "blind spot rather than to claim a pass. CHE-41 established that the "
+            "off-axis configuration does not rescue it either, and why: this "
+            "SCORE azimuthally averages about the grid centre, which cannot tell "
+            "a peak at (114, 0) from one at (0, 114) for any configuration. See "
+            "benchmarks/probes/records/m3_off_axis_handoff.json.",
         ),
         (
             "amplitude_weight_omitted",
@@ -761,9 +793,7 @@ def _psf_from_bundle(bundle, geometry, directory: Path, *, core_perturbation=Non
         sample_pitch_m=(geometry["pitch_m"], geometry["pitch_m"]),
         perturbation=core_perturbation or Perturbation(),
     )
-    record = field.to_artifact_record(
-        artifact_id="pupil:tilted", uri=directory / "pupil_field.npy"
-    )
+    record = field.to_artifact_record(artifact_id="pupil:tilted", uri=directory / "pupil_field.npy")
     record.metadata["z_m"] = geometry["pupil_z_m"]
     record.metadata["reference_plane"] = "exit_pupil"
     result = _propagate(record, geometry, directory / "wave")
@@ -781,9 +811,15 @@ def _orientation_control(rays, geometry: dict[str, Any], directory: Path) -> dic
     """A transpose control that CAN fail, built from a synthetic known tilt.
 
     Neither frozen configuration can detect an x/y transpose. Both on-axis cases
-    are rotationally symmetric, and the off-axis case turns out to form its PSF on
-    axis too (see off_axis_tilt_finding), so its symmetry is not broken either. A
-    control that cannot be made to fail validates nothing -- M2's rule.
+    are rotationally symmetric, and as M3.8 ran, the off-axis case formed its PSF
+    on axis too, so its symmetry was not broken either. A control that cannot be
+    made to fail validates nothing -- M2's rule.
+
+    CHE-41 fixed the off-axis handoff and the shipping PSF now lands 114 pixels off
+    axis, so a real configuration can be made to fail. This synthetic control is
+    kept rather than retired: it tests the x/y wiring against an ANALYTICALLY
+    PREDICTED displacement, which the off-axis case does not, and M3.8's audit is a
+    record of what was checked when.
 
     So the degree of freedom is excited directly: a known linear tilt is added to
     the declared OPL along x only. The PSF must move along +x by ``tilt * R``, an
@@ -798,9 +834,7 @@ def _orientation_control(rays, geometry: dict[str, Any], directory: Path) -> dic
     predicted_shift_m = tilt * distance
     predicted_pixels = predicted_shift_m / geometry["pitch_m"]
 
-    baseline = _psf_from_bundle(
-        _bundle_with(rays, geometry), geometry, directory / "baseline"
-    )
+    baseline = _psf_from_bundle(_bundle_with(rays, geometry), geometry, directory / "baseline")
     tilted = _psf_from_bundle(
         _bundle_with(rays, geometry, opl_tilt_x=tilt), geometry, directory / "tilted"
     )
@@ -843,9 +877,7 @@ def _orientation_control(rays, geometry: dict[str, Any], directory: Path) -> dic
             abs(transpose_offset[0] - base_offset[0]) > 1
             and abs(transpose_offset[1] - base_offset[1]) <= 1
         ),
-        "transpose_is_detectable_here": bool(
-            transpose_offset != tilt_offset and abs(moved_x) > 1
-        ),
+        "transpose_is_detectable_here": bool(transpose_offset != tilt_offset and abs(moved_x) > 1),
         "why_this_exists": (
             "the frozen configurations cannot detect a transpose; this one can, and "
             "against an analytically predicted displacement rather than against "
@@ -898,9 +930,7 @@ def _ray_count_convergence(
                     "traced_rays": int(np.asarray(aberration.positions_m).shape[0]),
                     "relative_l2_vs_fft_oracle": comparison["relative_l2_residual"],
                     "max_abs_residual": comparison["max_abs_residual"],
-                    "airy_peak_deficit_full_window": peak_full[
-                        "peak_intensity_relative_deficit"
-                    ],
+                    "airy_peak_deficit_full_window": peak_full["peak_intensity_relative_deficit"],
                     "airy_peak_deficit_within_5_airy_radii": peak_windowed[
                         "peak_intensity_relative_deficit"
                     ],
@@ -916,9 +946,7 @@ def _ray_count_convergence(
             "grid, padding, plane and system are the frozen ones."
         ),
         "rows": rows,
-        "monotonically_falling": bool(
-            len(trend) > 1 and all(b < a for a, b in pairwise(trend))
-        ),
+        "monotonically_falling": bool(len(trend) > 1 and all(b < a for a, b in pairwise(trend))),
         "first_over_last_ratio": (trend[0] / trend[-1] if len(trend) > 1 and trend[-1] else None),
         "protocol_term": "ray_sampling_error (value: null, status: to_be_measured, owner CHE-38)",
     }
@@ -982,9 +1010,7 @@ def characterize() -> dict[str, Any]:
     )
 
     protocol = _protocol()
-    frozen_singlet = next(
-        entry for entry in protocol["systems"] if entry["id"] == "M3-SINGLET-REF"
-    )
+    frozen_singlet = next(entry for entry in protocol["systems"] if entry["id"] == "M3-SINGLET-REF")
     out: dict[str, Any] = {
         "probe": "m3_psf_verification",
         "issue": "CHE-37 (M3.8)",
@@ -1010,10 +1036,7 @@ def characterize() -> dict[str, Any]:
             "coefficient_used": AIRY_FIRST_NULL_COEFFICIENT_EXACT,
             "coefficient_protocol_quotes": AIRY_FIRST_NULL_COEFFICIENT_ROUNDED,
             "coefficient_difference_pct": 100.0
-            * (
-                AIRY_FIRST_NULL_COEFFICIENT_ROUNDED / AIRY_FIRST_NULL_COEFFICIENT_EXACT
-                - 1.0
-            ),
+            * (AIRY_FIRST_NULL_COEFFICIENT_ROUNDED / AIRY_FIRST_NULL_COEFFICIENT_EXACT - 1.0),
             "frozen_pixels_field": "sampling.grids.M3-SINGLET-REF.airy_radius_in_pixels",
             "frozen_pixels_value": float(
                 protocol["sampling"]["grids"]["M3-SINGLET-REF"]["airy_radius_in_pixels"]
@@ -1181,9 +1204,7 @@ def characterize() -> dict[str, Any]:
                 },
                 "vs_fft_oracle": {
                     **oracle_def.as_dict(),
-                    **_oracle_vs_shipping(
-                        measurement_def, oracle_def, max_radius_m=compare_radius
-                    ),
+                    **_oracle_vs_shipping(measurement_def, oracle_def, max_radius_m=compare_radius),
                 },
                 "vs_analytic_airy_should_disagree": _profile_residual(
                     measurement_def.intensity,
@@ -1222,7 +1243,8 @@ def characterize() -> dict[str, Any]:
                     "purpose": (
                         "excite the x/y degree of freedom. A circular pupil with an "
                         "on-axis PSF cannot detect a transpose, and both other "
-                        "configurations are exactly that."
+                        "configurations are exactly that. Since CHE-41 this vehicle "
+                        "does put the PSF off centre in y only; see off_axis_handoff."
                     ),
                 },
                 "pupil_wavefront_at_observation_plane": aberration_off.as_dict(),
@@ -1239,7 +1261,7 @@ def characterize() -> dict[str, Any]:
                 },
                 "energy_ledger": _energy_ledger(off, REVERSE_TELEPHOTO),
             }
-            # The finding that disqualifies this configuration as a vehicle.
+            # The off-axis handoff, re-measured through this probe's own path.
             positions = np.asarray(bundle_off.positions_m)
             opl = np.asarray(bundle_off.optical_path_length_m)
             design = np.stack(
@@ -1251,14 +1273,16 @@ def characterize() -> dict[str, Any]:
             geometric_height = float(
                 np.mean(positions[:, 1] + directions[:, 1] * step / directions[:, 2])
             )
-            out["off_axis_tilt_finding"] = {
-                "verdict": "the off-axis handoff is NOT verified, and this vehicle cannot serve",
-                "geometric_image_height_m": geometric_height,
-                "geometric_image_height_pixels": geometric_height
-                / REVERSE_TELEPHOTO["pitch_m"],
-                "measured_psf_peak_offset_pixels": (
-                    measurement_off.peak_index[0] - ny // 2
+            out["off_axis_handoff"] = {
+                "verdict": (
+                    "verified at Hy = 0.2 by CHE-41, and re-measured here through "
+                    "M3.8's own path. The block this replaces recorded the defect; its "
+                    "numbers are retained below under superseded_finding, because five "
+                    "records were measured while they were true."
                 ),
+                "geometric_image_height_m": geometric_height,
+                "geometric_image_height_pixels": geometric_height / REVERSE_TELEPHOTO["pitch_m"],
+                "measured_psf_peak_offset_pixels": (measurement_off.peak_index[0] - ny // 2),
                 "declared_opl_linear_slope_y": float(slope[2]),
                 "opl_slope_required_to_reach_the_geometric_point": geometric_height / step,
                 "slope_present_as_fraction_of_required": float(
@@ -1274,37 +1298,59 @@ def characterize() -> dict[str, Any]:
                     focus_off.sphere.center_m[1] - geometric_height
                 ),
                 "diagnosis": (
-                    "the declared pupil OPL carries essentially none of the linear "
-                    "tilt an off-axis field requires: the slope present is 0.13% of "
-                    "the slope needed to reach the geometric image point. Fitting the "
-                    "reference sphere finds its centre ON AXIS, within 1 um of y = 0, "
-                    "where the residual drops from 57.0 to 0.072 waves P-V -- so the "
-                    "reconstructed wave is a clean converging sphere aimed at the "
-                    "wrong place. The shipping PSF lands there too, 1 pixel from the "
-                    "axis instead of 114."
+                    "the declared pupil OPL now carries the linear tilt the field "
+                    "requires, and the shipping PSF lands at the traced chief-ray "
+                    "intersection. The fitted least-squares slope reads ~0.19% above "
+                    "the y_image / R the geometry names because a converging sphere's "
+                    "slope is not constant across the pupil -- the sphere fit, not the "
+                    "slope, is the oracle. CHE-41's own record carries that fit and a "
+                    "reference-sphere-free geometric spot check."
                 ),
-                "probable_cause": (
+                "cause_established_by_che41": (
                     "for an object at infinity Optiland seeds the OPD accumulator on a "
-                    "plane perpendicular to z, not on the incoming wavefront. For an "
-                    "off-axis parallel bundle those differ by exactly a linear term "
-                    "sin(theta) * y, which cancels the convergence tilt. CHE-30 "
-                    "characterized this launch plane and recorded that its zero moves "
-                    "with the aperture -- the PISTON consequence -- but the TILT "
-                    "consequence is invisible on axis, and CHE-30, CHE-32 and CHE-33 "
-                    "all validated on axis only. conventions.opd_is_relative_to_chief_ray "
-                    "reads False, which on axis is untestable."
+                    "plane perpendicular to z, not on the incoming wavefront. This "
+                    "probe's guess at the difference, sin(theta) * y, was right in "
+                    "mechanism and wrong in form: it is n_object * (d0 . r_launch), "
+                    "evaluated at the LAUNCH coordinate, which is why no downstream "
+                    "arithmetic could repair it and the ray adapter had to export it. "
+                    "CHE-30 recorded the PISTON consequence of that launch plane; the "
+                    "TILT consequence is invisible on axis, and CHE-30, CHE-32 and "
+                    "CHE-33 all validated on axis only."
                 ),
-                "not_fixed_here_because": (
-                    "referencing the OPD to the incoming tilted wavefront is a change "
-                    "to the handoff convention, and M3.8 must not both invent and "
-                    "verify a path. It is a follow-up."
+                "fixed_by": (
+                    "CHE-41, under slice_protocol amendment A3: the declared off-axis "
+                    "OPL reference is the incoming tilted wavefront. Evidence: "
+                    "benchmarks/probes/records/m3_off_axis_handoff.json."
                 ),
                 "consequence_for_this_ticket": (
-                    "no M3 configuration can detect an x/y transpose: both on-axis "
-                    "cases are rotationally symmetric and this one forms its PSF on "
-                    "axis as well. See orientation_control for the synthetic-tilt "
-                    "control added to cover the degree of freedom."
+                    "M3.8's blind-spot audit found no frozen configuration could detect "
+                    "an x/y transpose, and named this configuration's on-axis PSF as "
+                    "the reason. That reason is gone -- the PSF is now 114 pixels off "
+                    "axis in y only -- but the transpose control below STILL reads a "
+                    "margin of ~1.0, because its metric azimuthally averages about the "
+                    "grid centre and cannot tell (114, 0) from (0, 114). See CHE-41's "
+                    "axis_transpose_control for the scoring that does detect it, and "
+                    "orientation_control below for the synthetic-tilt control that was "
+                    "M3.8's mitigation."
                 ),
+                "superseded_finding": {
+                    "verdict": (
+                        "the off-axis handoff is NOT verified, and this vehicle cannot "
+                        "serve -- as measured by M3.8 before CHE-41"
+                    ),
+                    "declared_opl_linear_slope_y": 8.732361728171059e-05,
+                    "slope_present_as_fraction_of_required": 0.0012767217717386374,
+                    "fitted_sphere_centre_y_m": -1.013286092185631e-06,
+                    "fitted_centre_distance_from_geometric_point_m": 0.00020993654920029492,
+                    "wavefront_pv_waves_against_the_geometric_point": 57.01590386063586,
+                    "wavefront_pv_waves_against_the_fitted_centre": 0.07187252771390978,
+                    "measured_psf_peak_offset_pixels": -1,
+                    "retained_because": (
+                        "M3.8's report, the M3 protocol's open_structural_items entry "
+                        "and CHE-41's own ticket all quote these numbers. They were "
+                        "correct measurements of a wrong declaration."
+                    ),
+                },
             }
         else:
             out["off_axis_asymmetry_vehicle"] = {
@@ -1351,9 +1397,7 @@ def characterize() -> dict[str, Any]:
         }
 
         # An orientation control that can actually fail.
-        out["orientation_control"] = _orientation_control(
-            rays_dl, SINGLET, workdir / "orientation"
-        )
+        out["orientation_control"] = _orientation_control(rays_dl, SINGLET, workdir / "orientation")
 
         # Attribute the FFT-oracle residual.
         out["ray_count_convergence"] = _ray_count_convergence(
@@ -1376,9 +1420,9 @@ def characterize() -> dict[str, Any]:
         energy_gate = float(gates["energy_accounting_unexplained_residual"]["value"])
 
         airy_measured = abs(
-            out["diffraction_limited"]["vs_analytic_airy"][
-                "peak_intensity_within_5_airy_radii"
-            ]["peak_intensity_relative_deficit"]
+            out["diffraction_limited"]["vs_analytic_airy"]["peak_intensity_within_5_airy_radii"][
+                "peak_intensity_relative_deficit"
+            ]
         )
         airy_full_window = abs(
             out["diffraction_limited"]["vs_analytic_airy"]["peak_intensity"][
@@ -1440,9 +1484,7 @@ def characterize() -> dict[str, Any]:
                 "best_residual_at_highest_ray_count": sweep_best,
                 "best_over_gate": (sweep_best / fft_gate) if sweep_best else None,
                 "ray_sampling_accounts_for": (
-                    f"{fft_measured / sweep_best:.2g}x of the excess"
-                    if sweep_best
-                    else None
+                    f"{fft_measured / sweep_best:.2g}x of the excess" if sweep_best else None
                 ),
                 "diagnosis": (
                     "FAILS. Most of it is attributed by measurement rather than by "
@@ -1481,6 +1523,9 @@ def characterize() -> dict[str, Any]:
         }
 
         # The off-axis vehicle exists to catch what the on-axis controls cannot.
+        # Since CHE-41 its PSF is 114 pixels off axis, so the oracle and the
+        # azimuthal average are placed there; leaving them at the origin makes every
+        # margin read ~1 and measures the offset instead of the perturbation.
         if out.get("off_axis_asymmetry_vehicle", {}).get("psf"):
             out["off_axis_negative_controls"] = _negative_controls(
                 off["rays"],
@@ -1489,6 +1534,21 @@ def characterize() -> dict[str, Any]:
                 baseline_psf=off["measurement"].intensity,
                 max_radius_m=compare_radius,
                 airy_na=REVERSE_TELEPHOTO["na_frozen"],
+                psf_center_m=(geometric_height, 0.0),
+            )
+            out["off_axis_negative_controls"]["scoring_centre_m_y_x"] = [
+                geometric_height,
+                0.0,
+            ]
+            out["off_axis_negative_controls"]["scoring_note"] = (
+                "the analytic Airy reference and the azimuthal average are both "
+                "centred on the traced geometric image point, not on the grid origin. "
+                "Measured with them at the origin instead, all six controls score "
+                "within 2.6x of 1.0 -- including an x/y transpose that visibly moves "
+                "the peak from (1003, 889) to (889, 1003) -- because an azimuthal "
+                "average about a point the PSF is not at is nearly invariant under "
+                "anything a perturbation can do. CHE-41's own record scores the "
+                "transpose a second way, with no azimuthal average at all."
             )
     finally:
         shutil.rmtree(workdir, ignore_errors=True)

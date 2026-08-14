@@ -80,8 +80,13 @@ opd_convention:
   verified_by: CHE-30
   field: RealRays.opd
   quantity: absolute_optical_path_length
-  # NOT an OPD relative to a chief ray, which is what the name suggests.
+  # NOT an OPD relative to a chief ray, which is what the name suggests. CHE-41
+  # tested this off axis, where it is testable at all: at Hy = 0.2 the chief ray's
+  # own opd_native is 11051.3 waves rather than zero. The flag was right; what was
+  # missing was a statement of which SURFACE the accumulation starts from, now in
+  # reference_plane_infinite_object below.
   is_relative_to_chief_ray: false
+  is_relative_to_chief_ray_verified_off_axis: CHE-41 (Hy = 0.2, chief opd = 11051.3 waves)
   index_weighted: true
   unit: mm
   unit_basis: lens geometry unit; scales exactly with the prescription
@@ -107,9 +112,36 @@ opd_convention:
     # The consequence that matters: changing the aperture moves the OPL zero,
     # so an absolute Optiland OPL is only meaningful at a declared EPD.
     piston_is_aperture_dependent: true
+    # CHE-41: the plane's ORIENTATION, which CHE-30's on-axis cases could not see.
+    # It is perpendicular to z, not to the incoming bundle, so it is a wavefront
+    # only along z. Measured off axis at Hy = 0.2: launch z spread exactly 0.0 and
+    # launch direction spread 2.8e-17 across 3169 rays, against a wavefront's
+    # predicted z spread of tan(theta) * EPD = 0.031531 mm.
+    is_perpendicular_to_z: true
+    is_a_wavefront_of_the_incoming_bundle: false
+    omitted_term_off_axis: n_object * (d0 . r_launch)
+    omitted_term_shape: >-
+      linear in the LAUNCH coordinate, so a piston on axis (exactly constant, span
+      0.0) and the entire convergence tilt off it. A consumer that removes a piston
+      is unaffected on axis and wrong by the whole tilt off axis: on
+      M3-REVERSE-TELEPHOTO at Hy = 0.2 the pupil OPL retains 0.13% of the required
+      tilt without it, and the reconstructed wave converges 209 um from the traced
+      chief-ray intersection (CHE-37, CHE-41).
+    omitted_term_is_not_recoverable_downstream: >-
+      it is evaluated at the launch coordinate, and no object-space coordinate
+      survives into an exit-pupil export. The adapter therefore exports it as
+      object_space_reference_offset_m, regenerating the launch state through
+      ray_tracer.ray_generator.generate_rays; a re-trace of the regenerated state
+      reproduces Optic.trace exactly (max |dx| = |dy| = |d opd| = 0.0).
+    verified_off_axis_by: CHE-41
   reference_plane_finite_object:
     expression: object surface sag + object surface z
     depends_on_aperture: false
+    # CHE-41 did not probe this path, and the adapter refuses to supply an
+    # object-space reference term for it rather than supplying a zero. A point
+    # source IS a common wavefront, so the term should be zero -- but an untested
+    # zero is still an untested claim.
+    object_space_reference_available: false
   m1_anomaly_explained:
     observation: opd = 12 for a declared 10 mm planar separation
     explanation: EPD was 2.0 mm, so the aimed launch plane sat at z = -2 mm
@@ -299,12 +331,24 @@ validated_probe_ids:
     and reproduced against the frozen M3-SLICE-CPU-V1 geometry for both M3
     systems, projection checked as collinearity along each traced ray, and
     M3SingletRef pinned at the M1 standard at both handoff planes)
+  - off_axis_opd_reference (CHE-41; establishes that the opd accumulator is seeded
+    on a plane PERPENDICULAR TO Z rather than on a wavefront of the incoming
+    bundle, that the launch state can be regenerated exactly, that the omitted
+    term is a piston on axis and the whole convergence tilt off axis, and what a
+    tilt-carrying pupil costs in sampling at seven field points)
 not_yet_probed:
   - GPU device placement (no GPU in this environment)
   - pupil power and coordinate orientation
   - a system whose exit pupil is real rather than virtual (both M3 systems are
     virtual -- CHE-32)
-  - off-axis fields at the exit-pupil handoff plane (only Hx=Hy=0 -- CHE-32)
+  - off-axis fields beyond Hy = 0.2 through the full slice (CHE-41 exported and
+    verified the object-space reference at one off-axis field; the exit-pupil
+    handoff itself is still only pinned at Hx=Hy=0 -- CHE-32)
+  - an off-axis field in x, or in both axes at once (CHE-41 used y only and did so
+    deliberately, because a one-axis field is what makes the transpose control
+    non-vacuous)
+  - the object-space reference for a finite-object launch, where the launch state
+    is a point rather than a plane
   - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
 adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
 validation_status: environment_verified
