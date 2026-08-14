@@ -113,7 +113,12 @@ levels:
           Optiland-to-coupler OPL convention that M2 did not establish.
       - id: L2-PSF-01
         title: PSF-engineered microscope
-        graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX, C_FIELD_TO_PSF, M_SENSOR_IDEAL]
+        # Amended by CHE-36 (M3.7): the graph terminates at the propagated
+        # ComplexField. PSF extraction is a measurement on that terminal state,
+        # not an edge, and C_FIELD_TO_PSF is no longer a registered coupler.
+        # M_SENSOR_IDEAL stays out of M3 (no pixel integration, no noise model).
+        graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]
+        terminal_measurement: psf
         implemented: false
         blocked_by: >
           Optiland's opd_native sign and reference plane remain unverified (M1

@@ -211,9 +211,12 @@ _SUPPORTED_HANDOFF_PLANES = ("image_surface", "exit_pupil")
 _DEFAULT_HANDOFF_PLANE = "image_surface"
 
 _OPD_WARNING = (
-    "RealRays.opd is preserved in Optiland-native values because its reference "
-    "and sign convention remain unverified; it is regression evidence, not an "
-    "absolute OPL/OPD oracle."
+    "RealRays.opd is preserved in Optiland-native values. CHE-30 established the "
+    "convention -- absolute accumulated optical path in the geometry unit (mm), "
+    "index-weighted, referenced to the ray launch state -- but for an infinite "
+    "object that launch plane is aperture-dependent, so the exported value is a "
+    "piston of order 1e4 waves plus the wavefront. It must not be read as a phase "
+    "without subtracting a declared reference; see conventions.opd_reference."
 )
 
 
@@ -410,6 +413,51 @@ def _resolve_exit_pupil(lens: Any, be_utils: Any, image_plane_z_mm: float) -> di
         "diameter_mm": diameter_mm,
         "is_virtual": bool(beyond),
         "refracting_surfaces_beyond_pupil_z_mm": beyond,
+    }
+
+
+def _resolve_image_space(lens: Any, be_utils: Any, wavelength_um: float) -> dict[str, Any]:
+    """Read the three facts a downstream OPL declaration must not assume.
+
+    CHE-33 needs the image-space index to move an optical path between the traced
+    image surface and any other plane in image space, and needs the entrance pupil
+    diameter because CHE-30 showed the OPL zero of an infinite-object system moves
+    with the aperture.
+
+    Every value is read from the prescription and is ``None`` when the installed
+    package does not expose it. It is not defaulted: ``n = 1`` happens to hold for
+    both M3 systems, and a silent 1.0 for a system with a cover glass or an
+    immersion medium would be a wrong optical path with nothing to notice it by.
+    """
+    import numpy as np
+
+    def _scalar(thunk: Any) -> float | None:
+        # Everything, including the attribute lookup, happens inside the guard:
+        # this runs against fake lenses in the adapter's own failure tests, and a
+        # missing attribute must degrade to "not available" rather than turn an
+        # unrelated structured failure into a crash.
+        try:
+            value = float(np.asarray(be_utils.to_numpy(thunk())).ravel()[0])
+        except Exception:
+            return None
+        return value if np.isfinite(value) else None
+
+    index = _scalar(lambda: lens.surfaces.surfaces[-1].material_pre.n(wavelength_um))
+    entrance_pupil_diameter_mm = _scalar(lambda: lens.paraxial.EPD())
+
+    try:
+        object_at_infinity: bool | None = bool(lens.object_surface.is_infinite)
+    except Exception:
+        object_at_infinity = None
+
+    return {
+        "image_space_refractive_index": index,
+        "entrance_pupil_diameter_m": (
+            entrance_pupil_diameter_mm * _GEOMETRY_M_PER_MM
+            if entrance_pupil_diameter_mm is not None
+            else None
+        ),
+        "object_at_infinity": object_at_infinity,
     }
 
 
@@ -848,6 +896,7 @@ class OptilandAdapter:
                 handoff_plane,
                 exit_pupil,
                 len(lens.surfaces.surfaces) - 1,
+                _resolve_image_space(lens, be_utils, wavelength),
             )
             wavefront_artifact, wavefront_warnings = self._build_wavefront_artifact(
                 request, rays, be_utils, backend_name, sample_name, wavelength, run_dir
@@ -1034,8 +1083,14 @@ class OptilandAdapter:
         handoff_plane: str = _DEFAULT_HANDOFF_PLANE,
         exit_pupil: dict[str, Any] | None = None,
         image_surface_index: int = 14,
+        image_space: dict[str, Any] | None = None,
     ) -> ArtifactRecord:
         import numpy as np
+
+        image_space = image_space or {}
+        image_space_refractive_index = image_space.get("image_space_refractive_index")
+        entrance_pupil_diameter_m = image_space.get("entrance_pupil_diameter_m")
+        object_at_infinity = image_space.get("object_at_infinity")
 
         native = {
             "x": np.asarray(be_utils.to_numpy(rays.x), dtype=np.float64),
@@ -1239,8 +1294,35 @@ class OptilandAdapter:
                     ),
                     "opd_field": "opd_native",
                     "opd_unit": "Optiland native value (geometry-scale mm expected)",
-                    "opd_reference": "unverified",
-                    "opd_sign": "unverified",
+                    # CHE-30 established all four parts of this convention against
+                    # manufactured geometries with closed-form answers, each with the
+                    # competing hypothesis it rules out; M1's "unverified" is
+                    # superseded. Declaring it here does NOT admit opd_native as an
+                    # optical path length: the contract layer still refuses a bundle
+                    # whose OPL was never declared, because the value carried below is
+                    # absolute and its zero moves with the aperture.
+                    "opd_reference": (
+                        "ray launch state, where RealRays seeds the accumulator to "
+                        "zero. For this infinite-object system Optic.trace aims that "
+                        "plane at positions[1] - (EPD - min(positions[1:-1])), so the "
+                        "zero MOVES when the aperture changes -- the value is only "
+                        "meaningful alongside entrance_pupil_diameter_m below."
+                    ),
+                    "opd_sign": (
+                        "non-negative accumulation; larger means longer optical path. "
+                        "standard_surface.py adds be.abs(t * n_pre) per surface, so it "
+                        "never decreases along a purely refractive path."
+                    ),
+                    "opd_quantity": "absolute_accumulated_optical_path_length",
+                    "opd_is_relative_to_chief_ray": False,
+                    "opd_convention_verified_by": "CHE-30",
+                    "entrance_pupil_diameter_m": entrance_pupil_diameter_m,
+                    "object_at_infinity": object_at_infinity,
+                    # Read from the prescription, not assumed. A consumer moving an
+                    # optical path between the image surface and any other plane in
+                    # image space needs this index, and "it is air" is a property of
+                    # these two systems rather than of lenses.
+                    "image_space_refractive_index": image_space_refractive_index,
                     "polarization": "missing; RealRays provides no polarization state",
                     "coherence": "missing; sequential rays are not a coherent complex field",
                     "normalization": "raw Optiland ray intensity/weight; not normalized",

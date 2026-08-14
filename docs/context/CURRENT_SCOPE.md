@@ -12,10 +12,21 @@
 M_RAY_OPTILAND
   -> C_RAY_TO_WAVE
   -> M_WAVE_CHROMATIX
-  -> C_FIELD_TO_PSF
+  -> ComplexField          (terminal physical state; the graph ends here)
+
+then, outside the graph:
+  PSF measurement / observable on the terminal field
 ```
 
-`C_FIELD_TO_PSF` may remain a small local operation inside the Chromatix adapter during the first forward slice. Promote it only when another model needs the same contract.
+Amended by CHE-36 (M3.7). The graph terminates at the propagated `ComplexField`. PSF extraction is a **measurement**, not a coupler, and `C_FIELD_TO_PSF` has been removed from the registry.
+
+The distinction is the one the architecture rests on:
+
+- **Models** evolve physical state.
+- **Couplers** perform physically meaningful cross-representation or cross-model handoffs. `C_RAY_TO_WAVE` is one: `RayBundle -> ComplexField`, carrying assumptions about OPL reference, phase sign, amplitude weighting, sampling and handoff plane — which is why it can refuse a request.
+- **Measurements / observables** extract quantities such as a PSF from the terminal state. `ComplexField -> |U|^2` changes no representation and consults no convention it does not already hold.
+
+Do not add a coupler solely so a graph terminates in a particular artifact type. PSF extraction lives in `src/multiscale_optics_agent/evaluation/psf_measurement.py` and runs after the graph.
 
 ## Required Inputs
 

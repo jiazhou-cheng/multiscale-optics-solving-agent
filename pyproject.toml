@@ -43,6 +43,12 @@ wave = [
   "jaxtyping>=0.3.7",
   "chromatix @ git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
   "fmmax>=1.7.1",
+  # Declared by CHE-37 (M3.8). evaluation/psf_oracles.py needs scipy.special.j1
+  # for the analytic Airy pattern. It was already present transitively -- jax,
+  # chromatix and optiland each require it, and docker/requirements.txt pins
+  # 1.15.3 -- but a verification oracle should not rest on a dependency this
+  # project never declared.
+  "scipy>=1.10",
 ]
 em = [
   "jax>=0.6.2",

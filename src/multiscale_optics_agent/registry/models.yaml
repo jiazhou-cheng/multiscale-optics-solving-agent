@@ -17,7 +17,19 @@ models:
     outputs:
       - name: rays
         artifact: ray_bundle
-        provides_metadata: [wavelength, coordinates, direction, amplitude, polarization]
+        # CHE-34 (M3.5) closes the CONTRACT GAP recorded under validity below.
+        # `amplitude` and `polarization` were claimed and never written: RealRays
+        # exposes a real intensity weight and no polarization state at all. This
+        # list is now what the adapter actually puts in the record.
+        provides_metadata:
+          [
+            wavelength,
+            coordinates,
+            direction,
+            intensity_weight,
+            optical_path_length_native,
+            reference_plane,
+          ]
       - name: wavefront
         artifact: wavefront_samples
         provides_metadata:
@@ -44,24 +56,24 @@ models:
         - >-
           CHE-12 verified Optiland 0.6.0 geometry in millimetres and
           wavelength in micrometres on CPU. Convert both to SI at artifact
-          boundaries. The `opd` reference convention remains unverified.
+          boundaries. CHE-30 established the `opd` convention -- absolute
+          accumulated optical path in mm, referenced to an aperture-dependent
+          launch plane -- and CHE-33 declares it into an OPL; the raw value is
+          still not admissible as a phase on its own.
         - >-
-          CONTRACT GAP found 2026-07-30 building
-          src/multiscale_optics_agent/adapters/optiland_adapter.py:
-          optiland.rays.real_rays.RealRays (pinned 0.6.0) exposes only
-          x, y, z, L, M, N, intensity, opd -- no polarization state and no
-          pupil mask. This adapter therefore does NOT populate
-          "polarization"/"pupil_mask" in its output ArtifactRecord.metadata
-          even though both ports declare them in provides_metadata (kept
-          unchanged here only because C_RAY_TO_WAVE.source.requires_metadata
-          already depends on "polarization" and examples/graphs/ray_to_wave.yaml
-          + tests/test_graph_validation.py assert that edge validates).
-          This is a pre-existing contract mismatch, not introduced by this
-          adapter -- resolve during the ray_wave/ray_ewave bridge audit
-          (decide whether to synthesize an explicit
-          unpolarized/scalar placeholder, or narrow both port and coupler
-          contracts) rather than silently declaring metadata this adapter
-          cannot produce.
+          CONTRACT GAP found 2026-07-30, RESOLVED by CHE-34 (M3.5) for the
+          `rays` port. optiland.rays.real_rays.RealRays (pinned 0.6.0) exposes
+          only x, y, z, L, M, N, intensity, opd -- no polarization state and no
+          pupil mask -- and the adapter never populated "amplitude" or
+          "polarization" despite the port declaring them. The declarations were
+          kept while C_RAY_TO_WAVE.source.requires_metadata depended on them,
+          which meant the M3 edge validated only because producer and consumer
+          were both describing something that does not exist. Both lists were
+          narrowed to what is actually written, and the coupler now states the
+          declarations it needs on the edge instead. The `wavefront` port below
+          is UNCHANGED and still overclaims "amplitude"/"polarization"/
+          "pupil_mask"; it is not on the M3 path, and narrowing a port nothing
+          in M3 executes would be an unverified change.
     cost_model:
       scaling: O(number_of_surfaces * number_of_rays)
       memory_scaling: O(number_of_rays)

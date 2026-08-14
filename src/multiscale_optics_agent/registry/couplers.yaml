@@ -1,17 +1,37 @@
 couplers:
   - id: C_RAY_TO_WAVE
-    version: 0.1.0
+    version: 0.2.0
     description: Reconstruct a sampled complex pupil/wavefront field from ray amplitudes and optical path lengths.
     framework: internal
     source:
-      name: rays_or_wavefront
-      artifact: wavefront_samples
-      # CHE-23: `polarization` was removed from requires_metadata. The Optiland
-      # adapter documents that RealRays exposes no polarization state and
-      # deliberately refuses to fabricate one, so a required field nobody can
-      # supply was a contract defect rather than a safety feature. M2 is
-      # scalar-only; reinstate when a vector claim is made.
-      requires_metadata: [wavelength, coordinates, optical_path_length, amplitude]
+      # CHE-34 (M3.5): was `rays_or_wavefront` / `wavefront_samples`, and both
+      # halves of that were wrong. The implemented physics is a sum of plane
+      # WAVELETS, so it needs a direction per sample; `WavefrontSamples` carries
+      # (N, 2) pupil coordinates and no directions at all, so it could never have
+      # been an admissible input. The hedged port name was hiding that. Version
+      # bumped to 0.2.0 because this changes the artifact type of the port.
+      name: ray_bundle
+      artifact: ray_bundle
+      # CHE-23: `polarization` was removed. The Optiland adapter documents that
+      # RealRays exposes no polarization state and deliberately refuses to
+      # fabricate one, so a required field nobody can supply was a contract
+      # defect rather than a safety feature. M2 is scalar-only; reinstate when a
+      # vector claim is made.
+      #
+      # CHE-34: `amplitude` and `optical_path_length` were likewise removed from
+      # this list, and this is the substantive change. No ray model in this
+      # repository provides either one: Optiland emits a real intensity weight
+      # and an absolute accumulated opd whose zero moves with the aperture.
+      # Requiring them here made the edge validate only because the producer
+      # claimed metadata it does not write. What the coupler actually needs from
+      # the RECORD is below; what it needs beyond the record is a declaration
+      # supplied on the edge, and it refuses rather than defaults -- see
+      # validity.assumptions.
+      requires_metadata: [wavelength, coordinates, direction, reference_plane]
+      description: >
+        A traced ray bundle. Coherent input is accepted directly; an undeclared
+        one is promoted only under an explicit edge declaration and is otherwise
+        refused with OPL_REFERENCE_UNVERIFIED.
     target:
       name: complex_field
       artifact: complex_field
@@ -27,9 +47,18 @@ couplers:
         - Rays adequately sample the pupil and represent a locally single-valued wavefront.
         - Amplitude reconstruction and reference sphere are explicitly defined.
         - >
-          The optical path length carries a declared reference. Optiland's
-          opd_native is not admissible: M1 recorded its sign and reference as
-          unverified, and a wrong sign conjugates the wavefront.
+          The optical path length carries a declared reference. A bare Optiland
+          opd_native is not admissible: it is an absolute accumulated path whose
+          zero moves with the aperture (CHE-30), and a wrong sign conjugates the
+          wavefront.
+        - >
+          CHE-34: two declarations must be supplied ON THE EDGE when the source
+          record is not already coherent -- the handoff plane (kind and axial
+          position) and, through it, the OPL reference and the
+          intensity-to-amplitude map. They are configuration, not defaults: a
+          request that omits them is refused with OPL_REFERENCE_UNVERIFIED and a
+          remedy naming what is missing. See
+          src/multiscale_optics_agent/couplers/optiland_handoff.py.
       warnings:
         - Caustics, multi-valued phase, hard vignetting, and sparse rays can invalidate interpolation.
         - >
@@ -191,32 +220,32 @@ couplers:
     maturity: experimental
     tags: [metasurface, rcwa_wave]
 
-  - id: C_FIELD_TO_PSF
-    version: 0.1.0
-    description: Convert a coherent field or field ensemble at an image plane into a normalized point-spread function.
-    framework: jax
-    source:
-      name: image_field
-      artifact: complex_field
-      requires_metadata: [wavelength, sample_pitch, coordinate_frame, phasor, normalization]
-    target:
-      name: psf
-      artifact: psf
-      provides_metadata: [sample_pitch, normalization, coherence_model]
-    derivative:
-      mode: native_autodiff
-      verified: false
-      parameters: ["*"]
-    validity:
-      assumptions:
-        - Coherent/incoherent and polarization aggregation are explicitly selected.
-    cost_model:
-      scaling: O(number_of_pixels * number_of_modes)
-      memory_scaling: O(number_of_pixels)
-    lossy: true
-    invariants: [nonnegative_intensity, declared_psf_normalization]
-    maturity: experimental
-    tags: [psf, imaging]
+  # C_FIELD_TO_PSF was removed here by CHE-36 (M3.7). It is NOT a registered
+  # coupler and must not be reintroduced as one.
+  #
+  # The reason is categorical, not that `|U|^2` is cheap. A coupler performs a
+  # physically meaningful cross-representation or cross-model handoff:
+  # C_RAY_TO_WAVE turns a RayBundle into a ComplexField and carries real
+  # semantics for OPL reference, phase sign, amplitude weighting, sampling and
+  # handoff plane -- which is why it can refuse. `ComplexField -> |U|^2` changes
+  # no representation and consults no convention it does not already hold; it is
+  # a MEASUREMENT of the terminal simulated field. Registering it here put a
+  # trivial observable in the same category as a physical handoff.
+  #
+  # It also could not be deprecated in place. CouplerSpec requires `framework`
+  # and `derivative.mode`, and Framework has no `none`, so any surviving entry
+  # keeps asserting a framework and a differentiation mode for numerics that do
+  # not exist. The retired entry claimed `framework: jax` and
+  # `derivative.mode: native_autodiff` with nothing behind either; both existed
+  # only to fill out the abstraction. Gradients are out of M3 scope entirely.
+  #
+  # Where it went: PSF extraction is a measurement in
+  # src/multiscale_optics_agent/evaluation/psf_measurement.py, over the existing
+  # contracts.PSF primitive, run after the graph by the benchmark driver. Its two
+  # declared invariants survive as executed checks with the same names --
+  # `nonnegative_intensity` and `declared_psf_normalization` -- enforced by
+  # PSF.__post_init__ rather than by an edge. The M3 graph terminates at the
+  # propagated ComplexField, which is the last physical state the slice evolves.
 
   - id: C_ABSORPTION_TO_HEAT
     version: 0.1.0

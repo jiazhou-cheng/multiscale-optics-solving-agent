@@ -143,6 +143,41 @@ _SUPPORTED_PROPAGATION = "angular_spectrum"
 _EXPECTED_PHASOR = "exp(-i omega t)"
 _SUPPORTED_DTYPES = {"complex64", "complex128"}
 
+# CHE-35 (M3.6). Chromatix declares no time convention, so M1 recorded the
+# phasor as forwarded-but-unchecked and the adapter warned rather than acted.
+# The convention is now established by measurement rather than by reading source:
+# a converging spherical wave written under this project's declaration --
+# exp(-i omega t) in time with exp(+i k z) in space, i.e. pupil field
+# exp(-i k sqrt(rho^2 + R^2)) -- focuses under asm_propagate, reaching 0.990 of
+# the analytic Airy peak (pi a^2 / (lambda R))^2, while its complex conjugate
+# does not (peak ratio 1008x, and off axis). See
+# knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py.
+#
+# Because the sign is now known, a mismatched input phasor is refused rather than
+# forwarded: for a converging pupil field it is the difference between focusing
+# and defocusing, and nothing downstream could tell the two apart.
+_CHROMATIX_SPATIAL_FACTOR = "exp(+i k_z z) for z > 0"
+_PHASOR_ESTABLISHED_BY = (
+    "CHE-35 (M3.6), knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json"
+)
+
+_PROPAGATION_METHODS = ("asm_propagate", "asm_carrier_removed")
+_DEFAULT_PROPAGATION_METHOD = "asm_propagate"
+
+# Absolute tolerance, in metres, on agreement between a declared target plane and
+# the propagation distance. 1 pm: both come from the same float64 protocol
+# literals, so any real disagreement is a modelling error, not round-off.
+_PLANE_TOLERANCE_M = 1.0e-12
+
+# Above this fraction of |u|^2 on the one-pixel border, the sampled window is
+# truncating the field and any power or second-moment metric on it is
+# window-limited. Reported as a diagnostic, never as a pass/fail gate on its own:
+# CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 relative
+# intensity error from wraparound and a correctly padded one, so it is a weak
+# wraparound indicator and the padding decision is made against a float64
+# reference instead.
+_EDGE_ENERGY_REPORTING_THRESHOLD = 0.05
+
 # ---------------------------------------------------------------------------
 # CHE-14 standalone wave baseline constants
 # ---------------------------------------------------------------------------
@@ -358,6 +393,21 @@ class _BaselineError(Exception):
         self.failure = ChromatixWaveFailure(
             code=code, message=message, stage=stage, exception_type=exception_type
         )
+
+
+class WaveHandoffError(RuntimeError):
+    """A declared boundary condition of the propagation does not hold.
+
+    CHE-35. Distinct from ``SolverExecutionError``, which means Chromatix ran and
+    failed: these are refusals made *before* any solver call, on a declaration
+    that would otherwise produce a plausible field at the wrong place or with the
+    wrong sign. Carried as an exception rather than a sentinel so no code path can
+    mistake a refusal for a result; ``run()`` converts it to a structured failure.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def _installed_chromatix_provenance() -> tuple[str | None, str | None, list[str]]:
@@ -1181,13 +1231,35 @@ class ChromatixAdapter:
                     )
                 )
 
-        if "z_m" not in request.config:
+        if "z_m" not in request.config and "target_plane_z_m" not in request.config:
             issues.append(
                 ValidationIssue(
                     severity=Severity.ERROR,
                     code="CHROMATIX_MISSING_CONFIG",
-                    message="config['z_m'] (propagation distance in meters) is required.",
+                    message=(
+                        "config['z_m'] (propagation distance in metres) or "
+                        "config['target_plane_z_m'] (absolute target plane, from which the "
+                        "distance is derived against the input field's own plane) is required."
+                    ),
                     location="config.z_m",
+                )
+            )
+        if input_record is not None and input_record.metadata.get("phasor") not in (
+            None,
+            _EXPECTED_PHASOR,
+        ):
+            issues.append(
+                ValidationIssue(
+                    severity=Severity.ERROR,
+                    code="CHROMATIX_PHASOR_MISMATCH",
+                    message=(
+                        f"input phasor {input_record.metadata.get('phasor')!r} is not the "
+                        f"project canonical {_EXPECTED_PHASOR!r}. CHE-35 established that "
+                        f"Chromatix's ASM implements {_CHROMATIX_SPATIAL_FACTOR}, so a "
+                        "mismatched field focuses in the wrong direction rather than being "
+                        "merely mislabelled."
+                    ),
+                    location="inputs.input_field.metadata.phasor",
                 )
             )
 
@@ -1264,6 +1336,16 @@ class ChromatixAdapter:
             return self._run_asm_propagate(request, jax, jnp, cf, compute_padding_transfer)
         except (AdapterDependencyError, UnsupportedCapabilityError):
             raise
+        except WaveHandoffError as exc:
+            # A declared boundary condition failed. Structured refusal, never a
+            # field: a wrong plane or a wrong phasor produces output that looks
+            # entirely ordinary, so silence here is the dangerous option.
+            return ModelRunResult(
+                status=RunStatus.FAILED,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+                diagnostics={"code": exc.code, "stage": "wave_handoff_validation"},
+            )
         except Exception as exc:
             return ModelRunResult(
                 status=RunStatus.FAILED,
@@ -1307,28 +1389,67 @@ class ChromatixAdapter:
             )
 
         warnings: list[str] = []
+
+        # CHE-35: the complex64 cast used to be a warning string. It is a number,
+        # and the number is what the tolerance budget needs, so it is measured on
+        # the field actually being propagated rather than described.
+        truncation: dict[str, Any] | None = None
         if str(u_in.dtype) == "complex128":
-            warnings.append(
-                "input array dtype is complex128, but "
-                "chromatix.core.field.ScalarField.__init__ unconditionally casts to "
-                "complex64 (`jnp.asarray(u, dtype=jnp.complex64)`); precision beyond "
-                "complex64 will be silently lost inside Chromatix itself. "
-                "See KNOWN_REGISTRY_DISCREPANCIES in this module."
-            )
+            cast_back = u_in.astype(np.complex64).astype(np.complex128)
+            reference_norm = float(np.linalg.norm(u_in))
+            intensity_norm = float(np.linalg.norm(np.abs(u_in) ** 2))
+            truncation = {
+                "cause": (
+                    "chromatix.core.field.ScalarField.__init__ casts unconditionally to "
+                    "complex64 (`jnp.asarray(u, dtype=jnp.complex64)`), so a complex128 "
+                    "input is downcast inside Chromatix itself."
+                ),
+                "relative_field_error": (
+                    float(np.linalg.norm(cast_back - u_in) / reference_norm)
+                    if reference_norm
+                    else 0.0
+                ),
+                "relative_intensity_error": (
+                    float(
+                        np.linalg.norm(np.abs(cast_back) ** 2 - np.abs(u_in) ** 2) / intensity_norm
+                    )
+                    if intensity_norm
+                    else 0.0
+                ),
+                "scope": (
+                    "the input cast only. It does not include the transfer-function "
+                    "rounding, which depends on the represented phase and therefore on "
+                    "propagation_method -- see propagation_method below."
+                ),
+            }
 
         wavelength_m = float(input_record.metadata["wavelength"])
         pitch_y_m, pitch_x_m = _pitch_to_pair(input_record.metadata["sample_pitch"])
         phasor = input_record.metadata.get("phasor")
         if phasor != _EXPECTED_PHASOR:
-            warnings.append(
+            raise WaveHandoffError(
+                "CHROMATIX_PHASOR_MISMATCH",
                 f"input phasor metadata {phasor!r} is not the project canonical "
-                f"{_EXPECTED_PHASOR!r} (repository scientific conventions). Chromatix declares no "
-                "explicit time convention (see conventions.md); this adapter does "
-                "not attempt a sign correction and forwards the field unchanged."
+                f"{_EXPECTED_PHASOR!r}. CHE-35 established that Chromatix's ASM implements "
+                f"{_CHROMATIX_SPATIAL_FACTOR}, which is this project's declared spatial "
+                "factor, so the sign is no longer unknown and forwarding a mismatched "
+                "field unchanged is not a neutral act: for a converging pupil field it is "
+                "the difference between focusing and defocusing, and no downstream check "
+                "distinguishes them. Re-express the field under the project convention, or "
+                "conjugate it deliberately and say so in its metadata.",
             )
 
         refractive_index = float(config.get("refractive_index", 1.0))
-        z_m = float(config["z_m"])
+
+        propagation_method = str(config.get("propagation_method", _DEFAULT_PROPAGATION_METHOD))
+        if propagation_method not in _PROPAGATION_METHODS:
+            raise WaveHandoffError(
+                "CHROMATIX_UNSUPPORTED_PROPAGATION_METHOD",
+                f"config['propagation_method']={propagation_method!r} is not one of "
+                f"{list(_PROPAGATION_METHODS)!r}.",
+            )
+
+        z_m = self._resolve_propagation_distance(config, input_record)
 
         pad_width = config.get("pad_width")
         if pad_width is None:
@@ -1354,7 +1475,27 @@ class ChromatixAdapter:
             jnp.asarray([[pitch_y_m, pitch_x_m]]),
             wavelength_m,
         )
-        field_out = cf.asm_propagate(field_in, z=z_m, n=refractive_index, pad_width=pad_width)
+        removed_carrier_phase_rad: float | None = None
+        if propagation_method == "asm_carrier_removed":
+            # CHE-40's kernel, over Chromatix's own FFTs, padding, frequency grid
+            # and evanescent policy. Required by benchmarks/slice_protocol.yaml for
+            # any phase-insensitive M3 PSF path; the field's ABSOLUTE phase is not
+            # physical afterwards, which the output metadata states.
+            from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+                carrier_removed_asm_propagate,
+            )
+
+            propagation = carrier_removed_asm_propagate(
+                field_in,
+                z_m=z_m,
+                refractive_index=refractive_index,
+                pad_width=pad_width,
+                wavelength_m=wavelength_m,
+            )
+            field_out = propagation.field
+            removed_carrier_phase_rad = propagation.removed_carrier_phase_rad
+        else:
+            field_out = cf.asm_propagate(field_in, z=z_m, n=refractive_index, pad_width=pad_width)
 
         u_out = np.asarray(jax.device_get(field_out.u))
         dx_out = tuple(
@@ -1384,12 +1525,20 @@ class ChromatixAdapter:
                 "it is not a calibrated SI radiometric power (W) unless the input "
                 "amplitude already carried that convention."
             ),
-            "propagation_method": "asm_propagate",
+            "propagation_method": propagation_method,
             "z_m": z_m,
             "refractive_index": refractive_index,
             "pad_width": pad_width,
             "padded": tuple(u_out.shape) != tuple(u_in.shape),
             "input_shape": tuple(int(s) for s in u_in.shape),
+            "source_plane_z_m": input_record.metadata.get("z_m"),
+            "source_reference_plane": input_record.metadata.get("reference_plane"),
+            # CHE-40's policy, surfaced on the artifact rather than left in the
+            # calling code: the removed exp(i k z) is recorded in float64 and never
+            # folded back, so no consumer may read absolute optical phase off this
+            # field. None on the absolute path, where the phase is physical.
+            "removed_carrier_phase_rad": removed_carrier_phase_rad,
+            "absolute_phase_is_physical": removed_carrier_phase_rad is None,
         }
 
         output_record = ArtifactRecord(
@@ -1405,10 +1554,62 @@ class ChromatixAdapter:
             metadata=output_metadata,
         )
 
+        input_edge_energy = self._edge_energy_fraction(u_in)
+        output_edge_energy = self._edge_energy_fraction(u_out)
+        if max(input_edge_energy, output_edge_energy) > _EDGE_ENERGY_REPORTING_THRESHOLD:
+            warnings.append(
+                f"edge-energy fraction is {max(input_edge_energy, output_edge_energy):.3g}, "
+                f"above the {_EDGE_ENERGY_REPORTING_THRESHOLD:.2g} reporting threshold: the "
+                "sampled window is truncating the field, so power and second-moment "
+                "metrics taken on this grid are window-limited."
+            )
+
         diagnostics = {
+            # CHE-36 (M3.7). The graph path wrote dx_out onto the output artifact's
+            # `sample_pitch` and reported it nowhere else, so a consumer had nothing
+            # to check that metadata against -- reading the artifact and calling it
+            # verified is circular. The downstream PSF measurement takes its axes
+            # from this pitch, and taking the INPUT pupil pitch instead rescales
+            # every distance it reports while leaving the intensity map plausible,
+            # so the two are now stated separately and can be compared. The
+            # baseline path has reported both since M1; this makes the graph path
+            # symmetric with it.
+            "input_sample_pitch_m": [pitch_y_m, pitch_x_m],
+            "output_sample_pitch_m": list(dx_out),
+            "sample_pitch_unchanged": bool(
+                len(dx_out) == 2
+                and np.isclose(dx_out[0], pitch_y_m, rtol=1e-6)
+                and np.isclose(dx_out[1], pitch_x_m, rtol=1e-6)
+            ),
             "power_in": power_in,
             "power_out": power_out,
             "power_conservation_ratio": (power_out / power_in) if power_in else None,
+            "power_accounting": (
+                "the ASM transfer function is unit-modulus wherever k_z is real, and on a "
+                "grid with pitch > lambda/2 there are no evanescent bins, so total power "
+                "over the INFINITE plane is conserved exactly -- M2 measured 1.0000000000 "
+                "for a pure-phase DOE on that basis. The ratio above is taken on the "
+                "sampled window, so any deficit is power that left the window, not power "
+                "the propagation destroyed. On an unpadded run the same ratio reads 1.0 "
+                "because wraparound recirculates that power, which is why a ratio of 1.0 "
+                "here is not evidence of correctness."
+            ),
+            "input_edge_energy_fraction": input_edge_energy,
+            "output_edge_energy_fraction": output_edge_energy,
+            "edge_energy_reporting_threshold": _EDGE_ENERGY_REPORTING_THRESHOLD,
+            "edge_energy_is_a_weak_wraparound_indicator": (
+                "CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 "
+                "relative intensity error from wraparound and a correctly padded one. Use "
+                "it to notice window truncation, not to certify padding."
+            ),
+            "propagation_method": propagation_method,
+            "complex64_input_truncation": truncation,
+            "phasor_convention": {
+                "input": phasor,
+                "chromatix_spatial_factor": _CHROMATIX_SPATIAL_FACTOR,
+                "status": "established",
+                "established_by": _PHASOR_ESTABLISHED_BY,
+            },
             "chromatix_pinned_version": self.spec.source.pinned_version
             if self.spec.source
             else None,
@@ -1429,6 +1630,53 @@ class ChromatixAdapter:
             diagnostics=diagnostics,
             warnings=warnings,
         )
+
+    @staticmethod
+    def _resolve_propagation_distance(
+        config: dict[str, Any], input_record: ArtifactRecord
+    ) -> float:
+        """The distance, checked against the two planes rather than taken on trust.
+
+        CHE-35 AC6. The slice propagates from a declared exit pupil to a declared
+        focus, and both planes are recorded -- the source plane on the incoming
+        field's own metadata, the target on the edge. When the target is declared,
+        the distance is *derived* from the pair, so a mismatch with an explicitly
+        supplied ``z_m`` is a structured refusal instead of a silent defocus. A
+        0.13 mm disagreement of exactly this kind was 0.311 waves of defocus on
+        M3-SINGLET-REF (CHE-33, amendment A2), which is 300x the tightest gate in
+        the budget and would have been charged to the slice.
+        """
+        target_plane_z_m = config.get("target_plane_z_m")
+        declared_z_m = config.get("z_m")
+
+        if target_plane_z_m is None:
+            if declared_z_m is None:
+                raise WaveHandoffError(
+                    "CHROMATIX_MISSING_PROPAGATION_DISTANCE",
+                    "config requires either 'z_m' or 'target_plane_z_m'.",
+                )
+            return float(declared_z_m)
+
+        source_plane_z_m = input_record.metadata.get("z_m")
+        if source_plane_z_m is None:
+            raise WaveHandoffError(
+                "CHROMATIX_SOURCE_PLANE_UNDECLARED",
+                "config['target_plane_z_m'] was supplied, but the input field declares no "
+                "z_m of its own, so the propagation distance between the two planes cannot "
+                "be formed. A coupler-produced ComplexField always declares it.",
+            )
+        derived = float(target_plane_z_m) - float(source_plane_z_m)
+        if declared_z_m is not None and abs(float(declared_z_m) - derived) > _PLANE_TOLERANCE_M:
+            raise WaveHandoffError(
+                "CHROMATIX_PROPAGATION_DISTANCE_MISMATCH",
+                f"config['z_m']={float(declared_z_m)!r} m disagrees with the distance implied "
+                f"by the declared planes: target {float(target_plane_z_m)!r} m minus the input "
+                f"field's own reference plane {float(source_plane_z_m)!r} m = {derived!r} m "
+                f"(offset {abs(float(declared_z_m) - derived):.6e} m). An axial disagreement "
+                "between the plane a field is on and the distance it is propagated is a "
+                "defocus, not a piston. Fix the declaration; do not widen the tolerance.",
+            )
+        return derived
 
     @staticmethod
     def _load_complex_array(record: ArtifactRecord) -> np.ndarray[Any, Any]:

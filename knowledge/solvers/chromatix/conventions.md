@@ -75,14 +75,46 @@ sqrt(1 - (wavelength/n)^2 * |f_grid - kykx|^2)`. Plane waves are generated as
 This is the standard `exp(+i k.r)` spatial convention. Chromatix has no
 explicit time dependence in its `Field` representation (fields are
 snapshots at a plane, not functions of time), so it does not itself declare
-a `exp(-i omega t)` vs. `exp(+i omega t)` time convention. Combined with
-`exp(+i k.r)`, it is **consistent with** this project's canonical
-`exp(-i omega t)` phasor convention (repository scientific conventions) under the usual
-identification of a forward-traveling wave, but this has not been
-cross-checked against a second solver (e.g. FDTDX) in this repository. Any
-coupler joining Chromatix to a solver with an explicit time convention must
-verify sign agreement with a manufactured traveling-wave test, not assume
-it from this note.
+a `exp(-i omega t)` vs. `exp(+i omega t)` time convention.
+
+### Established by measurement (CHE-35, M3.6)
+
+Reading the kernel source tells you what Chromatix computes, not whether a
+field written under *this project's* declaration will focus in it. That is now
+settled by a manufactured test rather than by the "consistent with" argument
+this section used to make.
+
+Probe: `knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py`; recorded
+output: `knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json`;
+regression tests: `tests/test_m3_pupil_to_focus.py`.
+
+Under `exp(-i omega t)` with `exp(+i k z)`, a wave converging to a focus a
+distance `R` downstream has pupil field `exp(-i k sqrt(rho^2 + R^2))`, because
+the optical path still to travel is longest at the pupil edge. Both that field
+and its complex conjugate were propagated by `+R` through
+`asm_propagate`. Exactly one must concentrate, and it is not inferable which:
+
+| field | peak on axis | peak intensity | concentration vs input |
+|---|---|---|---|
+| `exp(-i k sqrt(rho^2 + R^2))` (project convention) | **yes** | 4943 | 4943x |
+| its conjugate | no | 4.90 | 4.9x |
+
+Peak ratio 1008x. The converging case also reaches **0.990** of the analytic
+Airy peak `(pi a^2 / (lambda R))^2` for a clear circular aperture, so the test
+pins the geometry as well as the sign.
+
+**Established:** `asm_propagate` implements `exp(+i k_z z)` for `z > 0`, which
+is this project's declared spatial factor. A field written under
+`exp(-i omega t)` / `exp(+i k z)` focuses; its conjugate does not.
+
+Consequence in the adapter: a mismatched input `phasor` is now a **structured
+refusal** (`CHROMATIX_PHASOR_MISMATCH`), not a warning. For a converging pupil
+field the two conventions differ by focusing versus defocusing, and no
+downstream metric distinguishes them.
+
+Still not established: agreement with a second solver that declares an explicit
+time convention (e.g. FDTDX). Any coupler joining those two must verify sign
+agreement with its own manufactured traveling-wave test.
 
 `chromatix.functional.fft`/`ifft` wrap plain `jnp.fft.fft2`/`ifft2` (NumPy's
 default normalization: unnormalized forward FFT, `1/N` on the inverse), with

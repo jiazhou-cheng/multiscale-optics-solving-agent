@@ -93,9 +93,22 @@ class ContractCode(StrEnum):
     EMPTY_ENSEMBLE = "EMPTY_ENSEMBLE"
     AMPLITUDE_IS_A_WEIGHT = "AMPLITUDE_IS_A_WEIGHT"
     OPL_REFERENCE_UNVERIFIED = "OPL_REFERENCE_UNVERIFIED"
+    #: The plane an artifact was produced on is not the plane the consumer
+    #: declared. Distinct from FRAME_MISMATCH, which is about axes rather than
+    #: position: two planes can share a frame and still be metres apart, and a
+    #: silently accepted offset is a defocus, not a piston.
+    REFERENCE_PLANE_MISMATCH = "REFERENCE_PLANE_MISMATCH"
     PAD_STATE_UNKNOWN = "PAD_STATE_UNKNOWN"
     NEGATIVE_INTENSITY = "NEGATIVE_INTENSITY"
     ARTIFACT_KIND_MISMATCH = "ARTIFACT_KIND_MISMATCH"
+    #: The sample pitch an artifact declares is not the pitch its producer
+    #: actually output. Added by CHE-36 (M3.7) for the PSF measurement, which must
+    #: take its axes from the propagated field's OUTPUT pitch: a measurement that
+    #: silently reads the input pupil pitch instead still produces a plausible
+    #: intensity map, and every angular comparison drawn on it is rescaled by a
+    #: constant nobody can see. Distinct from SHAPE_MISMATCH, which is about array
+    #: extent rather than the physical size of a sample.
+    SAMPLE_PITCH_MISMATCH = "SAMPLE_PITCH_MISMATCH"
 
 
 class ContractError(ValueError):
@@ -480,6 +493,17 @@ class RayBundle:
             optical_path_length_m=np.asarray(optical_path_length_m, dtype=np.float64),
             optical_path_length_reference=reference,
         )
+
+    def with_provenance(self, **entries: Any) -> RayBundle:
+        """Return a copy carrying additional provenance entries.
+
+        Declarations made by a bridge -- which reference plane the OPL was moved
+        to, which reference ray its piston was removed against, what the weight
+        was assumed to mean -- have to travel with the bundle. Without this they
+        would have to be threaded through every call site as loose arguments,
+        which is how a declaration and the array it describes drift apart.
+        """
+        return self._replace(provenance={**self.provenance, **entries})
 
     def _replace(self, **changes: Any) -> RayBundle:
         current = {
@@ -1017,7 +1041,24 @@ class PSF:
             )
 
     @classmethod
-    def from_complex_field(cls, field_: ComplexField, *, normalization: str) -> PSF:
+    def from_complex_field(
+        cls,
+        field_: ComplexField,
+        *,
+        normalization: str,
+        coherence_model: str | None = None,
+    ) -> PSF:
+        """Reduce a field to its intensity. The one place ``|u|^2`` is taken.
+
+        ``coherence_model`` was added by CHE-36 (M3.7): the slice is monochromatic
+        and fully coherent, and M3.8 compares against oracles that assume exactly
+        that, so the caller states it rather than inheriting the class default
+        silently. Omitting it keeps the previous behaviour.
+
+        The pitch is taken from the field, so a PSF's axes are only as correct as
+        the pitch the producing adapter declared. For a propagated field that must
+        be the OUTPUT pitch; see ``evaluation.psf_measurement``, which checks it.
+        """
         return cls(
             intensity=np.abs(field_.u) ** 2,
             sample_pitch_m=field_.sample_pitch_m,
@@ -1025,6 +1066,7 @@ class PSF:
             normalization=normalization,
             frame=field_.frame,
             provenance={"from_field": field_.provenance.get("source_artifact_id")},
+            **({} if coherence_model is None else {"coherence_model": coherence_model}),
         )
 
     def to_artifact_record(self, *, artifact_id: str, uri: str | Path) -> ArtifactRecord:

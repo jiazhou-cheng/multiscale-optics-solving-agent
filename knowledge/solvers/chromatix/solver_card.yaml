@@ -84,7 +84,65 @@ known_defective:
     thick_plano_convex_lens is implemented through an ABCD matrix and
     ray_transfer, not a surface-resolved wave-optical prescription; it is
     deliberately not used as a wave benchmark case.
+# CHE-35 (M3.6). The wave leg of the M3 slice: a real reconstructed pupil field
+# propagated to focus, with the two things the adapter used to describe in prose
+# replaced by measurements.
+m3_pupil_to_focus:
+  status: verified
+  verified_by: CHE-35 (M3.6)
+  probe: knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py
+  evidence: knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json
+  tests: tests/test_m3_pupil_to_focus.py
+  phasor_convention:
+    status: established        # was: consistent_with, argued from kernel source
+    spatial_factor: exp(+i k_z z) for z > 0
+    method: >-
+      a converging spherical wave written under exp(-i omega t) / exp(+i k z),
+      i.e. pupil field exp(-i k sqrt(rho^2 + R^2)), propagated by +R alongside its
+      complex conjugate as the control. Exactly one must concentrate.
+    measured:
+      converging_peak_on_axis: true
+      converging_over_diverging_peak_ratio: 1007.9
+      analytic_airy_peak_agreement: 0.990   # against (pi a^2 / (lambda R))^2
+    adapter_consequence: >-
+      a mismatched input phasor is now CHROMATIX_PHASOR_MISMATCH, a structured
+      refusal, not a warning. For a converging pupil field the two conventions
+      differ by focusing versus defocusing.
+  complex64_cast:
+    status: measured           # was: a warning string
+    input_cast_only_relative_field_error: 2.54e-8
+    end_to_end_relative_intensity_l2:
+      carrier_conditioned: 4.12e-7
+      absolute_carrier: 6.05e-5
+    method_note: >-
+      padding held identical on both sides. The first version of this probe
+      compared a padded Chromatix run against an unpadded float64 reference and
+      reported 6.1e-1 for an effect predicted at 6.6e-3; the number was measuring
+      padding, not dtype.
+  padding:
+    declared: chromatix.functional.compute_padding_transfer, explicitly, not by default
+    value_for_m3_singlet_ref: 566
+    cost_relative_intensity_l2: 9.58e-6
+    edge_energy_is_not_the_gate: >-
+      the edge-energy fraction moves by only 2x (0.036 -> 0.017) between a run
+      carrying 1.4e-1 relative intensity error from wraparound and a correct one.
+      Retained as a window-truncation indicator at a 0.05 reporting threshold; the
+      padding decision is made against a float64 reference.
+  energy_accounting:
+    conserved_in_principle: >-
+      the ASM transfer function is unit-modulus wherever k_z is real and this grid
+      has no evanescent bins, so power over the infinite plane is conserved exactly
+    measured_window_ratio: 0.63
+    trap: >-
+      an UNPADDED run reads 1.0000000 because wraparound recirculates the light
+      that should have left the window. A ratio of 1.0 is therefore not evidence
+      of correctness on this path.
+    attribution: ray sampling, not propagation -- see slice_protocol ray_sampling_error
+
 not_yet_probed:
+  - >
+    a second solver with an explicit time convention (e.g. FDTDX) cross-checked
+    against the phasor convention CHE-35 established here
   - Airy-pattern analytic comparison (listed as required in knowledge/solver_cards/chromatix.yaml, not yet done)
   - CPU/GPU numerical agreement (no GPU available in this environment)
   - >

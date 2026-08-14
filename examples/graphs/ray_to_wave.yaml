@@ -6,7 +6,8 @@
 # capability. The frozen configuration lives in benchmarks/slice_protocol.yaml
 # (M3-SLICE-CPU-V1) and is the source of truth for the numbers below.
 #
-# Executes in M3:  M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX -> C_FIELD_TO_PSF
+# Executes in M3:  M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX
+#                  then a PSF MEASUREMENT on the terminal field, outside the graph
 # Deferred to M4:  every gradient, and the reference-sphere pupil variant.
 schema_version: 0.1.0
 task_id: L2-PSF-01
@@ -23,39 +24,56 @@ nodes:
     model: M_WAVE_CHROMATIX
     config:
       propagation: angular_spectrum
-      # Pupil-to-focus distance of M3-SINGLET-REF. Kept short deliberately:
-      # Chromatix casts to complex64 unconditionally, so the ASM transfer-phase
-      # error grows as eps32 * 2*pi*z/lambda. A 47 mm version of this system
-      # measured 6.3e-2 relative field error and was rejected in M3.2.
-      z_m: 4.70560476022521e-3
+      # Pupil-to-focus distance of M3-SINGLET-REF: image_plane_z - exit_pupil_z.
+      # Corrected by CHE-33 (amendment A2) from the back focal length, which sits
+      # 0.1319 mm short because the exit pupil is not at the rear vertex; that
+      # offset is 0.311 waves of defocus at this NA.
+      z_m: 4.837461300309598e-3
 edges:
   - id: pupil_reconstruction
     coupler: C_RAY_TO_WAVE
     source:
       node: lens
-      port: wavefront
+      # CHE-34 (M3.5): was the `wavefront` port. C_RAY_TO_WAVE sums plane
+      # WAVELETS, so it needs a direction per sample, and wavefront_samples
+      # carries pupil coordinates only. The edge validated before only because
+      # producer and consumer both declared metadata neither writes.
+      port: rays
     target:
       node: wave
       port: input_field
     config:
-      interpolation: conservative_scattered_to_grid
       # A PLANE, read from optic.paraxial.XPL()/XPD(). The earlier
       # `reference_sphere: exit_pupil` here was aspirational: C_RAY_TO_WAVE
       # accumulates plane wavelets onto a plane, and nothing in this repository
       # implements a reference-sphere pupil. That variant is M4 scope.
-      reference_plane: exit_pupil
+      #
+      # These two keys are the DECLARATION the coupler refuses to default
+      # (CHE-33, CHE-34): stating the handoff plane is what promotes Optiland's
+      # absolute opd into an optical path length with a reference. Without them
+      # the edge fails with OPL_REFERENCE_UNVERIFIED rather than reconstructing
+      # a plausible field.
+      handoff_plane: exit_pupil
+      handoff_plane_z_m: 6.814345991561233e-05
       target_sample_pitch_m: 2.6587352810843895e-06
       grid_n: 188
-# C_FIELD_TO_PSF is deliberately NOT an edge here, and the reason is a
-# constraint on the graph model rather than a scope choice: every edge needs a
-# target NODE, and the only registered consumer of a `psf` artifact is
-# M_SENSOR_IDEAL, which M3 excludes (no pixel integration, no noise model). A
-# terminal coupler therefore has nothing to point at.
+      projection: asm_consistent
+# The graph ends here, at the wave node's output field, and that is now a
+# statement about physics rather than a workaround (CHE-36, M3.7).
 #
-# CHE-36 (M3.7) owns the resolution and has two honest options: add a minimal
-# sink node for the PSF, or run the reduction in the benchmark driver after the
-# graph and record it in provenance. Until then the graph ends at the wave
-# node's output field, which is what actually executes.
+# M3.2 read the missing final step as a graph-model constraint: every edge needs
+# a target NODE, the only registered consumer of a `psf` artifact was
+# M_SENSOR_IDEAL, and M3 excludes it, so a terminal coupler had nothing to point
+# at. The better reading is that there was no edge to place. A coupler performs a
+# physically meaningful change of representation -- C_RAY_TO_WAVE turns rays into
+# a field and carries real assumptions about OPL, phase sign, amplitude and
+# handoff plane, which is why it can refuse. `ComplexField -> |U|^2` changes no
+# representation; it is a MEASUREMENT of the terminal simulated field.
+#
+# So C_FIELD_TO_PSF was removed from the registry, and PSF extraction lives in
+# src/multiscale_optics_agent/evaluation/psf_measurement.py, run by the benchmark
+# driver on this node's output_field and recorded in provenance. No sink node was
+# added and M_SENSOR_IDEAL is still out of scope.
 design_variables: []
 # M4 scope, not M3. Kept here as a comment rather than as a declaration,
 # because a declared design variable with requires_gradient reads as a

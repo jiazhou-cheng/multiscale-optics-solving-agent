@@ -27,3 +27,17 @@ def load_probe_expected(solver: str, probe: str) -> dict:
     """
     path = KNOWLEDGE_ROOT / solver / "expected" / f"{probe}.json"
     return json.loads(path.read_text())
+
+
+COUPLER_KNOWLEDGE_ROOT = ROOT / "knowledge" / "couplers"
+
+
+def load_coupler_probe_expected(coupler: str, probe: str) -> dict:
+    """The coupler-side counterpart of :func:`load_probe_expected`.
+
+    Coupler probes characterize a transformation rather than a package, so their
+    evidence lives under ``knowledge/couplers/<coupler>/expected/`` beside the
+    coupler card that cites it.
+    """
+    path = COUPLER_KNOWLEDGE_ROOT / coupler / "expected" / f"{probe}.json"
+    return json.loads(path.read_text())

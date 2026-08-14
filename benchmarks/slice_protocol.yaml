@@ -19,10 +19,54 @@ amendments:
       binding constraint on a carrier-conditioned path.
     evidence: outputs/M3/carrier-phase/result.json
     probe: benchmarks/probes/m3_carrier_phase.py
+  - id: A2-singlet-pupil-to-focus-distance
+    issue: CHE-33 (M3.4)
+    supersedes: >-
+      M3-SINGLET-REF.derived.propagation_distance_mm = 4.705604760225210
+    summary: >-
+      The pupil-to-focus distance the wave leg must propagate is
+      image_plane_z_mm - exit_pupil_z_mm. For M3-REVERSE-TELEPHOTO the frozen
+      value satisfies that exactly (3.054578897851833). For M3-SINGLET-REF the
+      frozen value was the BACK FOCAL LENGTH, 4.705604760225210, while the
+      exit-pupil-to-image distance is 4.837461300309598 -- the two differ because
+      the exit pupil sits 0.068 mm behind the rear vertex, not at it. The gap is
+      0.1319 mm.
+    why_it_matters: >-
+      0.1319 mm of the wrong propagation distance is rho^2/2 * (1/R_wrong -
+      1/R_true) = 0.311 waves of defocus at this NA -- 18x the system's own
+      0.017-wave residual aberration and 300x the tightest gate in the tolerance
+      budget. It would have been charged to the slice rather than to the number.
+    found_by: >-
+      CHE-33's analytic oracle. A diffraction-limited system delivers equal
+      optical path to its focus, so the declared pupil OPL must equal
+      R - sqrt(rho^2 + R^2). At R = 4.7056 mm the residual is 0.311 waves; at
+      R = 4.8375 mm it is 0.016999 waves, which independently reproduces this
+      protocol's own frozen 0.016996 and Optiland's own Wavefront value of
+      0.016999.
+    correction: >-
+      propagation_distance_mm for M3-SINGLET-REF is 4.837461300309598. The
+      superseded value is retained below as propagation_distance_mm_superseded.
+      Every other derived number for that system is unaffected: efl, bfl, NA,
+      exit-pupil location and diameter, and the image plane z were all measured
+      independently and all still agree with the trace.
+    evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
+    probe: knowledge/couplers/ray_to_wave/probes/coherent_handoff.py
 scope:
   benchmark_ids: [L2-PSF-01]
   execution: end_to_end_graph
-  graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX, C_FIELD_TO_PSF]
+  # Amended by CHE-36 (M3.7). The graph terminates at the propagated
+  # ComplexField, which is the last physical state the slice evolves. PSF
+  # extraction is a MEASUREMENT on that terminal state, run by the benchmark
+  # driver after the graph and recorded in provenance -- deliberately not an
+  # edge. C_FIELD_TO_PSF was removed from the registry: `ComplexField -> |U|^2`
+  # changes no representation, so it is an observable, not a coupler.
+  graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]
+  terminal_state: complex_field
+  terminal_measurement:
+    kind: observable
+    quantity: psf
+    implementation: src/multiscale_optics_agent/evaluation/psf_measurement.py
+    is_a_graph_edge: false
   # M2 forbade engine imports in the coupler *core* and that rule is inherited
   # unchanged. M3 is an end-to-end slice, so the benchmark driver necessarily
   # imports both engines; the constraint is that they never reach the core.
@@ -36,7 +80,9 @@ scope:
     M2 verified both coupler directions against analytic oracles while
     deliberately never touching a real engine. M3 closes that gap: a real
     Optiland trace, reconstructed at a declared exit pupil, propagated by the
-    M1-verified Chromatix ASM, reduced to a normalized PSF.
+    M1-verified Chromatix ASM, and measured as a normalized PSF -- where the
+    measurement is an observable taken on the terminal field, not a fourth graph
+    step (CHE-36).
 
 execution:
   entrypoint: ./run.sh
@@ -113,7 +159,29 @@ required_conditioning:
       the choice of OPL_ref, the sign convention, and global-phase provenance
       belong to the M3.4 contract; this protocol fixes only that a reference
       subtraction must happen before phase is formed
-    status: recorded_not_implemented
+    status: implemented
+    implementation: src/multiscale_optics_agent/couplers/optiland_handoff.py
+    implemented_by: CHE-33 (M3.4)
+    opl_reference_chosen: >-
+      the traced chief ray -- the surviving ray of smallest pupil radius -- with
+      sign 'ray minus chief', matching the evaluator convention L1-RAY-01 already
+      declared. Because the reference comes from the same trace, CHE-30's
+      aperture-dependent launch-plane zero is common to every ray and cancels
+      exactly, so the declared OPL is invariant under the one thing that made the
+      absolute value meaningless.
+    global_phase_policy: retained_as_metadata_not_reapplied
+    measured_piston_removed_waves:
+      M3-SINGLET-REF: 1218.5651099327156
+      M3-REVERSE-TELEPHOTO: 5467.9789054454195
+    measured_signal_retained_waves:
+      M3-SINGLET-REF: 11.734374712240074
+      M3-REVERSE-TELEPHOTO: 15.801773246826363
+    known_consequence: >-
+      no per-ray area weight is applied, so the reconstructed field amplitude
+      scales with ray density. The PSF is convergent in shape but not in scale
+      under ray refinement. Recorded rather than hidden; CHE-38 owns it.
+    evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
+    regression_tests: tests/test_optiland_coherent_handoff.py
 
 # ---------------------------------------------------------------------------
 # Systems
@@ -156,7 +224,11 @@ systems:
       exit_pupil_z_mm: 0.06814345991561233
       exit_pupil_diameter_mm: 0.4987073505473812
       image_plane_z_mm: 4.90560476022521
-      propagation_distance_mm: 4.70560476022521
+      # Amended by CHE-33 (A2): image_plane_z_mm - exit_pupil_z_mm, which is what
+      # the wave leg propagates. The superseded value was the back focal length.
+      propagation_distance_mm: 4.837461300309598
+      propagation_distance_mm_superseded: 4.70560476022521
+      propagation_distance_superseded_by: CHE-33 (M3.4), amendment A2
     diffraction_limited_evidence:
       criterion: Rayleigh quarter wave, peak-to-valley
       peak_to_valley_waves: 0.01699595356250618
@@ -306,12 +378,55 @@ tolerance_budget:
       level: intensity, relative
       status: to_be_measured
       owner: M3.9 (CHE-38)
+      # CHE-35 did not measure this term, but its energy accounting located it and
+      # the finding is large enough that CHE-38 should not meet it cold.
+      che35_finding: >-
+        the reconstructed pupil field is nowhere near ray-converged at the counts
+        tried. Propagated to focus on the frozen grid with the declared padding,
+        the fraction of retained intensity landing within three Airy radii of the
+        axis is 0.043 / 0.166 / 0.388 at 217 / 817 / 1801 traced rays, with the
+        geometry untouched, while the coupler's own max adjacent-ray phase step
+        falls 2.53 / 0.63 / 0.28 rad. The protocol's 4096-ray starting value has
+        not been reached and the trend has not flattened.
+      che35_caution: >-
+        the coupler's ray_density_status reports wavelet_approximation_holds at
+        all three counts, because its criterion is a phase step below pi. That
+        criterion is satisfied long before the reconstruction is accurate, so it
+        must not be read as a convergence certificate.
     - name: grid_truncation_and_padding
-      value: null
+      value: 2.0e-5
       level: intensity, relative
-      status: to_be_measured
+      status: measured
+      measured_by: CHE-35 (M3.6)
       owner: M3.6 (CHE-35)
-      diagnostic: edge_energy_fraction
+      diagnostic: >-
+        NOT edge_energy_fraction. CHE-35 measured that fraction moving by only 2x
+        (0.036 -> 0.017) between a run carrying 1.4e-1 relative intensity error
+        from wraparound and a correctly padded one, so it cannot certify padding.
+        It is retained as a window-truncation indicator with a 0.05 reporting
+        threshold, and the padding decision is made against a float64 reference
+        instead.
+      decision: >-
+        pad_width is chromatix.functional.compute_padding_transfer's own value,
+        566 for M3-SINGLET-REF at the frozen grid, declared explicitly rather than
+        left to a default.
+      source: >-
+        measured 9.58e-6 relative intensity L2 against the same float64
+        angular-spectrum reference run at twice that padding, with dtype held
+        constant on both sides. 2.0e-5 carries the next sweep term's worth of
+        headroom, because the reference at 2x is itself still converging as ~1/pad.
+      sweep:
+        # pad_width -> relative intensity L2 against pad_width = 1132
+        0: 1.39e-1
+        94: 7.04e-4
+        188: 8.27e-5
+        283: 4.00e-5
+        566: 9.58e-6
+      why_not_half: >-
+        pad_width = 94 agrees with 566 to 0.06% on edge-energy fraction and 0.01%
+        on peak intensity, and is 73x worse at the intensity level. The cheap
+        indicators do not see it.
+      evidence: knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json
   gates:
     airy_peak_intensity_relative:
       value: 2.0e-3
@@ -338,6 +453,164 @@ tolerance_budget:
   widening_rule: >-
     A gate that fails is a finding to diagnose and report. M2 exited with no
     gate satisfied by loosening a tolerance; M3 inherits that rule.
+
+# ---------------------------------------------------------------------------
+# M3.8 verification result -- CHE-37
+# ---------------------------------------------------------------------------
+# Evidence: benchmarks/probes/m3_psf_verification.py ->
+# benchmarks/probes/records/m3_psf_verification.json, pinned by
+# tests/test_m3_psf_verification.py. Numbers below are at the frozen
+# configuration and 3169 traced rays unless a ray count is named.
+m3_8_verification:
+  verdict: >-
+    the diffraction-limited slice agrees with the analytic Airy pattern in shape
+    and scale, and the two intensity-level gates FAIL, both dominated by ray
+    sampling. The failures are reported with a measured attribution rather than a
+    widened tolerance.
+  diffraction_limited:
+    analytic_airy_profile_relative_l2: 5.866e-3
+    analytic_airy_profile_max_abs: 4.613e-3
+    first_null_ratio_measured_over_analytic_same_grid: 0.99632
+    first_null_estimator_bias_at_frozen_sampling: 0.1093
+    first_null_method: >-
+      the same estimator is run over the analytic pattern sampled on the same
+      grid and the comparison is the RATIO. At 2.44 pixels per Airy radius the
+      estimator reads an exactly known Airy null 10.9% high, so an absolute
+      comparison against 0.61 lambda/NA would be measuring the estimator.
+    pupil_wavefront_pv_waves_at_the_frozen_plane: 0.016999
+    pupil_wavefront_pv_waves_agrees_with: >-
+      this protocol's frozen 0.016996 and Optiland's own Wavefront 0.016999 --
+      three implementations, one number
+    best_focus_offset_from_the_frozen_image_plane_m: -7.224e-6
+    fft_oracle_relative_l2: 1.509e-2
+  aberrated_case:
+    method: defocus of the diffraction-limited system, 120 um past the frozen plane
+    rms_waves: 0.0895
+    peak_to_valley_waves: 0.3003
+    rayleigh_quarter_wave_limited: false
+    marechal_valid_regime: true
+    chosen_this_way_because: >-
+      past the 0.25-wave Rayleigh criterion, so unambiguously not diffraction
+      limited, while still inside Marechal's ~0.1-wave validity regime. A more
+      strongly aberrated case would leave that regime and make the Strehl
+      cross-check meaningless.
+    airy_profile_relative_l2: 8.954e-2      # 15x the diffraction-limited case
+    fft_oracle_relative_l2: 3.329e-2
+    measured_strehl: 0.6734
+    marechal_strehl: 0.7289
+    strehl_ratio_measured_over_marechal: 0.9238
+    strehl_note: >-
+      agreement to 7.6%, which is what a small-aberration expansion evaluated at
+      the edge of its regime can deliver. A sanity cross-check, not a gate. Its
+      value is that it does not share the FFT oracle's dependence on the traced
+      OPD map.
+  gates:
+    energy_accounting_unexplained_residual: pass, 7.5e-7 against 1.0e-3
+    fft_oracle_intensity_relative_l2: FAIL, 1.509e-2 against 1.0e-3 (15x)
+    airy_peak_intensity_relative: FAIL, 1.216e-2 against 2.0e-3 (6.1x)
+  energy_ledger:
+    psf_integral_over_propagated_out: 1.0000007
+    propagated_out_over_in: 0.9999986
+    propagated_in_over_pupil: 1.0000000
+    pupil_over_traced: 2.14e-7
+    pupil_over_traced_is_not_a_conservation_law: >-
+      it converts a sum of dimensionless ray weights into sum(|u|^2)*dy*dx on a
+      grid. The bundle declares reconstruction_normalization = none, so this ratio
+      is reported as a measure conversion and is not compared to unity.
+    every_step_has_a_named_mechanism: true
+    unattributed_remainder: 7.5e-7
+
+# ---------------------------------------------------------------------------
+# PSF measurement semantics -- frozen by CHE-36 (M3.7)
+# ---------------------------------------------------------------------------
+# M3.8 compares the measured PSF against an analytic Airy pattern and an
+# independent FFT/Fraunhofer oracle. Both are defined only up to a scale, so the
+# comparison means nothing unless these are a stated choice rather than an
+# accident of the implementation. Frozen here so a later ticket cannot make its
+# oracle pass by changing the measurement instead of finding the defect.
+psf_measurement:
+  category: observable
+  is_a_coupler: false
+  category_rationale: >-
+    a coupler performs a physically meaningful change of representation and
+    carries the assumptions that come with it -- C_RAY_TO_WAVE turns rays into a
+    field and can refuse. `ComplexField -> |U|^2` changes no representation and
+    consults no convention it does not already hold, so it is a measurement of
+    the terminal state. C_FIELD_TO_PSF was removed from the registry rather than
+    implemented; see open_structural_items.terminal_coupler_has_no_target_node.
+  implementation: src/multiscale_optics_agent/evaluation/psf_measurement.py
+  runs: after the graph, in the benchmark/measurement layer
+  intensity: abs(u)**2
+  intensity_taken_in: contracts.PSF.from_complex_field
+  normalization:
+    required: true
+    defaulted: never
+    frozen_for_m3_oracles: peak
+    definition: intensity / max(intensity) over the sampled window
+    why_peak: >-
+      neither oracle fixes an absolute scale this slice could be held to. The
+      Airy formula's absolute irradiance depends on total flux and aperture area,
+      and the flux descends from Optiland's per-ray intensity weights, which are
+      uncalibrated -- nothing between the trace and the propagated field converts
+      them to watts. A raw comparison would test an arbitrary constant and would
+      fail for a reason unrelated to the diffraction physics. Peak normalization
+      removes exactly that degree of freedom and leaves peak position, first-null
+      radius and profile shape untouched.
+    what_it_hides: >-
+      a constant multiplicative error, exactly. M2's amplitude-weight omission
+      under uniform sampling was one. Energy normalization hides the same
+      constant AND makes the result depend on how much energy left the window, so
+      it is not a fix.
+    mitigation: >-
+      the raw scale is not discarded: raw_peak_intensity and raw_window_energy
+      are recorded before scaling, and M3.8's energy ledger -- not the normalized
+      profile -- is what constrains the multiplicative factor.
+  axes:
+    source: the propagated field's OUTPUT pitch (dx_out)
+    never: the input pupil pitch
+    why: >-
+      PSF.from_complex_field takes its pitch from the field, so the axes are only
+      as correct as the pitch the producing adapter declared. The Chromatix
+      adapter carries both: its graph path writes dx_out onto the output
+      artifact, and its baseline summary's field_metadata.sample_pitch_m is the
+      input pitch. Taking the input pitch would rescale every distance the
+      measurement reports while leaving the intensity map entirely plausible.
+    enforced_by: >-
+      evaluation.psf_measurement.measure_psf_from_record refuses with
+      SAMPLE_PITCH_MISMATCH when the record's declared pitch is not the pitch the
+      propagation reported. CHE-36 added input/output pitch to the graph path's
+      diagnostics so there is something independent to compare against; reading
+      the pitch off the artifact being checked is circular.
+    asm_preserves_pitch: >-
+      true, which makes the check cheap rather than vacuous. It is the same
+      assertion for a method that does not preserve it, and the failure it guards
+      against is silent.
+  coherence_model: monochromatic, fully coherent, scalar (single wavelength)
+  absolute_phase_required: false
+  absolute_phase_note: >-
+    abs(u)**2 is invariant under a global phase, which is what makes CHE-40's
+    carrier-removed path admissible for the PSF; required_conditioning above
+    mandates that path for any phase-insensitive M3 result.
+  invariants:
+    - name: nonnegative_intensity
+      enforced_by: contracts.PSF.__post_init__ (NEGATIVE_INTENSITY)
+    - name: declared_psf_normalization
+      enforced_by: contracts.PSF.__post_init__ (MISSING_DECLARATION)
+    - name: finite_intensity
+      enforced_by: contracts.PSF.__post_init__ (NON_FINITE)
+  invariant_provenance: >-
+    the first two names are the ones the retired C_FIELD_TO_PSF entry declared
+    and nothing executed. They are kept verbatim so M3.10's claim audit can trace
+    them from the removed registry entry to the contract that now enforces them.
+  failure_path: >-
+    the PSF/measurement contract. Invalid construction raises ContractError; no
+    graph coupler owns this refusal.
+  excluded:
+    - pixel integration       # M_SENSOR_IDEAL, out of M3
+    - detector noise
+    - incoherent aggregation
+    - polychromatic aggregation
+    - any gradient claim
 
 # ---------------------------------------------------------------------------
 # Feasibility verdict
@@ -412,6 +685,8 @@ open_structural_items:
   - id: terminal_coupler_has_no_target_node
     found_by: CHE-31
     owner: CHE-36 (M3.7)
+    status: resolved
+    resolved_by: CHE-36 (M3.7)
     description: >-
       Every graph edge requires a target NODE, and the only registered consumer
       of a `psf` artifact is M_SENSOR_IDEAL, which M3 excludes. So C_FIELD_TO_PSF
@@ -423,12 +698,192 @@ open_structural_items:
     not_an_option: >-
       pulling M_SENSOR_IDEAL into M3 to make the graph close, which would widen
       the milestone to make its diagram tidier
+    resolution: >-
+      the second option, and the framing changed with it. The symptom was read at
+      M3.2 as a graph-model constraint -- a terminal coupler with nothing to point
+      at. It is better read as the registry having mis-categorized the operation:
+      `ComplexField -> |U|^2` is not a cross-representation handoff and so was
+      never an edge to place. C_FIELD_TO_PSF is removed from
+      registry/couplers.yaml, and PSF extraction is a measurement over the
+      existing contracts.PSF primitive
+      (src/multiscale_optics_agent/evaluation/psf_measurement.py), run after the
+      graph and recorded in provenance. No sink node was added, and M_SENSOR_IDEAL
+      stays out of M3.
+    also_found: >-
+      the entry could not be deprecated in place. CouplerSpec requires
+      `framework` and `derivative.mode`, and Framework has no `none`, so any
+      surviving entry keeps asserting a framework and a differentiation mode for
+      numerics that never existed. The retired entry claimed `framework: jax` and
+      `derivative.mode: native_autodiff`; both were artifacts of the abstraction,
+      and the schema left removal as the only honest option.
+  - id: airy_radius_entry_is_a_diameter
+    found_by: CHE-33 (M3.4)
+    owner: CHE-37 (M3.8) for the oracle, CHE-38 (M3.9) for the sampling claim
+    description: >-
+      systems.M3-SINGLET-REF.airy_radius_um = 12.974628171691823 is 1.22*lambda/NA,
+      which is the Airy first-null DIAMETER. The radius is 0.61*lambda/NA =
+      6.4873 um. The same factor of two propagates into
+      sampling.grids.M3-SINGLET-REF.airy_radius_in_pixels = 4.88 (true radius:
+      2.44 px at the frozen 2x oversampling) and into the oversampling rationale,
+      which argues from "~2.44 px at the critically admissible pitch" -- that
+      figure is the radius at 2x, not at 1x.
+    not_changed_here_because: >-
+      it changes the JUSTIFICATION for oversampling_factor = 2, not the factor
+      itself, and the frozen grids are what M3.4-M3.6 are being built against.
+      CHE-38 owns whether 2x is still the right number once the radius is counted
+      correctly; CHE-37 owns the Airy oracle that consumes the radius directly,
+      where using a diameter as a radius would be a factual error in the oracle.
+    measured: 0.61 * 0.55 um / 0.05171631827291936 = 6.4873 um
+    oracle_half_status: resolved
+    oracle_half_resolved_by: CHE-37 (M3.8)
+    oracle_half_resolution: >-
+      evaluation/psf_oracles.py computes the radius from the first zero of J1
+      (3.8317059702075125 / 2 pi = 0.6098349) and never reads airy_radius_um.
+      Using the exact coefficient rather than the quoted 0.61 is a further 0.03%.
+      The frozen fields are left as they are and the correction is recorded;
+      tests/test_m3_psf_verification.py asserts the factor of 2 against this file,
+      so correcting the fields later will surface here rather than silently.
+    sampling_half_status: still open, owner CHE-38
+  - id: off_axis_handoff_omits_the_pupil_tilt
+    found_by: CHE-37 (M3.8)
+    owner: unassigned; a follow-up, not M3.8
+    severity: >-
+      high for any off-axis work, none for M3's frozen on-axis configuration
+    description: >-
+      For an off-axis field the declared pupil OPL carries essentially none of the
+      linear tilt the geometry requires, so the reconstructed wave converges to the
+      wrong point. Measured on M3-REVERSE-TELEPHOTO at Hy = 0.2: the OPL's linear
+      slope in y is 8.7e-5 where 0.0684 is needed to reach the geometric image
+      point, i.e. 0.13% of it. Fitting the reference sphere finds its centre ON
+      AXIS, within 1 um of y = 0, where the wavefront residual drops from 57.0 to
+      0.072 waves peak-to-valley -- a clean converging sphere aimed 209 um away
+      from where the rays actually go. The shipping PSF lands there too: 1 pixel
+      from the axis instead of 114.
+    probable_cause: >-
+      for an object at infinity Optiland seeds the OPD accumulator on a plane
+      perpendicular to z rather than on the incoming wavefront. For an off-axis
+      parallel bundle those differ by exactly sin(theta) * y, which cancels the
+      convergence tilt. CHE-30 characterized this launch plane and recorded the
+      PISTON consequence (its zero moves with the aperture); the TILT consequence
+      is invisible on axis, and CHE-30, CHE-32 and CHE-33 all validated on axis
+      only. conventions.opd_is_relative_to_chief_ray reads False, which on axis is
+      an untestable claim.
+    not_fixed_here_because: >-
+      referencing the OPD to the incoming tilted wavefront changes the handoff
+      convention, and M3.8 must not both invent and verify a path.
+    consequences:
+      - >-
+        the off-axis asymmetry vehicle CHE-37 planned cannot serve its purpose:
+        its PSF forms on axis, so it does not break the symmetry that hides a
+        transpose.
+      - >-
+        no frozen M3 configuration can detect an x/y transpose. Covered instead by
+        the synthetic-tilt orientation control; see
+        no_frozen_configuration_detects_a_transpose.
+    evidence: benchmarks/probes/records/m3_psf_verification.json (off_axis_tilt_finding)
+
+  - id: no_frozen_configuration_detects_a_transpose
+    found_by: CHE-37 (M3.8)
+    owner: CHE-37, mitigated
+    description: >-
+      Both frozen on-axis configurations are rotationally symmetric, and the
+      off-axis one forms its PSF on axis as well (see
+      off_axis_handoff_omits_the_pupil_tilt), so an x/y transpose of the output
+      grid moves the measured PSF by nothing. The transpose control's detection
+      margin is 1.0000066 -- it cannot be made to fail, and by M2's rule it
+      therefore validates nothing.
+    mitigation: >-
+      a synthetic control that CAN fail. A known linear tilt of 0.02 is added to
+      the declared OPL along x only; the PSF must move along +x by tilt * R, an
+      analytically predicted 36.39 pixels. Measured 36 pixels in x and 0 in y,
+      ratio 0.989, and under Perturbation(transpose_axes=True) the displacement
+      appears along y instead. The x/y wiring is tested against a predicted
+      answer rather than against another run of the same code.
+    still_open: >-
+      a transpose in the SHIPPING configuration remains undetectable. Fixing that
+      needs the off-axis handoff, i.e. the item above.
+
+  - id: amplitude_path_is_not_exercised_by_any_m3_configuration
+    found_by: CHE-37 (M3.8)
+    owner: unassigned; a follow-up
+    description: >-
+      Optiland's per-ray intensity weights on M3SingletRef are exactly uniform
+      (min = max = 1.0, spread 0.0), so replacing every ray amplitude with 1 is an
+      exact no-op: the amplitude_weight_omitted control's detection margin is
+      1.0000000 and its raw peak ratio is 1.0000000. This is stronger and worse
+      than M2's finding that the omission was an exact CONSTANT SCALE -- here it
+      is not even a scale.
+    consequence: >-
+      the reconstruction's amplitude path carries no verification evidence from
+      M3. Exercising it needs a non-uniform weight: apodization, vignetting, or a
+      polarized Fresnel transmission. M3 has none of these.
+    reported_as: an undetected control, not a passing test
+
+  - id: fft_oracle_gate_fails_with_an_unattributed_floor
+    found_by: CHE-37 (M3.8)
+    owner: CHE-38 (M3.9) for the ray-sampling part; the floor is unassigned
+    description: >-
+      The fft_oracle_intensity_relative_l2 gate of 1.0e-3 is missed by 15x at the
+      frozen configuration (1.509e-2). Varying ONLY the ray count, with grid,
+      padding, plane and system held fixed, the residual falls monotonically:
+      3.29e-2 / 1.75e-2 / 1.51e-2 / 9.13e-3 / 7.40e-3 / 6.67e-3 at 817 / 1801 /
+      3169 / 7057 / 12481 / 27937 traced rays. So most of the excess is the
+      protocol's own ray_sampling_error term -- value null, status to_be_measured
+      -- which this gate's text already requires to fit inside it, and which CHE-35
+      independently found far from converged at these counts.
+    unresolved: >-
+      the trend FLATTENS at ~6.7e-3, well above the gate, so ray sampling is not
+      the whole story. Leading hypothesis, untested: the shipping reconstruction's
+      pupil edge is set by where the rays stop and is soft over roughly one ray
+      spacing, while the oracle applies a hard circular mask at the largest traced
+      radius. That is a difference in the aperture function, which is what sets
+      the ring structure the residual measures.
+    handling: >-
+      reported as a finding. The gate was NOT widened, and the failure is pinned
+      as a failure by tests/test_m3_psf_verification.py so it cannot go green
+      without someone saying what changed.
+    same_cause_as: airy_peak_intensity_relative, which fails 6.1x and whose
+      full-window peak deficit collapses from 0.886 at 817 rays to -0.007 at 12481
+
+  - id: airy_gate_residual_aberration_term_was_derived_at_best_focus
+    found_by: CHE-37 (M3.8)
+    owner: CHE-38 or CHE-39, minor
+    description: >-
+      The airy_peak_intensity_relative gate composes 9.1e-4 of residual
+      aberration, taken from 1 - 0.9990928, which is the Marechal Strehl at the
+      system's BEST FOCUS (0.00479 waves RMS). The slice observes the frozen image
+      plane, 7.22 um from best focus, where the wavefront is 0.00538 waves RMS and
+      the Marechal deficit is 1.14e-3. The term is 25% low for the plane the slice
+      actually uses.
+    impact: >-
+      small: 1.14e-3 still sits inside the 2.0e-3 gate. Recorded because the gate
+      is composed of named terms and one of them is evaluated at a plane the slice
+      does not use.
+
   - id: no_runnable_coupler_exists_yet
     found_by: CHE-31 (confirmed at M3 open)
     owner: CHE-34 (M3.5)
+    status: resolved
+    resolved_by: CHE-34 (M3.5)
     description: >-
       couplers/base.py declares Coupler.transform and nothing defines it, so
       GraphValidator currently validates edges that cannot execute.
+    resolution: >-
+      src/multiscale_optics_agent/couplers/ray_to_wave_node.py implements the
+      Coupler protocol for C_RAY_TO_WAVE. It is a wrapper over the M2 core and is
+      tested to be bit-identical to the direct function call, so M2's
+      verification evidence still binds on what a graph runs. The core keeps its
+      engine-agnosticism; the node is a separate module and is covered by the
+      same AST and sys.modules checks.
+    also_found: >-
+      the edge only validated because producer and consumer both declared
+      metadata neither writes. C_RAY_TO_WAVE's source port was
+      wavefront_samples, which carries pupil coordinates and NO directions, so a
+      plane-wavelet sum could never have consumed it; and M_RAY_OPTILAND's rays
+      port claimed amplitude and polarization that RealRays does not expose --
+      the CONTRACT GAP recorded in models.yaml since 2026-07-30. Both were
+      narrowed to what is real, C_RAY_TO_WAVE moved to 0.2.0, and the example
+      graph's edge now sources the rays port.
 
 inadmissible_sources:
   - id: optiland_paraxial_surface

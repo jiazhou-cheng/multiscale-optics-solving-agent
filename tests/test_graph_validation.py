@@ -29,7 +29,10 @@ def _gradient_requiring_graph() -> GraphSpec:
                 {
                     "id": "pupil_reconstruction",
                     "coupler": "C_RAY_TO_WAVE",
-                    "source": {"node": "lens", "port": "wavefront"},
+                    # CHE-34 moved C_RAY_TO_WAVE's source port to `rays`: the
+                    # wavelet sum needs a direction per sample and
+                    # wavefront_samples has none.
+                    "source": {"node": "lens", "port": "rays"},
                     "target": {"node": "wave", "port": "input_field"},
                 }
             ],
@@ -94,6 +97,15 @@ def test_unknown_model_fails() -> None:
 
 
 def test_artifact_type_mismatch_fails() -> None:
+    """Both ends wrong at once, so neither check can hide behind the other.
+
+    CHE-36 (M3.7) repointed this fixture. It used to name C_FIELD_TO_PSF, which is
+    no longer a registered coupler -- PSF extraction is a measurement on the
+    terminal field, not an edge. C_ABSORPTION_TO_HEAT replaces it because it has
+    the same property this test needs and nothing else: its declared source
+    (`absorbed_power_density`) and target (`heat_source`) both differ from the
+    ports wired below, so one report must carry both mismatch codes.
+    """
     registry = Registry.from_package()
     graph = GraphSpec.model_validate(
         {
@@ -104,7 +116,11 @@ def test_artifact_type_mismatch_fails() -> None:
             "edges": [
                 {
                     "id": "wrong",
-                    "coupler": "C_FIELD_TO_PSF",
+                    "coupler": "C_ABSORPTION_TO_HEAT",
+                    # near_field is `near_field_surface`, not absorbed_power_density;
+                    # input_field is `complex_field`, not heat_source. M_EM_FDTDX does
+                    # expose an `absorbed_power` port, so wiring `near_field` here is
+                    # the deliberate half of the error, not an accident of the model.
                     "source": {"node": "em", "port": "near_field"},
                     "target": {"node": "wave", "port": "input_field"},
                 }
@@ -117,6 +133,41 @@ def test_artifact_type_mismatch_fails() -> None:
     codes = {issue.code for issue in report.errors}
     assert "COUPLER_SOURCE_TYPE_MISMATCH" in codes
     assert "COUPLER_TARGET_TYPE_MISMATCH" in codes
+
+
+def test_field_to_psf_is_not_a_registered_coupler() -> None:
+    """CHE-36 (M3.7): the retirement is pinned, so it cannot drift back in.
+
+    `ComplexField -> |U|^2` is a measurement of the terminal simulated field, not
+    a cross-representation handoff, so it is not a coupler. The registry is the
+    architectural statement of what a coupler is, and a graph that names the
+    retired id must fail rather than validate.
+    """
+    registry = Registry.from_package()
+    assert "C_FIELD_TO_PSF" not in registry.couplers
+
+    graph = GraphSpec.model_validate(
+        {
+            "nodes": [
+                {"id": "wave", "model": "M_WAVE_CHROMATIX"},
+                {"id": "sensor", "model": "M_SENSOR_IDEAL"},
+            ],
+            "edges": [
+                {
+                    "id": "measurement_as_an_edge",
+                    "coupler": "C_FIELD_TO_PSF",
+                    "source": {"node": "wave", "port": "output_field"},
+                    "target": {"node": "sensor", "port": "psf"},
+                }
+            ],
+        }
+    )
+    report = GraphValidator(registry).validate(graph)
+
+    assert not report.valid
+    assert any(issue.code == "UNKNOWN_COUPLER" for issue in report.errors), [
+        issue.model_dump() for issue in report.errors
+    ]
 
 
 def test_cycle_is_rejected() -> None:

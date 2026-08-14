@@ -39,6 +39,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CORE_MODULES = (
     "src/multiscale_optics_agent/couplers/contracts.py",
     "src/multiscale_optics_agent/couplers/ray_to_wave.py",
+    # CHE-33. Named for Optiland and encoding Optiland's conventions, yet it must
+    # still import no engine: it reads a repository artifact record. Listing it
+    # here is the check that the name never becomes an import.
+    "src/multiscale_optics_agent/couplers/optiland_handoff.py",
 )
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6

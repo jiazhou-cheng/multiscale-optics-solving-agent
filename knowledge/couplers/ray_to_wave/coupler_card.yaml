@@ -155,7 +155,70 @@ validated_probe_ids:
     pitch reconstructs exactly at 0.25 um, confirming the limit is the grid and
     not the physics.
 
+# CHE-33 (M3.4). The coupler needs a complex amplitude and an OPL with a declared
+# reference; a real Optiland trace supplies neither. This is what has to be
+# declared before the coupler will accept one, and how each declaration was
+# checked. Implementation: src/multiscale_optics_agent/couplers/optiland_handoff.py
+coherent_handoff_from_a_ray_trace:
+  status: verified
+  verified_by: CHE-33 (M3.4)
+  probe: knowledge/couplers/ray_to_wave/probes/coherent_handoff.py
+  evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
+  tests: tests/test_optiland_coherent_handoff.py
+  declarations:
+    optical_path_length:
+      source: RealRays.opd via the ray adapter's opd_native
+      unit_conversion: native millimetres -> metres (CHE-30 part 4)
+      plane_transfer: >-
+        opd is accumulated to the final traced image surface, while the exported
+        positions are the image-space asymptote at the exit pupil. Subtract
+        n_image * (z_image - z_plane) / N per ray. Exact, because image space is
+        homogeneous; n_image is read from the prescription, not assumed to be 1.
+      reference: >-
+        the traced chief ray, sign 'ray minus chief'. The aperture-dependent
+        launch-plane zero CHE-30 warned about is common to every ray in the trace
+        and cancels exactly in this subtraction.
+      global_phase_policy: retained_as_metadata_not_reapplied
+    amplitude:
+      mapping: a_i = sqrt(intensity_i)
+      normalization: >-
+        raw. No per-ray area factor and no 1/N: a traced set is a physical
+        ensemble, not a Monte Carlo sample. CONSEQUENCE: the reconstructed
+        amplitude scales with ray density, so the field converges in shape but
+        not in scale under ray refinement. Owned by CHE-38.
+      no_phase_available: >-
+        RealRays.i is a real intensity. Every radian of the reconstructed field
+        therefore comes from the OPL, which is why a wrong OPL is not a degraded
+        field but a different one.
+  verification:
+    analytic_oracle: >-
+      equal optical path to the focus, so OPL(rho) - OPL(0) = R - sqrt(rho^2 + R^2)
+      exactly for a perfect system. Residual on M3-SINGLET-REF: 0.016999 waves
+      peak-to-valley.
+    independent_implementations_agreeing:
+      - this declaration: 0.016999 waves
+      - Optiland's own Wavefront (opposite sign convention, own reference sphere): 0.016999
+      - M3.2's frozen diffraction-limited evidence (different probe): 0.016996
+    falsifiers_detected:
+      opl_sign_flipped_waves: 23.45
+      plane_transfer_omitted_waves: 11.77
+      structural: >-
+        both perturbations also move the reconstructed pupil intensity by more
+        than 50% relative L2, which is the observable the negative tests gate on.
+        Checking the declared array against itself would prove nothing: M2's
+        lesson is that a shared convention error cancels in a round trip.
+  refusals:
+    - REFERENCE_PLANE_MISMATCH when the producer's plane kind or axial position
+      disagrees with the consumer's declaration
+    - OPL_REFERENCE_UNVERIFIED when no declaration was made, which is still the
+      behaviour for a bare adapter record
+    - MISSING_DECLARATION when the record carries no image-space refractive index
+
 not_yet_probed:
+  - off-axis fields at the exit-pupil handoff (CHE-33 exercised Hx=Hy=0 only)
+  - a system whose image space is not air, where the plane transfer's n_image
+    stops being 1 (both M3 systems are in air; the value is read, so this is a
+    coverage gap rather than a correctness one)
   - reconstruction error versus ray count for a non-planar wavefront (deferred to CHE-26 round trip)
   - power conservation against a physical aperture rather than a chosen ensemble
   - behaviour at a caustic or with multi-valued phase
@@ -176,7 +239,56 @@ measured_behaviour:
     The nearest-neighbour scan is O(N^2) and is skipped above 4096 rays,
     reporting not_computed rather than a fabricated estimate.
 
+# CHE-34 (M3.5). The core is a pure function over typed contracts; this is what
+# makes it runnable from a graph edge without moving any physics out of the core.
+runnable_graph_edge:
+  status: implemented
+  implemented_by: CHE-34 (M3.5)
+  module: src/multiscale_optics_agent/couplers/ray_to_wave_node.py
+  tests: tests/test_ray_to_wave_node.py
+  is_a_wrapper: >-
+    proven, not asserted: the field it writes is bit-identical (np.array_equal,
+    not allclose) to calling ray_to_wave directly on the same bundle. A tolerance
+    would have let the node acquire arithmetic of its own and quietly invalidate
+    M2's evidence for what a graph executes.
+  port_correction:
+    was: {name: rays_or_wavefront, artifact: wavefront_samples}
+    now: {name: ray_bundle, artifact: ray_bundle}
+    reason: >-
+      the implemented physics is a sum of plane WAVELETS and needs a direction
+      per sample; WavefrontSamples carries (N, 2) pupil coordinates and none.
+      The hedged port name was concealing an input type the coupler could never
+      have accepted.
+    version_bump: 0.1.0 -> 0.2.0
+  declaration_is_edge_configuration: >-
+    handoff_plane and handoff_plane_z_m. An undeclared ray record is promoted
+    only when the edge states the plane, and is otherwise refused with
+    OPL_REFERENCE_UNVERIFIED. A record that already declares its own OPL
+    reference and amplitude is consumed as-is and is never re-declared.
+  refusals:
+    - {condition: per-axis Nyquist violation, code: SHAPE_MISMATCH}
+    - {condition: no OPL declaration, code: OPL_REFERENCE_UNVERIFIED}
+    - {condition: handoff plane kind or position mismatch, code: REFERENCE_PLANE_MISMATCH}
+    - {condition: empty bundle, code: EMPTY_ENSEMBLE}
+    - {condition: non-finite input, code: NON_FINITE}
+    - {condition: source artifact of the wrong kind, code: ARTIFACT_KIND_MISMATCH}
+    - {condition: missing or unusable edge config, code: MISSING_DECLARATION}
+  validate_and_transform_cannot_disagree: >-
+    both are driven from one diagnose(); every refusal above is exercised through
+    both entry points. Two parallel checklists is how a validator comes to
+    approve a request that then fails.
+  cost_model_correction: >-
+    the registry's O(rays + pixels) understated the work by a factor of the grid
+    size. estimate() reports rays x grid points, which is the driver a graph
+    needs to reject an infeasible configuration. Memory really is additive,
+    because the core contracts two separable ramps instead of materializing an
+    (N, ny, nx) tensor, so the two scale differently and both are reported.
+  no_gradient_claimed: >-
+    require_gradients=True is refused. derivative.verified is false and M3 is
+    forward-only by protocol.
+
 implementation_location: src/multiscale_optics_agent/couplers/ray_to_wave.py
+runnable_node_location: src/multiscale_optics_agent/couplers/ray_to_wave_node.py
 test_location: tests/test_ray_to_wave.py
 validation_status: analytically_validated_scalar_planar_cpu
 validation_note: >

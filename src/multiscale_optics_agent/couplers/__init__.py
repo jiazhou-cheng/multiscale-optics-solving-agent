@@ -24,8 +24,10 @@ from multiscale_optics_agent.couplers.contracts import (
     ReferencePlane,
     WavefrontSamples,
 )
+from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler
 
 __all__ = [
+    "RayToWaveCoupler",
     "AXIS_ORDER",
     "DEFAULT_SOURCE_PORT",
     "ORIGIN_RULE",

@@ -199,7 +199,16 @@ def test_required_conditioning_covers_both_sides_of_the_coupler() -> None:
     ray = conditioning["ray_side"]
     assert "OPL_i - OPL_ref" in ray["rule"]
     assert "CHE-33" in ray["owner"]
-    assert ray["status"] == "recorded_not_implemented"
+    # Implemented by CHE-33. The two things that make the rule real rather than
+    # aspirational are that a reference is named and that the removed piston is
+    # kept rather than reapplied -- the same policy as the wave side.
+    assert ray["status"] == "implemented"
+    assert "chief ray" in ray["opl_reference_chosen"]
+    assert ray["global_phase_policy"] == "retained_as_metadata_not_reapplied"
+    # Conditioning has to be buying something: the removed piston must dominate
+    # the retained signal, or the rule would be ceremony.
+    for system_id, piston in ray["measured_piston_removed_waves"].items():
+        assert piston > 50.0 * ray["measured_signal_retained_waves"][system_id]
 
 
 def test_residual_aberration_is_scoped_to_the_airy_gate_only() -> None:
