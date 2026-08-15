@@ -42,6 +42,24 @@ Nothing here is new physics. Three prior results are being *applied*:
     cancels exactly in the subtraction. The declared OPL is therefore invariant
     under the one thing CHE-30 warned makes the absolute value meaningless.
 
+``CHE-41`` -- which SURFACE the path is measured from
+    The cancellation above is exact for the launch plane's *location*. It says
+    nothing about the plane's *orientation*, and that is where v1 was wrong.
+    ``RealRays.opd`` is seeded on a plane perpendicular to z, which is a wavefront
+    only for a bundle travelling along z. For an off-axis collimated bundle the
+    plane and the wavefront differ by ``n_object * (d0 . r_launch)`` -- linear in
+    the launch coordinate, so a piston on axis and a tilt off it. Omitting it
+    leaves a pupil OPL that is a clean converging sphere aimed at the *axis* at
+    every field angle: on ``M3-REVERSE-TELEPHOTO`` at ``Hy = 0.2`` it retained
+    0.13% of the required tilt and put the focus 209 um from the traced chief-ray
+    intersection, with a 0.072-wave-P-V residual against its own fitted sphere.
+    That is why it survived three tickets of on-axis verification.
+
+    The term is measured by the ray adapter from the regenerated launch state and
+    added here. When it is constant across the bundle it is *not* added, because a
+    piston cannot survive step 3 -- which is what keeps every on-axis number
+    bit-identical to v1's.
+
 Verification, not assertion
 ---------------------------
 ``knowledge/couplers/ray_to_wave/probes/coherent_handoff.py`` checks the declared
@@ -77,6 +95,8 @@ from multiscale_optics_agent.couplers.contracts import (
 __all__ = [
     "AMPLITUDE_MAPPING",
     "NATIVE_OPD_UNIT_M",
+    "OPL_REFERENCE_VERSION",
+    "SUPERSEDED_OPL_REFERENCE",
     "CoherentHandoff",
     "DeclaredHandoffPlane",
     "HandoffPerturbation",
@@ -100,6 +120,41 @@ AMPLITUDE_MAPPING = (
     "optical path length. No per-ray area factor and no 1/N is applied: the "
     "traced set is a physical ray ensemble, not a Monte Carlo sample of one."
 )
+
+#: The version of the OPL reference declaration this module produces. A handoff
+#: convention is part of the coupler contract, so a change to it is versioned
+#: rather than edited in place, and the superseded declaration is kept below
+#: rather than deleted: every number M3.4-M3.8 reported was measured under v1,
+#: and a reader of those records needs to be able to find out what they meant.
+OPL_REFERENCE_VERSION = "C_RAY_TO_WAVE opl_reference v2 (CHE-41)"
+
+#: What v1 said, and the one thing it got wrong.
+SUPERSEDED_OPL_REFERENCE = {
+    "version": "C_RAY_TO_WAVE opl_reference v1 (CHE-33)",
+    "reference_surface": (
+        "Optiland's ray launch state -- a plane perpendicular to z for an object at "
+        "infinity -- with the traced chief ray's value subtracted as a piston."
+    ),
+    "what_it_got_right": (
+        "everything measurable on axis. The declared OPL is numerically identical to "
+        "v2's for any field whose object-space term is constant across the bundle, "
+        "which is every configuration M3.4-M3.8 verified: 0.016999 waves P-V against "
+        "the analytic sphere on M3-SINGLET-REF, agreeing with Optiland's own Wavefront "
+        "and with M3.2's independently frozen 0.016996."
+    ),
+    "what_it_got_wrong": (
+        "it named the reference a plane and used it as a wavefront. Off axis those "
+        "differ by n_object * (d0 . r_launch), a term linear in the launch coordinate "
+        "that carries the whole convergence tilt: on M3-REVERSE-TELEPHOTO at Hy = 0.2 "
+        "the v1 pupil OPL retained 0.13% of the required tilt (slope 8.7e-5 against "
+        "0.0684) and the reconstructed wave converged on axis, 209 um from the traced "
+        "chief-ray intersection, with a 0.072-wave-P-V residual that looked healthy."
+    ),
+    "why_it_was_invisible": (
+        "the failure is exactly zero on axis, and CHE-30, CHE-32 and CHE-33 all "
+        "validated on axis only. It was found by CHE-37 and fixed by CHE-41."
+    ),
+}
 
 #: Absolute tolerance on the handoff-plane axial coordinate, in metres. The
 #: frozen protocol stores the plane as a float64 literal produced by the same
@@ -142,10 +197,21 @@ class HandoffPerturbation:
     #: Skip moving the OPL from the traced image surface to the declared plane.
     #: Leaves phase and position describing planes millimetres apart.
     transfer_opl_to_plane: bool = True
+    #: Skip moving the OPL's reference from Optiland's launch PLANE onto the
+    #: incoming WAVEFRONT (CHE-41). Reproduces the defect CHE-37 found: on axis an
+    #: exact no-op, off axis it removes the entire convergence tilt and the wave
+    #: converges 209 um from where the rays go. This is the one perturbation in
+    #: this class whose effect is zero for every configuration M3.4-M3.8 verified,
+    #: which is precisely why it needed a ticket of its own.
+    reference_incoming_wavefront: bool = True
 
     @property
     def is_identity(self) -> bool:
-        return self.opl_sign == 1 and self.transfer_opl_to_plane
+        return (
+            self.opl_sign == 1
+            and self.transfer_opl_to_plane
+            and self.reference_incoming_wavefront
+        )
 
     def describe(self) -> str:
         if self.is_identity:
@@ -155,6 +221,8 @@ class HandoffPerturbation:
             parts.append("opl_sign_flipped")
         if not self.transfer_opl_to_plane:
             parts.append("opl_plane_transfer_omitted")
+        if not self.reference_incoming_wavefront:
+            parts.append("incoming_wavefront_reference_omitted")
         return "+".join(parts)
 
 
@@ -254,6 +322,150 @@ def _require_positive_index(conventions: dict[str, Any], record: ArtifactRecord)
     return index
 
 
+def _object_space_reference(
+    record: ArtifactRecord, bundle: RayBundle, *, applied: bool
+) -> dict[str, Any]:
+    """Decide whether Optiland's launch-plane reference has to be moved, and to what.
+
+    CHE-41. Three outcomes, and which one occurs is decided by measurement rather
+    than by configuration:
+
+    ``applied``
+        The record carries the object-space term and its span across the bundle is
+        non-zero, so the omission is a *tilt*. The term is added.
+
+    ``pure piston, not applied``
+        The term is present and constant across every ray. A constant is removed
+        exactly by step 3's chief-ray subtraction, so adding it would only spend
+        float precision on a quantity that cannot survive -- the same policy CHE-40
+        already applies to the removed reference OPL and the wave side applies to
+        ``exp(i k z)``. This is the branch every on-axis configuration takes, and
+        taking it is what makes the on-axis declared OPL *bit-identical* to
+        CHE-33's rather than merely close to it.
+
+    ``refused``
+        The term is absent and the field is not on axis. There is no way to
+        reconstruct it downstream: the missing quantity is object-space
+        information, and the exit-pupil export does not contain it in any form. A
+        pupil OPL declared without it is a converging sphere aimed at the axis
+        whatever the field angle, which is a wrong answer that looks entirely
+        healthy -- 0.072 waves P-V against its own fitted sphere.
+    """
+    offset = bundle.provenance.get("object_space_reference_offset_m")
+    declaration = bundle.provenance.get("object_space_reference") or {}
+    field = bundle.provenance.get("requested_field") or {}
+    hx, hy = field.get("Hx"), field.get("Hy")
+    on_axis = hx == 0.0 and hy == 0.0
+
+    if offset is None:
+        if on_axis:
+            return {
+                "applied": False,
+                "offset_m": None,
+                "span_m": None,
+                "status": "absent, and the traced field is on axis",
+                "reason": (
+                    "the record carries no object_space_reference_offset_m. At "
+                    "Hx = Hy = 0 the incoming bundle travels along z, so Optiland's "
+                    "launch plane IS a wavefront of it and the term would be a "
+                    "constant; step 3 removes constants exactly. Accepted for this "
+                    "field only."
+                ),
+                "field": {"Hx": hx, "Hy": hy},
+            }
+        raise ContractError(
+            ContractCode.OBJECT_SPACE_REFERENCE_MISSING,
+            (
+                "this record was traced at an off-axis field "
+                f"(Hx = {hx!r}, Hy = {hy!r}) and carries no "
+                "object_space_reference_offset_m, so the optical path it exports is "
+                "measured from a plane perpendicular to z rather than from a "
+                "wavefront of the incoming bundle"
+                + (
+                    f"; the ray model declined to supply it because: "
+                    f"{declaration.get('unavailable_reason')}"
+                    if declaration.get("unavailable_reason")
+                    else ""
+                )
+            ),
+            declaration="provenance.object_space_reference_offset_m",
+            artifact_id=record.id,
+            remedy=(
+                "Re-run the ray model with a version that exports the object-space "
+                "reference (CHE-41), or trace on axis. This cannot be repaired "
+                "downstream: the missing term is n_object * (d0 . r_launch), it is "
+                "linear in the LAUNCH coordinate, and the exit-pupil export carries "
+                "no object-space coordinate to reconstruct it from. Declaring the OPL "
+                "without it produces a clean converging sphere aimed at the axis "
+                "instead of at the image point -- on M3-REVERSE-TELEPHOTO at Hy = 0.2, "
+                "209 um away, with a residual of 0.072 waves P-V that looks like a "
+                "healthy diffraction-limited wavefront (CHE-37)."
+            ),
+        )
+
+    offset_m = np.asarray(offset, dtype=np.float64)
+    if offset_m.shape != (bundle.count,):
+        raise ContractError(
+            ContractCode.SHAPE_MISMATCH,
+            (
+                "object_space_reference_offset_m must carry one value per ray, got "
+                f"{offset_m.shape} for {bundle.count} rays"
+            ),
+            declaration="provenance.object_space_reference_offset_m",
+            artifact_id=record.id,
+        )
+    if not np.all(np.isfinite(offset_m)):
+        raise ContractError(
+            ContractCode.NON_FINITE,
+            "object_space_reference_offset_m is not finite",
+            declaration="provenance.object_space_reference_offset_m",
+            artifact_id=record.id,
+        )
+
+    span_m = float(np.ptp(offset_m))
+    if not applied:
+        return {
+            "applied": False,
+            "offset_m": offset_m,
+            "span_m": span_m,
+            "status": "OMITTED -- negative test only",
+            "reason": (
+                "HandoffPerturbation(reference_incoming_wavefront=False). The declared "
+                "OPL is referenced to Optiland's launch plane, which is the defect "
+                "CHE-37 measured. Off axis this removes the entire convergence tilt."
+            ),
+            "field": {"Hx": hx, "Hy": hy},
+        }
+    if span_m == 0.0:
+        return {
+            "applied": False,
+            "offset_m": offset_m,
+            "span_m": 0.0,
+            "status": "present, constant across the bundle: a pure piston, not applied",
+            "reason": (
+                "the term is identical for every ray, so it is a piston and step 3's "
+                "chief-ray subtraction removes it exactly. Not added, so the declared "
+                "OPL is bit-identical to the pre-CHE-41 value rather than one rounding "
+                "away from it -- CHE-40's policy for quantities no single-path PSF can "
+                "see."
+            ),
+            "field": {"Hx": hx, "Hy": hy},
+        }
+    return {
+        "applied": True,
+        "offset_m": offset_m,
+        "span_m": span_m,
+        "status": "applied: the term varies across the bundle, so the omission is a tilt",
+        "reason": (
+            "n_object * (d0 . r_launch) added to the accumulated path, moving its "
+            "reference from Optiland's launch plane onto the plane wavefront of the "
+            "incoming bundle through the global origin. Off axis this term IS the "
+            "convergence tilt."
+        ),
+        "field": {"Hx": hx, "Hy": hy},
+    }
+
+
 def declare_coherent_bundle(
     record: ArtifactRecord,
     *,
@@ -327,6 +539,13 @@ def declare_coherent_bundle(
     else:
         optical_path_at_plane_m = optical_path_at_image_m
 
+    # --- 2b. Move the reference onto the incoming wavefront (CHE-41) ---------
+    object_space = _object_space_reference(
+        record, bundle, applied=perturbation.reference_incoming_wavefront
+    )
+    if object_space["applied"]:
+        optical_path_at_plane_m = optical_path_at_plane_m + object_space["offset_m"]
+
     # --- 3. Remove the reference piston (CHE-40 required conditioning) -------
     radius_m = np.hypot(bundle.positions_m[:, 0], bundle.positions_m[:, 1])
     chief_index = int(np.argmin(radius_m))
@@ -335,16 +554,19 @@ def declare_coherent_bundle(
 
     entrance_pupil_diameter_m = conventions.get("entrance_pupil_diameter_m")
     opl_reference_declaration = (
-        f"traced chief ray (smallest pupil radius, row {chief_index}, "
-        f"rho = {float(radius_m[chief_index]):.6e} m) evaluated at the "
-        f"{declared_plane.handoff_plane} plane z = {z_plane_m!r} m; sign convention "
-        "'ray minus chief', so a larger value means a longer optical path (CHE-30 "
-        "part 2, and the same sign L1-RAY-01's evaluator declares). Source is "
-        "RealRays.opd: absolute accumulated optical path in mm from the ray launch "
-        "state (CHE-30 part 3), which for this infinite-object system sits at an "
-        f"aperture-dependent plane at EPD = {entrance_pupil_diameter_m!r} m. That "
-        "dependence is common to every ray in the trace and cancels exactly in this "
-        "subtraction."
+        f"{OPL_REFERENCE_VERSION}. Zero at the traced chief ray (smallest pupil "
+        f"radius, row {chief_index}, rho = {float(radius_m[chief_index]):.6e} m) "
+        f"evaluated at the {declared_plane.handoff_plane} plane z = {z_plane_m!r} m; "
+        "sign convention 'ray minus chief', so a larger value means a longer optical "
+        "path (CHE-30 part 2, and the same sign L1-RAY-01's evaluator declares). The "
+        "SURFACE the path is measured from is the plane WAVEFRONT of the incoming "
+        "collimated bundle, not Optiland's launch plane: RealRays.opd accumulates from "
+        "a plane perpendicular to z (CHE-30 part 3, at an aperture-dependent location "
+        f"for EPD = {entrance_pupil_diameter_m!r} m), and CHE-41 adds "
+        "n_object * (d0 . r_launch) to move that reference onto a wavefront. "
+        f"Object-space term: {object_space['status']}. On axis the term is a constant "
+        "and both the launch-plane and wavefront references give the same declared "
+        "path; off axis the difference is the entire convergence tilt."
     )
 
     # --- 4. Declare, through the contract's own named entry points -----------
@@ -354,8 +576,36 @@ def declare_coherent_bundle(
     bundle = bundle.with_amplitude_from_weight(mapping=AMPLITUDE_MAPPING)
 
     declarations = {
-        "issue": "CHE-33 (M3.4)",
+        "issue": "CHE-33 (M3.4), off-axis reference by CHE-41",
+        "opl_reference_version": OPL_REFERENCE_VERSION,
+        "superseded_opl_reference": SUPERSEDED_OPL_REFERENCE,
         "optical_path_length_reference": opl_reference_declaration,
+        "optical_path_length_object_space_reference": {
+            "declared_reference_surface": (
+                "the plane wavefront of the incoming collimated bundle that passes "
+                "through the global origin. CHE-41 declares the INCOMING TILTED "
+                "WAVEFRONT rather than a chief-ray-referenced frame: it is a physical "
+                "surface fixed by the bundle rather than a frame chosen per field, it "
+                "leaves the reconstructed field in the same world coordinates the rays "
+                "are traced in -- so 'the PSF lands at the traced chief-ray "
+                "intersection' is a falsifiable statement rather than a definition -- "
+                "and it does not require re-introducing a reference sphere aimed at a "
+                "chosen image point, which is the construction whose approximate form "
+                "manufactured a 1.0-wave false aberration finding in M3.8. The cost is "
+                "that the pupil field carries the tilt and must be sampled at "
+                "pitch <= lambda / (2 max|transverse direction cosine|)."
+            ),
+            "term": "n_object * (d0 . r_launch), from the ray record",
+            "status": object_space["status"],
+            "reason": object_space["reason"],
+            "span_m": object_space["span_m"],
+            "span_waves": (
+                object_space["span_m"] / bundle.wavelength_m
+                if object_space["span_m"] is not None
+                else None
+            ),
+            "field": object_space["field"],
+        },
         "optical_path_length_unit_conversion": (
             f"opd_native * {NATIVE_OPD_UNIT_M!r} m per native unit (CHE-30 part 4: "
             "the lens geometry unit is millimetres)"
@@ -394,6 +644,15 @@ def declare_coherent_bundle(
 
     diagnostics = {
         "ray_count": bundle.count,
+        "opl_reference_version": OPL_REFERENCE_VERSION,
+        "object_space_reference_applied": object_space["applied"],
+        "object_space_reference_status": object_space["status"],
+        "object_space_reference_span_m": object_space["span_m"],
+        "object_space_reference_span_waves": (
+            object_space["span_m"] / bundle.wavelength_m
+            if object_space["span_m"] is not None
+            else None
+        ),
         "handoff_plane": declared_plane.handoff_plane,
         "reference_plane_z_m": z_plane_m,
         "traced_image_surface_z_m": z_image_m,

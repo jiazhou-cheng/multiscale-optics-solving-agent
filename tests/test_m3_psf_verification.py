@@ -418,27 +418,50 @@ def test_the_orientation_control_can_be_made_to_fail(record: dict) -> None:
     assert control["transpose_is_detectable_here"] is True
 
 
-def test_the_off_axis_handoff_is_recorded_as_unverified(record: dict) -> None:
-    """The finding: off axis, the declared OPL is missing its tilt.
+def test_the_off_axis_handoff_puts_the_psf_where_the_rays_go(record: dict) -> None:
+    """Four narrower positive claims, replacing one assertion of a defect.
 
-    Pinned so it cannot be forgotten. The wave converges on axis, within 1 um of
-    y = 0, when geometry puts the image 209 um away -- and the shipping PSF lands
-    there too.
+    M3.8 pinned the absence of the pupil tilt so it could not be forgotten. CHE-41
+    supplied it, so an assertion that it is missing would now be false. Following
+    M2's precedent -- whose ``wave_to_ray_not_claimed`` absence-check was replaced
+    by four narrower claims rather than deleted -- each thing the old test
+    established is replaced by the positive statement that took its place, and the
+    superseded numbers are asserted to still be *recorded* so the history cannot be
+    quietly dropped.
+
+    The oracle proper (sub-pixel PSF position, the fitted sphere centre, and a
+    reference-sphere-free geometric spot) lives in
+    tests/test_m3_off_axis_handoff.py against CHE-41's own record. This test only
+    asks that M3.8's own path agrees.
     """
-    finding = record["off_axis_tilt_finding"]
+    handoff = record["off_axis_handoff"]
 
-    assert "NOT verified" in finding["verdict"]
-    assert abs(finding["slope_present_as_fraction_of_required"]) < 0.01
-    # The wave converges ON AXIS: the fitted sphere centre is within 1 um of y = 0,
-    # while the geometric image point is 209 um away.
-    assert finding["fitted_centre_distance_from_axis_m"] < 2.0e-6
-    assert finding["fitted_centre_distance_from_geometric_point_m"] == pytest.approx(
-        abs(finding["geometric_image_height_m"]), rel=0.01
+    # 1. The tilt is present. The least-squares slope reads ~0.19% above y/R
+    #    because a sphere's slope is not constant across the pupil, so this is
+    #    bounded loosely on purpose: the sphere fit is the oracle, not the slope.
+    assert handoff["slope_present_as_fraction_of_required"] == pytest.approx(1.0, abs=0.01)
+    # 2. The reconstructed wave converges where the rays go, not on the axis.
+    assert handoff["fitted_centre_distance_from_geometric_point_m"] < 2.0e-6
+    assert handoff["fitted_centre_distance_from_axis_m"] > 1.0e-4
+    # 3. The wavefront against the geometric image point is diffraction limited,
+    #    which is what a converging sphere aimed at the right point looks like.
+    assert handoff["wavefront_pv_waves_against_the_geometric_point"] < 0.25
+    # 4. The shipping PSF lands there too, within one pixel of the prediction.
+    assert abs(handoff["geometric_image_height_pixels"]) > 100
+    assert (
+        abs(
+            handoff["measured_psf_peak_offset_pixels"]
+            - handoff["geometric_image_height_pixels"]
+        )
+        <= 1.0
     )
-    assert finding["wavefront_pv_waves_against_the_geometric_point"] > 50.0
-    assert finding["wavefront_pv_waves_against_the_fitted_centre"] < 0.1
-    assert abs(finding["measured_psf_peak_offset_pixels"]) <= 2
-    assert abs(finding["geometric_image_height_pixels"]) > 100
+
+    # The defect is retained as measured, not erased.
+    superseded = handoff["superseded_finding"]
+    assert superseded["slope_present_as_fraction_of_required"] < 0.01
+    assert superseded["wavefront_pv_waves_against_the_geometric_point"] > 50.0
+    assert abs(superseded["measured_psf_peak_offset_pixels"]) <= 2
+    assert "CHE-41" in handoff["fixed_by"]
 
 
 def test_the_two_failing_gates_are_pinned_as_failing_with_their_diagnosis(

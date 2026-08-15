@@ -39,6 +39,35 @@ from multiscale_optics_agent.core.specs import ArtifactKind  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
+#: The traced ray set: the arrays `scientific_array_sha256` covers, unchanged since
+#: M1. CHE-41 adds object-space arrays to the same file under a separate hash, so
+#: the two groups are named separately here rather than merged into one set.
+TRACED_ARRAY_NAMES = frozenset(
+    {
+        "x_m",
+        "y_m",
+        "z_m",
+        "L",
+        "M",
+        "N",
+        "intensity",
+        "wavelength_m",
+        "opd_native",
+        "survived",
+    }
+)
+
+#: CHE-41: the launch state Optic.trace discards, and the wavefront-reference term
+#: computed from it. Present whenever the launch geometry could be characterized.
+OBJECT_SPACE_ARRAY_NAMES = frozenset(
+    {
+        "object_space_reference_offset_m",
+        "launch_x_m",
+        "launch_y_m",
+        "launch_z_m",
+    }
+)
+
 
 def _smoke_request(**config_overrides) -> ModelRunRequest:
     """Mirror knowledge/solvers/optiland/probes/raytrace_probe.py exactly.
@@ -284,18 +313,12 @@ def test_standalone_contract_is_deterministic_and_complete(tmp_path) -> None:
     )
 
     saved = np.load(first.arrays_path)
-    assert set(saved.files) == {
-        "x_m",
-        "y_m",
-        "z_m",
-        "L",
-        "M",
-        "N",
-        "intensity",
-        "wavelength_m",
-        "opd_native",
-        "survived",
-    }
+    # The TRACED ray set, which is what scientific_array_sha256 covers and what M1
+    # pinned. CHE-41 adds an object-space group to the same file under its own hash
+    # (see the second assertion); it does not add a column to this set, because that
+    # would move a fingerprint no traced ray moved.
+    assert set(saved.files) >= TRACED_ARRAY_NAMES
+    assert set(saved.files) - TRACED_ARRAY_NAMES == OBJECT_SPACE_ARRAY_NAMES
     assert np.all(saved["survived"])
     assert np.max(np.abs(np.sqrt(saved["L"] ** 2 + saved["M"] ** 2 + saved["N"] ** 2) - 1)) <= 1e-12
     assert np.all(saved["wavelength_m"] == pytest.approx(0.55e-6))
@@ -568,19 +591,8 @@ def test_m3_singlet_ref_matches_recorded_m1_standard_evidence(tmp_path) -> None:
 
         # The M1 invariants, re-derived from the persisted arrays rather than
         # taken from the adapter's own summary of them.
-        scientific = {name: first_arrays[name] for name in first_arrays.files}
-        assert set(scientific) == {
-            "x_m",
-            "y_m",
-            "z_m",
-            "L",
-            "M",
-            "N",
-            "intensity",
-            "wavelength_m",
-            "opd_native",
-            "survived",
-        }
+        scientific = {name: first_arrays[name] for name in TRACED_ARRAY_NAMES}
+        assert set(first_arrays.files) - TRACED_ARRAY_NAMES == OBJECT_SPACE_ARRAY_NAMES
         for name, array in scientific.items():
             if name == "survived":
                 assert np.all(array)

@@ -81,6 +81,72 @@ amendments:
       widening: it makes the budget state that it does not close.
     evidence: benchmarks/probes/records/m3_convergence.json
     probe: benchmarks/probes/m3_convergence.py
+  # Renumbered A3 -> A4 when CHE-41's branch was merged into main. CHE-38 and
+  # CHE-41 were worked in parallel and both minted an "A3"; CHE-38's landed on
+  # main first and its id is asserted by tests/test_m3_convergence.py, so this
+  # entry took the next free number. The two amendments are independent: CHE-38
+  # concerns the on-axis oracle gate, CHE-41 the off-axis OPL reference.
+  - id: A4-off-axis-opl-reference-is-the-incoming-wavefront
+    issue: CHE-41
+    supersedes: >-
+      C_RAY_TO_WAVE opl_reference v1 (CHE-33), which measured the declared pupil
+      optical path from Optiland's ray launch state and named that state's surface
+      "the launch plane" while using it as a wavefront
+    summary: >-
+      The declared off-axis OPL reference is now the PLANE WAVEFRONT OF THE
+      INCOMING COLLIMATED BUNDLE, stated as a choice rather than defaulted into.
+      Optiland launches every ray of an infinite-object trace on one plane
+      PERPENDICULAR TO Z (measured: z spread exactly 0 across 3169 rays, direction
+      spread 2.8e-17), which is a wavefront only for a bundle travelling along z.
+      The two surfaces differ by n_object * (d0 . r_launch) -- a constant on axis,
+      linear in the launch coordinate off it. The ray adapter now exports that term
+      per ray and the coupler adds it; when the term is constant across the bundle
+      it is NOT added, so every on-axis declared OPL is bit-identical to v1's
+      rather than one rounding away from it.
+    the_alternative_and_why_not: >-
+      an explicit chief-ray-referenced frame with the observation window centred on
+      the chief ray. Rejected for four reasons, none of them about convenience.
+      (1) It makes the coupler's output frame field-dependent, where the wavefront
+      is a physical surface the incoming bundle defines identically at every field.
+      (2) It makes the oracle circular: under a chief-ray-centred window the PSF
+      lands at the window centre by declaration, so "the PSF lands at the traced
+      chief-ray intersection" stops being falsifiable. (3) Its correct form
+      requires a reference sphere aimed at a chosen image point; its approximate
+      form -- subtract a least-squares linear ramp -- is what reported this system
+      at 1.0 waves RMS in M3.8 before a geometric spot check caught it, so the
+      right and wrong implementations differ by a term shaped exactly like the
+      aberration the slice measures. (4) It is the less general choice: a chief-ray
+      frame can be built on top of a wavefront-referenced OPL by subtracting the
+      exact sphere aimed at the chief-ray intersection, while the reverse needs
+      object-space data the exit-pupil export does not carry.
+    cost_accepted: >-
+      the pupil field carries the tilt, so it must be sampled:
+      pitch <= lambda / (2 max|transverse direction cosine|). Measured over real
+      marginal rays on M3-REVERSE-TELEPHOTO, the frozen pitch of 1.8258e-06 m is
+      50.0% / 72.5% / 94.6% / 105.5% / 116.4% / 158.7% / 257.5% of the admissible
+      pitch at Hy = 0 / 0.1 / 0.2 / 0.25 / 0.3 / 0.5 / 1.0. The frozen grid
+      therefore admits a tilt-carrying pupil out to Hy ~ 0.25 and needs 2.58x
+      refinement at full field. A chief-ray-referenced frame would not sample the
+      tilt and would not pay this; that removes the constraint from the numerics,
+      not from the physics.
+    verification: >-
+      a geometric oracle that shares nothing with the reconstruction. On
+      M3-REVERSE-TELEPHOTO at Hy = 0.2 the measured PSF peak lands at pixel
+      (114, 0) against a traced chief-ray intersection at 114.42 pixels -- 0.42 px
+      = 0.17 Airy radii, below the one-pixel quantization of a peak index -- and
+      the fitted reference sphere's centre lands 0.57 um from that intersection
+      against 209.92 um under v1, an improvement of 367x. The pupil wavefront
+      against the traced chief-ray point falls from 57.01 to 0.0442 waves
+      peak-to-valley, and an independent reference-sphere-free measure agrees: the
+      geometric RMS ray radius about that point is 0.082 Airy radii (max 0.105).
+      Removing the term through the shipping code's own perturbation hook moves the
+      PSF back by 115 pixels.
+    evidence:
+      - benchmarks/probes/records/m3_off_axis_handoff.json
+      - knowledge/solvers/optiland/expected/off_axis_opd_reference.json
+    probe:
+      - benchmarks/probes/m3_off_axis_handoff.py
+      - knowledge/solvers/optiland/probes/off_axis_opd_reference.py
 scope:
   benchmark_ids: [L2-PSF-01]
   execution: end_to_end_graph
@@ -1212,7 +1278,47 @@ open_structural_items:
     sampling_half_status: resolved by CHE-38 (M3.9)
   - id: off_axis_handoff_omits_the_pupil_tilt
     found_by: CHE-37 (M3.8)
-    owner: unassigned; a follow-up, not M3.8
+    owner: CHE-41
+    status: >-
+      RESOLVED by CHE-41 under amendment A4 (minted as A3 on CHE-41's branch and
+      renumbered when it was merged; CHE-38 had independently taken A3).
+      Retained in full, unedited below,
+      because five records were measured while it was true and a reader of those
+      records needs to be able to find out what they meant. The resolution is
+      summarized in resolution/ and verified by
+      benchmarks/probes/records/m3_off_axis_handoff.json.
+    resolution:
+      declared_reference: >-
+        the plane wavefront of the incoming collimated bundle. The alternative --
+        an explicit chief-ray-referenced frame -- was weighed and rejected; see
+        amendment A4's the_alternative_and_why_not for the four reasons.
+      cause_confirmed: >-
+        the probable_cause below was right in mechanism and imprecise in form. The
+        omitted term is n_object * (d0 . r_launch), not sin(theta) * y: it is
+        evaluated at the LAUNCH coordinate, which is why it cannot be reconstructed
+        from the exported pupil arrays and had to be exported by the ray adapter.
+        Measured directly: the launch z spread is exactly 0 and the launch
+        direction spread is 2.8e-17 across 3169 rays, so the seeded reference
+        surface is a plane perpendicular to z rather than a wavefront
+        (knowledge/solvers/optiland/expected/off_axis_opd_reference.json).
+      opd_is_relative_to_chief_ray: >-
+        still False, and now tested where it is testable: off axis the chief ray's
+        own opd_native is 11051.3 waves rather than zero. The flag was correct; it
+        was the reference SURFACE that was undeclared, and two new conventions
+        entries now state it (opd_reference_surface,
+        opd_omits_incoming_wavefront_tilt).
+      oracle: >-
+        PSF peak at pixel (114, 0) against a traced chief-ray intersection at
+        114.42 pixels (0.42 px, 0.17 Airy radii, below the peak index's own
+        quantization); fitted reference-sphere centre 0.57 um from that
+        intersection against 209.92 um before, 367x better; pupil wavefront against
+        the traced chief-ray point 0.0442 waves P-V against 57.01 before; geometric
+        RMS ray radius about that point 0.082 Airy radii, which fits no sphere at
+        all.
+      on_axis_impact: >-
+        none, and bit-identically none: the term is constant across an on-axis
+        bundle, and the coupler does not add a constant. Asserted by
+        tests/test_m3_off_axis_handoff.py rather than assumed.
     severity: >-
       high for any off-axis work, none for M3's frozen on-axis configuration
     description: >-
@@ -1268,6 +1374,26 @@ open_structural_items:
     still_open: >-
       a transpose in the SHIPPING configuration remains undetectable. Fixing that
       needs the off-axis handoff, i.e. the item above.
+    resolved_by: >-
+      CHE-41, and the fix uncovered a SECOND blind spot the 1.0000066 margin was
+      hiding. With the off-axis handoff corrected the shipping PSF sits 114 pixels
+      off axis along +y and 0 along x, and Perturbation(transpose_axes=True) moves
+      it to (0, 114) -- a displacement of 161 pixels, 66 Airy radii. But CHE-37's
+      SCORING still reads a margin of 0.99999978, because it azimuthally averages
+      about the grid centre and such an average cannot distinguish a peak at
+      (114, 0) from one at (0, 114) for any configuration whatsoever. An off-axis
+      field was necessary and not sufficient; the metric had to change too. Two
+      repairs are reported rather than one. Centring the analytic reference and the
+      azimuthal average on the traced image point -- the smallest change, and the
+      one now applied to off_axis_negative_controls -- gives 233.6 in CHE-41's
+      record and 674.9 in m3_psf_verification's, and simultaneously lifts the
+      OPL-sign, phase-sign, oblique-ramp and distance-sign controls on that
+      configuration from within 2.6x of 1.0 to 651x-1400x, which is what an
+      asymmetric configuration was supposed to buy in the first place. Dropping the
+      azimuthal average entirely gives 12.43. The amplitude control remains
+      undetected at 1.00005. Evidence:
+      benchmarks/probes/records/m3_off_axis_handoff.json (axis_transpose_control)
+      and m3_psf_verification.json (off_axis_negative_controls).
 
   - id: amplitude_path_is_not_exercised_by_any_m3_configuration
     found_by: CHE-37 (M3.8)

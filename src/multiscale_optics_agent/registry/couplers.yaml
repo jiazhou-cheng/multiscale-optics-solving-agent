@@ -52,6 +52,15 @@ couplers:
           zero moves with the aperture (CHE-30), and a wrong sign conjugates the
           wavefront.
         - >
+          CHE-41: the declared OPL reference is versioned, and v2 measures the
+          path from the plane WAVEFRONT of the incoming bundle rather than from
+          Optiland's launch plane. The two agree exactly on axis and differ by
+          the whole convergence tilt off axis. An off-axis source record that
+          carries no object-space reference term is refused with
+          OBJECT_SPACE_REFERENCE_MISSING; the term cannot be reconstructed
+          downstream, and proceeding without it aims a clean converging sphere at
+          the axis instead of at the image point.
+        - >
           CHE-34: two declarations must be supplied ON THE EDGE when the source
           record is not already coherent -- the handoff plane (kind and axial
           position) and, through it, the OPL reference and the

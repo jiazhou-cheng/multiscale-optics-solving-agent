@@ -495,6 +495,165 @@ def _project_rays_to_plane(rays: Any, be_utils: Any, target_z_mm: float) -> dict
     }
 
 
+def _resolve_object_space_reference(
+    lens: Any,
+    be: Any,
+    be_utils: Any,
+    *,
+    hx: float,
+    hy: float,
+    wavelength_um: float,
+    num_rays: int,
+    traced_count: int,
+) -> dict[str, Any]:
+    """The optical path from an incoming *wavefront* to each ray's launch point.
+
+    CHE-41. ``RealRays.opd`` is seeded to zero at the launch state, and for an
+    object at infinity ``angle.py`` launches every ray on one plane
+    **perpendicular to z** at ``positions[1] - (EPD - min(positions[1:-1]))``.
+    A plane perpendicular to z is a wavefront only for a bundle travelling along
+    z. For a bundle tilted by ``theta`` the two surfaces differ by
+    ``n_object * (d0 . r_launch)``, which is *linear in the launch coordinate* --
+    a tilt, not a piston. CHE-30 characterized the same launch plane and recorded
+    only the piston consequence, because on axis that is all there is.
+
+    Nothing is corrected here. The term is measured from the launch state and
+    exported so that a *consumer* can declare its reference; the accumulated
+    ``opd_native`` is left exactly as Optiland produced it.
+
+    The launch state is regenerated through the public entry point
+    ``ray_tracer.ray_generator.generate_rays`` over the same hexapolar
+    distribution ``Optic.trace`` builds, which is the only reason this is
+    possible at all: ``Optic.trace`` returns the traced rays and keeps no record
+    of where they started.
+
+    Every precondition the term depends on is *checked rather than assumed*, and
+    a failed check returns ``available=False`` with the reason. It never returns
+    a term it could not verify: an unavailable term is a structured refusal
+    downstream, and a wrong one is a wavefront aimed at the wrong image point.
+    """
+    import numpy as np
+
+    def unavailable(reason: str) -> dict[str, Any]:
+        return {
+            "available": False,
+            "unavailable_reason": reason,
+            "offset_native": None,
+        }
+
+    try:
+        object_at_infinity = bool(lens.object_surface.is_infinite)
+    except Exception as exc:  # pragma: no cover - defensive
+        return unavailable(
+            f"the object surface could not be read ({type(exc).__name__}), so the "
+            "launch geometry is unknown"
+        )
+    if not object_at_infinity:
+        return unavailable(
+            "the object is at a finite distance, so the launch state is a POINT "
+            "rather than a plane. A point source is already a common wavefront and "
+            "the term would be zero -- but no system in this repository exercises "
+            "that path, and an untested zero is still an untested claim."
+        )
+
+    try:
+        from optiland.distribution import create_distribution
+
+        distribution = create_distribution("hexapolar")
+        distribution.generate_points(num_rays)
+        pupil_x = distribution.x
+        pupil_y = distribution.y
+        pupil_points = int(np.asarray(be_utils.to_numpy(pupil_x)).size)
+        field_x = be.atleast_1d(be.array(float(hx)))
+        field_y = be.atleast_1d(be.array(float(hy)))
+        launch = lens.ray_tracer.ray_generator.generate_rays(
+            be.repeat(field_x, pupil_points),
+            be.repeat(field_y, pupil_points),
+            pupil_x,
+            pupil_y,
+            wavelength_um,
+        )
+    except Exception as exc:
+        return unavailable(
+            "the launch state could not be regenerated from "
+            f"ray_tracer.ray_generator.generate_rays ({type(exc).__name__}: {exc}); "
+            "Optic.trace does not retain it, so there is nothing to measure the "
+            "object-space reference from"
+        )
+
+    def to_array(value: Any) -> Any:
+        return np.asarray(be_utils.to_numpy(value), dtype=np.float64)
+
+    x0, y0, z0 = to_array(launch.x), to_array(launch.y), to_array(launch.z)
+    l0, m0, n0 = to_array(launch.L), to_array(launch.M), to_array(launch.N)
+
+    if x0.size != traced_count:
+        return unavailable(
+            f"the regenerated launch state has {x0.size} rays but the trace exported "
+            f"{traced_count}; the two cannot be matched row for row"
+        )
+    if not (
+        np.all(np.isfinite(x0))
+        and np.all(np.isfinite(y0))
+        and np.all(np.isfinite(z0))
+        and np.all(np.isfinite(l0))
+        and np.all(np.isfinite(m0))
+        and np.all(np.isfinite(n0))
+    ):
+        return unavailable("the regenerated launch state is not finite")
+
+    direction_spread = max(float(np.ptp(l0)), float(np.ptp(m0)), float(np.ptp(n0)))
+    plane_spread = float(np.ptp(z0))
+    if direction_spread > _DIRECTION_NORM_TOLERANCE:
+        return unavailable(
+            "the launch directions are not common to every ray (spread "
+            f"{direction_spread:.3e}), so the incoming bundle is not collimated and "
+            "a single plane wavefront does not describe it"
+        )
+    if plane_spread > 0.0:
+        return unavailable(
+            f"the launch points do not lie on one plane (z spread {plane_spread:.3e} "
+            "in native units), so the seeded reference surface is not the plane this "
+            "term assumes"
+        )
+
+    index = None
+    try:
+        index = float(
+            np.asarray(
+                be_utils.to_numpy(lens.surfaces.surfaces[0].material_post.n(wavelength_um))
+            ).ravel()[0]
+        )
+    except Exception:
+        index = None
+    if index is None or not np.isfinite(index) or index <= 0.0:
+        return unavailable(
+            "the object-space refractive index could not be read from the "
+            "prescription, and the optical path from a wavefront to the launch "
+            "plane is index-weighted"
+        )
+
+    # d0 . r_launch, index-weighted. The N0 * z0 part is common to every ray
+    # because the launch plane is flat; it is retained rather than dropped so the
+    # exported quantity is the optical path from ONE stated wavefront (the one
+    # through the global origin, perpendicular to d0) rather than from an
+    # unstated one.
+    offset_native = index * (l0 * x0 + m0 * y0 + n0 * z0)
+
+    return {
+        "available": True,
+        "unavailable_reason": None,
+        "offset_native": offset_native,
+        "launch_x_native": x0,
+        "launch_y_native": y0,
+        "launch_z_native": z0,
+        "launch_direction": [float(l0[0]), float(m0[0]), float(n0[0])],
+        "launch_plane_z_native": float(z0[0]),
+        "object_space_refractive_index": index,
+        "span_native": float(np.ptp(offset_native)),
+    }
+
+
 @lru_cache(maxsize=1)
 def _load_spec() -> ModelSpec:
     return Registry.from_package().models[MODEL_ID]
@@ -881,6 +1040,18 @@ class OptilandAdapter:
                 exit_pupil = None
                 reference_plane_z_mm = image_plane_z_mm
 
+            import numpy as _np
+
+            object_space_reference = _resolve_object_space_reference(
+                lens,
+                be,
+                be_utils,
+                hx=hx,
+                hy=hy,
+                wavelength_um=wavelength,
+                num_rays=num_rays,
+                traced_count=int(_np.asarray(be_utils.to_numpy(rays.x)).size),
+            )
             rays_artifact = self._build_ray_bundle_artifact(
                 request,
                 rays,
@@ -897,6 +1068,7 @@ class OptilandAdapter:
                 exit_pupil,
                 len(lens.surfaces.surfaces) - 1,
                 _resolve_image_space(lens, be_utils, wavelength),
+                object_space_reference,
             )
             wavefront_artifact, wavefront_warnings = self._build_wavefront_artifact(
                 request, rays, be_utils, backend_name, sample_name, wavelength, run_dir
@@ -1084,6 +1256,7 @@ class OptilandAdapter:
         exit_pupil: dict[str, Any] | None = None,
         image_surface_index: int = 14,
         image_space: dict[str, Any] | None = None,
+        object_space_reference: dict[str, Any] | None = None,
     ) -> ArtifactRecord:
         import numpy as np
 
@@ -1153,6 +1326,41 @@ class OptilandAdapter:
             # the membership of each exported row; it is not an Optiland pupil mask.
             "survived": np.ones(native["x"].shape, dtype=np.bool_),
         }
+        # CHE-41. The object-space reference travels in the SAME file but under a
+        # separate hash, and `arrays` is left untouched: `scientific_array_sha256`
+        # is the frozen identity of the traced ray set (CHE-32 pinned
+        # e494af41... on M3-SINGLET-REF, L1-RAY-01's 43dab1ee... downstream of the
+        # same function), and adding a column to it would move a fingerprint that
+        # nothing about this change has any business moving. The new arrays are
+        # additional *object-space* data, not a revision of the traced output.
+        object_space = object_space_reference or {"available": False}
+        object_space_arrays: dict[str, Any] = {}
+        if object_space.get("available"):
+            object_space_arrays = {
+                "object_space_reference_offset_m": (
+                    np.asarray(object_space["offset_native"], dtype=np.float64)
+                    * _GEOMETRY_M_PER_MM
+                ),
+                "launch_x_m": (
+                    np.asarray(object_space["launch_x_native"], dtype=np.float64)
+                    * _GEOMETRY_M_PER_MM
+                ),
+                "launch_y_m": (
+                    np.asarray(object_space["launch_y_native"], dtype=np.float64)
+                    * _GEOMETRY_M_PER_MM
+                ),
+                "launch_z_m": (
+                    np.asarray(object_space["launch_z_native"], dtype=np.float64)
+                    * _GEOMETRY_M_PER_MM
+                ),
+            }
+            if object_space_arrays["object_space_reference_offset_m"].shape != arrays["x_m"].shape:
+                raise ValueError(
+                    "the object-space reference term does not match the exported ray "
+                    f"count: {object_space_arrays['object_space_reference_offset_m'].shape} "
+                    f"vs {arrays['x_m'].shape}."
+                )
+
         scientific_hash = _scientific_array_hash(arrays)
         summary_metrics = {
             "max_direction_norm_error": max_direction_norm_error,
@@ -1172,7 +1380,7 @@ class OptilandAdapter:
         }
 
         path = run_dir / "rays.npz"
-        np.savez(path, **arrays)
+        np.savez(path, **arrays, **object_space_arrays)
 
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1315,7 +1523,92 @@ class OptilandAdapter:
                     ),
                     "opd_quantity": "absolute_accumulated_optical_path_length",
                     "opd_is_relative_to_chief_ray": False,
-                    "opd_convention_verified_by": "CHE-30",
+                    # CHE-41 tested this off axis, where it is testable: the chief
+                    # ray's own opd_native is 1.0e4 waves rather than zero, and the
+                    # accumulator's zero sits on a plane, so the field name's
+                    # promise of a chief-ray-relative OPD remains false. What CHE-30
+                    # could not see on axis is the SHAPE of that plane's failure,
+                    # stated in the next two entries.
+                    "opd_is_relative_to_chief_ray_verified_off_axis": "CHE-41, Hy = 0.2",
+                    "opd_reference_surface": (
+                        "a plane PERPENDICULAR TO Z at the launch, which is a "
+                        "wavefront only for a bundle travelling along z"
+                    ),
+                    "opd_omits_incoming_wavefront_tilt": True,
+                    "opd_omitted_term": (
+                        "n_object * (d0 . r_launch), exported below as "
+                        "object_space_reference_offset_m. Linear in the launch "
+                        "coordinate, so on axis it is a piston that cancels in any "
+                        "chief-ray subtraction and off axis it is the whole "
+                        "convergence tilt: on M3-REVERSE-TELEPHOTO at Hy = 0.2 the "
+                        "pupil OPL carries 0.13% of the tilt the geometry requires "
+                        "without it (CHE-41, CHE-37)."
+                    ),
+                    "opd_convention_verified_by": "CHE-30, extended off axis by CHE-41",
+                    # CHE-41: the object-space information Optic.trace throws away.
+                    # Present as a declaration even when unavailable, because an
+                    # absent term is what a consumer must refuse an off-axis field
+                    # on, and it cannot refuse on a key that is not there.
+                    "object_space_reference": {
+                        "available": bool(object_space.get("available")),
+                        "unavailable_reason": object_space.get("unavailable_reason"),
+                        "array": (
+                            "object_space_reference_offset_m"
+                            if object_space.get("available")
+                            else None
+                        ),
+                        "unit": "m",
+                        "quantity": (
+                            "n_object * (d0 . r_launch): the optical path from the "
+                            "plane wavefront of the incoming collimated bundle that "
+                            "passes through the global origin, to each ray's launch "
+                            "point. ADD it to the native accumulated path to obtain a "
+                            "path measured from that wavefront. It is not applied "
+                            "here; opd_native is exported exactly as Optiland "
+                            "produced it."
+                        ),
+                        "launch_geometry": (
+                            "collimated_bundle_launched_on_a_plane_perpendicular_to_z"
+                            if object_space.get("available")
+                            else None
+                        ),
+                        "launch_direction": object_space.get("launch_direction"),
+                        "launch_plane_z_m": (
+                            object_space["launch_plane_z_native"] * _GEOMETRY_M_PER_MM
+                            if object_space.get("available")
+                            else None
+                        ),
+                        "object_space_refractive_index": object_space.get(
+                            "object_space_refractive_index"
+                        ),
+                        "span_m": (
+                            object_space["span_native"] * _GEOMETRY_M_PER_MM
+                            if object_space.get("available")
+                            else None
+                        ),
+                        "span_is_zero_on_axis": (
+                            "a zero span means the term is a pure piston, which the "
+                            "consumer's chief-ray subtraction removes exactly. That is "
+                            "the measured statement of 'this field is on axis', and it "
+                            "is what keeps the on-axis declaration bit-identical to "
+                            "CHE-33's."
+                        ),
+                        "source": (
+                            "ray_tracer.ray_generator.generate_rays over the same "
+                            "hexapolar distribution Optic.trace builds. Optic.trace "
+                            "returns only the traced rays and retains no launch state, "
+                            "so it is regenerated; the regeneration is checked to be "
+                            "collimated, planar, finite and row-matched before the "
+                            "term is offered, and CHE-41's probe re-traces it and "
+                            "requires x, y and opd to match the shipping trace exactly."
+                        ),
+                        "verified_by": "CHE-41",
+                        "sha256": (
+                            _scientific_array_hash(object_space_arrays)
+                            if object_space_arrays
+                            else None
+                        ),
+                    },
                     "entrance_pupil_diameter_m": entrance_pupil_diameter_m,
                     "object_at_infinity": object_at_infinity,
                     # Read from the prescription, not assumed. A consumer moving an
