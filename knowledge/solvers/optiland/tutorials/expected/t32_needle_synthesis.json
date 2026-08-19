@@ -1,0 +1,133 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "n(550 nm): MgF2 1.3785 < N-BK7 1.5185 < TiO2 2.6479. Needle synthesis can only work if the candidate set brackets the substrate index in both directions.",
+      "kind": "analytic",
+      "name": "the_candidate_set_spans_a_useful_index_range",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (200,)",
+      "kind": "invariant",
+      "name": "ar_reflectance_finite",
+      "passed": true
+    },
+    {
+      "detail": "reflectance below 1% at all 100 sampled wavelengths over 420-680 nm: mean 0.388%, peak 0.990%. Upstream's stated 'R < 1% across full band' reproduced.",
+      "kind": "reference",
+      "name": "the_synthesized_ar_meets_upstreams_R_below_one_percent_claim",
+      "passed": true
+    },
+    {
+      "detail": "merit 2.038637e-04 -> 2.104607e-05 (9.7x) after 4 needle insertions in 4 iterations",
+      "kind": "invariant",
+      "name": "needle_synthesis_strictly_improves_the_ar_merit",
+      "passed": true
+    },
+    {
+      "detail": "mean reflectance 1.408% (single 100 nm MgF2) -> 0.388% (7 layers)",
+      "kind": "analytic",
+      "name": "the_synthesized_ar_beats_the_starting_single_layer",
+      "passed": true
+    },
+    {
+      "detail": "thinnest layer 17.6848 nm against min_thickness_nm = 2.0: needles that could not grow were removed, as the algorithm requires",
+      "kind": "analytic",
+      "name": "no_synthesized_layer_is_thinner_than_the_declared_minimum",
+      "passed": true
+    },
+    {
+      "detail": "max |R + T + A - 1| = 2.220e-16",
+      "kind": "analytic",
+      "name": "the_synthesized_ar_stack_conserves_energy",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (100,)",
+      "kind": "invariant",
+      "name": "dichroic_reflectance_finite",
+      "passed": true
+    },
+    {
+      "detail": "merit 6.230789e-02 -> 4.942848e-03 (12.6x) after 4 needle insertions",
+      "kind": "invariant",
+      "name": "needle_synthesis_strictly_improves_the_dichroic_merit",
+      "passed": true
+    },
+    {
+      "detail": "mean reflectance over 420-540 nm rises from 90.9% to 96.3% (minimum 85.9%)",
+      "kind": "reference",
+      "name": "the_synthesized_dichroic_reflects_its_short_band",
+      "passed": true
+    },
+    {
+      "detail": "mean transmission over 560-680 nm rises from 28.1% to 97.2% (minimum 92.5%)",
+      "kind": "reference",
+      "name": "the_synthesized_dichroic_transmits_its_long_band",
+      "passed": true
+    },
+    {
+      "detail": "mean R(reflect band) - mean R(transmit band) = 0.9352. A dichroic is defined by that separation, and a stack that merely reflected everything or transmitted everything would score zero on it.",
+      "kind": "analytic",
+      "name": "the_two_bands_are_sharply_separated",
+      "passed": true
+    },
+    {
+      "detail": "max |R + T + A - 1| = 2.220e-16",
+      "kind": "analytic",
+      "name": "the_synthesized_dichroic_stack_conserves_energy",
+      "passed": true
+    }
+  ],
+  "demonstrates": "thin_film.optimization.NeedleSynthesis(stack, candidate_materials, needle_thickness_nm, min_thickness_nm, max_iterations, num_positions_per_layer, optimizer_max_iter), add_spectral_target('R', wavelengths, 'equal', value) and its result record.",
+  "level": "advanced",
+  "metrics": {
+    "ar_energy_residual": 2.220446049250313e-16,
+    "ar_final_layer_count": 7,
+    "ar_final_merit": 2.104607276305706e-05,
+    "ar_final_thickness_nm": [
+      94.58229497146124,
+      319.69147178191173,
+      17.684750003246585,
+      196.13480530055168,
+      26.34959145785942,
+      170.93554176212984,
+      190.40654926309904
+    ],
+    "ar_initial_merit": 0.00020386370893400916,
+    "ar_mean_R_percent_after": 0.38760405431410055,
+    "ar_mean_R_percent_before": 1.4078322862654602,
+    "ar_num_iterations": 4,
+    "ar_num_layers_added": 4,
+    "ar_peak_R_percent_after": 0.9895902484614836,
+    "ar_success": true,
+    "dichroic_band_separation": 0.935230859240444,
+    "dichroic_energy_residual": 2.220446049250313e-16,
+    "dichroic_final_layer_count": 12,
+    "dichroic_final_merit": 0.004942848031338168,
+    "dichroic_initial_merit": 0.06230788508840296,
+    "dichroic_max_iterations": 5,
+    "dichroic_num_layers_added": 4,
+    "index_at_550nm": {
+      "al2o3": 1.770446353492341,
+      "mgf2": 1.3785057149207824,
+      "nbk7": 1.5185223876207927,
+      "sio2": 1.4599108864687285,
+      "tio2": 2.647935017326822
+    },
+    "reflect_band_mean_R_percent_after": 96.32716095158156,
+    "reflect_band_mean_R_percent_before": 90.94031399388292,
+    "reflect_band_min_R_percent_after": 85.90523115022214,
+    "transmit_band_mean_T_percent_after": 97.19592497246285,
+    "transmit_band_mean_T_percent_before": 28.060351695432285,
+    "transmit_band_min_T_percent_after": 92.53775752626373,
+    "upstream_dichroic_max_iterations": 8
+  },
+  "notes": [
+    "Every candidate material lookup prints 'WARNING: No extinction coefficient data found for <reference>.yml. Assuming it is 0.' below the Python stream layer (see t07). All four candidates are therefore treated as lossless, which is why the energy checks above find A ~ 0."
+  ],
+  "slug": "t32_needle_synthesis",
+  "title": "Needle Synthesis for Thin Film Design",
+  "url": "https://www.optiland.org/tutorials/needle-synthesis"
+}

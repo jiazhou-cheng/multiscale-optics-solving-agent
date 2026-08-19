@@ -1,0 +1,111 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "44 == 1 object + 42 lens surfaces + 1 image",
+      "kind": "invariant",
+      "name": "the_published_prescription_builds_all_44_surfaces",
+      "passed": true
+    },
+    {
+      "detail": "observed=492.76437363076354 expected=494.0 (rel=0.005)",
+      "kind": "reference",
+      "name": "the_as_published_focal_length_is_already_near_the_494mm_target",
+      "passed": true
+    },
+    {
+      "detail": "paraxial magnification -0.249982: |M| < 1, so the reticle is imaged smaller onto the wafer",
+      "kind": "analytic",
+      "name": "the_system_demagnifies_as_a_projection_printer_must",
+      "passed": true
+    },
+    {
+      "detail": "mean |M/N| of the launched bundle at the object surface: 0.000e+00 on axis and 4.093e-18 at the 48 mm object height. obj_space_telecentric = True really does aim every chief ray parallel to the axis, which is what a stepper needs for depth-of-focus insensitivity to reticle height.",
+      "kind": "analytic",
+      "name": "the_object_space_chief_ray_is_telecentric",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.1330000000000001 expected=0.133 (rel=0.01)",
+      "kind": "analytic",
+      "name": "the_declared_object_side_numerical_aperture_is_realised",
+      "passed": true
+    },
+    {
+      "detail": "42 == 42 lens surfaces",
+      "kind": "invariant",
+      "name": "all_forty_two_radii_became_variables",
+      "passed": true
+    },
+    {
+      "detail": "2.628857e+00 -> 3.298930e-01, a 87.45% reduction in 30 capped iterations (upstream states ~98% with no cap)",
+      "kind": "invariant",
+      "name": "optimization_reduces_the_merit_function",
+      "passed": true
+    },
+    {
+      "detail": "observed=493.9914075721159 expected=494.0 (rel=0.005)",
+      "kind": "reference",
+      "name": "the_optimized_focal_length_still_meets_the_494mm_target",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.0 expected=1.0 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "the_duv_mtf_starts_at_unity",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (721,)",
+      "kind": "invariant",
+      "name": "edge_field_opd_finite",
+      "passed": true
+    },
+    {
+      "detail": "the orthonormal quadrature sum 0.894636 waves reaches 89.9% of the 0.994870-wave piston-removed RMS measured directly off wavefront.OPD",
+      "kind": "analytic",
+      "name": "twenty_one_standard_zernike_terms_capture_most_of_the_duv_wavefront",
+      "passed": true
+    },
+    {
+      "detail": "SpotDiagram.view, RayFan.view and Optic.info completed on the 44-surface system",
+      "kind": "qualitative",
+      "name": "spot_diagram_ray_fan_and_info_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "a 44-surface prescription, aperture_type='objectNA', field_type='object_height', Optic.obj_space_telecentric, OptimizerGeneric over 42 radius variables, and OptimizationProblem.merit_info().",
+  "level": "advanced",
+  "metrics": {
+    "declared_object_na": 0.133,
+    "edge_field_opd_ptv_waves": 4.433609808346215,
+    "edge_field_rms_waves": 0.9948698429997076,
+    "efl_after_mm": 493.9914075721159,
+    "efl_initial_mm": 492.76437363076354,
+    "maxiter": 30,
+    "measured_object_side_na": 0.1330000000000001,
+    "merit_after": 0.3298930075266858,
+    "merit_before": 2.628857314686527,
+    "merit_improvement_fraction": 0.8745108737230863,
+    "mtf_at_zero_frequency": 1.0,
+    "num_operands": 4,
+    "num_surfaces": 44,
+    "num_variables": 42,
+    "object_side_mean_slope": {
+      "axial": 0.0,
+      "edge": 4.092988109217167e-18
+    },
+    "paraxial_magnification": -0.2499819296638154,
+    "target_efl_mm": 494.0,
+    "upstream_stated_improvement": 0.98,
+    "wavelength_um": 0.248,
+    "zernike_num_terms": 21,
+    "zernike_quadrature_sum_waves": 0.8946363845209345
+  },
+  "notes": [
+    "Upstream reduces the original NA of 0.15 to 0.133 'to avoid negative edge thicknesses'. That adaptation is upstream's own and is reproduced verbatim."
+  ],
+  "slug": "t33_lithographic_projection_system",
+  "title": "Lithographic Projection System",
+  "url": "https://www.optiland.org/tutorials/lithographic-projection-system"
+}

@@ -168,7 +168,7 @@ def run() -> TutorialResult:
     result.check_true(
         "the_zernike_fit_converges_as_terms_are_added",
         "analytic",
-        all(b <= a + 1e-12 for a, b in zip(ordered, ordered[1:], strict=True))
+        all(b <= a + 1e-12 for a, b in zip(ordered, ordered[1:]))
         and ordered[-1] < 0.5 * ordered[0],
         "unfitted residual RMS (in quadrature against the directly measured "
         f"{direct_rms_piston_removed:.6f}-wave wavefront) falls "
