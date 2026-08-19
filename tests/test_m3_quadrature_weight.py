@@ -29,6 +29,8 @@ GATE = 1.0e-3
 
 optiland = pytest.importorskip("optiland")
 
+pytestmark = [pytest.mark.coupler, pytest.mark.optiland]
+
 from multiscale_optics_agent.adapters.base import ModelRunRequest  # noqa: E402
 from multiscale_optics_agent.adapters.optiland_adapter import get_adapter  # noqa: E402
 from multiscale_optics_agent.couplers.optiland_handoff import (  # noqa: E402

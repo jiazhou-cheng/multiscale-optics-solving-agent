@@ -16,6 +16,8 @@ from multiscale_optics_agent.couplers.quadrature import (
     hexapolar_ring_index,
 )
 
+pytestmark = pytest.mark.coupler
+
 
 def _hexapolar(num_rings: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """A reference implementation, independent of the one under test.

@@ -42,6 +42,8 @@ REVERSE_TELEPHOTO_PUPIL_Z_M = 2.1547825721481666 * MM_PER_M
 
 pytest.importorskip("optiland")
 
+pytestmark = [pytest.mark.coupler, pytest.mark.optiland]
+
 from multiscale_optics_agent.adapters.base import ModelRunRequest  # noqa: E402
 from multiscale_optics_agent.adapters.optiland_adapter import get_adapter  # noqa: E402
 from multiscale_optics_agent.couplers.optiland_handoff import (  # noqa: E402

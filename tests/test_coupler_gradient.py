@@ -22,6 +22,8 @@ from multiscale_optics_agent.couplers.gradient import (
 )
 from multiscale_optics_agent.couplers.wave_to_ray import SamplingDensity
 
+pytestmark = [pytest.mark.coupler, pytest.mark.slow]
+
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6
 N_GRID = 16

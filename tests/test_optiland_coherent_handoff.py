@@ -47,6 +47,8 @@ from multiscale_optics_agent.adapters.optiland_adapter import (
     get_adapter,
 )
 
+pytestmark = pytest.mark.optiland
+
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = load_coupler_probe_expected("ray_to_wave", "coherent_handoff")
 

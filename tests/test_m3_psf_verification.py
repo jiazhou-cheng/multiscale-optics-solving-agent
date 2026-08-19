@@ -48,6 +48,8 @@ from multiscale_optics_agent.evaluation.psf_oracles import (
     resample_to_grid,
 )
 
+pytestmark = pytest.mark.coupler
+
 ROOT = Path(__file__).resolve().parents[1]
 RECORD_PATH = ROOT / "benchmarks" / "probes" / "records" / "m3_psf_verification.json"
 

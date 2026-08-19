@@ -22,6 +22,8 @@ from multiscale_optics_agent.couplers.curvature import (
     measured_tangent_plane_direction_error,
 )
 
+pytestmark = pytest.mark.coupler
+
 WAVELENGTH_M = 1e-6  # the paper's Figure 3c is drawn in units of lambda
 
 

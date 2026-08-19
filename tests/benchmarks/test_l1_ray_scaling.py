@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("optiland")
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.optiland, pytest.mark.benchmark]
 
 ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = ROOT / "benchmarks" / "level1" / "L1-RAY-01"

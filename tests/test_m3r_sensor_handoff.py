@@ -37,6 +37,8 @@ RECORD_PATH = ROOT / "benchmarks" / "probes" / "records" / "m3r_sensor_handoff.j
 PROBE_PATH = ROOT / "benchmarks" / "probes" / "m3r_sensor_handoff.py"
 GATE = 1.0e-3
 
+pytestmark = pytest.mark.coupler
+
 
 @pytest.fixture(scope="module")
 def record() -> dict[str, Any]:
@@ -113,6 +115,7 @@ def test_the_lommel_helper_reduces_to_the_airy_pattern_at_zero_defocus(probe) ->
         assert math.isclose(numeric, closed, rel_tol=1e-6, abs_tol=1e-9), f"v={v}"
 
 
+@pytest.mark.slow
 def test_the_circular_reference_is_far_from_the_straight_edge_it_replaced(probe) -> None:
     """The two references must differ by the ~26% M3.9 could not explain."""
     circular = probe._lommel_circular_rim_slope(

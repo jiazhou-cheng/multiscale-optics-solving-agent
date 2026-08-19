@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytestmark = pytest.mark.coupler
+
 ROOT = Path(__file__).resolve().parents[1]
 COUPLERS = ROOT / "knowledge/couplers"
 DIRECTIONS = ("ray_to_wave", "wave_to_ray")

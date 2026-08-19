@@ -26,7 +26,7 @@ from multiscale_optics_agent.core.errors import (  # noqa: E402
 )
 from multiscale_optics_agent.core.specs import ArtifactKind  # noqa: E402
 
-pytestmark = [pytest.mark.jax, pytest.mark.integration]
+pytestmark = [pytest.mark.jax, pytest.mark.integration, pytest.mark.sax]
 
 
 def _component_request(**config_overrides) -> ModelRunRequest:

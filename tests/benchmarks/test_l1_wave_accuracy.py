@@ -26,7 +26,12 @@ import yaml
 
 pytest.importorskip("chromatix")
 
-pytestmark = [pytest.mark.jax, pytest.mark.integration]
+pytestmark = [
+    pytest.mark.jax,
+    pytest.mark.integration,
+    pytest.mark.chromatix,
+    pytest.mark.benchmark,
+]
 
 ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = ROOT / "benchmarks" / "level1" / "L1-WAVE-01"

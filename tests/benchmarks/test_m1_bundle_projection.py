@@ -14,7 +14,11 @@ implementation to the policy.
 
 from __future__ import annotations
 
+import pytest
+
 from multiscale_optics_agent.evaluation.m1_bundle import VOLATILE_KEYS, _strip_volatile
+
+pytestmark = pytest.mark.benchmark
 
 
 def test_strips_volatile_keys_at_any_nesting_depth() -> None:

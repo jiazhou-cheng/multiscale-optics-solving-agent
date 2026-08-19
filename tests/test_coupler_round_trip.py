@@ -34,6 +34,8 @@ from multiscale_optics_agent.couplers.wave_to_ray import (
     spectrum_to_rays,
 )
 
+pytestmark = pytest.mark.coupler
+
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6
 N_GRID = 16
@@ -87,6 +89,7 @@ def test_wave_to_ray_to_wave_is_exact_in_the_enumeration_limit() -> None:
     assert _relative_rms(_reconstruct(bundle), field.u) < 1e-14
 
 
+@pytest.mark.slow
 def test_wave_to_ray_to_wave_converges_at_the_monte_carlo_rate() -> None:
     field = _random_field()
     spectrum = decompose(field)

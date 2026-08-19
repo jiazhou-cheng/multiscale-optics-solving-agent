@@ -24,6 +24,8 @@ PROTOCOL_PATH = ROOT / "benchmarks/slice_protocol.yaml"
 DOCUMENT_PATH = ROOT / "benchmarks/M3_SLICE_PROTOCOL.md"
 FEASIBILITY_PROBE = ROOT / "benchmarks/probes/m3_slice_feasibility.py"
 
+pytestmark = pytest.mark.coupler
+
 WAVELENGTH_M = 5.5e-7
 
 

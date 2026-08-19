@@ -35,6 +35,8 @@ from multiscale_optics_agent.couplers.ray_to_wave import (
     ray_to_wave,
 )
 
+pytestmark = pytest.mark.coupler
+
 ROOT = Path(__file__).resolve().parents[1]
 CORE_MODULES = (
     "src/multiscale_optics_agent/couplers/contracts.py",
@@ -243,6 +245,7 @@ def _fft_bin_direction(mode_x: int, mode_y: int, n: int, pitch: float, wavelengt
     return (dx, dy, dz)
 
 
+@pytest.mark.chromatix
 def test_geometric_advance_agrees_with_chromatix_angular_spectrum() -> None:
     """Independent-implementation oracle.
 

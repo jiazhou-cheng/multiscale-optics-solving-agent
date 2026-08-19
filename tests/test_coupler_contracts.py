@@ -30,6 +30,8 @@ from multiscale_optics_agent.couplers import (
     WavefrontSamples,
 )
 
+pytestmark = pytest.mark.coupler
+
 WAVELENGTH_M = 632.8e-9
 PLANE = ReferencePlane(name="test plane", z_m=0.0)
 

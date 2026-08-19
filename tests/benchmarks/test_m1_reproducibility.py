@@ -9,7 +9,13 @@ import pytest
 
 pytest.importorskip("optiland")
 pytest.importorskip("chromatix")
-pytestmark = [pytest.mark.integration, pytest.mark.jax]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.jax,
+    pytest.mark.optiland,
+    pytest.mark.chromatix,
+    pytest.mark.benchmark,
+]
 
 ROOT = Path(__file__).resolve().parents[2]
 

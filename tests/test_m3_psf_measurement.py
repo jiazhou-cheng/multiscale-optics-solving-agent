@@ -44,6 +44,8 @@ from multiscale_optics_agent.evaluation.psf_measurement import (
     measure_psf_from_record,
 )
 
+pytestmark = [pytest.mark.optiland, pytest.mark.chromatix]
+
 ROOT = Path(__file__).resolve().parents[1]
 
 # Deliberately non-square, and deliberately not centred. A square pitch makes an

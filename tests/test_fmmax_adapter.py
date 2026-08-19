@@ -108,6 +108,7 @@ def _request(structure: ArtifactRecord, *, config: dict | None = None, **kwargs)
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_spec_matches_registry(registry) -> None:
     adapter = fmmax_adapter.get_adapter()
     assert adapter.spec.id == MODEL_ID
@@ -122,6 +123,7 @@ def test_spec_matches_registry(registry) -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_smoke_grating_run_succeeds(registry) -> None:
     adapter = fmmax_adapter.get_adapter()
     request = _request(_lamellar_grating_structure(), config={"approximate_num_terms": 9})
@@ -157,6 +159,7 @@ def test_smoke_grating_run_succeeds(registry) -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_bare_interface_matches_fresnel_oracle_and_closes_energy() -> None:
     expected = load_probe_expected("fmmax", "fresnel_oracle_probe")
     adapter = fmmax_adapter.get_adapter()
@@ -210,6 +213,7 @@ def test_bare_interface_matches_fresnel_oracle_and_closes_energy() -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_gradient_through_run_matches_recorded_probe() -> None:
     """jax.grad wrapped around FmmaxAdapter.run, regression-tested against gradient_probe.json.
 
@@ -283,6 +287,7 @@ def test_gradient_through_run_matches_recorded_probe() -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_import_error_maps_to_adapter_dependency_error(monkeypatch) -> None:
     """(a) Force the lazy-import helper's underlying import to fail -> AdapterDependencyError."""
 
@@ -309,6 +314,7 @@ def test_import_error_maps_to_adapter_dependency_error(monkeypatch) -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_non_convergent_truncation_reports_failed_status() -> None:
     """(b) A degenerate/non-convergent truncation order (0 Fourier terms) -> FAILED, not raised.
 
@@ -332,6 +338,7 @@ def test_non_convergent_truncation_reports_failed_status() -> None:
 
 @pytest.mark.jax
 @pytest.mark.integration
+@pytest.mark.fmmax
 def test_unsupported_oblique_incidence_raises_eagerly_before_solver_call() -> None:
     """Requesting physics outside this adapter's verified scope must fail before any solver call."""
 

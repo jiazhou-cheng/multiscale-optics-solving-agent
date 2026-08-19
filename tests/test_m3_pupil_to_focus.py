@@ -34,6 +34,8 @@ from multiscale_optics_agent.adapters.optiland_adapter import (
     get_adapter as get_ray_adapter,
 )
 
+pytestmark = [pytest.mark.coupler, pytest.mark.optiland, pytest.mark.chromatix]
+
 EXPECTED = load_probe_expected("chromatix", "m3_pupil_to_focus")
 
 PUPIL_Z_M = 0.06814345991561233e-3

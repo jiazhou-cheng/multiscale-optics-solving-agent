@@ -44,6 +44,8 @@ pytest.importorskip("optiland")
 from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus
 from multiscale_optics_agent.adapters.optiland_adapter import get_adapter
 
+pytestmark = [pytest.mark.coupler, pytest.mark.optiland]
+
 ROOT = Path(__file__).resolve().parents[1]
 
 PUPIL_Z_M = 6.814345991561233e-05

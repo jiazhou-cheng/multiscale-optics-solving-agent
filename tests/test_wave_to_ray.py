@@ -44,6 +44,8 @@ from multiscale_optics_agent.couplers.wave_to_ray import (
     wave_to_ray,
 )
 
+pytestmark = pytest.mark.coupler
+
 ROOT = Path(__file__).resolve().parents[1]
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6
@@ -233,6 +235,7 @@ def _overlap(estimate: np.ndarray, truth: np.ndarray) -> complex:
     return complex(np.vdot(truth, estimate))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "density_kind", [SamplingDensity.UNIFORM, SamplingDensity.MAGNITUDE]
 )
@@ -262,6 +265,7 @@ def test_ensemble_mean_is_unbiased_within_three_standard_errors(density_kind) ->
         )
 
 
+@pytest.mark.slow
 def test_omitting_the_importance_weight_is_detected_as_a_bias() -> None:
     """The negative control for unbiasedness. It must be run under p_mag: with
     uniform p the omitted 1/p is a constant, so the test would pass for the
@@ -317,6 +321,7 @@ def _rms_error(field: ComplexField, spectrum, density, count: int, seeds: int) -
     return float(np.mean(errors))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "density_kind", [SamplingDensity.UNIFORM, SamplingDensity.MAGNITUDE]
 )

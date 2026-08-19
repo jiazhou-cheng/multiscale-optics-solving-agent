@@ -27,7 +27,7 @@ from multiscale_optics_agent.core.artifacts import ArtifactRecord
 from multiscale_optics_agent.core.errors import AdapterDependencyError, UnsupportedCapabilityError
 from multiscale_optics_agent.core.specs import ArtifactKind
 
-pytestmark = [pytest.mark.jax, pytest.mark.integration]
+pytestmark = [pytest.mark.jax, pytest.mark.integration, pytest.mark.chromatix]
 
 _PHASOR = "exp(-i omega t)"
 _COORD_FRAME = "axes=(y, x) row-major; right-handed; +z propagation"
@@ -170,6 +170,7 @@ def test_matches_propagation_probe_asm_propagate(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_gradient_probe_regression_thin_lens_transform_propagate() -> None:
     """Regression-check the one narrow gradient path the knowledge pack probed.
 

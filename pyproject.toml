@@ -91,6 +91,14 @@ markers = [
   "jax: requires the optional JAX solver environment",
   "torch: requires the optional PyTorch solver environment",
   "integration: exercises an external physics solver",
+  "optiland: exercises the real Optiland ray-tracing engine (current-milestone ray model)",
+  "chromatix: exercises the real Chromatix wave-propagation engine (current-milestone wave model)",
+  "coupler: exercises C_RAY_TO_WAVE / C_WAVE_TO_RAY coupler physics or protocol",
+  "fmmax: exercises the FMMAX RCWA adapter (out of current milestone scope, see AGENTS.md)",
+  "fdtdx: exercises the FDTDX EM adapter (out of current milestone scope, see AGENTS.md)",
+  "sax: exercises the SAX photonic-circuit adapter (out of current milestone scope, see AGENTS.md)",
+  "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction",
+  "slow: individually expensive numerical characterization or convergence test",
 ]
 
 [tool.ruff]

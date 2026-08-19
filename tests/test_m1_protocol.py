@@ -5,11 +5,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.slow
 def test_engine_probe_uses_independent_compatible_processes() -> None:
     completed = subprocess.run(
         [sys.executable, "benchmarks/probes/verify_m1_engines.py"],

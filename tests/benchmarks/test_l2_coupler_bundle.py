@@ -21,14 +21,18 @@ ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK_DIR = ROOT / "benchmarks/level2/L2-COUPLER-01"
 BUNDLE = ROOT / "outputs/M2/coupler"
 
-pytestmark = pytest.mark.skipif(
-    not (BUNDLE / "result.json").is_file(),
-    reason=(
-        "no L2-COUPLER-01 bundle present; run "
-        "./run.sh python benchmarks/level2/L2-COUPLER-01/run_benchmark.py "
-        "--output-dir outputs/M2/coupler"
+pytestmark = [
+    pytest.mark.skipif(
+        not (BUNDLE / "result.json").is_file(),
+        reason=(
+            "no L2-COUPLER-01 bundle present; run "
+            "./run.sh python benchmarks/level2/L2-COUPLER-01/run_benchmark.py "
+            "--output-dir outputs/M2/coupler"
+        ),
     ),
-)
+    pytest.mark.coupler,
+    pytest.mark.benchmark,
+]
 
 
 @pytest.fixture(scope="module")

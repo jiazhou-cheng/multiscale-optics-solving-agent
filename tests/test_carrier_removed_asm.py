@@ -42,6 +42,8 @@ REJECTED_SYSTEM_DISTANCE_M = 47.06e-3
 
 pytest.importorskip("chromatix", reason="carrier-removed ASM is a Chromatix path")
 
+pytestmark = pytest.mark.chromatix
+
 
 @pytest.fixture(autouse=True)
 def _pinned_wave_engine_precision():

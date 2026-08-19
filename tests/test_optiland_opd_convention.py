@@ -38,6 +38,8 @@ IdealMaterial = pytest.importorskip("optiland.materials").IdealMaterial
 Optic = pytest.importorskip("optiland.optic").Optic
 RealRays = pytest.importorskip("optiland.rays.real_rays").RealRays
 
+pytestmark = pytest.mark.optiland
+
 WAVELENGTH_UM = 0.55
 
 # float64 round-off over a handful of accumulations; every case below is exact

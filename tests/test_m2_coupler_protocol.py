@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
+
+pytestmark = pytest.mark.coupler
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL_PATH = ROOT / "benchmarks/coupler_protocol.yaml"

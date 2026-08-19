@@ -26,7 +26,7 @@ from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # 
 from multiscale_optics_agent.adapters.fdtdx_adapter import FdtdxAdapter  # noqa: E402
 from multiscale_optics_agent.core.errors import UnsupportedCapabilityError  # noqa: E402
 
-pytestmark = [pytest.mark.integration, pytest.mark.jax]
+pytestmark = [pytest.mark.integration, pytest.mark.jax, pytest.mark.fdtdx]
 
 
 def _smoke_request(*, require_gradients: bool = False) -> ModelRunRequest:

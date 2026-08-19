@@ -37,7 +37,7 @@ from multiscale_optics_agent.core.errors import (  # noqa: E402
 )
 from multiscale_optics_agent.core.specs import ArtifactKind  # noqa: E402
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.optiland]
 
 #: The traced ray set: the arrays `scientific_array_sha256` covers, unchanged since
 #: M1. CHE-41 adds object-space arrays to the same file under a separate hash, so

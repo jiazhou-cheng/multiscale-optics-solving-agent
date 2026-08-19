@@ -34,6 +34,8 @@ RECORD_PATH = ROOT / "benchmarks" / "probes" / "records" / "m3_convergence.json"
 PROBE_PATH = ROOT / "benchmarks" / "probes" / "m3_convergence.py"
 PROTOCOL_PATH = ROOT / "benchmarks" / "slice_protocol.yaml"
 
+pytestmark = pytest.mark.coupler
+
 WAVELENGTH_M = 0.55e-6
 R_M = 4.837461300309598e-3
 
