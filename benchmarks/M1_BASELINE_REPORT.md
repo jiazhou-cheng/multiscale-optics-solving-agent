@@ -250,7 +250,17 @@ checks:
 | `wave_source` | no `optiland`, no coupler import, no coupler identifier |
 | `ray_bundle` | `forbidden_modules_loaded == []` at exit, in the bundle and both nested provenance files |
 | `wave_bundle` | `forbidden_modules_loaded == []` at exit |
-| `claim_audit` | 10/10 registry claims consistent with M1 evidence |
+| `claim_audit` | 10/10 registry claims consistent with the evidence behind them |
+
+The first three device/dtype checks were literal locks on the M1 snapshot
+(`devices == ["cpu"]`, `dtypes == ["float64"]`) until CHE-61 (PB4b) validated
+GPU and float32 execution for the ray model and GPU for the wave model. They now
+compare the registry against the executable capability model in
+`core/capabilities.py`, which is what the PB4b execution-matrix and GPU-pipeline
+tests gate. The property being asserted is the same one -- the registry must not
+claim more than has been executed -- but it is now sourced from measurement
+rather than from a frozen list, so widening a claim without evidence still fails
+while widening it with evidence does not.
 
 The check is both **static** (AST import analysis plus identifier scan of every
 entry-point source) and **dynamic** (`sys.modules` inspected at process exit in
@@ -262,8 +272,9 @@ wave failure, and neither branch can silently acquire a coupler dependency.
 All ten checks pass, confirming the registry claims nothing M1 did not
 establish:
 
-`ray_cpu_only`, `ray_float64_only`, `ray_gradient_unverified`,
-`wave_cpu_only`, `wave_complex64_only`, `wave_scalar_only`,
+`ray_device_claim_is_validated`, `ray_dtype_claim_is_validated`,
+`ray_gradient_unverified`, `wave_device_claim_is_validated`,
+`wave_complex64_only`, `wave_scalar_only`,
 `wave_gradient_unverified`, `ray_to_wave_experimental`,
 `ray_to_wave_gradient_unverified`, `wave_to_ray_not_claimed`.
 

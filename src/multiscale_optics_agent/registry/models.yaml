@@ -34,8 +34,24 @@ models:
         artifact: wavefront_samples
         provides_metadata:
           [wavelength, coordinates, optical_path_length, amplitude, polarization, pupil_mask]
-    devices: [cpu]
-    dtypes: [float64]
+    # CHE-61 (PB4b): updated FROM executable validation, not from what the
+    # package exposes. `optiland.backend.set_precision` is typed
+    # Literal['float32','float64'] and `set_device` is torch-backend-only
+    # (BackendCapabilityError otherwise) -- both measured on the pinned install,
+    # tmp_probes/pb4b_probe.py. Real adapter-driven traces of M3SingletRef ran on
+    # cuda:0 at both precisions with the placement read back off the traced
+    # tensors (tests/test_precision_gpu_pipeline.py::TestOptilandOnTheGpu).
+    #
+    # float16 is absent because Optiland has no float16 mode, not because this
+    # project declined to wire one: accepting it would mean casting to float32
+    # and calling the result float16 support.
+    #
+    # The authoritative form of these two lists is
+    # core/capabilities.py::OPTILAND_CAPABILITIES; tests/test_registry_matches_
+    # capabilities.py fails if the two disagree, so this cannot drift into an
+    # aspiration again.
+    devices: [cpu, gpu]
+    dtypes: [float32, float64]
     derivative:
       mode: native_autodiff
       verified: false
@@ -114,7 +130,20 @@ models:
         artifact: complex_field
         provides_metadata:
           [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
-    devices: [cpu]
+    # CHE-61 (PB4b): `gpu` added from executable validation -- asm_propagate ran
+    # on cuda:0 through the graph-facing adapter and the output array's own
+    # placement was read back (tests/test_precision_gpu_pipeline.py::
+    # TestChromatixOnTheGpu). `tpu` is deliberately NOT added: nothing has
+    # executed there.
+    #
+    # dtypes stays [complex64] and that is the substantive claim. Chromatix's
+    # ScalarField.__init__ is `jnp.asarray(u, dtype=jnp.complex64)`
+    # unconditionally; Field.build handed a complex128 array returns complex64
+    # even with jax_enable_x64 enabled (measured, tmp_probes/pb4b_probe2.py). So
+    # complex128 is INGESTIBLE but not supported, and it is recorded as a lossy
+    # bridge rather than listed here. Authoritative form:
+    # core/capabilities.py::CHROMATIX_CAPABILITIES.
+    devices: [cpu, gpu]
     dtypes: [complex64]
     derivative:
       mode: native_autodiff
@@ -122,7 +151,9 @@ models:
       parameters: ["*"]
       notes: >-
         M1 establishes only forward scalar asm_propagate on CPU/complex64.
-        Gradients, GPU/TPU, vector fields, and other kernels remain unverified.
+        Gradients, vector fields, and other kernels remain unverified. CHE-61
+        adds validated GPU execution of the same complex64 forward path; it
+        does not change the gradient claim.
     validity:
       assumptions:
         - Sampling and propagation method satisfy the relevant band-limit conditions.

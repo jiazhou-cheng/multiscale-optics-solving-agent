@@ -37,14 +37,25 @@ couplers:
       artifact: complex_field
       provides_metadata:
         [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
-    # CHE-55 (M3.5): pure NumPy, no device/backend branch anywhere in this
-    # coupler. ComplexField.__post_init__ force-casts the output field to
-    # complex128 regardless of input dtype; RayBundle geometry is float64.
-    # Both to_artifact_record paths hard-code device=Device.CPU. This is
-    # descriptive metadata only (nothing in the loader or this coupler reads
-    # it back to gate execution).
-    devices: [cpu]
-    dtypes: [float64, complex128]
+    # CHE-61 (PB4b) replaces CHE-55's description of this coupler, every clause
+    # of which has stopped being true. It is no longer pure NumPy: one
+    # xp-parameterized implementation executes in NumPy on the host and in JAX
+    # wherever the input array lives, with no CPU/GPU fork.
+    # ComplexField.__post_init__ no longer force-casts to complex128, and
+    # to_artifact_record no longer hard-codes device=Device.CPU -- both now
+    # preserve what the data actually is.
+    #
+    # Validated by execution, not declaration: dtype/device/namespace
+    # preservation and the measured float32 agreement in
+    # tests/test_precision_execution_matrix.py, GPU residency across the live
+    # boundary in tests/test_precision_gpu_pipeline.py.
+    #
+    # float16 is absent on purpose. The bridge widens a float16 input to float32
+    # under SAFE and the coupler computes phase in float32; that is a promotion,
+    # and listing float16 here would advertise a computation that never happens.
+    # Authoritative form: core/capabilities.py::C_RAY_TO_WAVE_CAPABILITIES.
+    devices: [cpu, gpu]
+    dtypes: [float32, float64, complex64, complex128]
     derivative:
       mode: finite_difference
       verified: false
@@ -105,14 +116,28 @@ couplers:
       artifact: ray_bundle
       provides_metadata:
         [wavelength, coordinates, directions, amplitude, optical_path_length, normalization]
-    # CHE-55 (M3.5): pure NumPy, no device/backend branch anywhere in this
-    # coupler. The input ComplexField is always complex128 (forced by
-    # ComplexField.__post_init__ upstream); RayBundle.__post_init__ likewise
-    # force-casts amplitude to complex128 and coordinates/directions to
-    # float64. to_artifact_record hard-codes device=Device.CPU. Descriptive
-    # metadata only, matching C_RAY_TO_WAVE.
-    devices: [cpu]
-    dtypes: [float64, complex128]
+    # CHE-61 (PB4b), same correction as C_RAY_TO_WAVE above: the FFT, the
+    # frequency grid, the evanescent cut and the 1/p weighting all execute in the
+    # input field's own namespace, so a complex64 GPU field is decomposed on the
+    # GPU and emits a float32/complex64 bundle on the same device. The input is
+    # no longer forced to complex128 upstream.
+    #
+    # One host operation remains and is deliberate: `draw_indices` reads the
+    # probability vector to the host because numpy.random.Generator is what pins
+    # the seed, and bitwise reproducibility across devices is worth more than
+    # avoiding one copy of a probability vector. It is written out in the source
+    # rather than left to happen inside rng.choice.
+    #
+    # `dtypes` here is the ACCEPTED INPUT set, and for this coupler that is
+    # complex only: its source port is a ComplexField, so a real dtype has no
+    # meaning as an input. The bundle it EMITS carries real geometry
+    # (float32/float64) alongside a complex amplitude, at the precision of the
+    # field it decomposed -- an output fact the registry schema has no field for,
+    # so it is stated here and asserted in core/capabilities.py's output_dtypes.
+    #
+    # Authoritative form: core/capabilities.py::C_WAVE_TO_RAY_CAPABILITIES.
+    devices: [cpu, gpu]
+    dtypes: [complex64, complex128]
     derivative:
       # `surrogate`, not `native_autodiff`: the estimator differentiates a
       # fixed-direction surrogate of the objective, not the objective itself.

@@ -216,6 +216,96 @@ class TestOptilandOnTheGpu:
             )
 
 
+class TestAutodiffSurvivesTheNewDeviceLogic:
+    """PB4b adds no autodiff architecture; it must not cost any either.
+
+    The checklist from the ticket is `np.asarray`, `to_numpy`, `.cpu()`,
+    `.detach()`, scalar extraction, and tensor recreation through Python
+    literals -- every one of which silently produces a tensor with no gradient
+    history. The design-parameter leaf now also carries a device and a dtype,
+    which is a new opportunity to recreate it in the wrong place, so the graph is
+    checked on the device rather than only on the host.
+    """
+
+    @pytest.mark.parametrize("dtype", ["float32", "float64"])
+    def test_a_gradient_flows_through_a_gpu_trace(self, tmp_path, dtype):
+        torch = pytest.importorskip("torch")
+        parameter = "surfaces.surfaces[1].geometry.radius"
+        result = get_ray_adapter().run(
+            ModelRunRequest(
+                run_id="che61-grad",
+                node_id=f"lens-grad-{dtype}",
+                config={
+                    "sample": "M3SingletRef",
+                    "num_rays": NUM_RAYS,
+                    "wavelength": WAVELENGTH_UM,
+                    "backend": "torch",
+                    "device": "cuda",
+                    "dtype": dtype,
+                    "output_directory": str(tmp_path / dtype),
+                },
+                design_parameters={parameter: 1.6911},
+                require_gradients=True,
+            )
+        )
+        assert result.status is RunStatus.SUCCEEDED, result.error_message
+
+        objective = result.diagnostics["objective_tensor"]
+        leaf = result.diagnostics["design_parameter_tensors"][parameter]
+
+        # The leaf is where the new dtype/device logic could go wrong: it must be
+        # on the requested device, at the requested precision, and still a leaf.
+        assert leaf.device.type == "cuda"
+        assert str(leaf.dtype) == f"torch.{dtype}"
+        assert leaf.requires_grad
+        assert leaf.grad is None
+
+        # The objective must still be attached, and on the device -- a detach or a
+        # host copy anywhere in the export path would show up here.
+        assert objective.requires_grad
+        assert objective.grad_fn is not None
+        assert objective.device.type == "cuda"
+
+        objective.backward()
+        assert leaf.grad is not None
+        assert leaf.grad.device.type == "cuda"
+        assert torch.isfinite(leaf.grad).all()
+        assert float(leaf.grad.abs().item()) > 0.0, "a zero gradient means the graph was cut"
+
+    def test_the_persisted_artifact_is_detached_and_says_so(self, tmp_path):
+        """The record is a detached host copy, which is correct and declared.
+
+        `ArtifactRecord` has no field that could hold a live autograd graph, so
+        persisting one is necessarily a derivative boundary. The point is that it
+        is confined to the serialization boundary and stated there, while the live
+        tensor stays available in diagnostics for `.backward()`.
+        """
+        parameter = "surfaces.surfaces[1].geometry.radius"
+        result = get_ray_adapter().run(
+            ModelRunRequest(
+                run_id="che61-grad",
+                node_id="lens-detach",
+                config={
+                    "sample": "M3SingletRef",
+                    "num_rays": NUM_RAYS,
+                    "wavelength": WAVELENGTH_UM,
+                    "backend": "torch",
+                    "device": "cuda",
+                    "dtype": "float32",
+                    "output_directory": str(tmp_path),
+                },
+                design_parameters={parameter: 1.6911},
+                require_gradients=True,
+            )
+        )
+        assert result.status is RunStatus.SUCCEEDED, result.error_message
+        serialization = result.outputs["rays"].metadata["serialization"]
+        assert "detach" in serialization["mechanism"]
+        assert serialization["kind"] == "serialization"
+        # Still differentiable after the artifact was written.
+        assert result.diagnostics["objective_tensor"].requires_grad
+
+
 # ---------------------------------------------------------------------------
 # Chromatix
 # ---------------------------------------------------------------------------

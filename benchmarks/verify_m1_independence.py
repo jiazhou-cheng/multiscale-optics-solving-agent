@@ -105,6 +105,38 @@ def _bundle_check(path: Path) -> dict[str, Any]:
     }
 
 
+def _validated_device_claims() -> dict[str, list[str]]:
+    """Devices each component has actually executed on, from the capability model.
+
+    Imported rather than hard-coded so this audit cannot disagree with the thing
+    the tests validate. Importing ``core.capabilities`` is not an engine import
+    and does not touch the independence property this script exists to check --
+    that property is about the ray and wave *adapter sources* not importing each
+    other's engine or a coupler, and it is checked separately by ``_source_check``.
+    """
+    from multiscale_optics_agent.core.capabilities import COMPONENT_CAPABILITIES
+
+    return {
+        name: sorted(kind.to_spec_device_name() for kind in capability.devices)
+        for name, capability in COMPONENT_CAPABILITIES.items()
+    }
+
+
+def _validated_dtype_claims() -> dict[str, list[str]]:
+    """Input dtypes each component accepts natively -- not merely ingests.
+
+    ``lossy_input_dtypes`` is excluded on purpose: Chromatix swallows a
+    complex128 array and returns complex64, and counting that as an accepted
+    dtype would turn a measured precision loss into a support claim.
+    """
+    from multiscale_optics_agent.core.capabilities import COMPONENT_CAPABILITIES
+
+    return {
+        name: sorted(str(dtype) for dtype in capability.accepted_input_dtypes)
+        for name, capability in COMPONENT_CAPABILITIES.items()
+    }
+
+
 def _claim_audit() -> dict[str, Any]:
     registry = yaml.safe_load(
         (ROOT / "src/multiscale_optics_agent/registry/models.yaml").read_text()
@@ -116,11 +148,33 @@ def _claim_audit() -> dict[str, Any]:
     by_id = {item["id"]: item for item in couplers}
     ray = models["M_RAY_OPTILAND"]
     wave = models["M_WAVE_CHROMATIX"]
+    # CHE-61 (PB4b) rewrote three of these checks. What they exist to catch is
+    # unchanged -- a registry that claims more than has been executed -- but they
+    # were written as literal locks on the M1 snapshot (`devices == ["cpu"]`,
+    # `dtypes == ["float64"]`), and PB4b validated GPU and float32 execution for
+    # the ray model and GPU for the wave model. A literal lock cannot tell
+    # "someone widened this without evidence" from "someone widened this and
+    # produced the evidence", so the check now compares the registry against the
+    # executable capability model instead of against a frozen list. That is the
+    # same assertion, sourced from measurement rather than from a snapshot, and
+    # the capability model is in turn gated by
+    # tests/test_precision_execution_matrix.py (host) and
+    # tests/test_precision_gpu_pipeline.py (device).
+    #
+    # `wave_complex64_only` is deliberately still a literal, because it is a
+    # statement about the package and not about this project: Chromatix's
+    # ScalarField.__init__ casts unconditionally to complex64, so complex128 will
+    # never appear here for a reason no amount of project work can change.
+    validated_devices = _validated_device_claims()
+    validated_dtypes = _validated_dtype_claims()
     checks = {
-        "ray_cpu_only": ray["devices"] == ["cpu"],
-        "ray_float64_only": ray["dtypes"] == ["float64"],
+        "ray_device_claim_is_validated": sorted(ray["devices"])
+        == validated_devices["M_RAY_OPTILAND"],
+        "ray_dtype_claim_is_validated": sorted(ray["dtypes"])
+        == validated_dtypes["M_RAY_OPTILAND"],
         "ray_gradient_unverified": ray["derivative"]["verified"] is False,
-        "wave_cpu_only": wave["devices"] == ["cpu"],
+        "wave_device_claim_is_validated": sorted(wave["devices"])
+        == validated_devices["M_WAVE_CHROMATIX"],
         "wave_complex64_only": wave["dtypes"] == ["complex64"],
         "wave_scalar_only": wave["approximation"] == "scalar_wave",
         "wave_gradient_unverified": wave["derivative"]["verified"] is False,

@@ -237,6 +237,10 @@ class DeviceKind(StrEnum):
     CPU = "cpu"
     CUDA = "cuda"
 
+    def to_spec_device_name(self) -> str:
+        """The coarse registry spelling. ``cuda`` is ``gpu`` in ``Device``."""
+        return Device.CPU.value if self is DeviceKind.CPU else Device.GPU.value
+
 
 @dataclass(frozen=True, order=False)
 class DevicePlacement:

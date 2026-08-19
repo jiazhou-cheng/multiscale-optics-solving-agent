@@ -46,6 +46,7 @@ This is the single repository-wide instruction source for Codex and Claude Code;
 - The repository is mounted at `/workspace`, which is also the container working directory, so source edits are visible immediately to the editable install.
 - Host-side work is limited to editing files, Git/Linear operations, and invoking Docker through `run.sh`; scientific or project-code execution remains containerized.
 - Do not assume GPU access, and record the actual device used. The default image is CPU-only by construction; GPU work uses the opt-in `agent_solver_gpu` image via `./run.sh --gpu ...` (`MOA_GPUS` picks devices, max 2). Setup, evidence, and two traps that silently disable the GPU: `docs/testing/gpu_environment.md`.
+- Precision, dtype, device and array namespace are four separate concepts, not one string (CHE-61). Never write a requested device or precision into an artifact: read it off the array. What each package can actually execute is declared once in `core/capabilities.py`, and cross-model conversion goes through `core/precision.py`'s bridge planner under an explicit policy. Registry `devices`/`dtypes` reflect that model and are updated only after executable tests pass. Policy, measured tolerances, and the two silent precision losses this uncovered: `docs/precision/precision_device_policy.md`.
 - If a required check cannot run through `./run.sh`, report a structured environment/setup failure instead of silently falling back to the host.
 
 ## Test Command Surface
