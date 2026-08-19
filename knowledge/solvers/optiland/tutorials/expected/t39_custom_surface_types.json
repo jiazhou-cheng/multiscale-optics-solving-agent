@@ -1,0 +1,110 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "max |sag_custom(a=b=c=0) - sag_StandardGeometry| = 0.000e+00 mm over r = 0.5..12 mm",
+      "kind": "analytic",
+      "name": "the_custom_sag_reduces_to_the_base_conic_when_its_terms_vanish",
+      "passed": true
+    },
+    {
+      "detail": "max component-wise difference 5.203e-01 over 25 aperture points between the tutorial's _surface_normal() and a central difference of its own sag(). d(a*r)/dx = a*x/r, but the tutorial writes a*x/r2. The b*r^3 and c*sin(d*r^2) derivatives beside it are correct, so this is one wrong term, not a wrong method.",
+      "kind": "analytic",
+      "name": "the_published_analytic_normal_disagrees_with_the_gradient_of_its_own_sag",
+      "passed": true
+    },
+    {
+      "detail": "replacing a*x/r2 with a*x/r drops the disagreement from 5.203e-01 to 1.324e-09. Nothing else in the class changed, which is what makes the diagnosis falsifiable.",
+      "kind": "analytic",
+      "name": "correcting_only_that_one_term_makes_the_normal_agree_to_float_precision",
+      "passed": true
+    },
+    {
+      "detail": "max |n|^2 - 1: published 3.331e-16, corrected 2.220e-16. A wrong gradient normalizes to a unit vector just as happily as a right one, so a unit-norm assertion is not a validation of a hand-written surface normal.",
+      "kind": "analytic",
+      "name": "both_normals_are_unit_vectors_so_normalisation_cannot_catch_the_error",
+      "passed": true
+    },
+    {
+      "detail": "_surface_normal(0.0, 0.0) with PYTHON FLOATS raises 'ZeroDivisionError: float division by zero', while the same call with numpy arrays returns [nan, nan, nan]. This is not only the wrong term: `a*r` is genuinely non-differentiable at r = 0 (the surface has a conical cusp there for a != 0), so even the corrected a*x/r is 0/0 at the vertex. Upstream's warnings.catch_warnings suppresses only the numpy path -- whether the failure is loud depends on the input TYPE.",
+      "kind": "analytic",
+      "name": "the_a_times_r_term_makes_the_normal_singular_at_the_vertex",
+      "passed": true
+    },
+    {
+      "detail": "exactly 1 of 217 rays has non-finite direction cosines in both the published and the corrected geometry: the r = 0 ray, killed by the conical cusp of the a*r term. The trace does NOT raise -- a NaN ray is returned alongside the good ones, so 'the script ran' is not evidence of anything. This failure is independent of the wrong derivative below.",
+      "kind": "analytic",
+      "name": "the_vertex_ray_comes_back_non_finite_in_both_versions",
+      "passed": true
+    },
+    {
+      "detail": "over the 216 finite rays: max unit-norm error 1.554e-15, all landing at z = 65.0",
+      "kind": "analytic",
+      "name": "the_corrected_geometry_traces_the_remaining_rays_correctly",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius over the finite rays: 10.330389 mm published vs 32.437378 mm corrected (ratio 0.3185). The wrong a*x/r2 term refracts every ray in the wrong direction; the result is a different lens, silently.",
+      "kind": "analytic",
+      "name": "the_wrong_normal_changes_the_physics_not_just_the_finiteness",
+      "passed": true
+    },
+    {
+      "detail": "sag spans [-8.667172, -0.189962] mm over the 75.6% of the 64x64 grid inside the 12 mm aperture",
+      "kind": "analytic",
+      "name": "the_sag_surface_is_finite_across_the_clear_aperture",
+      "passed": true
+    },
+    {
+      "detail": "lens.draw(num_rays=4) completed; lens.draw3D() deliberately skipped (hangs)",
+      "kind": "qualitative",
+      "name": "the_custom_surface_lens_draws_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "subclassing geometries.NewtonRaphsonGeometry with custom sag() and _surface_normal(), assembling surfaces.Surface(geometry=..., material_post=..., is_stop=...), and Optic.surfaces.add(new_surface=...).",
+  "level": "advanced",
+  "metrics": {
+    "corrected_normal_unit_norm_error": 2.220446049250313e-16,
+    "corrected_normal_vs_finite_difference_error": 1.3235645912601512e-09,
+    "max_abs_sag_difference_vs_base_conic": 0.0,
+    "num_normal_samples": 25,
+    "on_axis_array_normal": [
+      NaN,
+      NaN,
+      NaN
+    ],
+    "on_axis_array_normal_is_finite": false,
+    "on_axis_scalar_normal_error": "ZeroDivisionError: float division by zero",
+    "published_normal_unit_norm_error": 3.3306690738754696e-16,
+    "published_normal_vs_finite_difference_error": 0.5202703901034776,
+    "published_over_corrected_rms_spot": 0.31847177056395587,
+    "sag_grid_finite_fraction": 0.755859375,
+    "sag_grid_max_mm": -0.1899619750781963,
+    "sag_grid_min_mm": -8.667171627990895,
+    "traces": {
+      "corrected": {
+        "all_finite": false,
+        "image_surface_z_mm": 65.0,
+        "max_abs_z_minus_image": 0.0,
+        "max_direction_norm_error": 1.5543122344752192e-15,
+        "num_nonfinite_direction_cosines": 1,
+        "num_rays": 217,
+        "rms_spot_radius_mm": 32.43737837636858
+      },
+      "published": {
+        "all_finite": false,
+        "image_surface_z_mm": 65.0,
+        "max_abs_z_minus_image": 0.0,
+        "max_direction_norm_error": 1.1102230246251565e-15,
+        "num_nonfinite_direction_cosines": 1,
+        "num_rays": 217,
+        "rms_spot_radius_mm": 10.330389323975076
+      }
+    }
+  },
+  "notes": [],
+  "slug": "t39_custom_surface_types",
+  "title": "Custom Surface Types",
+  "url": "https://www.optiland.org/tutorials/extending-surfaces"
+}

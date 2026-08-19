@@ -1,0 +1,95 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (1001,)",
+      "kind": "invariant",
+      "name": "candidate_history_finite",
+      "passed": true
+    },
+    {
+      "detail": "1001 == 1000 + 1",
+      "kind": "invariant",
+      "name": "the_history_has_one_entry_per_step_plus_the_initial_value",
+      "passed": true
+    },
+    {
+      "detail": "3 == coeff_number 0, 1, 2",
+      "kind": "invariant",
+      "name": "three_asphere_coefficients_became_variables",
+      "passed": true
+    },
+    {
+      "detail": "the running minimum of the candidate history falls monotonically from 6.123440e-01 to 5.483521e-06 over 1000 steps, accepting 176 of them. A hill-climbing walk that only accepts improvements cannot do otherwise.",
+      "kind": "analytic",
+      "name": "the_accepted_best_value_is_monotonically_non_increasing",
+      "passed": true
+    },
+    {
+      "detail": "the last candidate value 1.629742e-05 is well above the best 5.483521e-06: `values` contains REJECTED trials too, so plotting it directly (as the tutorial does) shows scatter rather than convergence. The running minimum is the convergence curve.",
+      "kind": "analytic",
+      "name": "the_returned_list_is_a_candidate_history_not_a_convergence_curve",
+      "passed": true
+    },
+    {
+      "detail": "observed=5.483520876347125e-06 expected=5.483520876347125e-06 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "the_variables_are_left_at_the_best_position_found",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius 0.636344 -> 0.002500 mm (254.5x), measured by a direct trace rather than through the operand that was optimized",
+      "kind": "analytic",
+      "name": "the_random_walk_improves_the_rms_spot_by_more_than_five_times",
+      "passed": true
+    },
+    {
+      "detail": "the running best needs 356 steps to come within a factor of 10 of its final value and 889 to come within 1% -- both well past upstream's stated 'about 250 iterations'. That figure describes when a log-scale plot stops looking like it is moving, not numerical convergence, and a random walk's apparent plateau should not be trusted as one. The design does improve 254x, so the method works; only the stated step count does not reproduce.",
+      "kind": "reference",
+      "name": "upstreams_250_step_convergence_claim_is_criterion_dependent",
+      "passed": true
+    },
+    {
+      "detail": "seed=42 twice gives an identical 101-value history (True), and seed=7 gives a different one (True)",
+      "kind": "invariant",
+      "name": "the_seed_makes_the_walk_reproducible_and_actually_varies_it",
+      "passed": true
+    },
+    {
+      "detail": "draw, SpotDiagram.view and plt.plot(values) completed",
+      "kind": "qualitative",
+      "name": "layout_spot_diagram_and_convergence_plot_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "subclassing optimization.OptimizerGeneric and using its protected self._fun(position) objective, self._x history and problem.variables[i].update(value), plus the 'asphere_coeff' variable with coeff_number=.",
+  "level": "advanced",
+  "metrics": {
+    "best_value": 5.483520876347125e-06,
+    "delta": 0.1,
+    "different_seed_differs": true,
+    "final_candidate_value": 1.6297417056253146e-05,
+    "initial_value": 0.6123440124334585,
+    "max_steps": 1000,
+    "merit_after_optimize": 5.483520876347125e-06,
+    "num_accepted_steps": 176,
+    "num_candidate_values": 1001,
+    "num_variables": 3,
+    "optimized_asphere_coefficients": [
+      -2.6086657231895054,
+      -8.995694793369255,
+      -3.5513406970752373
+    ],
+    "rms_spot_final_mm": 0.0025003025876248735,
+    "rms_spot_initial_mm": 0.6363439076827757,
+    "same_seed_reproducible": true,
+    "seed": 42,
+    "step_reaching_within_one_order_of_best": 356,
+    "step_reaching_within_one_percent_of_best": 889,
+    "upstream_stated_convergence_steps": 250
+  },
+  "notes": [],
+  "slug": "t41_custom_optimization_algorithms",
+  "title": "Custom Optimization Algorithms",
+  "url": "https://www.optiland.org/tutorials/extending-optimization"
+}
