@@ -1,0 +1,193 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "Field.extent = [22500.0, 22500.0]; upstream prints [22500. 22500.] (= 256 px x 9.2 um)",
+      "kind": "reference",
+      "name": "the_field_extent_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "Field.intensity.shape = (51, 256, 256); upstream prints (51, 256, 256). One transfer_propagate call over a 51-element z produces the whole 3D stack, which is what makes this a single-shot optimization rather than a loop over planes.",
+      "kind": "reference",
+      "name": "a_1d_z_array_adds_a_leading_batch_axis",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (51, 256, 256)",
+      "kind": "invariant",
+      "name": "target_finite",
+      "passed": true
+    },
+    {
+      "detail": "the target value at the three SEEDED voxels is [2e-06, 1e-06, 3e-06] but at those voxels shifted by +12 on each axis it is [1000.0, 1000.0, 1000.0], all above half the 1000.000 maximum. `fftn(kernel, s=sample.shape)` puts the kernel origin at index 0 rather than centring it, so the circular convolution translates every blob. That is upstream's own construction, and a reader who assumed the blobs sit at the seeded coordinates would look in the wrong place.",
+      "kind": "analytic",
+      "name": "the_fft_convolution_shifts_every_blob_by_half_the_kernel_width",
+      "passed": true
+    },
+    {
+      "detail": "0.041% of voxels exceed 1% of the 1000.000 target maximum. Note 32.5% of voxels are above a bare 1e-6: building the target by FFT convolution leaves float32 ringing everywhere, so an absolute threshold measures the numerical floor rather than the object.",
+      "kind": "analytic",
+      "name": "the_target_is_three_localised_blobs",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.9996345043182373 expected=0.99963427 (rel=0.01)",
+      "kind": "reference",
+      "name": "the_initial_loss_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.0003654663451015949 expected=0.00036573 (rel=0.5)",
+      "kind": "reference",
+      "name": "the_initial_correlation_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1000,)",
+      "kind": "invariant",
+      "name": "correlation_history_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.7180631756782532 expected=0.714 (rel=0.1)",
+      "kind": "reference",
+      "name": "the_final_correlation_matches_upstreams_0p714",
+      "passed": true
+    },
+    {
+      "detail": "correlation rises from 0.000365 to 0.718063 over 1000 Adam steps, with a best of 0.718063",
+      "kind": "invariant",
+      "name": "the_running_maximum_correlation_never_falls",
+      "passed": true
+    },
+    {
+      "detail": "phase RMS 0.000000 -> 2.808836, range [-10.9630, 11.4669] rad. The parameter is the mask, so a non-trivial mask is the deliverable.",
+      "kind": "analytic",
+      "name": "the_phase_mask_actually_moved_off_its_zero_initialisation",
+      "passed": true
+    },
+    {
+      "detail": "the first gradient is (256, 256) with a maximum magnitude of 2.754111e-06: jax.grad differentiates the whole 51-plane stack with respect to all 65536 mask pixels at once",
+      "kind": "analytic",
+      "name": "the_gradient_reaches_every_pixel_of_the_phase_mask",
+      "passed": true
+    },
+    {
+      "detail": "intensity at each ACTUAL blob centre (the seeded voxel shifted by the kernel half-width, see above) relative to the volume mean: 42_140_140 75.16x, 22_63_104 194.91x, 11_22_37 155.43x. Correlation is a global measure, so this checks that the hologram forms WHERE the target actually is rather than merely somewhere.",
+      "kind": "analytic",
+      "name": "the_intensity_is_concentrated_at_the_three_target_voxels",
+      "passed": true
+    }
+  ],
+  "demonstrates": "a 1D `z` array adding a leading batch axis to transfer_propagate, phase_change as the only free parameter of an equinox.Module, ff_lens(f, n, NA), Field.extent, and a correlation loss over a 3D stack.",
+  "level": "advanced",
+  "metrics": {
+    "best_correlation": 0.7180631756782532,
+    "correlation_at_iterations": [
+      0.0003654663451015949,
+      0.7071111798286438,
+      0.7154966592788696,
+      0.7168096899986267,
+      0.717702329158783,
+      0.7180631756782532
+    ],
+    "field_extent": [
+      22500.0,
+      22500.0
+    ],
+    "final_correlation": 0.7180631756782532,
+    "final_loss": 0.2819368243217468,
+    "first_gradient_abs_max": 2.754110710156965e-06,
+    "initial_correlation": 0.0003654663451015949,
+    "initial_loss": 0.9996345043182373,
+    "initial_phase_rms": 0.0,
+    "intensity_shape": [
+      51,
+      256,
+      256
+    ],
+    "kernel_half_width": 12,
+    "learned_intensity_shape": [
+      51,
+      256,
+      256
+    ],
+    "learned_phase_range": [
+      -10.962969779968262,
+      11.466897010803223
+    ],
+    "learned_phase_rms": 2.8088359229791244,
+    "max_iterations": 1000,
+    "num_planes": 51,
+    "shape": [
+      256,
+      256
+    ],
+    "shifted_target_voxels": [
+      [
+        42,
+        140,
+        140
+      ],
+      [
+        22,
+        63,
+        104
+      ],
+      [
+        11,
+        22,
+        37
+      ]
+    ],
+    "spacing": 9.2,
+    "target_max": 1000.0,
+    "target_numerical_floor_fraction": 0.3250582825903799,
+    "target_occupied_fraction": 0.00041378245634191176,
+    "target_shape": [
+      51,
+      256,
+      256
+    ],
+    "target_value_at_seed_voxels": [
+      2.17152319237357e-06,
+      1.4150544984659064e-06,
+      3.1193146696750773e-06
+    ],
+    "target_value_at_shifted_voxels": [
+      999.9999389648438,
+      999.9998779296875,
+      999.9999389648438
+    ],
+    "target_voxel_contrast": {
+      "11_22_37": 155.43209838867188,
+      "22_63_104": 194.9141845703125,
+      "42_140_140": 75.16415405273438
+    },
+    "target_voxels": [
+      [
+        30,
+        128,
+        128
+      ],
+      [
+        10,
+        51,
+        92
+      ],
+      [
+        50,
+        10,
+        25
+      ]
+    ],
+    "volume_mean_intensity": 1.9753088054130785e-09
+  },
+  "notes": [
+    "Upstream's loop here rebinds opt_state correctly (`model, opt_state, metrics = update(model, opt_state, sample)`), unlike the aberration-fitting examples c04_zernike_fitting and c10_seidel_fitting whose update() returns only (model, metrics). That inconsistency between the examples is why those two behave the way they do, and it is recorded here because this is the example that shows the intended pattern."
+  ],
+  "slug": "c03_computer_generated_holography",
+  "title": "Computer Generated Holography",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/cgh/"
+}
