@@ -1,0 +1,179 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (256, 256)",
+      "kind": "invariant",
+      "name": "psf_Hy_0_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (256, 256)",
+      "kind": "invariant",
+      "name": "psf_Hy_0p7_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (256, 256)",
+      "kind": "invariant",
+      "name": "psf_Hy_1_finite",
+      "passed": true
+    },
+    {
+      "detail": "Strehl in {'Hy_0': 0.30576757034107277, 'Hy_0p7': 0.023679766458193682, 'Hy_1': 0.0351021136565573}: a ratio of peak intensities cannot exceed the aberration-free case",
+      "kind": "analytic",
+      "name": "strehl_ratio_is_a_physical_ratio_at_every_field",
+      "passed": true
+    },
+    {
+      "detail": "Strehl 0.3058 on axis against 0.0237 at Hy=0.7 and 0.0351 at Hy=1.0. Note the off-axis pair is NOT monotonic (Hy=1.0 beats Hy=0.7): a designed triplet balances field aberrations against each other, so Strehl need not fall monotonically with field.",
+      "kind": "analytic",
+      "name": "the_on_axis_field_is_by_far_the_best_corrected",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.30576757034107277 expected=0.28463475589976217 (rel=0.1)",
+      "kind": "analytic",
+      "name": "strehl_matches_the_marechal_approximation_on_axis",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (128, 128)",
+      "kind": "invariant",
+      "name": "huygens_psf_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.0351021136565573 expected=0.042980704216799274 (rel=0.25)",
+      "kind": "analytic",
+      "name": "fft_and_huygens_psf_agree_on_the_strehl_ratio",
+      "passed": true
+    },
+    {
+      "detail": "FFTPSF returns (256, 256) and HuygensPSF (128, 128) for the same num_points request, over different physical extents. They cannot be compared pixelwise; compare Strehl ratios or interpolate onto a common physical grid.",
+      "kind": "invariant",
+      "name": "the_two_psf_algorithms_use_different_grids",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (384,)",
+      "kind": "invariant",
+      "name": "mtf_curves_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.0 expected=1.0 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "diffraction_mtf_is_exactly_one_at_zero_frequency",
+      "passed": true
+    },
+    {
+      "detail": "max modulation 1.000000000",
+      "kind": "analytic",
+      "name": "diffraction_mtf_never_exceeds_unity",
+      "passed": true
+    },
+    {
+      "detail": "observed=363.6379413055218 expected=363.6379413055218 (rel=0.0001)",
+      "kind": "analytic",
+      "name": "geometric_mtf_axis_ends_at_the_incoherent_cutoff",
+      "passed": true
+    },
+    {
+      "detail": "observed=363.6379413055218 expected=363.6379413055218 (rel=0.0001)",
+      "kind": "analytic",
+      "name": "the_reported_cutoff_frequency_is_one_over_lambda_fno",
+      "passed": true
+    },
+    {
+      "detail": "observed=2.0246932427054967 expected=2.0 (rel=0.05)",
+      "kind": "invariant",
+      "name": "the_fft_mtf_grid_extends_to_about_twice_the_cutoff",
+      "passed": true
+    },
+    {
+      "detail": "FFT MTF = 0.00000 at the 1/(lambda*F/#) = 363.64 cycles/mm incoherent cutoff for F/5.000",
+      "kind": "analytic",
+      "name": "diffraction_mtf_has_essentially_vanished_by_the_cutoff",
+      "passed": true
+    },
+    {
+      "detail": "at half the cutoff the geometric MTF reads 0.05648 against the diffraction MTF's 0.01748, 3.23x higher: the geometric model carries no diffraction envelope, which is exactly why the tutorial plots both. (At the cutoff itself both have reached zero, so the comparison has to be made inside the band.)",
+      "kind": "analytic",
+      "name": "the_geometric_mtf_overestimates_modulation_inside_the_band",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.psf.{FFTPSF,HuygensPSF} with .strehl_ratio() and view(projection='2d'|'3d', num_points=...), and optiland.mtf.{GeometricMTF,FFTMTF}.",
+  "level": "advanced",
+  "metrics": {
+    "fft_mtf_at_cutoff": 3.8237064720131026e-17,
+    "fft_mtf_at_half_cutoff": 0.017482239351907524,
+    "fft_mtf_at_zero": 1.0,
+    "fft_mtf_freq_shape": [
+      3,
+      128
+    ],
+    "fft_mtf_max": 1.0,
+    "fft_mtf_max_freq": 736.2552825526279,
+    "fft_psf_shape": [
+      256,
+      256
+    ],
+    "fft_strehl_at_edge_field": 0.0351021136565573,
+    "fft_vs_huygens_strehl_ratio": 0.8166947074551985,
+    "geometric_mtf_at_cutoff": 0.0,
+    "geometric_mtf_at_half_cutoff": 0.05648487597619192,
+    "geometric_mtf_at_zero": 1.0,
+    "geometric_mtf_cutoff_freq_attribute": 363.6379413055218,
+    "geometric_mtf_max_freq": 363.6379413055218,
+    "geometric_over_diffraction_at_half_cutoff": 3.2309863078283927,
+    "huygens_psf_shape": [
+      128,
+      128
+    ],
+    "huygens_strehl": 0.042980704216799274,
+    "huygens_strehl_at_edge_field": 0.042980704216799274,
+    "incoherent_cutoff_cycles_per_mm": 363.6379413055218,
+    "marechal_relative_error": 0.07424537588358603,
+    "marechal_strehl_estimate": 0.28463475589976217,
+    "on_axis_rms_wavefront_waves_piston_removed": 0.1784061232005997,
+    "paraxial_FNO": 4.999978307143191,
+    "psf_Hy_0_peak_offset_from_centre": [
+      0,
+      0
+    ],
+    "psf_Hy_0_shape": [
+      256,
+      256
+    ],
+    "psf_Hy_0_strehl": 0.30576757034107277,
+    "psf_Hy_0p7_peak_offset_from_centre": [
+      2,
+      0
+    ],
+    "psf_Hy_0p7_shape": [
+      256,
+      256
+    ],
+    "psf_Hy_0p7_strehl": 0.023679766458193682,
+    "psf_Hy_1_peak_offset_from_centre": [
+      9,
+      0
+    ],
+    "psf_Hy_1_shape": [
+      256,
+      256
+    ],
+    "psf_Hy_1_strehl": 0.0351021136565573,
+    "strehl_by_field": {
+      "Hy_0": 0.30576757034107277,
+      "Hy_0p7": 0.023679766458193682,
+      "Hy_1": 0.0351021136565573
+    }
+  },
+  "notes": [],
+  "slug": "t25_psf_and_mtf",
+  "title": "PSF and MTF Calculation",
+  "url": "https://www.optiland.org/tutorials/psf-and-mtf"
+}
