@@ -1,0 +1,104 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (256, 256)",
+      "kind": "invariant",
+      "name": "scalar_psf_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (256, 256, 3)",
+      "kind": "invariant",
+      "name": "vectorial_psf_finite",
+      "passed": true
+    },
+    {
+      "detail": "scalar PSF (256, 256) and vectorial PSF (256, 256, 3) against a requested camera shape of (256, 256)",
+      "kind": "invariant",
+      "name": "the_example_produces_the_requested_camera_shape",
+      "passed": true
+    },
+    {
+      "detail": "gaussian_plane_wave(scalar=False) gives VectorField",
+      "kind": "invariant",
+      "name": "the_vector_pupil_is_a_VectorField",
+      "passed": true
+    },
+    {
+      "detail": "energy fractions per component index [0.0, 0.0, 1.0] for amplitude=[0, 0, 1]: all at index 2, confirming the (E_z, E_y, E_x) order independently of c11_polarized_multislice, which reached it through cf.linear(0).",
+      "kind": "analytic",
+      "name": "amplitude_0_0_1_gives_an_x_polarized_pupil",
+      "passed": true
+    },
+    {
+      "detail": "Iz/Ix = 0.011431 with an x-polarized pupil at NA 1.3. A high-NA focus must have a longitudinal component, so the function is not the scalar case in disguise -- it is a vectorial calculation that happens to be wrong (see below).",
+      "kind": "invariant",
+      "name": "the_vectorial_calculation_generates_longitudinal_field",
+      "passed": true
+    },
+    {
+      "detail": "refining ONLY the pupil sampling (128 -> 192 -> 256 px) with wavelength, NA, focal length, camera shape and camera pitch all fixed gives Iz/Ix = 0.011431, 0.004438, 0.003619 and |E_z| second-moment radii of 117.339, 100.186, 93.144 px. A correct high-NA focusing calculation converges under pupil refinement; this one does not. Root cause (CHE-18): high_na_ff_lens derives s_z from field.f_grid * lambda / n -- the FREQUENCY grid -- rather than the pupil position grid, so the obliquity Jacobian, the defocus phase and the output zoom factor all degenerate to constants. This check is a guard, not a validation: it should start failing if the bug is ever fixed upstream, which is the signal to re-validate against the Richards-Wolf oracle in benchmarks/level1/L1-WAVE-01.",
+      "kind": "analytic",
+      "name": "high_na_ff_lens_is_not_sampling_independent",
+      "passed": true
+    }
+  ],
+  "demonstrates": "cf.gaussian_plane_wave(waist=, pupil=, amplitude=, scalar=False) and cf.high_na_ff_lens(field, f, n, NA, camera_shape, camera_pixel_pitch) -- and that the latter is not sampling-independent in the pinned commit.",
+  "level": "advanced",
+  "metrics": {
+    "Iz_over_Ix": 0.011430896818637848,
+    "camera_pixel_pitch": 0.005,
+    "camera_shape": [
+      256,
+      256
+    ],
+    "focal_length": 100.0,
+    "numerical_aperture": 1.3,
+    "pupil_component_energy_fraction": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "pupil_correction": 86.66666666666667,
+    "pupil_sampling_sweep": {
+      "128": {
+        "Ex_radial_width_px": 103.25583933575356,
+        "Ez_radial_width_px": 117.33852438809438,
+        "Iz_over_Ix": 0.011430896818637848
+      },
+      "192": {
+        "Ex_radial_width_px": 103.76649368004351,
+        "Ez_radial_width_px": 100.1863805859313,
+        "Iz_over_Ix": 0.004438214935362339
+      },
+      "256": {
+        "Ex_radial_width_px": 104.65417785492544,
+        "Ez_radial_width_px": 93.14397610266344,
+        "Iz_over_Ix": 0.003619132563471794
+      }
+    },
+    "refractive_index": 1.5,
+    "scalar_psf_shape": [
+      256,
+      256
+    ],
+    "scalar_pupil_class": "ScalarField",
+    "vector_pupil_class": "VectorField",
+    "vectorial_Ix_total": 1517571.5,
+    "vectorial_Iy_total": 468.0234375,
+    "vectorial_Iz_total": 17347.203125,
+    "vectorial_psf_shape": [
+      256,
+      256,
+      3
+    ],
+    "wavelength": 0.532
+  },
+  "notes": [
+    "Do NOT use high_na_ff_lens for quantitative work in this pinned commit. capability_notes.md records the full CHE-18 evidence: refining only the pupil sampling moves the |E_z| ring radius from 246 nm to 2536 nm against an oracle value of 197 nm, and the best achievable vector overlap with an independent float64 Richards-Wolf quadrature was 0.070. What IS correct there is cartesian_to_spherical (the aplanatic polarization transform), and note that no sqrt(cos theta) apodization is applied anywhere -- the caller must supply it."
+  ],
+  "slug": "c12_high_na_psf",
+  "title": "High-NA vectorial PSF generation",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/highNA_PSF/"
+}

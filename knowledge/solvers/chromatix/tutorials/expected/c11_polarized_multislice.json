@@ -1,0 +1,137 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "(70, 180, 180, 3, 3); upstream prints (70, 180, 180, 3, 3)",
+      "kind": "reference",
+      "name": "the_sample_shape_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (70, 180, 180, 3, 3)",
+      "kind": "invariant",
+      "name": "potential_finite",
+      "passed": true
+    },
+    {
+      "detail": "max |eps - eps^T| = 9.537e-06 against a tensor scale of 7.334e+01 (relative 1.300e-07). R^T diag(n^2) R is symmetric for any rotation R, so this checks the rotation composition as well as the assembly.",
+      "kind": "analytic",
+      "name": "the_permittivity_tensor_is_symmetric_at_every_voxel",
+      "passed": true
+    },
+    {
+      "detail": "max off-diagonal magnitude 1.820e+01, i.e. 24.82% of the tensor scale. A diagonal-only potential would be three independent scalar problems; the rotated beads are not.",
+      "kind": "analytic",
+      "name": "the_rotated_beads_produce_genuinely_off_diagonal_tensors",
+      "passed": true
+    },
+    {
+      "detail": "type VectorField, u shape (180, 180, 3)",
+      "kind": "invariant",
+      "name": "the_field_is_a_VectorField_with_a_trailing_three_component_axis",
+      "passed": true
+    },
+    {
+      "detail": "for cf.linear(0) -- x-polarized light -- the energy fractions per component index are [0.0, 0.0, 1.0]: essentially all of it sits at index 2. Combined with upstream's own code (it normalises by field.u[90, 90, 2] to set the x amplitude and labels amplitude[..., 2] as 'Amplitude Ex'), the last axis is (E_z, E_y, E_x) -- the REVERSE of this project's (E_x, E_y, E_z) convention. Any coupler must transpose it.",
+      "kind": "analytic",
+      "name": "vectorfield_u_is_ordered_E_z_E_y_E_x",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (194400,)",
+      "kind": "invariant",
+      "name": "output_finite",
+      "passed": true
+    },
+    {
+      "detail": "(180, 180, 3) == (180, 180, 3)",
+      "kind": "invariant",
+      "name": "the_field_shape_survives_the_sample",
+      "passed": true
+    },
+    {
+      "detail": "phase in [-3.141534, 3.141580], which is why upstream plots it with vmin=-pi, vmax=pi",
+      "kind": "invariant",
+      "name": "the_phase_is_wrapped_into_minus_pi_to_pi",
+      "passed": true
+    },
+    {
+      "detail": "the input carried 0.000e+00 of its energy outside E_x; the output carries 0.021733. That conversion is the physics this example exists to show, and it is what distinguishes a genuinely tensorial propagation from a scalar one applied three times.",
+      "kind": "analytic",
+      "name": "the_birefringent_sample_generates_cross_polarization",
+      "passed": true
+    },
+    {
+      "detail": "mean |E_y|^2 per quadrant: top_left 7.565694e-04, top_right 5.248840e-05, bottom_left 4.988705e-05, bottom_right 5.100020e-02 -- a spread of 1022.3x. The four beads differ only in their rotation matrices, so the orientation really enters the calculation rather than being averaged away.",
+      "kind": "analytic",
+      "name": "the_four_crystal_orientations_give_four_different_responses",
+      "passed": true
+    }
+  ],
+  "demonstrates": "cf.polarized_multislice_thick_sample with a per-voxel 3x3 permittivity tensor, cf.linear / plane_wave(scalar=False) for a VectorField, chromatix.utils.utils.sigmoid_taper, and the (E_z, E_y, E_x) component order of VectorField.u.",
+  "level": "advanced",
+  "metrics": {
+    "bead_radius": 1.5,
+    "cross_polarized_energy_fraction": 0.021733421522568852,
+    "field_class": "VectorField",
+    "field_u_shape": [
+      180,
+      180,
+      3
+    ],
+    "input_component_energy_fraction": [
+      0.0,
+      0.0,
+      1.0
+    ],
+    "mean_Ey_intensity_per_quadrant": {
+      "bottom_left": 4.988705040886998e-05,
+      "bottom_right": 0.0510002002120018,
+      "top_left": 0.0007565693813376129,
+      "top_right": 5.248840170679614e-05
+    },
+    "n_background": 1.33,
+    "n_bead_zyx": [
+      1.44,
+      1.4,
+      1.37
+    ],
+    "output_amplitude_range": [
+      4.441289638634771e-05,
+      2.9392385482788086
+    ],
+    "output_component_energy_fraction": [
+      0.006908439745887751,
+      0.0148249817766811,
+      0.9782665784774311
+    ],
+    "output_over_input_total_energy": 1.062483362977905,
+    "output_phase_range": [
+      -3.1415343284606934,
+      3.1415796279907227
+    ],
+    "output_u_shape": [
+      180,
+      180,
+      3
+    ],
+    "potential_max_abs": 73.33683776855469,
+    "potential_max_off_diagonal": 18.202760696411133,
+    "potential_relative_symmetry_error": 1.3004028335881775e-07,
+    "potential_symmetry_error": 9.5367431640625e-06,
+    "sample_dtype": "float32",
+    "sample_shape": [
+      70,
+      180,
+      180,
+      3,
+      3
+    ],
+    "spacing": 0.065,
+    "wavelength": 0.405
+  },
+  "notes": [],
+  "slug": "c11_polarized_multislice",
+  "title": "Scattering through 3D birefringent samples",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/polarized_multislice/"
+}
