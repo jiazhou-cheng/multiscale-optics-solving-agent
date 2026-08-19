@@ -1,0 +1,127 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "4 == 4",
+      "kind": "invariant",
+      "name": "zmx_round_trip_preserves_surface_count",
+      "passed": true
+    },
+    {
+      "detail": "observed=25.84000000165376 expected=25.84 (rel=1e-09)",
+      "kind": "invariant",
+      "name": "zmx_round_trip_preserves_r1",
+      "passed": true
+    },
+    {
+      "detail": "reloaded R2 = inf",
+      "kind": "invariant",
+      "name": "zmx_round_trip_preserves_plano_second_surface",
+      "passed": true
+    },
+    {
+      "detail": "observed=50.000151135138175 expected=50.0 (rel=0.002)",
+      "kind": "reference",
+      "name": "efl_matches_edmund_datasheet_50mm",
+      "passed": true
+    },
+    {
+      "detail": "observed=47.870665819698864 expected=47.87 (rel=0.003)",
+      "kind": "reference",
+      "name": "bfl_matches_edmund_datasheet_47p87mm",
+      "passed": true
+    },
+    {
+      "detail": "observed=50.000151135138175 expected=50.00015113193816 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "efl_matches_thick_lens_closed_form",
+      "passed": true
+    },
+    {
+      "detail": "observed=47.870665819698864 expected=47.87066581649885 (rel=1e-06)",
+      "kind": "analytic",
+      "name": "bfl_matches_thick_lens_closed_form",
+      "passed": true
+    },
+    {
+      "detail": "max |delta| per array: {'x': 7.091891518484772e-10, 'y': 7.091891518484772e-10, 'z': 0.0, 'L': 1.4002243808874937e-11, 'M': 1.4002243808874937e-11, 'N': 2.845279567509351e-12, 'opd': 7.850076144677587e-11}. Unlike the exact JSON round trip of t03, the .zmx round trip is NOT bit-identical: Zemax files record CURVATURE, so R1 comes back as 25.84000000165376 instead of 25.84 (relative error 6.40e-11) and the trace shifts accordingly.",
+      "kind": "invariant",
+      "name": "zmx_round_trip_is_lossy_but_only_at_float_text_precision",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1,)",
+      "kind": "invariant",
+      "name": "spot_rms_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=8.581126306340602 expected=8.0 (rel=0.1)",
+      "kind": "analytic",
+      "name": "spot_size_scales_as_pupil_height_cubed",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius 0.253524 mm at f/2.63 is more than 100x the 0.001546 mm diffraction scale lambda*F/#: an uncorrected plano-convex singlet is aberration limited",
+      "kind": "analytic",
+      "name": "on_axis_blur_is_aberration_not_diffraction_limited",
+      "passed": true
+    },
+    {
+      "detail": "Optic.info() and RayFan.view() completed",
+      "kind": "qualitative",
+      "name": "info_and_rayfan_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.fileio.save_zemax_file / load_zemax_file (.zmx round trip), Optic.info(), analysis.SpotDiagram, analysis.RayFan. Substitutes a repo-owned Edmund #45-362 prescription for the tutorial's network download.",
+  "level": "beginner",
+  "metrics": {
+    "bfl_closed_form_mm": 47.87066581649885,
+    "efl_closed_form_mm": 50.00015113193816,
+    "image_surface_z_mm": 51.099999999999994,
+    "nbk7_index_at_5876": 1.5167984379050088,
+    "num_surfaces": 4,
+    "num_traced_rays": 217,
+    "paraxial_F2_relative_to_image_surface_mm": 0.0006658196988651044,
+    "paraxial_bfl_mm": 47.870665819698864,
+    "paraxial_efl_mm": 50.000151135138175,
+    "radius_round_trip_relative_error": 6.399999209644747e-11,
+    "reloaded_name": "Edmund 45-362",
+    "reloaded_radii_mm": [
+      25.84000000165376,
+      Infinity
+    ],
+    "rms_full_epd_mm": 0.21598035007370547,
+    "rms_half_epd_mm": 0.02516923098010076,
+    "rms_scaling_ratio": 8.581126306340602,
+    "spot_rms_mm": [
+      0.25352404657194544
+    ],
+    "trace_max_abs_deviation": {
+      "L": 1.4002243808874937e-11,
+      "M": 1.4002243808874937e-11,
+      "N": 2.845279567509351e-12,
+      "opd": 7.850076144677587e-11,
+      "x": 7.091891518484772e-10,
+      "y": 7.091891518484772e-10,
+      "z": 0.0
+    },
+    "working_f_number": 2.631586901849378,
+    "zmx_bytes": 711,
+    "zmx_first_lines": [
+      "VERS 240000 3 0",
+      "MODE SEQ",
+      "NAME Edmund 45-362",
+      "NOTE 0",
+      "UNIT MM X W X CM MR CPMM",
+      "ENPD 1.90000000E+01"
+    ]
+  },
+  "notes": [
+    "The tutorial's own artifact (zmax_47728.zmx from edmundoptics.com) was NOT downloaded: the container has no network access and Optiland 0.6.0 ships no .zmx fixture. save_zemax_file -> load_zemax_file on a repo-owned Edmund prescription exercises the same handler with a stronger, offline oracle. Reading a genuine vendor-authored .zmx (which may use surface/aperture records this round trip never emits) remains unverified."
+  ],
+  "slug": "t08_edmund_optics_catalogue",
+  "title": "Edmund Optics Catalogue",
+  "url": "https://www.optiland.org/tutorials/catalogue-edmund-optics"
+}

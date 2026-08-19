@@ -1,0 +1,72 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "16791 bytes, top-level keys ['aperture', 'apodization', 'fields', 'name', 'pickups', 'ray_tracer', 'solves', 'surface_group', 'version', 'wavelengths']",
+      "kind": "invariant",
+      "name": "artifact_is_valid_json_with_content",
+      "passed": true
+    },
+    {
+      "detail": "13 == 13",
+      "kind": "invariant",
+      "name": "surface_count_survives_round_trip",
+      "passed": true
+    },
+    {
+      "detail": "Optic.to_dict() of original and reloaded system compare equal",
+      "kind": "invariant",
+      "name": "to_dict_survives_round_trip",
+      "passed": true
+    },
+    {
+      "detail": "element-wise equal for ['L', 'M', 'N', 'i', 'opd', 'x', 'y', 'z']",
+      "kind": "invariant",
+      "name": "trace_is_element_wise_identical_after_round_trip",
+      "passed": true
+    },
+    {
+      "detail": "observed=3.2779472613064593 expected=3.2779472613064593 (rel=0.0, abs=0.0)",
+      "kind": "invariant",
+      "name": "paraxial_efl_survives_round_trip",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.fileio.save_optiland_file / load_optiland_file JSON round trip, and Optic.to_dict as the serialized form. Exercised on a reflecting (mirror) sample system.",
+  "level": "beginner",
+  "metrics": {
+    "artifact_bytes": 16791,
+    "artifact_top_level_keys": [
+      "aperture",
+      "apodization",
+      "fields",
+      "name",
+      "pickups",
+      "ray_tracer",
+      "solves",
+      "surface_group",
+      "version",
+      "wavelengths"
+    ],
+    "efl_after_mm": 3.2779472613064593,
+    "efl_before_mm": 3.2779472613064593,
+    "num_surfaces": 13,
+    "num_traced_rays": 469,
+    "primary_wavelength_um": 0.27,
+    "reloaded_num_surfaces": 13,
+    "trace_arrays_identical": {
+      "L": true,
+      "M": true,
+      "N": true,
+      "i": true,
+      "opd": true,
+      "x": true,
+      "y": true,
+      "z": true
+    }
+  },
+  "notes": [],
+  "slug": "t03_saving_and_loading",
+  "title": "Saving and Loading Files",
+  "url": "https://www.optiland.org/tutorials/saving-and-loading"
+}

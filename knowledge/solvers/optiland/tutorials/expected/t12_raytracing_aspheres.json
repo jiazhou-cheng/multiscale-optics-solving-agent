@@ -1,0 +1,109 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "geometry class EvenAsphere",
+      "kind": "invariant",
+      "name": "even_asphere_surface_type_builds_an_EvenAsphere_geometry",
+      "passed": true
+    },
+    {
+      "detail": "max |sag_optiland - sag_closed_form| = 4.441e-16 mm over r = (0.0, 1.0, 2.0, 5.0, 10.0)",
+      "kind": "analytic",
+      "name": "sag_matches_the_r2_first_even_asphere_closed_form",
+      "passed": true
+    },
+    {
+      "detail": "the Zemax r^4-first reading of the same coefficient list differs by up to 1.321e+01 mm -- so coefficients[0] multiplying r^2 is a real, testable convention, not a notational preference",
+      "kind": "analytic",
+      "name": "the_two_coefficient_conventions_are_distinguishable",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius 0.573063 mm (spherical) -> 0.027118 mm (even asphere): 21.1x better",
+      "kind": "analytic",
+      "name": "asphere_reduces_on_axis_rms_spot_by_more_than_an_order_of_magnitude",
+      "passed": true
+    },
+    {
+      "detail": "halving the pupil shrinks the RMS spot 9.73x, bracketing the h^3 = 8x signature of third-order spherical aberration (steepened by higher orders at this f/1.3 aperture)",
+      "kind": "analytic",
+      "name": "spherical_surface_shows_h_cubed_scaling",
+      "passed": true
+    },
+    {
+      "detail": "halving the pupil changes the RMS spot by 9.73x for the spherical surface (the h^3 signature) but only 2.33x for the asphere: the third-order term has been cancelled, so the residual grows far more slowly with pupil height",
+      "kind": "analytic",
+      "name": "asphere_breaks_the_h_cubed_scaling",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1,)",
+      "kind": "invariant",
+      "name": "spot_diagram_rms_spherical_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1,)",
+      "kind": "invariant",
+      "name": "spot_diagram_rms_asphere_finite",
+      "passed": true
+    }
+  ],
+  "demonstrates": "surface_type='even_asphere' with conic= and coefficients= kwargs, Optic.update_paraxial, and the fact that Optiland's even-asphere polynomial starts at r^2 rather than the Zemax-conventional r^4.",
+  "level": "intermediate",
+  "metrics": {
+    "asphere_coefficients": [
+      -0.0002248851,
+      -4.690412e-06,
+      -6.404376e-08
+    ],
+    "asphere_conic": 0.0,
+    "asphere_geometry_class": "EvenAsphere",
+    "aspheric_improvement_factor": 21.131967545826654,
+    "max_abs_error_vs_r2_first": 4.440892098500626e-16,
+    "max_abs_error_vs_r4_first": 13.21020261,
+    "rms_pupil_scaling_asphere": 2.332778512686041,
+    "rms_pupil_scaling_spherical": 9.732047946803307,
+    "rms_spot_asphere_mm": 0.027118318684486557,
+    "rms_spot_spherical_mm": 0.5730634303379545,
+    "sag_observed_mm": [
+      0.0,
+      0.024786005006061082,
+      0.09927257207496092,
+      0.6255289502129155,
+      2.5460555343112268
+    ],
+    "sag_r2_first_convention_mm": [
+      0.0,
+      0.024786005006061082,
+      0.09927257207496092,
+      0.6255289502129155,
+      2.546055534311227
+    ],
+    "sag_r4_first_convention_mm": [
+      0.0,
+      0.024786005006061082,
+      0.09633651469704092,
+      0.3962253002129156,
+      -10.664147075688772
+    ],
+    "sag_sample_radii_mm": [
+      0.0,
+      1.0,
+      2.0,
+      5.0,
+      10.0
+    ],
+    "spot_diagram_rms_asphere_mm": [
+      0.040520591493113274
+    ],
+    "spot_diagram_rms_spherical_mm": [
+      0.6846707875212006
+    ]
+  },
+  "notes": [],
+  "slug": "t12_raytracing_aspheres",
+  "title": "Raytracing Aspheres",
+  "url": "https://www.optiland.org/tutorials/raytracing-aspheres"
+}

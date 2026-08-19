@@ -1,0 +1,135 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "be.get_precision() == 32 immediately after set_backend('torch'): single precision is the DEFAULT, not float64",
+      "kind": "invariant",
+      "name": "torch_backend_defaults_to_float32",
+      "passed": true
+    },
+    {
+      "detail": "be.grad_mode.requires_grad = True",
+      "kind": "invariant",
+      "name": "grad_mode_can_be_enabled",
+      "passed": true
+    },
+    {
+      "detail": "relative error GROWS as the step shrinks: 1.32e-04 (1e-3) -> 1.11e-03 (1e-4) -> 3.26e-02 (1e-5). Classic single-precision cancellation, not a bad gradient.",
+      "kind": "analytic",
+      "name": "float32_finite_differences_do_not_converge",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.0011096180243779091 expected=0.00111 (rel=0.05)",
+      "kind": "reference",
+      "name": "float32_reproduces_the_recorded_1p11e_minus_3_probe_number",
+      "passed": true
+    },
+    {
+      "detail": "relative error falls by 100x then 99x per decade of step size (6.24e-05 -> 6.24e-07 -> 6.28e-09), i.e. the O(eps^2) truncation of a centered difference against an exact derivative",
+      "kind": "analytic",
+      "name": "float64_finite_differences_converge_quadratically",
+      "passed": true
+    },
+    {
+      "detail": "best relative error 6.28e-09 (float64) vs 3.26e-02 (float32)",
+      "kind": "analytic",
+      "name": "float64_gradient_is_four_orders_more_accurate_than_float32",
+      "passed": true
+    },
+    {
+      "detail": "traced objective dtype per precision: {'float32': 'torch.float32', 'float64': 'torch.float64'}. A float64 parameter tensor alone is NOT enough -- the lens is built with be.array, which follows the global precision.",
+      "kind": "invariant",
+      "name": "float64_precision_actually_changes_the_traced_dtype",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius 0.844481 -> 0.108594 mm over 100 Adam steps (best 0.108594 mm)",
+      "kind": "invariant",
+      "name": "adam_reduces_the_rms_spot_radius",
+      "passed": true
+    },
+    {
+      "detail": "final/initial = 0.1286",
+      "kind": "invariant",
+      "name": "adam_improvement_is_substantial_not_marginal",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (100,)",
+      "kind": "invariant",
+      "name": "adam_loss_history_finite",
+      "passed": true
+    },
+    {
+      "detail": "r1, r2 and t2 all received a finite gradient: autodiff flows through both surface curvature and axial spacing",
+      "kind": "invariant",
+      "name": "gradients_reach_every_declared_variable",
+      "passed": true
+    },
+    {
+      "detail": "r1=73.1331 > 0, r2=-73.7161 < 0 (biconvex retained), back spacing 67.2397 > 0",
+      "kind": "analytic",
+      "name": "optimized_singlet_is_still_physically_sensible",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.backend.set_backend('torch') + set_device + set_precision + get_precision + grad_mode.enable, torch tensors as surface radii and thicknesses, reverse-mode gradients through Optic.trace, and an Adam loop. Establishes that the torch backend defaults to float32.",
+  "level": "intermediate",
+  "metrics": {
+    "adam_best_rms_mm": 0.10859390570335363,
+    "adam_final_rms_mm": 0.10859390570335363,
+    "adam_initial_rms_mm": 0.8444805415418978,
+    "adam_loss_history_every_25": [
+      0.8444805415418978,
+      0.17994875002686833,
+      0.11444918885741456,
+      0.1096014851783113,
+      0.10859390570335363
+    ],
+    "backend": "torch",
+    "default_precision": 32,
+    "device": "cpu",
+    "float64_error_reduction_per_decade": [
+      100.00373474320138,
+      99.37648533068582
+    ],
+    "gradient_convergence": {
+      "float32": {
+        "grad_autodiff": 4.1261282603954896e-05,
+        "grad_fd_eps_0.0001": 4.130711772631912e-05,
+        "grad_fd_eps_0.001": 4.126672337179116e-05,
+        "grad_fd_eps_1e-05": 4.265245934220729e-05,
+        "objective": 2.251810400366594e-07,
+        "rel_error_eps_0.0001": 0.0011096180243779091,
+        "rel_error_eps_0.001": 0.00013184395056626676,
+        "rel_error_eps_1e-05": 0.03261656560271858
+      },
+      "float64": {
+        "grad_autodiff": 4.126137612912819e-05,
+        "grad_fd_eps_0.0001": 4.126135038724632e-05,
+        "grad_fd_eps_0.001": 4.125880200379458e-05,
+        "grad_fd_eps_1e-05": 4.12613758700941e-05,
+        "objective": 2.251840790955842e-07,
+        "rel_error_eps_0.0001": 6.238739554271086e-07,
+        "rel_error_eps_0.001": 6.23897255517244e-05,
+        "rel_error_eps_1e-05": 6.277883076173419e-09
+      }
+    },
+    "optimized_r1_mm": 73.13309561789228,
+    "optimized_r2_mm": -73.71607427990648,
+    "optimized_t2_mm": 67.23971139959889,
+    "supports_gpu": false,
+    "supports_gradients": true,
+    "traced_objective_dtype": {
+      "float32": "torch.float32",
+      "float64": "torch.float64"
+    }
+  },
+  "notes": [
+    "optiland.backend state is process-global and not thread-safe. This module restores the entering backend and float32 precision in a finally block so a pytest session that imports it does not leak the torch backend into other tests."
+  ],
+  "slug": "t10_differentiable_ray_tracing",
+  "title": "Differentiable Ray Tracing",
+  "url": "https://www.optiland.org/tutorials/differentiable-ray-tracing"
+}

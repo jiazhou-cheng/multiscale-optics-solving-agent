@@ -1,0 +1,162 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "shape (8, 1) == (8, 1)",
+      "kind": "invariant",
+      "name": "paraxial_rays_are_per_surface_columns",
+      "passed": true
+    },
+    {
+      "detail": "observed=-49.99978307143189 expected=-49.999783071431914 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "f1_equals_minus_f2_in_air",
+      "passed": true
+    },
+    {
+      "detail": "observed=49.999783071431914 expected=49.999783071431914 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "back_focal_point_minus_back_principal_plane_is_efl",
+      "passed": true
+    },
+    {
+      "detail": "observed=-49.99978307143189 expected=-49.99978307143189 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "front_focal_point_minus_front_principal_plane_is_ffl",
+      "passed": true
+    },
+    {
+      "detail": "observed=12.654110097005749 expected=12.654110097005727 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "front_nodal_equals_front_principal",
+      "passed": true
+    },
+    {
+      "detail": "observed=-49.79270551247308 expected=-49.7927055124731 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "back_nodal_equals_back_principal",
+      "passed": true
+    },
+    {
+      "detail": "observed=4.999978307143191 expected=4.999978307143191 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "fno_equals_efl_over_epd",
+      "passed": true
+    },
+    {
+      "detail": "observed=5.0 expected=5.0 (rel=1e-12)",
+      "kind": "analytic",
+      "name": "marginal_ray_starts_at_semi_epd",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.36397023426620234 expected=0.36397023426620234 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "chief_ray_slope_is_tan_max_field_angle",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.819851171331012 expected=1.8198511713310117 (rel=1e-06)",
+      "kind": "analytic",
+      "name": "lagrange_invariant_conserved_object_to_image",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.8198511713310117 expected=1.8198511713310117 (rel=1e-06)",
+      "kind": "analytic",
+      "name": "lagrange_invariant_magnitude_matches_accessor",
+      "passed": true
+    },
+    {
+      "detail": "observed=-0.0 expected=0.0 (abs=1e-12)",
+      "kind": "analytic",
+      "name": "magnification_is_zero_for_infinite_object",
+      "passed": true
+    },
+    {
+      "detail": "EPL=11.5122 > 0 > XPL=-50.9613",
+      "kind": "invariant",
+      "name": "exit_pupil_is_virtual_and_behind_the_lens",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (15,)",
+      "kind": "invariant",
+      "name": "all_paraxial_properties_finite",
+      "passed": true
+    }
+  ],
+  "demonstrates": "Optic.paraxial accessors: f1/f2, F1/F2, P1/P2, N1/N2, EPD/XPD, EPL/XPL, FNO, magnification, invariant, marginal_ray, chief_ray. All return backend arrays of shape (1,) or (num_surfaces, 1), not floats.",
+  "level": "beginner",
+  "metrics": {
+    "chief_u": [
+      0.36397023426620234,
+      0.29734713736496715,
+      0.4870801896867035,
+      0.29489091578149884,
+      0.47880114611344315,
+      0.2841284806067406,
+      0.35565747165980505,
+      0.35565747165980505
+    ],
+    "chief_y": [
+      -4.1900830893933145,
+      -4.1900830893933145,
+      -3.221040662606381,
+      -0.2948820690540255,
+      -2.7755575615628914e-16,
+      2.2745017525087614,
+      3.1132717575383078,
+      18.124784076711595
+    ],
+    "lagrange_invariant_image_space": 1.819851171331012,
+    "lagrange_invariant_object_space": 1.8198511713310117,
+    "marginal_ray_shape": [
+      8,
+      1
+    ],
+    "marginal_u": [
+      0.0,
+      -0.08715262170627819,
+      -0.14815270803632544,
+      -0.02508938783022278,
+      0.07607940967108827,
+      0.026844162020279148,
+      -0.1000004338590185,
+      -0.1000004338590185
+    ],
+    "marginal_y": [
+      5.0,
+      5.0,
+      4.715973091964107,
+      3.8259382908004804,
+      3.8008496556518927,
+      4.162258044147527,
+      4.241504157964353,
+      0.020707845738349384
+    ],
+    "max_field_deg": 20.0,
+    "num_surfaces": 8,
+    "paraxial_EPD": 10.0,
+    "paraxial_EPL": 11.512158673746795,
+    "paraxial_F1": -37.345672974426165,
+    "paraxial_F2": 0.2070775589588157,
+    "paraxial_FNO": 4.999978307143191,
+    "paraxial_N1": 12.654110097005749,
+    "paraxial_N2": -49.79270551247308,
+    "paraxial_P1": 12.654110097005727,
+    "paraxial_P2": -49.7927055124731,
+    "paraxial_XPD": 10.233729452318345,
+    "paraxial_XPL": -50.961347703805274,
+    "paraxial_f1": -49.99978307143189,
+    "paraxial_f2": 49.999783071431914,
+    "paraxial_invariant": -1.8198511713310117,
+    "paraxial_magnification": -0.0
+  },
+  "notes": [
+    "paraxial.invariant() returns the NEGATIVE of (u_bar*y - u*y_bar) for this system; only the magnitude is compared. The sign is a convention of Optiland's accessor, not a physical result."
+  ],
+  "slug": "t02_lens_properties",
+  "title": "Determining Lens Properties",
+  "url": "https://www.optiland.org/tutorials/lens-properties"
+}

@@ -1,0 +1,202 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "max sqrt(Px^2+Py^2) = 0.986321348445 <= 1",
+      "kind": "invariant",
+      "name": "random_points_inside_unit_pupil",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (200,)",
+      "kind": "invariant",
+      "name": "random_points_finite",
+      "passed": true
+    },
+    {
+      "detail": "max sqrt(Px^2+Py^2) = 1.000000000000 <= 1",
+      "kind": "invariant",
+      "name": "uniform_points_inside_unit_pupil",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (298,)",
+      "kind": "invariant",
+      "name": "uniform_points_finite",
+      "passed": true
+    },
+    {
+      "detail": "max sqrt(Px^2+Py^2) = 0.983000000000 <= 1",
+      "kind": "invariant",
+      "name": "gaussian_quadrature_points_inside_unit_pupil",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (36,)",
+      "kind": "invariant",
+      "name": "gaussian_quadrature_points_finite",
+      "passed": true
+    },
+    {
+      "detail": "max sqrt(Px^2+Py^2) = 1.000000000000 <= 1",
+      "kind": "invariant",
+      "name": "hexagonal_points_inside_unit_pupil",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (254,)",
+      "kind": "invariant",
+      "name": "hexagonal_points_finite",
+      "passed": true
+    },
+    {
+      "detail": "127 == 1 + 3*6*7 = 127",
+      "kind": "analytic",
+      "name": "hexapolar_count_matches_closed_form",
+      "passed": true
+    },
+    {
+      "detail": "7 distinct radii == 6 rings + centre",
+      "kind": "analytic",
+      "name": "hexapolar_has_one_radius_per_ring_plus_centre",
+      "passed": true
+    },
+    {
+      "detail": "a Gauss-Legendre rule places no node on the integration boundary: max radius 0.983000 < 1",
+      "kind": "analytic",
+      "name": "gaussian_quadrature_radii_strictly_inside_pupil",
+      "passed": true
+    },
+    {
+      "detail": "seed=7 reproducible=True, seed=None reproducible=False (the tutorial's seed=None must not be used in a repository probe)",
+      "kind": "invariant",
+      "name": "random_distribution_is_reproducible_only_when_seeded",
+      "passed": true
+    },
+    {
+      "detail": "same object, and access warns: ['Optic.surface_group is deprecated; use Optic.surfaces instead.']",
+      "kind": "invariant",
+      "name": "surface_group_is_the_deprecated_alias_of_surfaces",
+      "passed": true
+    },
+    {
+      "detail": "trace(distribution=<fresh instance>) -> AttributeError: 'RandomDistribution' object has no attribute 'x'; num_rays is only forwarded to generate_points for the STRING form",
+      "kind": "invariant",
+      "name": "a_distribution_instance_must_have_generate_points_called_first",
+      "passed": true
+    },
+    {
+      "detail": "shape (15, 1024) == (15, 1024)",
+      "kind": "invariant",
+      "name": "per_surface_arrays_are_surface_by_ray",
+      "passed": true
+    },
+    {
+      "detail": "surfaces.x[num_surfaces-1, :] is element-wise equal to the returned rays.x",
+      "kind": "invariant",
+      "name": "last_surface_row_equals_returned_realrays",
+      "passed": true
+    },
+    {
+      "detail": "|centroid| = 2.160e-05 mm is 0.0450 of the 4.799e-04 mm RMS spot: consistent with 1/sqrt(1024) Monte Carlo residue, not with a real asymmetry",
+      "kind": "analytic",
+      "name": "random_pupil_on_axis_centroid_is_sampling_noise",
+      "passed": true
+    },
+    {
+      "detail": "hexapolar centroid = (-1.034e-18, 1.258e-18) mm; a rotationally symmetric system on axis with a symmetric pupil fill has an exactly centred spot",
+      "kind": "analytic",
+      "name": "symmetric_pupil_on_axis_centroid_is_at_the_origin",
+      "passed": true
+    },
+    {
+      "detail": "Optic.trace(distribution=\"random\") returns different rays on identical consecutive calls, while trace(distribution=RandomDistribution(seed=...)) reproduces its rays exactly. Only the latter is admissible as recorded evidence.",
+      "kind": "invariant",
+      "name": "trace_distribution_string_random_is_not_reproducible",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (721,)",
+      "kind": "invariant",
+      "name": "edge_field_opl_finite",
+      "passed": true
+    },
+    {
+      "detail": "OPL in [6.441903, 6.592187] mm, peak-to-valley 1.503e-01 mm",
+      "kind": "invariant",
+      "name": "opl_is_positive_and_non_degenerate",
+      "passed": true
+    },
+    {
+      "detail": "Hy=1 image centroid y = 1.131325 mm, far from the on-axis 0 -- the field displacement the tutorial's OPL map is coloured by",
+      "kind": "analytic",
+      "name": "edge_field_centroid_is_displaced_from_axis",
+      "passed": true
+    },
+    {
+      "detail": "z direction cosine in [0.930288, 0.965845] subset (0, 1]",
+      "kind": "invariant",
+      "name": "all_rays_still_travel_forward",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.distribution.{Random,Uniform,GaussianQuadrature,Hexagonal}Distribution.generate_points, Optic.trace(distribution=...), and the per-surface arrays Optic.surfaces.{x,y,opd,N} of shape (num_surfaces, num_rays).",
+  "level": "beginner",
+  "metrics": {
+    "distributions": {
+      "gaussian_quadrature": {
+        "max_pupil_radius": 0.983,
+        "num_distinct_radii": 6,
+        "num_points": 18
+      },
+      "hexagonal": {
+        "max_pupil_radius": 1.0,
+        "num_distinct_radii": 7,
+        "num_points": 127
+      },
+      "random": {
+        "max_pupil_radius": 0.9863213484445922,
+        "num_distinct_radii": 100,
+        "num_points": 100
+      },
+      "uniform": {
+        "max_pupil_radius": 1.0,
+        "num_distinct_radii": 24,
+        "num_points": 149
+      }
+    },
+    "edge_field_centroid_y_mm": 1.1313246264525958,
+    "edge_field_num_rays": 721,
+    "edge_field_opl_max_mm": 6.592187393089349,
+    "edge_field_opl_min_mm": 6.441903293157395,
+    "edge_field_opl_ptv_mm": 0.15028409993195346,
+    "num_surfaces": 15,
+    "oblique_field_N_max": 0.9658450179831748,
+    "oblique_field_N_min": 0.9302877421963014,
+    "oblique_field_num_rays": 12644,
+    "on_axis_centroid_over_rms_random": 0.04501237116318185,
+    "on_axis_centroid_x_mm": -2.126427644496671e-05,
+    "on_axis_centroid_y_mm": 3.810775591350891e-06,
+    "on_axis_hexapolar_centroid_x_mm": -1.0338064211844724e-18,
+    "on_axis_hexapolar_centroid_y_mm": 1.2575820508147428e-18,
+    "on_axis_hexapolar_rms_spot_mm": 0.00046423291905547736,
+    "on_axis_num_rays": 1024,
+    "on_axis_rms_spot_mm": 0.0004799356790184392,
+    "per_surface_array_shape": [
+      15,
+      1024
+    ],
+    "seeded_instance_distribution_reproducible": true,
+    "seeded_random_reproducible": true,
+    "string_random_distribution_reproducible": false,
+    "surface_group_deprecation": [
+      "Optic.surface_group is deprecated; use Optic.surfaces instead."
+    ],
+    "unprepared_distribution_instance_error": "AttributeError: 'RandomDistribution' object has no attribute 'x'",
+    "unseeded_random_reproducible": false
+  },
+  "notes": [],
+  "slug": "t05_tracing_and_analyzing_rays",
+  "title": "Tracing and Analyzing Rays",
+  "url": "https://www.optiland.org/tutorials/tracing-and-analyzing-rays"
+}

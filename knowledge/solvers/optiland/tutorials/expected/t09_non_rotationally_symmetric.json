@@ -1,0 +1,197 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "max |delta(y, z)| over the 10 finite surfaces = 0.000e+00 mm",
+      "kind": "invariant",
+      "name": "absolute_and_relative_construction_place_every_vertex_identically",
+      "passed": true
+    },
+    {
+      "detail": "x, y, z, L, M, N and opd all element-wise equal between the two builds",
+      "kind": "invariant",
+      "name": "absolute_and_relative_construction_trace_identically",
+      "passed": true
+    },
+    {
+      "detail": "surfaces [4, 5, 6, 9] deviate [90.0, 90.0, 90.0, 89.8832] degrees; the two refracting doublet surfaces deviate only [1.1651, 2.2778] degrees",
+      "kind": "analytic",
+      "name": "exactly_the_four_mirrors_deviate_the_beam_by_90_degrees",
+      "passed": true
+    },
+    {
+      "detail": "all 11 surfaces report interaction_model in ['RefractiveReflectiveModel']: material='mirror' is resolved by the material factory, so a builder cannot detect reflectivity from the surface or interaction class",
+      "kind": "invariant",
+      "name": "mirror_is_a_material_not_a_surface_or_interaction_type",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.269766554483466 expected=0.2697665544834713 (rel=0.05)",
+      "kind": "analytic",
+      "name": "opposite_fields_land_symmetrically_about_the_axial_field",
+      "passed": true
+    },
+    {
+      "detail": "sum of squared operand residuals 9.666830e-01 -> 6.436707e-04",
+      "kind": "invariant",
+      "name": "optimizer_reduces_the_merit_function",
+      "passed": true
+    },
+    {
+      "detail": "surface 9 thickness = 13.062633 mm within [10, 20]",
+      "kind": "invariant",
+      "name": "optimized_variable_respects_its_declared_bounds",
+      "passed": true
+    },
+    {
+      "detail": "mean RMS spot radius 0.189105 -> 0.006124 mm over the three fields",
+      "kind": "analytic",
+      "name": "optimization_improves_the_mean_rms_spot_radius",
+      "passed": true
+    }
+  ],
+  "demonstrates": "Absolute surface placement (z=, y= kwargs) vs relative placement (thickness=, dy=), material='mirror', per-surface rx tilts, analysis.SpotDiagram(num_rings, distribution), and optimization.OptimizationProblem + OptimizerGeneric with an rms_spot_size operand over a thickness variable.",
+  "level": "intermediate",
+  "metrics": {
+    "field_centroids_y_mm": {
+      "minus_half_deg": 9.730233445516527,
+      "plus_half_deg": 10.269766554483464,
+      "zero_deg": 9.999999999999998
+    },
+    "field_offset_minus_mm": -0.2697665544834713,
+    "field_offset_plus_mm": 0.269766554483466,
+    "interaction_model_classes": [
+      "RefractiveReflectiveModel"
+    ],
+    "max_vertex_deviation_mm": 0.0,
+    "mean_deviation_per_surface_deg": [
+      0.0,
+      0.0,
+      0.0,
+      90.00000000000001,
+      90.00000000000001,
+      90.00000000000001,
+      1.165071847433708,
+      2.2778163354279055,
+      89.88315963867348,
+      0.0
+    ],
+    "merit_after": 0.000643670694211244,
+    "merit_before": 0.9666829742245174,
+    "num_surfaces": 11,
+    "num_traced_rays": 127,
+    "optimized_thickness_mm": 13.062633385151711,
+    "spot_rms_after_mm": [
+      0.0066226273343580715,
+      0.00512796760194726,
+      0.006622627334357374
+    ],
+    "spot_rms_before_mm": [
+      0.1889491086314182,
+      0.18941739157765267,
+      0.18894910863141848
+    ],
+    "surfaces_deviating_more_than_60_deg": [
+      4,
+      5,
+      6,
+      9
+    ],
+    "vertices_absolute_yz": [
+      [
+        0.0,
+        -Infinity
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        10.0
+      ],
+      [
+        0.0,
+        15.0
+      ],
+      [
+        0.0,
+        25.0
+      ],
+      [
+        -15.0,
+        25.0
+      ],
+      [
+        -15.0,
+        45.0
+      ],
+      [
+        -10.0,
+        45.0
+      ],
+      [
+        -5.0,
+        45.0
+      ],
+      [
+        10.0,
+        45.0
+      ],
+      [
+        10.0,
+        55.0
+      ]
+    ],
+    "vertices_relative_yz": [
+      [
+        0.0,
+        Infinity
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        10.0
+      ],
+      [
+        0.0,
+        15.0
+      ],
+      [
+        0.0,
+        25.0
+      ],
+      [
+        -15.0,
+        25.0
+      ],
+      [
+        -15.0,
+        45.0
+      ],
+      [
+        -10.0,
+        45.0
+      ],
+      [
+        -5.0,
+        45.0
+      ],
+      [
+        10.0,
+        45.0
+      ],
+      [
+        10.0,
+        55.0
+      ]
+    ]
+  },
+  "notes": [],
+  "slug": "t09_non_rotationally_symmetric",
+  "title": "Non-Rotationally Symmetric Systems",
+  "url": "https://www.optiland.org/tutorials/non-rotationally-symmetric"
+}
