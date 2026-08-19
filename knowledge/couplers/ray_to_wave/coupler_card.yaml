@@ -32,6 +32,37 @@ governing_equation: >
   U_plane(x,y) = sum_i a_i * exp(i k (OPL_i + dr_i(x,y))) * <n_hat, d_hat_i>
   with dr_i(x,y) = d_x_i (x - x0_i) + d_y_i (y - y0_i)
 
+# CHE-38 (M3.9R). Read the equation again: the reconstruction plane's z does not
+# appear in it. Only the TRANSVERSE offset does. This has three consequences that
+# a caller has to know, and none of them is visible from the signature.
+the_plane_z_is_not_a_kernel_parameter:
+  statement: >
+    reference_plane.z_m is metadata. It labels the output and is checked for
+    consistency; it does not enter the sum. What the operator returns is one fixed
+    superposition of plane waves sampled on a grid.
+  consequence_1_moving_the_handoff: >
+    To reconstruct on a different plane, the RAY STATE must be advanced there --
+    positions along each direction, optical path by n * arc length. That is exact,
+    not an approximation: advancing by arc length s changes the per-ray constant
+    phase by k s d_z^2, and s d_z^2 = dz d_z for a plane offset dz = s d_z, which
+    is precisely the phase an exact plane wave accumulates over dz. Verified in
+    tests/test_m3r_sensor_handoff.py against a single-ray closed form.
+  consequence_2_the_output_is_a_free_space_field: >
+    A superposition of plane waves solves the Helmholtz equation exactly, so the
+    operator is self-consistent in z. Reconstructing at the pupil and propagating
+    to the sensor, and reconstructing at the sensor directly, are the same field in
+    exact arithmetic; they differ only through the finite window, the grid and the
+    propagator's own error.
+  consequence_3_no_wavefront_curvature: >
+    The output carries no exp(i k r^2 / 2R) term, because the sum is linear in the
+    transverse coordinate. This is invisible in |U|^2 and NOT invisible to a
+    subsequent propagation. Measured on M3-SINGLET-REF: about 1.2 rad of phase
+    difference against an exact spherical-wave reference at the 5-Airy-radius gate
+    edge, while the intensity residual is at 1e-3. A caller who measures a PSF is
+    unaffected; a caller who propagates the reconstructed sensor field further is
+    not. Evidence: benchmarks/probes/records/m3r_sensor_handoff.json
+    (experiment_e_shipping_sensor_path.missing_quadratic_phase).
+
 required_source_metadata:
   - wavelength_m
   - positions_m
@@ -72,6 +103,41 @@ deliberately_refused:
       -> sqrt? photon count? already an amplitude?) that the caller must declare
       and test. The coupler does not choose.
 
+# CHE-38 (M3.9R), section 11. Not every ray plane has the same semantics, and the
+# card previously implied that it did. There are two distinct operations and this
+# implementation is one of them.
+reconstruction_semantics:
+  implemented:
+    id: ray_as_coherent_contribution
+    statement: >
+      A ray is a coherent optical contribution to the field at a declared
+      OBSERVATION-side plane. The inputs are position, direction, optical path and
+      complex amplitude; the aperture enters implicitly, as the domain of a
+      quadrature in direction space -- i.e. through which rays exist.
+    typical_use: declared Ray->Wave handoff at or near a sensor / observation plane
+    status: verified
+    verified_by: CHE-38 (M3.9R)
+    evidence: benchmarks/probes/records/m3r_sensor_handoff.json
+  not_implemented:
+    id: ray_as_wavefront_sample
+    statement: >
+      A ray is a SAMPLE of a finite-support wavefront, typically at an exit pupil,
+      to be interpolated onto a grid and multiplied by an explicit pupil support
+      P(rho) before an FFT/Fresnel propagation.
+    typical_use: exit pupil, smooth wavefront reconstruction, FFT PSF workflow
+    requires_and_does_not_have:
+      - an explicit aperture support function
+      - interpolation / reconstruction of the sampled wavefront
+      - aperture semantics of any kind
+    status: NOT implemented, NOT claimed
+    measured_consequence_of_using_it_anyway: >
+      the reconstructed pupil rim comes back Fresnel-soft on the sqrt(lambda R)
+      scale instead of hard, and does not sharpen with ray count. See the
+      aperture_edge validity condition below.
+  do_not_claim_both: >
+    Both would need separate implementations and separate verification. Only the
+    first has either.
+
 supported_regimes:
   - scalar, monochromatic, fully coherent
   - planar reconstruction surface with a single declared normal
@@ -95,38 +161,143 @@ validity_conditions:
       Coherent complex summation remains valid at caustics and at overlapping ray
       branches. Any downstream operation that UNWRAPS phase is not valid there.
     enforcement: documented; caller responsibility
+    measured_by: >
+      CHE-38 (M3.9R) turned this from a plausible claim into a measurement, and the
+      result is the opposite of the usual intuition. At the geometric focus of
+      M3-SINGLET-REF the ray bundle collapses to 0.73 um, about 0.11 of one Airy
+      first-null radius, so the exact sensor plane IS a caustic in the
+      position-space sense. It is also where the operator is BEST conditioned: the
+      coherent gain |U|/sum|a_i| at the peak is ~1, because every wavelet arrives
+      in phase. The operator reads directions and optical paths and never a local
+      ray density, so the position-space degeneracy is not one of its inputs. By
+      contrast the exit-pupil plane, where the rays are spread out, is where the sum
+      is a near-total-cancellation problem. A handoff must NOT be moved upstream to
+      avoid a caustic on this operator's behalf.
+  - id: observation_side_handoff_is_the_verified_placement
+    statement: >
+      The verified placement is at (or near) the observation/sensor plane, with the
+      ray state advanced there in the ray domain. Seven handoff planes spanning the
+      exit pupil to just past focus were measured against two independent wave
+      references; the residual is monotone in the handoff coordinate and best at the
+      sensor.
+    enforcement: measured; no run-time check (the operator cannot know where it is)
+    measured_by: CHE-38 (M3.9R), Experiments A and E
+  - id: per_ray_area_weight_at_the_aperture_boundary
+    status: implemented_and_partially_resolved (CHE-47)
+    statement: >
+      The sum is a QUADRATURE over the ray ensemble. The coupler itself still
+      applies no area weight -- it uses whatever amplitude the producer supplies
+      (unchanged: see coherent_handoff_from_a_ray_trace.amplitude below) -- but as
+      of CHE-47 the Optiland producer DOES supply one by default. Hexapolar
+      sampling is very nearly equal-area in the interior, and wrong at both
+      boundaries: the outermost ring lies exactly on rho = a and is counted as a
+      full cell rather than a half cell, and the central ray represents a smaller
+      cell than a uniform assignment implies. The effect is an inflated EFFECTIVE
+      APERTURE, hence a PSF that is slightly too narrow, first order in the ray
+      spacing.
+    enforcement: >
+      not enforced by the coupler and cannot be: it does not know where the
+      aperture is (see the aperture_edge condition). CHE-47 makes the producer
+      supply an absolute-area quadrature weight
+      (multiscale_optics_agent.couplers.quadrature.hexapolar_area_weight_m2) by
+      default whenever the Optiland adapter can confirm an un-vignetted hexapolar
+      fan (optiland_adapter.py's _resolve_ray_quadrature_weight regenerates the
+      pupil sampling and matches it row for row against the trace, exactly as
+      CHE-41's object-space term does); optiland_handoff.declare_coherent_bundle
+      folds it into the amplitude declaration
+      (amplitude = sqrt(weight) * quadrature_weight_m2) unless
+      HandoffPerturbation(apply_quadrature_weight=False) is passed explicitly.
+      C_RAY_TO_WAVE's own kernel (ray_to_wave.py) is untouched by CHE-47.
+    measured_by: >
+      CHE-38 (M3.9R) on a SYNTHETIC aberration-free bundle at N_f = 23.45,
+      against a Rayleigh-Sommerfeld reference: the residual falls as ring_count^-0.87
+      (1.21e-2 at 12481 rays to 1.85e-3 at 787969), and the fitted effective NA
+      excess tracks 1/(2 * rings) -- exactly half a ring spacing of extra radius --
+      over a 16x range of ring counts. Applying a radial trapezoid weight (outer
+      ring 1/2, central ray 3/4) collapses the residual to a CONVERGED 4.07e-4,
+      flat from 64 rings upward and inside the 1e-3 gate. CHE-47
+      (benchmarks/probes/m3_quadrature_weight.py) reproduced this mechanism as
+      the PRODUCTION default and re-measured it on the REAL (residually
+      aberrated) M3-SINGLET-REF trace: the sensor-plane residual against the O2
+      wave oracle improves 1.58x (3.91e-3 -> 2.48e-3 at 787969 rays) but does
+      NOT reach the 1e-3 gate on the real system -- the analytic Airy oracle O1
+      (aberration-free, sharing no code with the trace) is CLOSER to the
+      weighted result (2.21e-3) than the aberration-matched O2 oracle is
+      (2.48e-3), pointing at O2's own ring-averaged/interpolated pupil-fit
+      quality rather than a further coupler-side defect. Not decomposed
+      further; see the CHE-47 follow-up items.
+    consequence: >
+      at uniform weights the slice needs of order 10^6 rays to reach 1e-3 on the
+      SYNTHETIC aberration-free case; on the REAL traced system uniform weights
+      plateau at 3.9e-3 and CANNOT reach 1e-3 by ray refinement alone (CHE-38).
+      With the CHE-47 area weight the real system reaches 2.2-2.5e-3, a genuine
+      but partial improvement; the synthetic case still reaches 4e-4. The
+      remaining real-system gap is open (see coupler_card.yaml's evidence above
+      and CHE-47's recorded follow-up items), not attributed to a named
+      mechanism it has not been shown to cause.
   - id: plane_not_surface
     statement: Equation 2 reconstructs onto a plane with one normal n_hat.
     enforcement: contract validation
   - id: aperture_edge_is_resolved_only_to_a_fresnel_scale
+    scope: >
+      APPLIES TO the ray_as_wavefront_sample mode only -- i.e. to using this
+      operator to rebuild a finite-support pupil function. It is not a bound on the
+      verified observation-side handoff, and CHE-38 (M3.9R) corrected the card on
+      exactly this point: the previous wording implied every ray plane carried this
+      term, and the sensor-side measurement shows it does not.
     statement: >
-      Each ray contributes an infinite plane wave, so the sum is a stationary-phase
-      estimate of the field on the plane and resolves it only over a Fresnel zone
-      of the bundle's own convergence, sqrt(lambda R). A hard aperture edge
-      therefore comes back as a knife-edge diffraction profile -- amplitude 1/2 at
-      the geometric rim, an overshoot fringe inside it, a tail outside -- and NOT
-      as a truncation. The resulting error is set by the pupil Fresnel number
-      a^2 / (lambda R) and does not fall with ray count, grid or padding.
+      Each ray contributes an infinite plane wave, so the sum contains no aperture
+      support term. Asked to reconstruct a hard pupil edge, it returns a Fresnel-soft
+      boundary instead of a truncation -- amplitude near 1/2 at the geometric rim, an
+      overshoot fringe inside it, a tail outside -- over a transition scale
+      sqrt(lambda R) set by the bundle's own convergence, and the transition does NOT
+      sharpen as the ray spacing falls.
     enforcement: >
-      documented only, and it is the one validity condition here that nothing can
-      measure at run time: the coupler is never told where the aperture is. RealRays
-      carries no mask and Optic.trace returns survivors only (CHE-32), so the
-      boundary is implicit in which rays exist, and a reconstruction cannot
-      distinguish "the beam ends here" from "the stop is here".
+      documented only, and it is the one condition here that nothing can measure at
+      run time: the coupler is never told where the aperture is. RealRays carries no
+      mask and Optic.trace returns survivors only (CHE-32), so the boundary is
+      implicit in which rays exist, and a reconstruction cannot distinguish "the beam
+      ends here" from "the stop is here".
     measured_by: >
-      CHE-38 (M3.9). On M3-SINGLET-REF, sqrt(lambda R) = 51.6 um = 19.4 pixels =
-      0.21 of the pupil radius at a Fresnel number of 23.45, and the rim amplitude
-      settles at 0.50 for every ray count above 12481. At the PSF level it costs
-      7.1e-3 relative intensity L2 against an analytic hard-mask pupil propagated
-      the same way, against a 1.0e-3 gate. Evidence:
-      benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis).
-    consequence: >
-      C_RAY_TO_WAVE is not a substitute for an aperture model. Any comparison
-      against an oracle that assumes a hard stop -- the analytic Airy pattern, or a
-      Fourier transform of a masked pupil -- carries this term. Adding rays makes the
-      TOTAL disagreement worse once the ray-sampling term has fallen below this one,
-      because the two had been partially cancelling; measured on M3-SINGLET-REF, the
-      turnaround is near 28000 traced rays.
+      CHE-38 (M3.9) and re-measured in CHE-38 (M3.9R). On M3-SINGLET-REF,
+      sqrt(lambda R) = 51.6 um = 19.4 pupil pixels = 0.21 of the pupil radius at a
+      Fresnel number of 23.45, and the rim amplitude settles near 0.50 for every ray
+      count above 12481. Evidence: benchmarks/probes/records/m3_convergence.json
+      (aperture_edge_hypothesis) and benchmarks/probes/records/m3r_sensor_handoff.json
+      (o4_exit_pupil_negative_control).
+    the_correct_reference_for_the_rim: >
+      M3.9R closed CHE-38 section 13's loose end. The measured rim slope, in units of
+      1/sqrt(lambda R), was compared against a ONE-DIMENSIONAL straight Fresnel knife
+      edge (1.0009) and read as an unexplained 26% discrepancy. The straight edge was
+      simply the wrong reference. The circular-aperture Debye/Lommel solution at this
+      Fresnel number gives 0.7142 with a rim amplitude of 0.4839 and an overshoot of
+      1.143, against a measured slope near 0.744. The gap closes to a few percent,
+      attributable to pixel binning and the finite fit band. The earlier
+      rim-curvature / azimuthal-averaging / pixel-binning explanations are WITHDRAWN
+      as the cause of a 26% effect; the correct geometry accounts for it.
+    conclusion: >
+      This implementation cannot be ASSUMED to reconstruct finite pupil support from
+      survivor rays alone. That is a statement about pupil reconstruction. It is NOT
+      a statement that C_RAY_TO_WAVE is incorrect, and it is NOT a bound on the
+      observation-side handoff: at the sensor the residual against two independent
+      wave references is monotone in ray count with no floor and no turn-around, and
+      the previous "adding rays makes the total disagreement worse" behaviour does
+      not recur.
+    withdrawn_claims:
+      - >
+        "the resulting error is set by the pupil Fresnel number a^2/(lambda R) and
+        does not fall with ray count, grid or padding" -- true of exit-pupil
+        reconstruction, FALSE of the sensor-side handoff, where the residual falls as
+        ring_count^-0.87 and is removed by a per-ray area weight.
+      - >
+        "any comparison against an oracle that assumes a hard stop carries this term"
+        -- too general. At the sensor handoff the aperture is carried correctly, as
+        the domain of a direction-space quadrature.
+      - >
+        "adding rays makes the TOTAL disagreement worse ... the turnaround is near
+        28000 traced rays" -- an exit-pupil artifact. Re-measured at the sensor
+        handoff over 217 to 787969 rays, no turn-around occurs against the
+        independent wave oracle.
 
 derivative:
   mode: not_applicable_yet
@@ -248,12 +419,41 @@ coherent_handoff_from_a_ray_trace:
           chief-ray intersection with a healthy-looking 0.072-wave-P-V residual.
       global_phase_policy: retained_as_metadata_not_reapplied
     amplitude:
-      mapping: a_i = sqrt(intensity_i)
+      # CHE-47 (M3.9R extension) changed the DEFAULT mapping. The bare
+      # sqrt(intensity_i) declaration below is still available
+      # (HandoffPerturbation(apply_quadrature_weight=False)) and is exactly what
+      # ships when the adapter cannot confirm an un-vignetted hexapolar fan.
+      default_mapping: a_i = sqrt(intensity_i) * quadrature_weight_m2_i
+      default_mapping_status: implemented_by CHE-47, verified_by CHE-47
+      default_mapping_source: >-
+        quadrature_weight_m2_i is an ABSOLUTE per-ray pupil/phase-space area
+        element in square metres (multiscale_optics_agent.couplers.quadrature.
+        hexapolar_area_weight_m2), producer-supplied by the Optiland adapter
+        whenever it can regenerate the hexapolar pupil sampling Optic.trace used
+        and match it row for row against the traced ray count (the same
+        row-count-match technique CHE-41 uses for the object-space term).
+        Radial-trapezoid corrected: interior rings get the nominal cell
+        pi*a^2/(3*num_rings^2), the central ray 3/4 of it, the outermost ring
+        (sitting exactly on rho = a) 1/2 of it.
+      legacy_mapping: a_i = sqrt(intensity_i)
+      legacy_mapping_when: >-
+        the adapter could not confirm an un-vignetted hexapolar fan (a
+        non-hexapolar distribution, or a trace where at least one ray was
+        vignetted so ring order no longer matches row order), OR
+        HandoffPerturbation(apply_quadrature_weight=False) is passed explicitly
+        (the CHE-38 negative-test / pre-CHE-47 configuration).
       normalization: >-
-        raw. No per-ray area factor and no 1/N: a traced set is a physical
-        ensemble, not a Monte Carlo sample. CONSEQUENCE: the reconstructed
-        amplitude scales with ray density, so the field converges in shape but
-        not in scale under ray refinement. Owned by CHE-38.
+        with the default mapping: an absolute-area quadrature, so the
+        reconstructed discrete power CONVERGES under ray refinement instead of
+        growing as (ray count)^2 -- CHE-33/CHE-38's N^2.0024 finding is
+        resolved for a bundle the adapter could weight (CHE-47: fitted exponent
+        -0.0098, r^2 = 0.23, i.e. flat/noise, vs the legacy path's 1.9948,
+        r^2 = 0.9999, reproducing CHE-33/CHE-38 almost exactly). With the
+        legacy mapping: raw, no per-ray area factor and no 1/N -- a traced set
+        is a physical ensemble, not a Monte Carlo sample -- so the reconstructed
+        amplitude scales with ray density and the field converges in shape but
+        not in scale under ray refinement (CHE-33/CHE-38's original finding,
+        still exactly reproduced on that path).
       no_phase_available: >-
         RealRays.i is a real intensity. Every radian of the reconstructed field
         therefore comes from the OPL, which is why a wrong OPL is not a degraded
@@ -287,6 +487,97 @@ coherent_handoff_from_a_ray_trace:
       downstream and its absence produces a converging sphere aimed at the axis.
       An on-axis record without the term is still accepted, because there the
       omission is a piston.
+    - >-
+      CHE-47's quadrature weight does NOT add a refusal here -- a missing or
+      non-hexapolar-consistent weight falls back to the legacy
+      sqrt(intensity_i) amplitude mapping rather than raising, because (unlike
+      the object-space term) an unweighted bundle is still coherent and
+      correct, just not scale-invariant under ray refinement. The adapter's own
+      NON_HEXAPOLAR_SAMPLING code (multiscale_optics_agent.couplers.quadrature)
+      is caught internally at that boundary and recorded as
+      quadrature_weight.unavailable_reason, never propagated to the caller.
+
+# CHE-38 (M3.9R). The placement question M3.4-M3.9 never asked: is the exit pupil
+# where this operator should be used at all? Measured over seven declared planes.
+observation_side_handoff:
+  status: verified
+  verified_by: CHE-38 (M3.9R)
+  probe: benchmarks/probes/m3r_sensor_handoff.py
+  evidence: benchmarks/probes/records/m3r_sensor_handoff.json
+  tests: tests/test_m3r_sensor_handoff.py
+  report: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md
+  figures: outputs/M3/CHE-38-M3.9R/
+  system_verified: M3-SINGLET-REF, on axis, 550 nm
+  verdict: >-
+    A. Sensor-side Ray->Wave handoff verified. The residual against two independent
+    wave references is monotone in ray count with no floor and no turn-around, and
+    on a synthetic aberration-free bundle it is attributed to the ray ensemble's
+    per-ray area weight rather than to the wavelet kernel.
+  verified_does_not_mean_the_shipped_slice_meets_the_gate:
+    at_uniform_ray_weights: >-
+      the traced slice at the sensor sits at 3.84e-3 against O2 at 787969 rays --
+      still falling, no floor -- so the SHIPPED configuration does not meet the
+      1.0e-3 gate at any ray count this study could afford. What is verified is that
+      the residual is a refinement error and not a structural one.
+    unattributed_remainder: >-
+      at 787969 rays the traced slice reads 3.84e-3 while a synthetic bundle at the
+      same ring count reads 1.85e-3 against the same class of reference. Roughly half
+      the traced residual, in quadrature, is NOT yet attributed. Candidates, none
+      of them measured: the O2 oracle's own wavefront representation (ring-averaged
+      traced OPL from a 256-ring trace, linearly interpolated, and held FIXED while
+      the slice ray count varies), and the aberration's distortion of the
+      pupil-coordinate-to-direction mapping that the equal-area argument assumes.
+      This is recorded as open rather than explained.
+    half_a_ring_spacing_prediction_is_right_in_kind_not_in_exponent: >-
+      the fitted effective-NA excess is 1.05x to 1.51x the naive 1/(2 rings) over 64
+      to 512 rings and falls as ring_count^-0.83, not ring_count^-1. The mechanism is
+      confirmed by the trapezoid-weight collapse, which is the strong evidence; the
+      shallower exponent is an open loose end and is NOT explained here.
+  references_used:
+    - id: O1
+      what: analytic Airy, [2 J1(v)/v]^2, paraxial, aberration-free
+      shares_with_the_slice: nothing
+      numerical_aperture: >-
+        the largest traced transverse direction cosine. NOT a / sqrt(a^2 + R^2),
+        which is 0.29% smaller for this singlet because the marginal ray crosses the
+        axis about 14 um before the declared image plane. Using the sphere value
+        instead is a 4e-3 relative L2 on its own -- four times the gate -- so this
+        is a load-bearing declaration and not bookkeeping.
+    - id: O2a
+      what: >-
+        the constructed hard-support pupil (exact support, uniform amplitude, traced
+        wavefront by radial interpolation) propagated to the sensor by independent
+        float64 angular spectrum on a 2048 um window
+      shares_with_the_slice: the ray-measured wavefront only; never the coupler
+    - id: O2b
+      what: >-
+        the same pupil through an exact Rayleigh-Sommerfeld surface integral in polar
+        form -- a different REPRESENTATION (Huygens spherical waves), not a different
+        discretization, with no FFT and therefore no wraparound
+      agreement_with_O2a: 2.4e-4 in intensity over the gate disc
+    - id: O3
+      what: the highest-ray-count result, used ONLY for ray-sampling convergence
+      not_allowed_to: establish physical correctness
+    - id: O4
+      what: M3.9's exit-pupil reconstruction, retained as a negative control
+      label: out of contract; see the aperture_edge validity condition
+  what_was_checked_and_cleared:
+    eikonal_consistency_of_the_declared_handoff: >-
+      dOPL/drho equals the transverse direction cosine to 2.5e-8 in the interior and
+      8.6e-7 at the rim. The declared OPL and the declared directions describe the
+      same wavefront, so the handoff itself was cleared before the oracle was
+      believed. This is the measurement that redirected the investigation.
+    an_underfitted_oracle_that_nearly_became_a_coupler_defect: >-
+      building O2's pupil phase from a 5-term polynomial in rho^2 gives a fit
+      residual of 1.3e-3 waves -- which looks excellent -- and a rim SLOPE 0.28%
+      wrong, because RMS over the pupil does not bound the derivative at the edge.
+      That oracle charges the coupler about 5e-3, monotone in ray count, five times
+      the gate. Retained in the record as a named control.
+  caution_for_callers: >-
+    do not move a handoff upstream to avoid a caustic. At the geometric focus the
+    bundle collapses to ~0.11 of one Airy first-null radius, and that is where this
+    operator is best conditioned (coherent gain ~1). It reads directions and optical
+    paths, never a local ray density.
 
 # CHE-41 (M3.9). The off-axis half of the handoff, which CHE-33 left unprobed and
 # CHE-37 found broken. Same implementation module; the OPL reference is versioned.
@@ -366,8 +657,15 @@ not_yet_probed:
 measured_behaviour:
   power_scaling: >
     N identical in-phase wavelets give N times the amplitude and N^2 times the
-    discrete power. Reported, not gated: it is bookkeeping about a chosen
-    ensemble, not a conservation law about a physical aperture.
+    discrete power -- true of the KERNEL, unconditionally, for any bundle whose
+    amplitude does not itself carry a compensating per-ray factor. Reported, not
+    gated by C_RAY_TO_WAVE: it is bookkeeping about a chosen ensemble's
+    amplitude, not a conservation law the kernel enforces. CHE-47 gives the
+    Optiland producer path a compensating factor (quadrature_weight_m2) by
+    default, so a bundle built through optiland_handoff.declare_coherent_bundle
+    no longer exhibits this scaling in practice (measured: fitted power-vs-N
+    exponent -0.0098 against the legacy path's 1.9948); a bundle built any other
+    way, or with apply_quadrature_weight=False, still does.
   two_independent_sampling_conditions: >
     Grid Nyquist (can the output pitch write the steepest ramp?) and ray
     density (do adjacent wavelets agree to better than pi?) fail independently,

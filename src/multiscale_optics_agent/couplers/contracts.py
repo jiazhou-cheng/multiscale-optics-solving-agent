@@ -120,6 +120,13 @@ class ContractCode(StrEnum):
     #: reference here is known and stated, and the missing quantity is the
     #: object-space information needed to move it onto a wavefront.
     OBJECT_SPACE_REFERENCE_MISSING = "OBJECT_SPACE_REFERENCE_MISSING"
+    #: A per-ray quadrature/area weight was requested from a pupil sampling that
+    #: is not a recognized hexapolar ring set -- e.g. a ray's normalized pupil
+    #: radius does not land within tolerance of ``j / num_rings`` for any integer
+    #: ring ``j``. Added by CHE-47 (M3.9R extension). Distinct from
+    #: SHAPE_MISMATCH: the arrays agree in length, but the *geometry* the weight
+    #: formula assumes is not the geometry the rays were actually sampled on.
+    NON_HEXAPOLAR_SAMPLING = "NON_HEXAPOLAR_SAMPLING"
 
 
 class ContractError(ValueError):
@@ -585,9 +592,7 @@ class RayBundle:
         weight_semantics = None
         if "intensity" in data:
             weight = np.asarray(data["intensity"], dtype=np.float64)
-            weight_semantics = metadata.get(
-                "intensity_is_not_amplitude", "unnamed ray weight"
-            )
+            weight_semantics = metadata.get("intensity_is_not_amplitude", "unnamed ray weight")
 
         # opd_native is carried in provenance, never promoted to an OPL.
         provenance: dict[str, Any] = {
@@ -617,6 +622,24 @@ class RayBundle:
             )
         if isinstance(conventions.get("object_space_reference"), dict):
             provenance["object_space_reference"] = dict(conventions["object_space_reference"])
+        # CHE-47: the RAW hexapolar pupil coordinates a per-ray quadrature (area)
+        # weight is computed from, carried the same way as the object-space term
+        # above -- present when the adapter regenerated an un-vignetted hexapolar
+        # fan and matched it row for row against the trace, absent for a record
+        # written before CHE-47 or a non-hexapolar sampling. Carried, never turned
+        # into a weight or applied here; computing and folding it into the
+        # amplitude is a declaration made by the coupler-side handoff, not by this
+        # classmethod (which imports no coupler math, only carries adapter data).
+        if "pupil_normalized_x" in data:
+            provenance["pupil_normalized_x"] = np.asarray(
+                data["pupil_normalized_x"], dtype=np.float64
+            )
+        if "pupil_normalized_y" in data:
+            provenance["pupil_normalized_y"] = np.asarray(
+                data["pupil_normalized_y"], dtype=np.float64
+            )
+        if isinstance(conventions.get("quadrature_weight"), dict):
+            provenance["quadrature_weight"] = dict(conventions["quadrature_weight"])
         provenance["requested_field"] = {
             "Hx": metadata.get("requested_Hx"),
             "Hy": metadata.get("requested_Hy"),
@@ -832,7 +855,9 @@ class WavefrontSamples:
             optical_path_length_reference=str(reference),
             wavelength_m=wavelength_m,
             reference_plane=ReferencePlane(
-                name=str(_require(metadata, "reference_plane", artifact_id=record.id, what="plane")),
+                name=str(
+                    _require(metadata, "reference_plane", artifact_id=record.id, what="plane")
+                ),
                 z_m=float(
                     _require(metadata, "reference_plane_z_m", artifact_id=record.id, what="plane z")
                 ),

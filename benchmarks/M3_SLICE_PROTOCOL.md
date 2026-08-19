@@ -259,6 +259,53 @@ wavelets onto a plane. `examples/graphs/ray_to_wave.yaml` carried
 `reference_sphere: exit_pupil`, which nothing implements; that file is now
 annotated with what executes in M3 and what is M4 scope.
 
+### CHE-38 (M3.9R): the exit pupil is the frozen configuration, not the verified one
+
+Read the coupler's equation again and notice what is missing:
+
+```
+U(x,y) = sum_i a_i exp[i k (OPL_i - d_i . r0_i)] exp[i k (d_x_i x + d_y_i y)]
+```
+
+The reconstruction plane's `z` **does not appear**. The plane is metadata; what
+the operator returns is one fixed superposition of plane waves sampled on a grid.
+Two things follow. First, the handoff can only be moved by advancing the **ray
+state** — and doing so is exact, because advancing by arc length `s` changes the
+per-ray constant phase by `k s d_z²`, which is precisely the phase an exact plane
+wave accumulates over the plane offset `s d_z`. Second, there is no aperture
+support term anywhere in it.
+
+That second point is what M3.9 ran into. At an exit pupil a ray is a *sample of a
+finite-support wavefront*, and reconstructing the pupil requires the support
+function `P(ρ)` explicitly. This operator has no such term, so it returned a
+Fresnel-soft rim on the `√(λR)` scale instead of a hard edge. The conclusion is
+**not** that the coupler is wrong; it is that exit-pupil hard-support
+reconstruction is a different operation, and one this repository does not
+implement.
+
+The implemented and verified mode is **ray-as-coherent-contribution** at a
+declared observation plane, where the aperture enters correctly as the *domain of
+a quadrature in direction space* — through which rays exist. M3.9R measured seven
+declared handoff planes from the exit pupil to just past focus, against two
+independent wave references, and the residual is worst at the exit pupil and best
+at the sensor.
+
+The exact image plane turns out to be the right place despite being a caustic.
+The bundle collapses there to 0.73 µm — about 0.11 of one Airy first-null radius
+— yet the coherent gain `|U|/Σ|a_i|` at the peak is ≈ 1, so the sum is fully
+constructive and loses no precision. The operator never reads a local ray density,
+so the position-space degeneracy is not one of its inputs. **Do not move a handoff
+upstream to avoid a caustic on this operator's behalf.**
+
+Sensor grid, declared before the sweep: `0.5 µm` pitch, `grid_n = 256`, a `128 µm`
+window — 12.97 pixels per Airy first-null radius and 9.87 Airy radii across the
+half-window. The binding constraint is *resolving the core*, not the per-axis
+Nyquist limit, which allows `5.317 µm` here and is satisfied with better than 10×
+margin. That inverts the pupil-plane situation, and it is why M3.9's `grid_n = 188`
+does not transfer.
+
+Evidence: `benchmarks/probes/records/m3r_sensor_handoff.json`.
+
 ---
 
 ## Sampling

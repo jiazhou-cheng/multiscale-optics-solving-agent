@@ -94,6 +94,7 @@ from multiscale_optics_agent.couplers.contracts import (
 
 __all__ = [
     "AMPLITUDE_MAPPING",
+    "AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT",
     "NATIVE_OPD_UNIT_M",
     "OPL_REFERENCE_VERSION",
     "SUPERSEDED_OPL_REFERENCE",
@@ -119,6 +120,26 @@ AMPLITUDE_MAPPING = (
     "phase in i, so every radian of the reconstructed field comes from the "
     "optical path length. No per-ray area factor and no 1/N is applied: the "
     "traced set is a physical ray ensemble, not a Monte Carlo sample of one."
+)
+
+#: CHE-47 (M3.9R extension): the declaration used when the ray record carries a
+#: usable per-ray quadrature weight (see :mod:`multiscale_optics_agent.couplers.
+#: quadrature`). ``amplitude = sqrt(weight) * quadrature_weight_m2`` is a LINEAR
+#: correction on the amplitude, not on the intensity: the wavelet sum
+#: approximates a surface integral over the aperture, and a quadrature weight is
+#: the area element that integral discretizes with, which multiplies the field
+#: value directly. Folding it in here -- rather than in C_RAY_TO_WAVE -- is what
+#: keeps the kernel CHE-24/CHE-38 validated unchanged: the coupler still just
+#: sums whatever amplitude the bundle declares.
+AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT = (
+    "amplitude = sqrt(weight) * quadrature_weight_m2; weight is Optiland "
+    "RealRays.i as above. quadrature_weight_m2 is the absolute per-ray "
+    "pupil/phase-space area element a hexapolar ring set represents "
+    "(multiscale_optics_agent.couplers.quadrature.hexapolar_area_weight_m2), "
+    "radial-trapezoid corrected at the center and outer-ring boundaries "
+    "(CHE-38 sections 14-15, CHE-47). This replaces AMPLITUDE_MAPPING's 'no "
+    "per-ray area factor' with the producer-supplied one the coupler card's "
+    "per_ray_area_weight_at_the_aperture_boundary validity condition calls for."
 )
 
 #: The version of the OPL reference declaration this module produces. A handoff
@@ -204,6 +225,11 @@ class HandoffPerturbation:
     #: this class whose effect is zero for every configuration M3.4-M3.8 verified,
     #: which is precisely why it needed a ticket of its own.
     reference_incoming_wavefront: bool = True
+    #: Skip folding the producer's quadrature weight into the amplitude (CHE-47),
+    #: even when the record carries one. Reproduces CHE-38's uniform-weight
+    #: configuration -- the ``3.84e-3`` sensor residual at 787 969 rays -- for a
+    #: negative-test comparison against the corrected declaration.
+    apply_quadrature_weight: bool = True
 
     @property
     def is_identity(self) -> bool:
@@ -211,6 +237,7 @@ class HandoffPerturbation:
             self.opl_sign == 1
             and self.transfer_opl_to_plane
             and self.reference_incoming_wavefront
+            and self.apply_quadrature_weight
         )
 
     def describe(self) -> str:
@@ -223,6 +250,8 @@ class HandoffPerturbation:
             parts.append("opl_plane_transfer_omitted")
         if not self.reference_incoming_wavefront:
             parts.append("incoming_wavefront_reference_omitted")
+        if not self.apply_quadrature_weight:
+            parts.append("quadrature_weight_omitted")
         return "+".join(parts)
 
 
@@ -466,6 +495,104 @@ def _object_space_reference(
     }
 
 
+def _ray_quadrature_weight(
+    record: ArtifactRecord, bundle: RayBundle, *, applied: bool
+) -> dict[str, Any]:
+    """Decide whether a per-ray quadrature weight can be computed and folded in.
+
+    CHE-47. Mirrors :func:`_object_space_reference`'s structure, with one
+    difference in kind: a missing quadrature weight is not itself a physics
+    error the way a missing off-axis tilt term is. A bundle without one is
+    still coherent and still passes ``require_coherent()`` -- it is simply
+    unweighted, which is CHE-38's pre-CHE-47 configuration and the ``3.84e-3``
+    sensor residual it measured. So the ``unavailable`` branch here falls back
+    to :data:`AMPLITUDE_MAPPING` rather than raising.
+
+    The adapter exports only the RAW hexapolar pupil coordinates (it must
+    import no coupler -- see ``optiland_adapter._resolve_ray_pupil_sampling``);
+    this function does the actual coupler-side physics, calling
+    :mod:`multiscale_optics_agent.couplers.quadrature` to turn them into a ring
+    index and an absolute per-ray area weight.
+    """
+    from multiscale_optics_agent.couplers.quadrature import (
+        hexapolar_area_weight_m2,
+        hexapolar_ring_index,
+    )
+
+    pupil_x = bundle.provenance.get("pupil_normalized_x")
+    pupil_y = bundle.provenance.get("pupil_normalized_y")
+    declaration = bundle.provenance.get("quadrature_weight") or {}
+    if pupil_x is None or pupil_y is None:
+        return {
+            "applied": False,
+            "weight_m2": None,
+            "status": "unavailable",
+            "reason": (
+                declaration.get("unavailable_reason")
+                or "the record carries no pupil_normalized_x/y (predates CHE-47, or "
+                "the adapter could not confirm an un-vignetted hexapolar fan)"
+            ),
+        }
+
+    num_rings = declaration.get("num_rings")
+    aperture_radius_m = declaration.get("aperture_radius_m")
+    if num_rings is None or aperture_radius_m is None:
+        return {
+            "applied": False,
+            "weight_m2": None,
+            "status": "unavailable",
+            "reason": (
+                "pupil_normalized_x/y are present but conventions.quadrature_weight "
+                "carries no num_rings/aperture_radius_m to scale a weight from"
+            ),
+        }
+
+    pupil_x = np.asarray(pupil_x, dtype=np.float64)
+    pupil_y = np.asarray(pupil_y, dtype=np.float64)
+    if pupil_x.shape != (bundle.count,) or pupil_y.shape != (bundle.count,):
+        raise ContractError(
+            ContractCode.SHAPE_MISMATCH,
+            (
+                "pupil_normalized_x/y must carry one value per ray, got "
+                f"{pupil_x.shape}/{pupil_y.shape} for {bundle.count} rays"
+            ),
+            declaration="provenance.pupil_normalized_x",
+            artifact_id=record.id,
+        )
+
+    try:
+        ring_index = hexapolar_ring_index(pupil_x, pupil_y, int(num_rings))
+        weight_m2 = hexapolar_area_weight_m2(ring_index, int(num_rings), float(aperture_radius_m))
+    except ContractError as exc:
+        return {
+            "applied": False,
+            "weight_m2": None,
+            "status": "unavailable",
+            "reason": f"{exc.code}: {exc}",
+        }
+
+    if not applied:
+        return {
+            "applied": False,
+            "weight_m2": weight_m2,
+            "status": "available, OMITTED -- negative test only",
+            "reason": (
+                "HandoffPerturbation(apply_quadrature_weight=False). Reproduces "
+                "CHE-38's pre-CHE-47 uniform-weight configuration."
+            ),
+        }
+    return {
+        "applied": True,
+        "weight_m2": weight_m2,
+        "status": "applied",
+        "reason": (
+            "amplitude = sqrt(weight) * quadrature_weight_m2 (CHE-47), replacing "
+            "the equal-weight sum CHE-38 measured as the dominant sensor-plane "
+            "residual (3.84e-3 -> ~4e-4 at 787969 rays, on-axis M3-SINGLET-REF)."
+        ),
+    }
+
+
 def declare_coherent_bundle(
     record: ArtifactRecord,
     *,
@@ -573,7 +700,20 @@ def declare_coherent_bundle(
     bundle = bundle.with_declared_optical_path_length(
         relative_opl_m, reference=opl_reference_declaration
     )
-    bundle = bundle.with_amplitude_from_weight(mapping=AMPLITUDE_MAPPING)
+
+    # --- 4b. Fold in the per-ray quadrature weight, if the record has one (CHE-47) -
+    quadrature = _ray_quadrature_weight(
+        record, bundle, applied=perturbation.apply_quadrature_weight
+    )
+    if quadrature["applied"]:
+        amplitude = np.sqrt(bundle.weight).astype(np.complex128) * quadrature["weight_m2"].astype(
+            np.complex128
+        )
+        bundle = bundle.with_amplitude_from_weight(
+            mapping=AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT, amplitude=amplitude
+        )
+    else:
+        bundle = bundle.with_amplitude_from_weight(mapping=AMPLITUDE_MAPPING)
 
     declarations = {
         "issue": "CHE-33 (M3.4), off-axis reference by CHE-41",
@@ -606,6 +746,21 @@ def declare_coherent_bundle(
             ),
             "field": object_space["field"],
         },
+        "quadrature_weight": {
+            "declared_reference": (
+                "the absolute per-ray pupil/phase-space area element a hexapolar "
+                "ring set represents, radial-trapezoid corrected at the center and "
+                "outer-ring boundaries (CHE-38 sections 14-15, CHE-47). See "
+                "multiscale_optics_agent.couplers.quadrature."
+            ),
+            "status": quadrature["status"],
+            "reason": quadrature["reason"],
+            "weight_sum_m2": (
+                float(np.sum(quadrature["weight_m2"]))
+                if quadrature["weight_m2"] is not None
+                else None
+            ),
+        },
         "optical_path_length_unit_conversion": (
             f"opd_native * {NATIVE_OPD_UNIT_M!r} m per native unit (CHE-30 part 4: "
             "the lens geometry unit is millimetres)"
@@ -619,7 +774,9 @@ def declare_coherent_bundle(
             if perturbation.transfer_opl_to_plane
             else "OMITTED -- negative test only. Phase and position describe different planes."
         ),
-        "amplitude_mapping": AMPLITUDE_MAPPING,
+        "amplitude_mapping": (
+            AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT if quadrature["applied"] else AMPLITUDE_MAPPING
+        ),
         "phase_source": (
             "the optical path length only. RealRays.i carries no phase, so a bundle "
             "with a correct amplitude and a wrong OPL is not a degraded field, it is "
@@ -628,10 +785,18 @@ def declare_coherent_bundle(
         "reconstruction_normalization": (
             f"{bundle.reconstruction_normalization!r}: a traced ray set is the physical "
             "ensemble, not a Monte Carlo sample of a spectrum, so SI eq S3/S5's 1/N "
-            "must not be applied. CONSEQUENCE, recorded rather than hidden: with no "
-            "per-ray area weight the reconstructed amplitude scales with ray density, "
-            "so the field is convergent in shape but not in scale under ray "
-            "refinement. Handed to CHE-38, which owns the ray-count convergence study."
+            "must not be applied. "
+            + (
+                "CHE-47: the amplitude now carries a per-ray quadrature (area) weight, "
+                "so the reconstructed discrete power converges under ray refinement "
+                "instead of growing as (ray count)^2 -- CHE-33's N^2.0024 finding is "
+                "resolved for this bundle, not merely relabeled."
+                if quadrature["applied"]
+                else "CONSEQUENCE, recorded rather than hidden: with no per-ray area "
+                "weight the reconstructed amplitude scales with ray density, so the "
+                "field is convergent in shape but not in scale under ray refinement "
+                "(CHE-33, measured by CHE-38 as (ray count)^2.0024)."
+            )
         ),
         "global_phase_policy": (
             "retained_as_metadata_not_reapplied -- the removed reference OPL is kept "
@@ -673,6 +838,13 @@ def declare_coherent_bundle(
         "weight_min": float(np.min(bundle.weight)) if bundle.weight is not None else None,
         "weight_max": float(np.max(bundle.weight)) if bundle.weight is not None else None,
         "weight_sum": float(np.sum(bundle.weight)) if bundle.weight is not None else None,
+        "quadrature_weight_applied": quadrature["applied"],
+        "quadrature_weight_status": quadrature["status"],
+        "quadrature_weight_sum_m2": (
+            float(np.sum(quadrature["weight_m2"])) if quadrature["weight_m2"] is not None else None
+        ),
+        "reconstructed_amplitude_abs_min": float(np.min(np.abs(bundle.amplitude))),
+        "reconstructed_amplitude_abs_max": float(np.max(np.abs(bundle.amplitude))),
         "perturbation": perturbation.describe(),
     }
 

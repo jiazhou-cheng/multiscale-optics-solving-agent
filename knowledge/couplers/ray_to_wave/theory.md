@@ -99,9 +99,101 @@ inferred, and reports discrete power on both sides of every transformation.
    `n̂`. A curved reconstruction surface needs the tangent-plane treatment and
    inherits the curvature bound of `../wave_to_ray/theory.md`.
 
+5. **The aperture is the quadrature domain, not a mask.** The sum is a quadrature
+   over the ray ensemble, and the only thing that tells it where the aperture is
+   is *which rays exist*. It follows that (a) the operator cannot impose a hard
+   pupil support, and (b) the per-ray **area weight** matters, because a
+   quadrature with the wrong weights integrates over the wrong aperture. See
+   "the effective aperture" below.
+
 ## What this direction does not do
 
 It does not propagate. It reconstructs the field *at the plane the rays already
 reached*. Propagation away from that plane is a wave-model operation
 (`M_WAVE_CHROMATIX`), and the M1 evidence for `asm_propagate` is what makes that
 handoff usable.
+
+Note carefully what "the plane the rays already reached" means, because the
+equation is more literal than it looks: **`z` does not appear in the kernel at
+all**, only the transverse offset does. `reference_plane.z_m` labels the output;
+it does not enter the sum. So the plane the field is reconstructed on is wherever
+the *rays* are, and moving it means advancing the ray state — positions along each
+direction, optical path by `n ×` arc length. CHE-38 (M3.9R) showed that this is
+exact rather than approximate: advancing by arc length `s` changes the per-ray
+constant phase by `k s d_z²`, which is exactly the phase a plane wave accumulates
+over the plane offset `s d_z`. The corollary is that the output is a genuine
+free-space field — a superposition of plane waves solves the Helmholtz equation —
+so the operator is self-consistent in `z`. The corollary of *that* is point 5
+above: the sum is linear in the transverse coordinate, so it carries no
+`exp(i k r²/2R)` wavefront curvature. Invisible in `|U|²`; not invisible to a
+subsequent propagation.
+
+## Two semantics for "a ray at a plane", and only one is implemented
+
+At an **exit pupil** a ray is naturally read as a *sample of a finite-support
+wavefront*: to get a field you interpolate the samples and multiply by `P(ρ)`.
+This operator does neither, and cannot — support is not one of its inputs.
+
+At an **observation plane** a ray is a *coherent contribution to the measured
+field*, and no support term is needed because the aperture is already encoded in
+the quadrature domain. This is the mode eq 2 implements and the mode CHE-38
+(M3.9R) verified. Asking the first question of an operator that answers the second
+is what produced M3.9's Fresnel-soft pupil rim, and the correct reference for that
+rim is the circular-aperture Debye/Lommel solution (`0.7142` in units of
+`1/√(λR)`), not a one-dimensional straight knife edge (`1.0009`).
+
+## The effective aperture, and why a per-ray area weight is not cosmetic
+
+Hexapolar sampling is very nearly equal-area in the interior — ring `j` carries
+`6j` points and represents an annulus of area `∝ j` — and wrong at both
+boundaries. The outermost ring lies exactly on `ρ = a` and represents only the
+inner half of its cell; the single central ray represents a smaller cell than an
+interior one. With uniform weights the quadrature therefore integrates over an
+aperture that is too large by half a ring spacing, so the reconstructed PSF is
+slightly too *narrow*.
+
+CHE-38 (M3.9R) measured this on a synthetic aberration-free bundle against a
+Rayleigh–Sommerfeld reference. The residual falls as `ring_count^-0.87` — first
+order in the ray spacing, which is the wrong rate for a smooth equal-area
+quadrature and the right one for a boundary error — and the fitted effective-NA
+excess tracks `1/(2 × rings)` over a 16× range of ring counts. Applying the radial
+trapezoid weight (outer ring `½`, central ray `¾`) collapses the residual to a
+*converged* `4.07e-4`, flat from 64 rings upward.
+
+This is a **producer-side** obligation: the coupler cannot compute the weight
+because it does not know where the aperture is. CHE-38 deliberately did not
+implement it (§14) and assigned it to a follow-up ticket that must also settle
+absolute normalization (§15).
+
+**CHE-47 (M3.9R extension) implements it.** `multiscale_optics_agent.couplers.
+quadrature.hexapolar_area_weight_m2` computes the same radial-trapezoid weight
+CHE-38 measured, scaled to an absolute area in m² (`π a² / (3 n²)` per interior
+ray, `¾`/`½` of that at the center/outer-ring boundaries). The Optiland adapter
+regenerates the hexapolar pupil sampling `Optic.trace` used and matches it row
+for row against the traced set — the same technique CHE-41 already uses for the
+off-axis object-space term — and exports it as `quadrature_weight_m2`.
+`optiland_handoff.declare_coherent_bundle` folds it into the amplitude
+declaration by default (`a_i = sqrt(intensity_i) · quadrature_weight_m2,i`)
+whenever the adapter could confirm an un-vignetted hexapolar fan; `C_RAY_TO_WAVE`
+itself is untouched.
+
+Two results, measured rather than assumed:
+
+* **Absolute power now converges.** The old mapping made discrete power grow as
+  `(ray count)^2` (CHE-33/CHE-38's `N^2.0024`, reproduced exactly on the legacy
+  path: fitted exponent `1.9948`, `r² = 0.9999`). With the area weight it is flat
+  in ray count (`-0.0098`, `r² = 0.23` — noise, not a trend), because the sum now
+  approximates a fixed integral over a fixed aperture instead of accumulating
+  more equal-sized contributions as the ray count grows.
+* **The sensor-plane residual improves but does not close on the real system.**
+  CHE-38's `4.07e-4` was measured on a *synthetic, aberration-free* bundle. On the
+  real (residually aberrated) `M3-SINGLET-REF` trace, the same weight improves the
+  sensor residual against the independent wave oracle `1.58×` (`3.91e-3 → 2.48e-3`
+  at 787 969 rays) but stays above the `1e-3` gate. The analytic Airy oracle
+  (aberration-free, sharing no code with the trace) is *closer* to the weighted
+  result (`2.21e-3`) than the aberration-matched wave oracle is (`2.48e-3`) —
+  which would not happen if the leftover gap were a coupler-side
+  aberration/quadrature defect, since the aberration-matched oracle should then
+  track the coupler more closely, not less. The likelier explanation is the wave
+  oracle's own ring-averaged, linearly-interpolated pupil-fit quality at this
+  resolution; not decomposed further (`benchmarks/probes/m3_quadrature_weight.py`).

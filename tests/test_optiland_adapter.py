@@ -68,6 +68,18 @@ OBJECT_SPACE_ARRAY_NAMES = frozenset(
     }
 )
 
+#: CHE-47: the RAW hexapolar pupil coordinates a quadrature weight is computed
+#: from downstream, regenerated the same way as the object-space term above.
+#: Present whenever the trace is an un-vignetted hexapolar fan (both M3 samples,
+#: at every ray count M1/M2/M3 exercise). The adapter exports coordinates only,
+#: never a ring index or a weight -- see optiland_adapter._resolve_ray_pupil_sampling.
+QUADRATURE_ARRAY_NAMES = frozenset(
+    {
+        "pupil_normalized_x",
+        "pupil_normalized_y",
+    }
+)
+
 
 def _smoke_request(**config_overrides) -> ModelRunRequest:
     """Mirror knowledge/solvers/optiland/probes/raytrace_probe.py exactly.
@@ -318,7 +330,9 @@ def test_standalone_contract_is_deterministic_and_complete(tmp_path) -> None:
     # (see the second assertion); it does not add a column to this set, because that
     # would move a fingerprint no traced ray moved.
     assert set(saved.files) >= TRACED_ARRAY_NAMES
-    assert set(saved.files) - TRACED_ARRAY_NAMES == OBJECT_SPACE_ARRAY_NAMES
+    assert (
+        set(saved.files) - TRACED_ARRAY_NAMES == OBJECT_SPACE_ARRAY_NAMES | QUADRATURE_ARRAY_NAMES
+    )
     assert np.all(saved["survived"])
     assert np.max(np.abs(np.sqrt(saved["L"] ** 2 + saved["M"] ** 2 + saved["N"] ** 2) - 1)) <= 1e-12
     assert np.all(saved["wavelength_m"] == pytest.approx(0.55e-6))
@@ -592,7 +606,10 @@ def test_m3_singlet_ref_matches_recorded_m1_standard_evidence(tmp_path) -> None:
         # The M1 invariants, re-derived from the persisted arrays rather than
         # taken from the adapter's own summary of them.
         scientific = {name: first_arrays[name] for name in TRACED_ARRAY_NAMES}
-        assert set(first_arrays.files) - TRACED_ARRAY_NAMES == OBJECT_SPACE_ARRAY_NAMES
+        assert (
+            set(first_arrays.files) - TRACED_ARRAY_NAMES
+            == OBJECT_SPACE_ARRAY_NAMES | QUADRATURE_ARRAY_NAMES
+        )
         for name, array in scientific.items():
             if name == "survived":
                 assert np.all(array)

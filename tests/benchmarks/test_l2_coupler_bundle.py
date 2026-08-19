@@ -246,8 +246,10 @@ def test_the_registry_still_claims_no_verified_coupler_gradient() -> None:
 
 
 def test_the_manifest_records_which_l2_benchmarks_are_actually_implemented() -> None:
-    """L2-PSF-01 is the end-to-end graph and is still blocked. A manifest that
-    listed both without distinction would read as if the graph path worked."""
+    """L2-PSF-01 is the end-to-end graph. CHE-39 (M3.10) implemented it -- the
+    manifest must say so, but "implemented" must not be read as "gate met": the
+    note is required to name the still-open physical-correctness gap rather
+    than let a bare ``implemented: true`` imply the graph is fully verified."""
     manifest = yaml.safe_load((ROOT / "benchmarks/manifest.yaml").read_text())
     tasks = {task["id"]: task for task in manifest["levels"][2]["tasks"]}
 
@@ -257,5 +259,8 @@ def test_the_manifest_records_which_l2_benchmarks_are_actually_implemented() -> 
     assert (ROOT / coupler["entry_point"]).is_file()
 
     psf = tasks["L2-PSF-01"]
-    assert psf["implemented"] is False
-    assert "opd_native" in psf["blocked_by"]
+    assert psf["implemented"] is True
+    assert "blocked_by" not in psf
+    assert psf["protocol_id"] == "M3-SLICE-CPU-V1"
+    assert (ROOT / psf["entry_point"]).is_file()
+    assert "1.0e-3" in psf["note"] or "1.0e-03" in psf["note"]

@@ -119,11 +119,21 @@ levels:
         # M_SENSOR_IDEAL stays out of M3 (no pixel integration, no noise model).
         graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]
         terminal_measurement: psf
-        implemented: false
-        blocked_by: >
-          Optiland's opd_native sign and reference plane remain unverified (M1
-          limitation, carried into M2), so no admissible optical path length can be
-          handed to C_RAY_TO_WAVE from a real trace yet.
+        protocol_id: M3-SLICE-CPU-V1
+        milestone: M3
+        implemented: true
+        entry_point: benchmarks/level2/L2-PSF-01/run_benchmark.py
+        note: >
+          Closed by CHE-39 (M3.10). The blocked_by above is gone: M3.1 (CHE-30)
+          and M3.4 (CHE-33) verified Optiland's opd_native sign and reference
+          plane, and the sensor-side handoff itself was verified by M3.9R
+          (CHE-38). What remains open is narrower than the old blocker: on the
+          real traced M3-SINGLET-REF system the reconstruction is
+          discretization-converged and within its declared validity region,
+          but does NOT meet the frozen 1.0e-3 fft_oracle_intensity_relative_l2
+          gate (CHE-47 measures 2.2e-3-2.5e-3 at 787,969 rays; a synthetic
+          aberration-free bundle reaches 4.07e-4, inside the gate). See
+          benchmarks/level2/L2-PSF-01/README.md and the M3 exit report.
       - id: L2-META-01
         title: Unit-cell-to-system meta-optic imaging
         graph: [M_RCWA_FMMAX, C_CELL_TO_SURFACE, M_WAVE_CHROMATIX]

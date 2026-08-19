@@ -209,6 +209,53 @@ handoff_plane:
   propagation_target: paraxial focus / image plane
   propagation_method: angular_spectrum   # the M1-verified ASM, unchanged
 
+  # -------------------------------------------------------------------------
+  # CHE-38 (M3.9R). The exit pupil is retained as the frozen configuration for
+  # the M3.4-M3.8 chain, and it is NOT the placement the coupler is verified at.
+  # -------------------------------------------------------------------------
+  semantics_amendment:
+    issue: CHE-38 (M3.9R)
+    finding: >-
+      Placing the handoff at the exit pupil asks C_RAY_TO_WAVE to rebuild a
+      finite-support pupil function, and support is not one of its inputs. That is
+      the ray_as_wavefront_sample mode, which this repository does not implement.
+      The implemented mode is ray_as_coherent_contribution, whose verified
+      placement is the observation side.
+    verified_placement:
+      name: declared_observation_plane
+      z_m: 4.90560476022521e-3      # the declared paraxial image plane
+      how_the_rays_get_there: >-
+        the ray state is advanced in the RAY domain from the exit-pupil export:
+        positions along each direction, optical path by n * arc length with
+        n = 1 for image-space air. Exact, not an approximation -- the per-ray
+        constant phase changes by k s d_z^2, which is the phase an exact plane
+        wave accumulates over the plane offset s d_z.
+      post_handoff_propagation_m: 0.0
+      why_not_the_exit_pupil: >-
+        measured, not argued. Over seven declared handoff planes from the exit
+        pupil to just past focus, at fixed sensor and fixed ray count, the
+        residual against two independent wave references is worst at the exit
+        pupil and best at the sensor.
+      why_the_caustic_is_not_a_problem: >-
+        at the sensor the ray bundle collapses to 0.73 um, about 0.11 of one Airy
+        first-null radius, so the plane IS a caustic in the position-space sense.
+        The operator reads directions and optical paths, never a local ray
+        density, and the coherent gain there is ~1 -- fully constructive, no
+        cancellation. The caustic is where this operator is best conditioned.
+    sensor_grid:
+      sample_pitch_m: 0.5e-6
+      grid_n: 256
+      window_m: 128.0e-6
+      pixels_per_airy_first_null_radius: 12.97
+      window_in_airy_first_null_radii: 9.87
+      binding_constraint: >-
+        resolving the Airy core, NOT the per-axis Nyquist limit. The Nyquist limit
+        allows 5.317 um here and is satisfied with better than 10x margin, which
+        inverts the pupil-plane situation where it bound. M3.9's grid_n = 188 is a
+        pupil-grid figure and does not transfer.
+    evidence: benchmarks/probes/records/m3r_sensor_handoff.json
+    coupler_card: knowledge/couplers/ray_to_wave/coupler_card.yaml (reconstruction_semantics)
+
 # ---------------------------------------------------------------------------
 # Required numerical conditioning (CHE-40, M3.2A)
 # ---------------------------------------------------------------------------
@@ -273,16 +320,22 @@ required_conditioning:
       M3-SINGLET-REF: 11.734374712240074
       M3-REVERSE-TELEPHOTO: 15.801773246826363
     known_consequence: >-
-      no per-ray area weight is applied, so the reconstructed field amplitude
-      scales with ray density. The PSF is convergent in shape but not in scale
-      under ray refinement. Recorded rather than hidden; CHE-38 owns it.
-    known_consequence_measured_by: CHE-38 (M3.9)
+      no per-ray area weight is applied BY DEFAULT PRIOR TO CHE-47, so the
+      reconstructed field amplitude scales with ray density. The PSF is
+      convergent in shape but not in scale under ray refinement. Recorded rather
+      than hidden; CHE-38 owns the finding, CHE-47 (M3.9R extension) resolves it
+      for the Optiland producer path.
+    known_consequence_measured_by: CHE-38 (M3.9), resolved by CHE-47
     known_consequence_measurement: >-
       the reconstructed pupil discrete power grows as (traced rays)^2.0024 +/-
       0.0002 over 27937 to 787969 rays, r^2 = 0.9999999 -- amplitude exactly linear
       in ray count, as the missing dA factor implies. Below ~28000 rays the fitted
       exponent is lower (1.63 over the whole sweep) because the sum is not yet a
-      quadrature of the aperture at all.
+      quadrature of the aperture at all. CHE-47 reproduced this exactly as the
+      LEGACY-path baseline (fitted exponent 1.9948, r^2 = 0.9999) and measured the
+      new default (quadrature-weighted) path at exponent -0.0098, r^2 = 0.23 --
+      flat in ray count, i.e. resolved. See benchmarks/probes/records/
+      m3_quadrature_weight.json.
     known_consequence_for_a_convergence_study: >-
       no absolute-scale metric can converge, so every metric in the M3.9 study is a
       ratio: peak-normalized intensity residuals, and peak-over-energy ratios for
@@ -646,6 +699,12 @@ tolerance_budget:
         every M3 result once the ray count is above ~28000, and roughly half of the
         frozen configuration's residual in quadrature
       evidence: benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis)
+      scoped_by_che_38_m3_9r: >-
+        this term belongs to the EXIT-PUPIL handoff. At the observation-side handoff
+        it does not appear: the residual against two independent wave references is
+        monotone in ray count with no floor, and what remains is the ray ensemble's
+        per-ray area weight, which a radial trapezoid weight reduces to a converged
+        4.07e-4. See benchmarks/probes/records/m3r_sensor_handoff.json.
     - name: grid_truncation_and_padding
       value: 2.0e-5
       level: intensity, relative
@@ -782,6 +841,31 @@ m3_8_verification:
 # handoff and it is recorded unverified, so no convergence evidence here is built
 # on an off-axis field point.
 m3_9_convergence:
+  # -------------------------------------------------------------------------
+  # SCOPE AMENDMENT -- CHE-38 (M3.9R). Nothing measured below is retracted. What
+  # changes is what it is a statement ABOUT.
+  # -------------------------------------------------------------------------
+  interpretation_superseded_by:
+    issue: CHE-38 (M3.9R)
+    record: benchmarks/probes/records/m3r_sensor_handoff.json
+    report: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md
+    scope_of_everything_below: >-
+      the EXIT-PUPIL handoff, i.e. asking C_RAY_TO_WAVE to rebuild a finite
+      hard-support pupil function. That is the ray_as_wavefront_sample mode and this
+      repository does not implement it. Read the numbers below as a validity-limit
+      measurement, not as a bound on the coupler.
+    what_the_sensor_side_handoff_gives_instead: >-
+      the residual against two independent wave references is monotone in ray count
+      with no floor and NO turn-around, falling as ring_count^-0.87. The remaining
+      term is the ray ensemble's per-ray AREA WEIGHT at the aperture boundary -- the
+      outermost hexapolar ring lies on rho = a and is counted as a full quadrature
+      cell, inflating the effective aperture by half a ring spacing -- and a radial
+      trapezoid weight collapses it to a converged 4.07e-4, inside the gate.
+    claims_below_that_do_not_generalize:
+      - "the residual cannot be reduced by rays, by grid, or by padding"
+      - "more rays make the agreement worse"
+      - "the term falls as the pupil Fresnel number grows"
+    they_are_true_of_exit_pupil_reconstruction_and_false_of_the_sensor_handoff: true
   verdict: >-
     all three discretizations converge, and the answer they converge to is 8x
     outside the gate. Ray count, grid and padding each reach the point where
@@ -1533,6 +1617,41 @@ open_structural_items:
       feasibility.rejected_configuration.cost_only_claim_qualified_by. It cannot be
       reduced by rays, by grid, or by padding.
     evidence: benchmarks/probes/records/m3_convergence.json (aperture_edge_hypothesis)
+    reclassified_by:
+      issue: CHE-38 (M3.9R)
+      status: >-
+        retained as a verified structural property of exit-pupil reconstruction, and
+        DOWNGRADED as a blocker. The correct statement is that this implementation
+        cannot be ASSUMED to reconstruct finite pupil support from survivor rays
+        alone -- not that C_RAY_TO_WAVE is incorrect.
+      the_old_conclusion_aperture_aware_reconstruction_is_required: >-
+        DOWNGRADED. It is required only for the ray_as_wavefront_sample mode, which
+        is not a declared capability of this coupler. The observation-side handoff
+        needs no aperture machinery, because the aperture enters as the domain of a
+        direction-space quadrature.
+      straight_edge_loose_end: >-
+        RESOLVED. The measured rim slope near 0.744 was compared against a
+        ONE-DIMENSIONAL straight Fresnel knife edge (1.0009), which is the wrong
+        geometry. The circular-aperture Debye/Lommel solution at this Fresnel number
+        gives 0.7142, with a rim amplitude of 0.4839 and an overshoot of 1.143, so
+        the 26% gap closes to a few percent. The rim-curvature, azimuthal-averaging
+        and pixel-binning explanations are WITHDRAWN as the cause of a 26% effect.
+      robust_claims_unchanged:
+        - rim amplitude near 1/2 at the geometric boundary
+        - transition width on the sqrt(lambda R) scale
+        - failure to sharpen as the ray spacing falls
+      what_is_actually_required_instead: >-
+        a per-ray pupil/phase-space quadrature weight, supplied by the PRODUCER. See
+        observation_side_handoff and per_ray_area_weight_at_the_aperture_boundary in
+        knowledge/couplers/ray_to_wave/coupler_card.yaml. CHE-38 section 14 forbade
+        implementing it there and section 15 assigned it its own ticket; CHE-47
+        (M3.9R extension) is that ticket and implements it as a producer-side
+        default (optiland_handoff.declare_coherent_bundle). This item's own subject
+        -- exit-pupil HARD-SUPPORT reconstruction, the ray_as_wavefront_sample mode
+        -- remains out of contract regardless: the quadrature weight is a
+        correction to the observation-side sensor quadrature, not an aperture mask,
+        and CHE-47 did not touch the exit-pupil negative control (o4_exit_pupil_
+        negative_control in benchmarks/probes/records/m3r_sensor_handoff.json).
 
   - id: the_frozen_window_is_the_pupil_diameter_rounded_up
     found_by: CHE-38 (M3.9)

@@ -1,0 +1,65 @@
+# L2-PSF-01 tolerances (CHE-39/M3.10), under protocol M3-SLICE-CPU-V1.
+#
+# Every entry states its basis, and none is chosen to make this bundle pass.
+# The primary physical gate is unchanged from benchmarks/slice_protocol.yaml's
+# tolerance_budget.gates.fft_oracle_intensity_relative_l2, frozen by M3.2
+# (CHE-31) and re-affirmed unwidened through M3.8 (CHE-37) and M3.9R (CHE-38).
+
+# The tightest gate in the frozen M3 tolerance budget: relative L2 of the
+# reconstructed sensor-plane intensity against O1, the analytic Airy oracle
+# (paraxial, aberration-free, shares no code or traced data with the
+# coupler), over the 5-Airy-radius gate disc. This is the ONLY oracle that
+# decides the gate: O2 (our own independent float64 ASM/RS propagator) is a
+# custom implementation written to check this same coupler, so per working
+# ethics it is retained as characterization evidence only and never decides
+# pass/fail -- using our own numerical code as the answer key for our own
+# numerical code is circular validation. CHE-47 measured the production
+# (weighted) configuration at 2.21e-3 vs O1 on the real traced
+# M3-SINGLET-REF system at 787,969 rays -- NOT met. That is reported as a
+# measured, characterized result in result.json, not silently passed or
+# hidden.
+fft_oracle_intensity_relative_l2: 1.0e-3
+fft_oracle_intensity_relative_l2_basis: >
+  benchmarks/slice_protocol.yaml tolerance_budget.gates, unchanged since M3.2
+  (CHE-31). CHE-38's synthetic aberration-free diagnostic reaches 4.07e-4
+  (inside gate); CHE-47's real-traced-system measurement of the production
+  (weighted) configuration reaches 2.21e-3 vs O1 (outside gate, by ~2.2x).
+  Against O1 only, the uniform (pre-CHE-47) configuration reaches 9.21e-4
+  and clears the gate -- the opposite ordering from what the O2 oracle
+  measured, which is itself evidence that O2's own pupil-fit resolution
+  should not be trusted to decide correctness here. Open item, not closed
+  by this bundle: why the production quadrature weight, which fixes the
+  unrelated absolute-power N^2 divergence (see accuracy.production.
+  absolute_power), does not also improve relative-L2 agreement with O1 on
+  this aberrated system.
+
+# A convention error must be caught by an INDEPENDENT oracle, not merely
+# differ from the correct answer -- otherwise a shared bug between the
+# handoff and its own self-test could cancel. 0.5 mirrors L2-COUPLER-01's
+# mismatched-phase-sign floor (CHE-29): a genuinely wrong OPL sign scrambles
+# the reconstructed wavefront curvature entirely, which is a >>50% effect,
+# not a refinement of the correct answer.
+opl_sign_flip_min_relative_l2: 0.5
+opl_sign_flip_basis: >
+  Anything below this would mean the negative control cannot distinguish a
+  scrambled wavefront from a converging one.
+
+# Decisive factor is measured against O1 (analytic Airy) only, per working
+# ethics: O2 (our own ASM/RS propagator) must not decide correctness for
+# our own coupler. Against O1, the production (weighted) configuration does
+# NOT currently clear this floor at 787,969 rays -- see
+# quadrature_weight_min_improvement_factor_basis. That failure is reported
+# honestly by this bundle's negative_controls_pass, not hidden or widened.
+quadrature_weight_min_improvement_factor: 1.2
+quadrature_weight_min_improvement_factor_basis: >
+  benchmarks/probes/records/m3_quadrature_weight.json finest_configuration.
+  improvement_factor_vs_o1 = 0.42 at 787,969 rays (uniform is CLOSER to O1
+  than weighted is: 9.21e-4 vs 2.21e-3) -- below the 1.2 floor, so this
+  control currently reads detected=false. The previous basis for this floor
+  (improvement_factor_vs_o2_asm = 1.575) used O2, our own custom ASM/RS
+  propagator, as the decisive oracle; that was circular validation and has
+  been retired as the gate input, though the O2 number is still reported in
+  result.json for characterization.
+
+# Protocol constant, restated so a change to it shows up in this file's hash.
+no_gate_may_be_satisfied_by_widening: true

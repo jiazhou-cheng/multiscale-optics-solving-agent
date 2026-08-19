@@ -654,6 +654,91 @@ def _resolve_object_space_reference(
     }
 
 
+def _resolve_ray_pupil_sampling(
+    lens: Any,
+    be_utils: Any,
+    *,
+    num_rays: int,
+    traced_count: int,
+) -> dict[str, Any]:
+    """The raw hexapolar pupil coordinates CHE-47's quadrature weight needs.
+
+    CHE-38 found that the wavelet sum's dominant sensor-plane residual is a
+    per-ray quadrature-weight error, not a kernel defect (section 14/15), and
+    CHE-47 is the ticket that supplies the weight. Computing it needs to know
+    which pupil ring each traced ray came from, and ``Optic.trace`` keeps no
+    record of that -- so the same hexapolar distribution is regenerated from
+    ``optiland.distribution.create_distribution`` and matched row for row
+    against the trace, exactly as :func:`_resolve_object_space_reference`
+    regenerates the launch state above.
+
+    This function returns only the RAW normalized pupil coordinates, the ring
+    count, and the aperture radius -- not a ring index or a weight. The actual
+    quadrature math (`multiscale_optics_agent.couplers.quadrature`) is coupler
+    physics, not adapter physics, and this module must import no coupler: the
+    M1 independence check (`benchmarks/level1/L1-RAY-01`) asserts that tracing
+    a ray bundle loads no `multiscale_optics_agent.couplers.*` module, and an
+    import here would violate that for every caller of this adapter, not only
+    CHE-47's. `optiland_handoff.py` (already coupler-side) computes the ring
+    index and area weight from what this function returns.
+
+    Every precondition is checked rather than assumed, exactly as CHE-41's
+    object-space term is: a row-count mismatch (a vignetted ray, so the
+    regenerated pupil no longer lines up one-to-one with the traced set) or an
+    unreadable aperture diameter returns ``available=False`` with the reason,
+    never a fabricated value.
+    """
+    import numpy as np
+
+    def unavailable(reason: str) -> dict[str, Any]:
+        return {
+            "available": False,
+            "unavailable_reason": reason,
+            "pupil_x": None,
+            "pupil_y": None,
+        }
+
+    try:
+        from optiland.distribution import create_distribution
+
+        distribution = create_distribution("hexapolar")
+        distribution.generate_points(num_rays)
+        pupil_x = np.asarray(be_utils.to_numpy(distribution.x), dtype=np.float64)
+        pupil_y = np.asarray(be_utils.to_numpy(distribution.y), dtype=np.float64)
+    except Exception as exc:
+        return unavailable(
+            "the hexapolar pupil sampling could not be regenerated from "
+            f"optiland.distribution.create_distribution ({type(exc).__name__}: {exc})"
+        )
+
+    if pupil_x.size != traced_count:
+        return unavailable(
+            f"the regenerated pupil sampling has {pupil_x.size} points but the trace "
+            f"exported {traced_count}; at least one ray was vignetted (or num_rays did "
+            "not request a hexapolar fan), so a ring index cannot be assigned row for row"
+        )
+
+    try:
+        epd_mm = float(np.asarray(be_utils.to_numpy(lens.paraxial.EPD())).ravel()[0])
+    except Exception as exc:
+        return unavailable(
+            f"the entrance pupil diameter could not be read ({type(exc).__name__}: {exc}), "
+            "so the physical aperture area a quadrature weight scales to is unknown"
+        )
+    if not np.isfinite(epd_mm) or epd_mm <= 0.0:
+        return unavailable(f"entrance pupil diameter is not a positive finite value ({epd_mm!r})")
+    aperture_radius_m = (epd_mm / 2.0) * _GEOMETRY_M_PER_MM
+
+    return {
+        "available": True,
+        "unavailable_reason": None,
+        "pupil_x": pupil_x,
+        "pupil_y": pupil_y,
+        "num_rings": num_rays,
+        "aperture_radius_m": aperture_radius_m,
+    }
+
+
 @lru_cache(maxsize=1)
 def _load_spec() -> ModelSpec:
     return Registry.from_package().models[MODEL_ID]
@@ -1052,6 +1137,12 @@ class OptilandAdapter:
                 num_rays=num_rays,
                 traced_count=int(_np.asarray(be_utils.to_numpy(rays.x)).size),
             )
+            ray_pupil_sampling = _resolve_ray_pupil_sampling(
+                lens,
+                be_utils,
+                num_rays=num_rays,
+                traced_count=int(_np.asarray(be_utils.to_numpy(rays.x)).size),
+            )
             rays_artifact = self._build_ray_bundle_artifact(
                 request,
                 rays,
@@ -1069,6 +1160,7 @@ class OptilandAdapter:
                 len(lens.surfaces.surfaces) - 1,
                 _resolve_image_space(lens, be_utils, wavelength),
                 object_space_reference,
+                ray_pupil_sampling,
             )
             wavefront_artifact, wavefront_warnings = self._build_wavefront_artifact(
                 request, rays, be_utils, backend_name, sample_name, wavelength, run_dir
@@ -1257,6 +1349,7 @@ class OptilandAdapter:
         image_surface_index: int = 14,
         image_space: dict[str, Any] | None = None,
         object_space_reference: dict[str, Any] | None = None,
+        ray_pupil_sampling: dict[str, Any] | None = None,
     ) -> ArtifactRecord:
         import numpy as np
 
@@ -1338,8 +1431,7 @@ class OptilandAdapter:
         if object_space.get("available"):
             object_space_arrays = {
                 "object_space_reference_offset_m": (
-                    np.asarray(object_space["offset_native"], dtype=np.float64)
-                    * _GEOMETRY_M_PER_MM
+                    np.asarray(object_space["offset_native"], dtype=np.float64) * _GEOMETRY_M_PER_MM
                 ),
                 "launch_x_m": (
                     np.asarray(object_space["launch_x_native"], dtype=np.float64)
@@ -1361,6 +1453,25 @@ class OptilandAdapter:
                     f"vs {arrays['x_m'].shape}."
                 )
 
+        # CHE-47 (M3.9R extension). Same reasoning as the object-space block above:
+        # additional per-ray columns, not a revision of the traced set, so they do
+        # not enter `scientific_hash` below. Raw pupil coordinates only -- the ring
+        # index and area weight are coupler physics, computed downstream in
+        # optiland_handoff.py, never here (see _resolve_ray_pupil_sampling).
+        quadrature = ray_pupil_sampling or {"available": False}
+        quadrature_arrays: dict[str, Any] = {}
+        if quadrature.get("available"):
+            quadrature_arrays = {
+                "pupil_normalized_x": np.asarray(quadrature["pupil_x"], dtype=np.float64),
+                "pupil_normalized_y": np.asarray(quadrature["pupil_y"], dtype=np.float64),
+            }
+            if quadrature_arrays["pupil_normalized_x"].shape != arrays["x_m"].shape:
+                raise ValueError(
+                    "the regenerated pupil sampling does not match the exported ray "
+                    f"count: {quadrature_arrays['pupil_normalized_x'].shape} vs "
+                    f"{arrays['x_m'].shape}."
+                )
+
         scientific_hash = _scientific_array_hash(arrays)
         summary_metrics = {
             "max_direction_norm_error": max_direction_norm_error,
@@ -1380,7 +1491,7 @@ class OptilandAdapter:
         }
 
         path = run_dir / "rays.npz"
-        np.savez(path, **arrays, **object_space_arrays)
+        np.savez(path, **arrays, **object_space_arrays, **quadrature_arrays)
 
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -1607,6 +1718,52 @@ class OptilandAdapter:
                             _scientific_array_hash(object_space_arrays)
                             if object_space_arrays
                             else None
+                        ),
+                    },
+                    # CHE-47 (M3.9R extension): the RAW hexapolar pupil coordinates a
+                    # per-ray quadrature weight is computed from downstream (CHE-38
+                    # identified the missing weight as the dominant sensor-plane
+                    # residual). Present as a declaration even when unavailable, for the
+                    # same reason as object_space_reference above. This adapter exports
+                    # coordinates only, never a ring index or a weight: that computation
+                    # is coupler physics (multiscale_optics_agent.couplers.quadrature),
+                    # and this module must import no coupler -- see
+                    # _resolve_ray_pupil_sampling.
+                    "quadrature_weight": {
+                        "available": bool(quadrature.get("available")),
+                        "unavailable_reason": quadrature.get("unavailable_reason"),
+                        "pupil_x_array": (
+                            "pupil_normalized_x" if quadrature.get("available") else None
+                        ),
+                        "pupil_y_array": (
+                            "pupil_normalized_y" if quadrature.get("available") else None
+                        ),
+                        "pupil_coordinate_unit": "dimensionless, normalized to the unit disk",
+                        "quantity": (
+                            "the normalized entrance-pupil coordinates (Px, Py) Optic.trace "
+                            "sampled the hexapolar fan on, regenerated because Optic.trace "
+                            "keeps no record of them. A CONSUMER computes each ray's ring "
+                            "index and the absolute pupil/phase-space area element that ring "
+                            "represents (multiscale_optics_agent.couplers.quadrature."
+                            "hexapolar_ring_index / hexapolar_area_weight_m2), radial-"
+                            "trapezoid corrected at the two boundaries (center 3/4, outer "
+                            "ring 1/2, interior 1x the nominal cell pi*a^2/(3*num_rings^2)), "
+                            "then multiplies it onto sqrt(intensity) to get a per-ray "
+                            "amplitude whose coherent sum is a converged quadrature of the "
+                            "aperture. Not applied here; intensity is exported exactly as "
+                            "Optiland produced it."
+                        ),
+                        "num_rings": quadrature.get("num_rings"),
+                        "aperture_radius_m": quadrature.get("aperture_radius_m"),
+                        "source": (
+                            "optiland.distribution.create_distribution('hexapolar') "
+                            "regenerated over the same num_rings Optic.trace used, matched "
+                            "row for row against the traced set (CHE-38 sections 14-15, "
+                            "CHE-47)."
+                        ),
+                        "verified_by": "CHE-47",
+                        "sha256": (
+                            _scientific_array_hash(quadrature_arrays) if quadrature_arrays else None
                         ),
                     },
                     "entrance_pupil_diameter_m": entrance_pupil_diameter_m,

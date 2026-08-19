@@ -240,8 +240,22 @@ the objective itself, and declaring otherwise would overstate the method.
 
 **Still unverified after M2**, in both cards and registry: any gradient through
 either coupler, GPU/TPU execution, vector and polarized fields, chromatic
-coupling, partial coherence, conformal-surface coupling, caustics, and the
-end-to-end Optiland→Chromatix graph.
+coupling, partial coherence, conformal-surface coupling, and caustics.
+
+> **Amended by CHE-39 (M3.10).** This list originally also named "the
+> end-to-end Optiland→Chromatix graph" as still unverified. M3 (CHE-30, CHE-33,
+> CHE-38, CHE-47, CHE-39) implemented and ran it — `L2-PSF-01` — so that line is
+> removed rather than left to imply the graph still does not exist. What
+> replaces it, narrower and no weaker: the sensor-side `C_RAY_TO_WAVE` handoff
+> itself is verified (CHE-38), discretization-converged and within its declared
+> validity region on the real traced `M3-SINGLET-REF` system, but the frozen
+> `fft_oracle_intensity_relative_l2` gate (`1.0e-3`) is **not** met there
+> (CHE-47 measures `2.2e-3`–`2.5e-3` at 787,969 rays; a synthetic
+> aberration-free bundle reaches `4.07e-4`, inside the gate). Caustics remain
+> unverified as a general capability; M3 only showed the one caustic it
+> encountered — the exact sensor plane at on-axis focus — is not
+> ill-conditioned for this operator. See `benchmarks/level2/L2-PSF-01/README.md`
+> and the M3 exit report for the full claim.
 
 ---
 
@@ -261,6 +275,12 @@ This is recorded in `benchmarks/manifest.yaml` as `implemented: false` with the
 blocker named. **Characterizing Optiland's OPD convention is the single highest-
 value piece of work for M3**: it is what stands between M2's verified couplers
 and a working vertical slice.
+
+> **Closed by M3 (CHE-30, CHE-33, CHE-39/M3.10).** Optiland's `opd_native` sign
+> and reference plane were characterized and declared (M3.1/M3.4); `manifest.
+> yaml` now records `L2-PSF-01` as `implemented: true`. The blocker named here
+> is gone. What is open now is narrower and is not an M1/M2-style blocker: see
+> the amendment to the claim audit above.
 
 ### L2 — Fixed grid, one wavelength, one grid size
 

@@ -32,6 +32,7 @@ from multiscale_optics_agent.adapters.base import ModelRunRequest
 from multiscale_optics_agent.couplers import ContractCode, ContractError, RayBundle
 from multiscale_optics_agent.couplers.optiland_handoff import (
     AMPLITUDE_MAPPING,
+    AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT,
     DeclaredHandoffPlane,
     HandoffPerturbation,
     declare_coherent_bundle,
@@ -169,7 +170,26 @@ def test_declared_bundle_is_coherent_and_carries_both_declarations(singlet_recor
     # non-negative; any imaginary part would mean phase leaked in from the weight.
     assert np.all(amplitude.imag == 0.0)
     assert np.all(amplitude.real >= 0.0)
-    assert handoff.bundle.provenance["amplitude_mapping"] == AMPLITUDE_MAPPING
+    # CHE-47: an un-vignetted hexapolar trace (16 rings, 817 rays -- exactly
+    # 1 + 3*16*17) gets a quadrature weight by default, so the amplitude mapping
+    # is the quadrature-weighted one, not the bare sqrt(weight) CHE-33 declared.
+    assert (
+        handoff.bundle.provenance["amplitude_mapping"] == AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT
+    )
+    assert handoff.declarations["quadrature_weight"]["status"] == "applied"
+
+    legacy = declare_coherent_bundle(
+        singlet_record,
+        declared_plane=singlet_plane,
+        perturbation=HandoffPerturbation(apply_quadrature_weight=False),
+    )
+    assert legacy.bundle.provenance["amplitude_mapping"] == AMPLITUDE_MAPPING
+    assert legacy.declarations["quadrature_weight"]["status"] == (
+        "available, OMITTED -- negative test only"
+    )
+    legacy_amplitude, _ = legacy.bundle.require_coherent()
+    raw_weight = RayBundle.from_artifact_record(singlet_record).weight
+    np.testing.assert_allclose(legacy_amplitude.real, np.sqrt(raw_weight))
 
     reference = handoff.bundle.optical_path_length_reference
     assert reference and reference != "unverified"

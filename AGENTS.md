@@ -158,3 +158,28 @@ Review against the linked Linear issue. Classify feedback as:
 - Must fix before merge.
 - Should fix soon.
 - Safe to merge.
+
+## GPU server resource policy
+
+This is a shared GPU server with limited system RAM relative to total GPU
+memory. Stability is more important than parallelism.
+
+When working on this machine:
+
+- Never run multiple GPU-consuming jobs concurrently.
+- Run GPU jobs sequentially, never in parallel.
+- Never launch training, inference, CUDA, PyTorch, JAX, or similar workloads
+  as background jobs.
+- Before starting a GPU-intensive command, run:
+    nvidia-smi
+    free -h
+- Check whether another GPU job is already running before launching one.
+- If substantial GPU or system memory is already occupied, ask me before
+  starting another workload.
+- Do not use agent teams or parallel agents for tasks that execute code.
+- Subagents may only be used for read-only analysis and must not launch
+  compute-intensive processes.
+- Do not use nohup, &, screen, tmux, or other mechanisms to leave compute
+  jobs running without explicit permission.
+- Do not modify swap, /etc/fstab, mounts, GPU drivers, or systemd settings.
+- Never reboot or shut down this server without explicit permission.
