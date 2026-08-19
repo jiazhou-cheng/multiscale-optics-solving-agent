@@ -38,22 +38,37 @@ from typing import Any
 
 import numpy as np
 
+from multiscale_optics_agent.core.arrays import (
+    array_state,
+    device_of,
+    dtype_of,
+    namespace_of,
+    numpy_dtype,
+    to_host_numpy,
+    xp_for,
+)
 from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.specs import ArtifactKind, Device, Framework
+from multiscale_optics_agent.core.precision import (
+    ArrayNamespace,
+    ArrayState,
+    DevicePlacement,
+    DType,
+)
+from multiscale_optics_agent.core.specs import ArtifactKind, Framework
 
 __all__ = [
-    "PHASOR",
-    "SPATIAL_FACTOR",
     "AXIS_ORDER",
     "ORIGIN_RULE",
+    "PHASOR",
+    "PSF",
+    "SPATIAL_FACTOR",
+    "ComplexField",
     "ContractCode",
     "ContractError",
     "Frame",
-    "ReferencePlane",
     "RayBundle",
+    "ReferencePlane",
     "WavefrontSamples",
-    "ComplexField",
-    "PSF",
 ]
 
 
@@ -76,7 +91,25 @@ PROPAGATION_AXIS = "+z"
 #: defaulted.
 UNVERIFIED = "unverified"
 
+#: Historical float64 direction-norm tolerance. Kept verbatim as the FLOOR so
+#: the established CPU/float64 behaviour is bit-for-bit unchanged: it is ~4e6
+#: times looser than float64 round-off, a legacy allowance that CHE-61 has no
+#: business tightening.
 _DIRECTION_NORM_TOLERANCE = 1e-9
+
+
+def _direction_norm_tolerance(dtype: DType) -> float:
+    """Unit-norm tolerance appropriate to the dtype the directions are stored in.
+
+    Holding a float32 bundle to a float64 tolerance is not strictness, it is a
+    category error: casting an exactly normalized float64 direction to float32
+    already perturbs ``|d|`` by about one float32 epsilon (1.2e-7) before the
+    norm is even computed, and computing it adds a few more. ``64 * eps`` is
+    that round-off with an order of magnitude of headroom, derived rather than
+    picked, and it reduces to the historical constant for float64.
+    """
+    eps = float(np.finfo(numpy_dtype(dtype)).eps)
+    return max(_DIRECTION_NORM_TOLERANCE, 64.0 * eps)
 
 
 class ContractCode(StrEnum):
@@ -127,6 +160,14 @@ class ContractCode(StrEnum):
     #: SHAPE_MISMATCH: the arrays agree in length, but the *geometry* the weight
     #: formula assumes is not the geometry the rays were actually sampled on.
     NON_HEXAPOLAR_SAMPLING = "NON_HEXAPOLAR_SAMPLING"
+    #: The arrays inside one artifact do not agree on where they live or which
+    #: array ecosystem owns them -- e.g. positions on ``cuda:0`` with a NumPy
+    #: amplitude. Added by CHE-61 (PB4b). Before this, every array was force-cast
+    #: to host NumPy on construction, so the situation could not arise and
+    #: neither could GPU residency. Now that an artifact preserves what its data
+    #: actually is, a mixed artifact is refused rather than being silently
+    #: unified by the first operation that touches both.
+    REPRESENTATION_INCONSISTENT = "REPRESENTATION_INCONSISTENT"
 
 
 class ContractError(ValueError):
@@ -185,13 +226,152 @@ def _require(mapping: dict[str, Any], key: str, *, artifact_id: str | None, what
     return mapping[key]
 
 
-def _check_finite(array: np.ndarray, name: str) -> None:
-    if not np.all(np.isfinite(array)):
+def _check_finite(array: Any, name: str) -> None:
+    xp = xp_for(namespace_of(array))
+    if not bool(xp.all(xp.isfinite(array))):
         raise ContractError(
             ContractCode.NON_FINITE,
             f"{name} contains non-finite values",
             declaration=name,
         )
+
+
+# --- Representation-preserving array intake ---------------------------------
+# Before CHE-61 every field here ran through ``np.asarray(value,
+# dtype=np.float64)`` (or ``complex128``). That single line did four things at
+# once: it moved data to the host, changed its dtype, changed its array
+# ecosystem, and broke any autograd graph attached to it -- so a float32 GPU
+# artifact could not exist at all, whatever the producing solver supported.
+#
+# The replacement keeps the *default* exactly where it was. A Python list or
+# scalar still becomes host float64/complex128, because it has no dtype, device
+# or namespace of its own and the historical default is the right one. An input
+# that IS an array is left in the representation it arrived in.
+
+
+def _default_dtype(complex_: bool) -> DType:
+    """What an input carrying no representation of its own becomes."""
+    return DType.COMPLEX128 if complex_ else DType.FLOAT64
+
+
+def _intake(value: Any, *, name: str, complex_: bool) -> Any:
+    """Adopt ``value`` as artifact data, preserving what it already is.
+
+    ``complex_`` says which kind the *field* is, not what the caller passed. A
+    real array handed to a complex field is widened to the complex dtype of the
+    same precision -- ``float32 -> complex64``, not ``-> complex128`` -- because
+    a phase-free amplitude is still an amplitude, while silently promoting its
+    precision would be a conversion nobody asked for.
+    """
+    if not hasattr(value, "dtype"):
+        # list / tuple / Python scalar: no representation to preserve.
+        return np.asarray(value, dtype=numpy_dtype(_default_dtype(complex_)))
+
+    dtype = dtype_of(value)
+    namespace = namespace_of(value)
+    if namespace is ArrayNamespace.TORCH:
+        raise ContractError(
+            ContractCode.REPRESENTATION_INCONSISTENT,
+            (
+                f"{name} is a torch tensor. Boundary artifacts execute in the "
+                "NumPy/JAX compute namespaces; a torch array must cross an "
+                "explicit bridge (core.arrays.to_namespace) so the conversion, "
+                "and any autograd graph break it causes, is recorded."
+            ),
+            declaration=name,
+            remedy=(
+                "Plan the handoff with core.precision.plan_bridge and apply it "
+                "with core.arrays.apply_bridge before building the artifact."
+            ),
+        )
+
+    if complex_ and dtype.is_real:
+        target = dtype.precision.complex_dtype
+        if target is None:
+            # float16 has no complex counterpart anywhere in this stack; widen
+            # to the smallest one that exists rather than inventing complex32.
+            target = DType.COMPLEX64
+        return xp_for(namespace).asarray(value, dtype=numpy_dtype(target))
+    if not complex_ and dtype.is_complex:
+        raise ContractError(
+            ContractCode.MISSING_DECLARATION,
+            f"{name} must be real-valued; a complex array here is an amplitude, not a magnitude",
+            declaration=name,
+        )
+    return value
+
+
+_FRAMEWORK_BY_NAMESPACE = {
+    ArrayNamespace.NUMPY: Framework.NUMPY,
+    ArrayNamespace.JAX: Framework.JAX,
+    ArrayNamespace.TORCH: Framework.PYTORCH,
+}
+
+
+def _framework_for(namespace: ArrayNamespace) -> Framework:
+    return _FRAMEWORK_BY_NAMESPACE[namespace]
+
+
+class _HostView:
+    """The explicit execution -> serialization boundary of PB4b section 11.
+
+    ``.npy``/``.npz`` are host formats. A GPU artifact therefore has to be
+    copied to the host *to be written*, and the important property is that this
+    is the only place it happens: the live artifact stays on its device, the
+    copy is made at the moment of writing, and the record says so. A reader can
+    then tell a persistence copy apart from a computational fallback, which is
+    the distinction that goes missing when ``to_numpy()`` is sprinkled through
+    an execution path.
+    """
+
+    def __init__(self, artifact: Any, *, reason: str) -> None:
+        self._state = artifact.state
+        self._reason = reason
+        self._copied = False
+
+    def of(self, array: Any) -> np.ndarray:
+        if namespace_of(array) is not ArrayNamespace.NUMPY:
+            self._copied = True
+        return to_host_numpy(array, reason=self._reason)
+
+    def as_metadata(self) -> dict[str, Any]:
+        return {
+            "boundary": "explicit_persistence",
+            "host_copy": self._copied,
+            "kind": "serialization" if self._copied else "already_on_host",
+            "reason": self._reason,
+            "execution_representation_preserved": True,
+            "from": self._state.as_dict(),
+        }
+
+
+def _require_same_representation(
+    arrays: dict[str, Any], *, reference: str
+) -> None:
+    """Every array in one artifact must live in the same place, in the same ecosystem.
+
+    Dtype is deliberately NOT unified: a float32 geometry with a complex64
+    amplitude is a legitimate FP32 artifact, and forcing a common dtype would
+    reintroduce exactly the hidden conversion this class of change removes.
+    """
+    base = arrays[reference]
+    base_device, base_namespace = device_of(base), namespace_of(base)
+    for name, array in arrays.items():
+        if array is None or name == reference:
+            continue
+        device, namespace = device_of(array), namespace_of(array)
+        if namespace is not base_namespace or device != base_device:
+            raise ContractError(
+                ContractCode.REPRESENTATION_INCONSISTENT,
+                (
+                    f"{name} is {namespace}:{device} but {reference} is "
+                    f"{base_namespace}:{base_device}. One artifact cannot span two "
+                    "devices or two array ecosystems; the first operation to touch "
+                    "both would silently move one of them."
+                ),
+                declaration=name,
+                remedy="Bridge the mismatched array explicitly before constructing the artifact.",
+            )
 
 
 @dataclass(frozen=True)
@@ -323,10 +503,11 @@ class RayBundle:
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        positions = np.asarray(self.positions_m, dtype=np.float64)
-        directions = np.asarray(self.directions, dtype=np.float64)
+        positions = _intake(self.positions_m, name="positions_m", complex_=False)
+        directions = _intake(self.directions, name="directions", complex_=False)
         object.__setattr__(self, "positions_m", positions)
         object.__setattr__(self, "directions", directions)
+        xp = xp_for(namespace_of(positions))
 
         if positions.ndim != 2 or positions.shape[1] != 3:
             raise ContractError(
@@ -349,12 +530,16 @@ class RayBundle:
         _check_finite(positions, "positions_m")
         _check_finite(directions, "directions")
 
-        norms = np.linalg.norm(directions, axis=1)
-        worst = float(np.max(np.abs(norms - 1.0)))
-        if worst > _DIRECTION_NORM_TOLERANCE:
+        norms = xp.linalg.norm(directions, axis=1)
+        worst = float(xp.max(xp.abs(norms - 1.0)))
+        tolerance = _direction_norm_tolerance(dtype_of(directions))
+        if worst > tolerance:
             raise ContractError(
                 ContractCode.NON_UNIT_DIRECTION,
-                f"direction vectors must be unit norm; worst deviation {worst:.3e}",
+                (
+                    f"direction vectors must be unit norm; worst deviation {worst:.3e} "
+                    f"exceeds {tolerance:.3e} for {dtype_of(directions)}"
+                ),
                 declaration="directions",
             )
 
@@ -375,8 +560,7 @@ class RayBundle:
             value = getattr(self, name)
             if value is None:
                 continue
-            dtype = np.complex128 if name == "amplitude" else np.float64
-            array = np.asarray(value, dtype=dtype)
+            array = _intake(value, name=name, complex_=(name == "amplitude"))
             object.__setattr__(self, name, array)
             if array.shape != (positions.shape[0],):
                 raise ContractError(
@@ -385,6 +569,17 @@ class RayBundle:
                     declaration=name,
                 )
             _check_finite(array, name)
+
+        _require_same_representation(
+            {
+                "positions_m": self.positions_m,
+                "directions": self.directions,
+                "amplitude": self.amplitude,
+                "weight": self.weight,
+                "optical_path_length_m": self.optical_path_length_m,
+            },
+            reference="positions_m",
+        )
 
         if self.optical_path_length_m is not None and not self.optical_path_length_reference:
             raise ContractError(
@@ -418,6 +613,33 @@ class RayBundle:
     def wavenumber(self) -> float:
         """Free-space wavenumber ``k = 2 pi / lambda`` in rad/m."""
         return 2.0 * math.pi / self.wavelength_m
+
+    @property
+    def state(self) -> ArrayState:
+        """What this bundle's geometry actually is: dtype, device, namespace.
+
+        Read from ``positions_m``, never from a caller-supplied field, so the
+        answer cannot contradict the data. ``amplitude`` may legitimately carry
+        the complex counterpart of this dtype at the same precision.
+        """
+        return array_state(self.positions_m)
+
+    @property
+    def device(self) -> DevicePlacement:
+        return self.state.device
+
+    @property
+    def namespace(self) -> ArrayNamespace:
+        return self.state.namespace
+
+    @property
+    def dtype(self) -> DType:
+        return self.state.dtype
+
+    @property
+    def xp(self) -> Any:
+        """The array module this bundle's data belongs to."""
+        return xp_for(self.namespace)
 
     def require_coherent(self) -> tuple[np.ndarray, np.ndarray]:
         """Return ``(amplitude, optical_path_length_m)`` or fail structurally.
@@ -480,13 +702,17 @@ class RayBundle:
                     declaration="weight",
                 )
             if mapping.startswith("amplitude = sqrt(weight)"):
-                if np.any(self.weight < 0.0):
+                xp = self.xp
+                if bool(xp.any(self.weight < 0.0)):
                     raise ContractError(
                         ContractCode.NEGATIVE_INTENSITY,
                         "cannot take sqrt of a negative weight",
                         declaration="weight",
                     )
-                amplitude = np.sqrt(self.weight).astype(np.complex128)
+                # The complex counterpart of the weight's OWN precision: a
+                # float32 weight yields a complex64 amplitude, not a complex128
+                # one. _intake widens real -> complex without touching precision.
+                amplitude = xp.sqrt(self.weight)
             else:
                 raise ContractError(
                     ContractCode.MISSING_DECLARATION,
@@ -494,7 +720,7 @@ class RayBundle:
                     declaration="amplitude",
                 )
         return self._replace(
-            amplitude=np.asarray(amplitude, dtype=np.complex128),
+            amplitude=_intake(amplitude, name="amplitude", complex_=True),
             provenance={**self.provenance, "amplitude_mapping": mapping},
         )
 
@@ -508,7 +734,9 @@ class RayBundle:
                 declaration="optical_path_length_reference",
             )
         return self._replace(
-            optical_path_length_m=np.asarray(optical_path_length_m, dtype=np.float64),
+            optical_path_length_m=_intake(
+                optical_path_length_m, name="optical_path_length_m", complex_=False
+            ),
             optical_path_length_reference=reference,
         )
 
@@ -585,13 +813,15 @@ class RayBundle:
             )
         )
 
-        positions = np.column_stack([data["x_m"], data["y_m"], data["z_m"]]).astype(np.float64)
-        directions = np.column_stack([data["L"], data["M"], data["N"]]).astype(np.float64)
+        # No .astype(float64): the persisted file already declares a dtype, and
+        # widening it back on load would erase the precision the producer chose.
+        positions = np.column_stack([data["x_m"], data["y_m"], data["z_m"]])
+        directions = np.column_stack([data["L"], data["M"], data["N"]])
 
         weight = None
         weight_semantics = None
         if "intensity" in data:
-            weight = np.asarray(data["intensity"], dtype=np.float64)
+            weight = np.asarray(data["intensity"])
             weight_semantics = metadata.get("intensity_is_not_amplitude", "unnamed ray weight")
 
         # opd_native is carried in provenance, never promoted to an OPL.
@@ -660,34 +890,52 @@ class RayBundle:
         )
 
     def to_artifact_record(self, *, artifact_id: str, uri: str | Path) -> ArtifactRecord:
+        """Persist the bundle. The host copy taken here is a declared boundary.
+
+        ``.npz`` is a host format, so writing one requires host bytes whatever
+        device the bundle lives on. That is a *serialization* requirement, not a
+        computational fallback, and the two are distinguished in
+        ``metadata['serialization']`` rather than left for a reader to guess.
+        Nothing about the live artifact changes: this method returns a record and
+        leaves ``self`` on its device.
+        """
         path = Path(uri)
+        reason = "npz persistence requires host bytes; the live bundle is unchanged"
+        host = _HostView(self, reason=reason)
+        positions, directions = host.of(self.positions_m), host.of(self.directions)
         arrays: dict[str, np.ndarray] = {
-            "x_m": self.positions_m[:, 0],
-            "y_m": self.positions_m[:, 1],
-            "z_m": self.positions_m[:, 2],
-            "L": self.directions[:, 0],
-            "M": self.directions[:, 1],
-            "N": self.directions[:, 2],
+            "x_m": positions[:, 0],
+            "y_m": positions[:, 1],
+            "z_m": positions[:, 2],
+            "L": directions[:, 0],
+            "M": directions[:, 1],
+            "N": directions[:, 2],
         }
         if self.amplitude is not None:
-            arrays["amplitude"] = self.amplitude
+            arrays["amplitude"] = host.of(self.amplitude)
         if self.weight is not None:
-            arrays["intensity"] = self.weight
+            arrays["intensity"] = host.of(self.weight)
         if self.optical_path_length_m is not None:
-            arrays["opl_m"] = self.optical_path_length_m
+            arrays["opl_m"] = host.of(self.optical_path_length_m)
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(path, **arrays)
 
+        state = self.state
         return ArtifactRecord(
             id=artifact_id,
             kind=ArtifactKind.RAY_BUNDLE,
             uri=str(path),
             shape=(self.count,),
-            dtype="float64",
-            framework=Framework.NUMPY,
-            device=Device.CPU,
+            dtype=str(state.dtype),
+            framework=_framework_for(state.namespace),
+            device=state.device.to_spec_device(),
             units="SI: metres, dimensionless unit directions",
             metadata={
+                "execution": state.as_dict(),
+                "serialization": host.as_metadata(),
+                "amplitude_dtype": (
+                    None if self.amplitude is None else str(dtype_of(self.amplitude))
+                ),
                 "length_unit": "m",
                 "wavelength_unit": "m",
                 "wavelength_m": self.wavelength_m,
@@ -736,7 +984,7 @@ class WavefrontSamples:
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        positions = np.asarray(self.positions_m, dtype=np.float64)
+        positions = _intake(self.positions_m, name="positions_m", complex_=False)
         object.__setattr__(self, "positions_m", positions)
         if positions.ndim != 2 or positions.shape[1] != 2:
             raise ContractError(
@@ -750,7 +998,7 @@ class WavefrontSamples:
                 "wavefront sample set is empty",
                 declaration="positions_m",
             )
-        opl = np.asarray(self.optical_path_length_m, dtype=np.float64)
+        opl = _intake(self.optical_path_length_m, name="optical_path_length_m", complex_=False)
         object.__setattr__(self, "optical_path_length_m", opl)
         if opl.shape != (positions.shape[0],):
             raise ContractError(
@@ -791,7 +1039,7 @@ class WavefrontSamples:
                 declaration="wavelength_m",
             )
         if self.amplitude is not None:
-            amplitude = np.asarray(self.amplitude, dtype=np.complex128)
+            amplitude = _intake(self.amplitude, name="amplitude", complex_=True)
             object.__setattr__(self, "amplitude", amplitude)
             if amplitude.shape != (positions.shape[0],):
                 raise ContractError(
@@ -800,9 +1048,36 @@ class WavefrontSamples:
                     declaration="amplitude",
                 )
 
+        _require_same_representation(
+            {
+                "positions_m": self.positions_m,
+                "optical_path_length_m": self.optical_path_length_m,
+                "amplitude": self.amplitude,
+                "pupil_mask": self.pupil_mask,
+            },
+            reference="positions_m",
+        )
+
     @property
     def count(self) -> int:
         return int(self.positions_m.shape[0])
+
+    @property
+    def state(self) -> ArrayState:
+        """Observed dtype/device/namespace, read from the pupil coordinates."""
+        return array_state(self.positions_m)
+
+    @property
+    def device(self) -> DevicePlacement:
+        return self.state.device
+
+    @property
+    def namespace(self) -> ArrayNamespace:
+        return self.state.namespace
+
+    @property
+    def dtype(self) -> DType:
+        return self.state.dtype
 
     @classmethod
     def from_artifact_record(
@@ -850,8 +1125,8 @@ class WavefrontSamples:
                 ),
             )
         return cls(
-            positions_m=np.column_stack([data["x_m"], data["y_m"]]).astype(np.float64),
-            optical_path_length_m=np.asarray(data["opl_m"], dtype=np.float64),
+            positions_m=np.column_stack([data["x_m"], data["y_m"]]),
+            optical_path_length_m=np.asarray(data["opl_m"]),
             optical_path_length_reference=str(reference),
             wavelength_m=wavelength_m,
             reference_plane=ReferencePlane(
@@ -889,15 +1164,18 @@ class ComplexField:
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        u = np.asarray(self.u)
-        if not np.iscomplexobj(u):
+        u = self.u if hasattr(self.u, "dtype") else np.asarray(self.u)
+        if not dtype_of(u).is_complex:
             raise ContractError(
                 ContractCode.MISSING_DECLARATION,
                 "a ComplexField must hold a complex array; a real array is an intensity, "
                 "not an amplitude",
                 declaration="u",
             )
-        u = u.astype(np.complex128, copy=False)
+        # No `.astype(complex128)`. A complex64 field produced on a GPU stays a
+        # complex64 field on that GPU; widening it here would both fabricate
+        # precision the producer never had and drag the array back to the host.
+        u = _intake(u, name="u", complex_=True)
         object.__setattr__(self, "u", u)
         if u.ndim != 2:
             raise ContractError(
@@ -944,22 +1222,60 @@ class ComplexField:
     def wavenumber(self) -> float:
         return 2.0 * math.pi / self.wavelength_m
 
-    def coordinates(self) -> tuple[np.ndarray, np.ndarray]:
+    @property
+    def state(self) -> ArrayState:
+        """Observed dtype/device/namespace of ``u``. Never caller-declared."""
+        return array_state(self.u)
+
+    @property
+    def device(self) -> DevicePlacement:
+        return self.state.device
+
+    @property
+    def namespace(self) -> ArrayNamespace:
+        return self.state.namespace
+
+    @property
+    def dtype(self) -> DType:
+        return self.state.dtype
+
+    @property
+    def xp(self) -> Any:
+        return xp_for(self.namespace)
+
+    @property
+    def real_dtype(self) -> DType:
+        """The real dtype matching this field's precision -- float32 for complex64."""
+        return self.dtype.precision.real_dtype
+
+    def coordinates(self) -> tuple[Any, Any]:
         """Return ``(y, x)`` coordinate vectors in metres.
 
         Uses the M1-pinned origin rule: array index ``n // 2`` is coordinate
         zero. This is the one place the rule is implemented, so a coupler
         cannot quietly adopt a different centring.
+
+        Built in the field's own namespace, device and real precision, so a
+        GPU complex64 field does not silently produce host float64 axes that
+        every downstream operation then has to move or demote.
         """
+        xp = self.xp
         ny, nx = self.shape
         dy, dx = self.sample_pitch_m
-        y = (np.arange(ny, dtype=np.float64) - ny // 2) * dy
-        x = (np.arange(nx, dtype=np.float64) - nx // 2) * dx
+        real = numpy_dtype(self.real_dtype)
+        y = (xp.arange(ny, dtype=real) - ny // 2) * dy
+        x = (xp.arange(nx, dtype=real) - nx // 2) * dx
         return y, x
 
     def discrete_power(self) -> float:
+        """Total discrete power. A Python float, so this synchronizes a GPU array.
+
+        Called only where the number itself is the product -- diagnostics and
+        persisted metadata -- never inside the propagation path.
+        """
+        xp = self.xp
         dy, dx = self.sample_pitch_m
-        return float(np.sum(np.abs(self.u) ** 2) * dy * dx)
+        return float(xp.sum(xp.abs(self.u) ** 2) * dy * dx)
 
     @classmethod
     def from_artifact_record(
@@ -991,12 +1307,18 @@ class ComplexField:
                 "field arrived without a declared pad width, so its extent cannot be trusted",
                 declaration="pad_width",
                 artifact_id=record.id,
-                remedy="M1 measured a 256x256 input growing to 1756x1756; shape alone is not extent.",
+                remedy=(
+                    "M1 measured a 256x256 input growing to 1756x1756; shape alone "
+                    "is not extent."
+                ),
             )
         pad_width = metadata.get("pad_width") or 0
 
         return cls(
-            u=np.asarray(u),
+            # Loaded from a host file, so this artifact IS host NumPy; the
+            # producer's own device is recorded in the record's metadata rather
+            # than claimed by an object that no longer lives there.
+            u=u if hasattr(u, "dtype") else np.asarray(u),
             sample_pitch_m=pitch_tuple,
             wavelength_m=wavelength_m,
             reference_plane=ReferencePlane(
@@ -1016,17 +1338,21 @@ class ComplexField:
     def to_artifact_record(self, *, artifact_id: str, uri: str | Path) -> ArtifactRecord:
         path = Path(uri)
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(path, self.u)
+        host = _HostView(self, reason="npy persistence requires host bytes")
+        np.save(path, host.of(self.u))
+        state = self.state
         return ArtifactRecord(
             id=artifact_id,
             kind=ArtifactKind.COMPLEX_FIELD,
             uri=str(path),
             shape=self.shape,
-            dtype=str(self.u.dtype),
-            framework=Framework.NUMPY,
-            device=Device.CPU,
+            dtype=str(state.dtype),
+            framework=_framework_for(state.namespace),
+            device=state.device.to_spec_device(),
             units=None,
             metadata={
+                "execution": state.as_dict(),
+                "serialization": host.as_metadata(),
                 "wavelength": self.wavelength_m,
                 "sample_pitch": list(self.sample_pitch_m),
                 "coordinate_frame": (
@@ -1060,8 +1386,9 @@ class PSF:
     provenance: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        intensity = np.asarray(self.intensity, dtype=np.float64)
+        intensity = _intake(self.intensity, name="intensity", complex_=False)
         object.__setattr__(self, "intensity", intensity)
+        xp = xp_for(namespace_of(intensity))
         if intensity.ndim != 2:
             raise ContractError(
                 ContractCode.SHAPE_MISMATCH,
@@ -1069,7 +1396,7 @@ class PSF:
                 declaration="intensity",
             )
         _check_finite(intensity, "intensity")
-        if np.any(intensity < 0.0):
+        if bool(xp.any(intensity < 0.0)):
             raise ContractError(
                 ContractCode.NEGATIVE_INTENSITY,
                 "PSF intensity must be non-negative; a negative value means an "
@@ -1112,7 +1439,10 @@ class PSF:
         be the OUTPUT pitch; see ``evaluation.psf_measurement``, which checks it.
         """
         return cls(
-            intensity=np.abs(field_.u) ** 2,
+            # |u|^2 in the field's own namespace and precision: a complex64 GPU
+            # field yields a float32 GPU PSF, with no host round trip and no
+            # fabricated float64 digits.
+            intensity=field_.xp.abs(field_.u) ** 2,
             sample_pitch_m=field_.sample_pitch_m,
             wavelength_m=field_.wavelength_m,
             normalization=normalization,
@@ -1121,20 +1451,41 @@ class PSF:
             **({} if coherence_model is None else {"coherence_model": coherence_model}),
         )
 
+    @property
+    def state(self) -> ArrayState:
+        """Observed dtype/device/namespace of the intensity map."""
+        return array_state(self.intensity)
+
+    @property
+    def device(self) -> DevicePlacement:
+        return self.state.device
+
+    @property
+    def namespace(self) -> ArrayNamespace:
+        return self.state.namespace
+
+    @property
+    def dtype(self) -> DType:
+        return self.state.dtype
+
     def to_artifact_record(self, *, artifact_id: str, uri: str | Path) -> ArtifactRecord:
         path = Path(uri)
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.save(path, self.intensity)
+        host = _HostView(self, reason="npy persistence requires host bytes")
+        np.save(path, host.of(self.intensity))
+        state = self.state
         return ArtifactRecord(
             id=artifact_id,
             kind=ArtifactKind.PSF,
             uri=str(path),
             shape=(int(self.intensity.shape[0]), int(self.intensity.shape[1])),
-            dtype=str(self.intensity.dtype),
-            framework=Framework.NUMPY,
-            device=Device.CPU,
+            dtype=str(state.dtype),
+            framework=_framework_for(state.namespace),
+            device=state.device.to_spec_device(),
             units=None,
             metadata={
+                "execution": state.as_dict(),
+                "serialization": host.as_metadata(),
                 "sample_pitch": list(self.sample_pitch_m),
                 "wavelength": self.wavelength_m,
                 "normalization": self.normalization,

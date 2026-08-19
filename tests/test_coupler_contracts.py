@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from multiscale_optics_agent.core.artifacts import ArtifactRecord
+from multiscale_optics_agent.core.precision import ArrayNamespace, DType
 from multiscale_optics_agent.core.specs import ArtifactKind
 from multiscale_optics_agent.couplers import (
     AXIS_ORDER,
@@ -387,9 +388,13 @@ def test_complex_field_builds_from_an_unmodified_chromatix_artifact(tmp_path) ->
     assert field_.sample_pitch_m == (1e-6, 1e-6)
     assert field_.padded is True
     assert field_.pad_width == 4
-    # complex64 from the engine is widened for the reference core; the source
-    # dtype stays visible through provenance rather than being lost.
-    assert field_.u.dtype == np.complex128
+    # CHE-61 (PB4b): complex64 from the engine stays complex64. It used to be
+    # widened to complex128 on the way in, which fabricated eight decimal digits
+    # Chromatix never computed -- it has no complex128 path at all -- and made
+    # every downstream artifact claim a precision the wave model cannot produce.
+    assert field_.u.dtype == np.complex64
+    assert field_.dtype is DType.COMPLEX64
+    assert field_.state.namespace is ArrayNamespace.NUMPY
 
 
 def test_complex_field_refuses_a_field_with_an_undeclared_pad_state(tmp_path) -> None:
