@@ -230,6 +230,84 @@ Three further specifics:
 Evidence: `tutorials/t07_anti_reflective_coating.py`, `tutorials/t18_introduction_to_coatings.py`,
 `tutorials/t40_custom_coating_types.py`.
 
+## Grating parameters use the wavelength's unit, not the geometry's (CHE-56)
+
+Every length in a prescription is millimetres (see "Units" below) -- except
+`grating_period`, which is **micrometres**, because
+`DiffractiveInteractionModel` and `RealRays.gratingdiffract` only ever use it as
+the ratio `m * rays.w / d`, and `rays.w` is micrometres.
+
+Measured at normal incidence on a plane transmission grating in air, order 1,
+lambda = 0.55 um (`probes/system_construction_probe.py`):
+
+| `grating_period` | measured `sin(theta)` | `m*lambda/d` with d in um | with d in mm |
+| -- | -- | -- | -- |
+| 2.0 | 0.275 | 0.275 | 2.75e-4 |
+| 4.0 | 0.1375 | 0.1375 | 1.375e-4 |
+| 8.0 | 0.06875 | 0.06875 | 6.875e-5 |
+
+Exact agreement, to 0.0 in float64, across a 4x sweep. A millimetre reading
+would be wrong by 1000x and no single measurement would reveal it.
+
+`groove_orientation_angle` is **radians**: `PlaneGrating.grating_vector` returns
+`(-sin(angle), cos(angle), 0)`, so at 0 the grating vector is +y and the
+diffracted order is deviated in y, and at pi/2 the deviation moves to -x with the
+same magnitude. Read as degrees, pi/2 would be 1.57 deg and the deviation would
+still be essentially in y.
+
+A grating is a *geometry class*, not an attribute of one:
+`surface_type='grating'` yields `PlaneGrating` when the base radius is infinite
+and `StandardGratingGeometry` otherwise, and `SurfaceFactory.create_surface` then
+selects `DiffractiveInteractionModel` from the same string. There is therefore no
+aspheric grating in this version, and asking for one must be refused rather than
+downgraded to its base conic -- which would trace without complaint.
+
+## Unrecognized surface keywords are silently discarded (CHE-56)
+
+`GeometryFactory.create` filters `**kwargs` down to the dataclass fields of the
+geometry config it selected:
+
+```python
+config_fields = {f.name for f in fields(config_cls)}
+filtered_kwargs = {k: v for k, v in kwargs.items() if k in config_fields}
+```
+
+So `surfaces.add(index=1, radius=10.0, coefficients=[...])` on a `standard`
+surface silently builds a plain sphere, and a misspelled keyword builds a
+different optical system with no error, no warning, and no attribute left behind
+to notice it by (`probes/system_construction_probe.py`,
+`surface_kwargs_are_silently_filtered`). Validate a prescription before it
+reaches `surfaces.add`; this repository does that in
+`core/optical_system.py` (`extra="forbid"`) and
+`adapters/optiland_builder.py` (explicit per-type keyword sets).
+
+## A bare glass name is a fuzzy query (CHE-56)
+
+`Material(name)` is not a lookup. `_find_material_matches` filters the catalog by
+substring over `category_name`, `name` and `filename_no_ext`, scores the
+survivors by Levenshtein distance, sorts, and `_retrieve_file` takes the best
+row. `robust_search` defaults to `True`, so an inexact best match is returned
+rather than refused, and only a printed line (not a warning) says so.
+
+Measured (`probes/system_construction_probe.py`):
+
+| requested | rows surviving the filter | exact (score 0) | resolved file |
+| -- | -- | -- | -- |
+| `N-SK10` | 1 | 1 | `glass/schott/N-SK10.yml` |
+| `SK15` | 7 | 1 | `glass/hikari/SK15.yml` |
+| `BASF2` | 4 | 1 | `glass/hikari/BASF2.yml` |
+| `FK3` | 1 | 1 | `glass/schott/FK3.yml` |
+| `SF15` + `hikari` | 3 | 1 | `glass/hikari/SF15.yml` |
+| `N-LAK12` | 1 | 1 | `glass/schott/N-LAK12.yml` |
+
+Two consequences. First, the manufacturer is not implied by the name: `SK15`
+resolves to HIKARI while `N-SK10` resolves to SCHOTT. Second, a near-miss still
+resolves -- `SK1` returns `SK16`. The selected row carries its own
+`similarity_score`, and `== 0` is Optiland's own exactness criterion; compare
+against `material_data['name']` alone and you will reject legitimate rows, since
+`N-BK7` resolves to a row named `N-BK7 (SCHOTT)` whose `filename_no_ext` is what
+matched. Record the resolved `filename` in the prescription if the glass matters.
+
 ## Differentiability is opt-in, not automatic
 
 A bare `pip install optiland` gives you the NumPy backend and **zero

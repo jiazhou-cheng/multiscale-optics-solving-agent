@@ -13,6 +13,7 @@ nothing here is a re-derived or assumed oracle.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -382,6 +383,11 @@ def _fake_optiland_import(values, *, paraxial=None):
 
     `paraxial` is left absent by default so that a test which does not opt into
     the exit-pupil path cannot accidentally depend on a fabricated pupil.
+
+    Returns the `_import_optiland` tuple and the fake lens separately: since
+    CHE-56 the adapter builds its system through the canonical prescription
+    builder rather than by looking a class up on `optiland.samples`, so
+    substituting a lens means patching `_resolve_lens`, not the sample module.
     """
 
     class Backend:
@@ -405,7 +411,24 @@ def _fake_optiland_import(values, *, paraxial=None):
     if paraxial is not None:
         Lens.paraxial = paraxial
 
-    return Backend, SimpleNamespace(ReverseTelephoto=Lens), BackendUtils, None
+    return (Backend, BackendUtils, None), Lens()
+
+
+@contextmanager
+def _patched_optiland(values, *, paraxial=None):
+    """Patch both extracted collaborators: the import probe and the builder."""
+    modules, lens = _fake_optiland_import(values, paraxial=paraxial)
+    with (
+        patch(
+            "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
+            return_value=modules,
+        ),
+        patch(
+            "multiscale_optics_agent.adapters.optiland_adapter._resolve_lens",
+            return_value=lens,
+        ),
+    ):
+        yield
 
 
 @pytest.mark.parametrize("bad_value", [np.array([], dtype=float), np.array([np.nan])])
@@ -421,10 +444,7 @@ def test_standalone_empty_or_nonfinite_output_is_structured(tmp_path, bad_value)
         w=bad_value,
         opd=bad_value,
     )
-    with patch(
-        "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
-        return_value=_fake_optiland_import(rays),
-    ):
+    with _patched_optiland(rays):
         result = OptilandAdapter().run_standalone({"output_directory": tmp_path / "failed"})
 
     assert result.status is RunStatus.FAILED
@@ -621,7 +641,15 @@ def test_m3_singlet_ref_matches_recorded_m1_standard_evidence(tmp_path) -> None:
 
 
 def test_m3_singlet_ref_is_a_supported_sample_not_a_custom_prescription(tmp_path) -> None:
-    """Adding the system did not open the custom-prescription path."""
+    """The `system` input port stays refused, and an unknown name is rejected.
+
+    CHE-56 opened a *typed* custom-prescription path
+    (``config['prescription']``), which is exercised in
+    ``test_optiland_canonical_prescriptions.py``. It did not open the untyped
+    one: an arbitrary solver object on the ``system`` input port has no contract
+    to validate, so it is still refused, and a name that is not in the
+    prescription registry is still rejected by the same eager gate.
+    """
     adapter = OptilandAdapter()
 
     # A prescription arriving through the input port stays refused even when the
@@ -643,8 +671,11 @@ def test_m3_singlet_ref_is_a_supported_sample_not_a_custom_prescription(tmp_path
     with pytest.raises(UnsupportedCapabilityError, match="system"):
         adapter.run(request)
 
-    # And an unprobed name is still rejected by the same gate.
-    with pytest.raises(UnsupportedCapabilityError, match="validated"):
+    # And an unregistered name is still rejected by the same gate, now naming
+    # the supported alternatives rather than only refusing.
+    with pytest.raises(UnsupportedCapabilityError, match="not a canonical prescription"):
+        adapter.run(_smoke_request(sample="M3SingletRefV2"))
+    with pytest.raises(UnsupportedCapabilityError, match="ReverseTelephoto, M3SingletRef"):
         adapter.run(_smoke_request(sample="M3SingletRefV2"))
 
     report = adapter.validate_request(_smoke_request(sample="M3SingletRefV2"))
@@ -682,10 +713,7 @@ def _unit_norm_fake_rays(*, n_values) -> SimpleNamespace:
 
 
 def _run_with_fake_optiland(tmp_path, rays, *, paraxial, handoff_plane="exit_pupil"):
-    with patch(
-        "multiscale_optics_agent.adapters.optiland_adapter._import_optiland",
-        return_value=_fake_optiland_import(rays, paraxial=paraxial),
-    ):
+    with _patched_optiland(rays, paraxial=paraxial):
         return OptilandAdapter().run(
             _smoke_request(handoff_plane=handoff_plane, output_directory=str(tmp_path / "out"))
         )

@@ -36,6 +36,8 @@ supported_regimes:
   - the bundled ReverseTelephoto sample at one field and wavelength
   - the adapter-owned M3SingletRef system at one field and wavelength (see
     adapter_owned_systems)
+  - generic system construction from a canonical project-owned prescription
+    (see canonical_system_construction)
   - ray export at the paraxial exit pupil as well as the image surface (see
     exit_pupil_handoff)
 package_reported_unverified_regimes:
@@ -65,6 +67,40 @@ verified_by_che57_tutorial_reproductions:
   - "apertures: EPD, imageFNO, objectNA; fields: angle, object_height; obj_space_telecentric"
   - "extension points: NewtonRaphsonGeometry, BaseCoating and OptimizerGeneric subclasses"
   - "fileio: save/load_optiland_file (exact round trip), save/load_zemax_file (LOSSY)"
+canonical_system_construction:
+  issue: CHE-56 (PB5)
+  schema: optical-system-spec/1 (src/multiscale_optics_agent/core/optical_system.py)
+  builder: src/multiscale_optics_agent/adapters/optiland_builder.py
+  registry: src/multiscale_optics_agent/registry/prescriptions.py
+  docs: docs/prescriptions/canonical_optical_systems.md
+  probe: knowledge/solvers/optiland/probes/system_construction_probe.py
+  evidence: knowledge/solvers/optiland/expected/system_construction_probe.json
+  tests: tests/test_optiland_canonical_prescriptions.py
+  supported_features:
+    - "geometry: plane, spherical/conic (radius or curvature), even_asphere (conic + coefficients starting at r^2)"
+    - "interaction: refractive, grating (order, period in MICROMETRES, groove orientation in RADIANS)"
+    - "material: air, ideal constant index, catalog glass with pinned resolved catalog file"
+    - "one aperture stop; EPD aperture; angular fields; wavelength list with exactly one primary"
+    - "object at infinity or at a finite distance; image plane placed by the last surface thickness"
+  rejected_eagerly:
+    - decentres, tilts, coordinate breaks, GRIN, freeform and arbitrary sag
+    - phase surfaces beyond the grating, coatings and BSDFs
+    - imageFNO/objectNA apertures, object-height and image-height fields
+    - a grating on an aspheric base (no such geometry class exists in 0.6.0)
+    - no stop or several stops; no primary wavelength or several; any non-finite number
+  migration_oracles:
+    reverse_telephoto: >
+      Optic.to_dict() equal to optiland.samples.objectives.ReverseTelephoto()
+      (name aside) and element-wise identical traces at Hy = 0, 0.5, 1.0.
+    m3_singlet_ref: >
+      reproduces benchmarks/slice_protocol.yaml's frozen efl/bfl/image-plane
+      z/EPD/semi-aperture, the superseded hand-written builder's to_dict() and
+      trace bit-for-bit, and the M1 standalone_baseline scientific-array SHA-256.
+  construction_hazards:
+    - "GeometryFactory.create silently DISCARDS kwargs that are not fields of the selected geometry config -- a misplaced key builds a different system with no error"
+    - "Material(name) is a fuzzy substring+Levenshtein query with robust_search=True by default: 'SK1' returns SK16, and 'SK15' selects HIKARI while 'N-SK10' selects SCHOTT"
+    - "grating_period shares the wavelength's unit (um), not the geometry's (mm) -- a 1000x trap"
+
 derivative:
   mode: native_autodiff
   mechanism: >

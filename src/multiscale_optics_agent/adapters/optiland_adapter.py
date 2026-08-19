@@ -9,15 +9,21 @@ below relies on training-data memory of an older/different Optiland API.
 Scope (deliberately narrow -- see current Optiland scope "do not broaden scope
 while a P0 model/coupler lacks tests")
 ------------------------------------------------------------------------
-- Only the bundled sample lens systems that have actually been probed are
-  supported (currently just ``optiland.samples.objectives.ReverseTelephoto``,
-  selected via ``config["sample"]``, default ``"ReverseTelephoto"``). A
-  custom, hand-built lens prescription supplied through the optional
-  ``system`` input port is NOT implemented: building one from scratch has not
-  been exercised against this pinned install (see
-  ``knowledge/solvers/optiland/capability_notes.md``, "Not yet exercised"),
-  so this adapter raises ``UnsupportedCapabilityError`` rather than guessing
-  at an untested construction API.
+- Optical systems are built from canonical prescriptions
+  (``core/optical_system.py``, schema ``optical-system-spec/1``) through the one
+  generic builder in ``adapters/optiland_builder.py`` -- CHE-56 (PB5). A request
+  either names a registered prescription via ``config["sample"]`` (default
+  ``"ReverseTelephoto"``; the registry is ``registry/prescriptions.py``) or
+  supplies one inline via ``config["prescription"]``, as an
+  ``OpticalSystemSpec`` or its serialized mapping. There is no longer a
+  bundled-sample construction path and a separate hand-written one.
+  What remains refused is the optional ``system`` **input port**: it would
+  carry an arbitrary Optiland object with no typed contract, and the canonical
+  schema exists precisely so that is unnecessary. Prescription features outside
+  the Phase 3 supported set (plane/spherical/even-asphere geometry, refractive
+  and grating interactions, air/ideal/catalog materials, one stop, EPD
+  aperture, angular fields, wavelengths with one primary) are rejected eagerly
+  with a structured ``PrescriptionError`` rather than approximated.
 - Only ``config["device"] == "cpu"`` and ``config["dtype"] == "float64"`` are
   supported (matching what was actually probed); GPU execution was never
   tested (no CUDA device in the probing container) and is rejected eagerly
@@ -145,45 +151,52 @@ from multiscale_optics_agent.adapters.base import (
     ModelRunResult,
     RunStatus,
 )
+from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
 from multiscale_optics_agent.core.artifacts import ArtifactRecord
 from multiscale_optics_agent.core.errors import (
     AdapterDependencyError,
     UnsupportedCapabilityError,
 )
 from multiscale_optics_agent.core.graph import Severity, ValidationIssue, ValidationReport
+from multiscale_optics_agent.core.optical_system import (
+    OPTICAL_SYSTEM_SPEC_VERSION,
+    OpticalSystemSpec,
+    PrescriptionError,
+)
 from multiscale_optics_agent.core.specs import ArtifactKind, Device, Framework, ModelSpec
 from multiscale_optics_agent.registry.loader import Registry
+from multiscale_optics_agent.registry.prescriptions import (
+    prescription_names,
+    resolve_prescription,
+)
 
 MODEL_ID = "M_RAY_OPTILAND"
 
 _SUPPORTED_BACKENDS = ("numpy", "torch")
 
-# CHE-32 (M3.3) adds exactly one system, and it is not a bundled sample because
-# no bundled sample qualifies: tmp_probes/optiland_exit_pupil_probe.py measures
-# every system in optiland.samples.objectives on axis at 550 nm and the best is
-# WideAngle100FOV at 0.36 waves peak-to-valley, against Rayleigh's 0.25. M3.2's
-# Airy oracle needs a system whose residual aberration is small compared with the
-# effect being measured, so the adapter owns one.
+# Since CHE-56 (PB5) every supported system -- bundled or adapter-owned -- is a
+# canonical prescription in registry/prescriptions.py, built by the single
+# generic builder in optiland_builder.py. There is no longer one construction
+# path for bundled samples and another for adapter-owned ones, and the name
+# `sample` survives only as the lookup key for a canonical prescription.
 #
-# This is NOT the custom-prescription path, which stays refused: the name must
-# still appear in this tuple, and `inputs['system']` is still rejected outright.
-# The difference is that an adapter-owned prescription is probed and pinned here
-# to the same M1 standard as a bundled one, rather than arriving unexamined from
-# a caller.
-_BUNDLED_SAMPLES = ("ReverseTelephoto",)
-_ADAPTER_OWNED_SAMPLES = ("M3SingletRef",)
-_SUPPORTED_SAMPLES = _BUNDLED_SAMPLES + _ADAPTER_OWNED_SAMPLES
+# CHE-32 (M3.3)'s reason for owning a prescription at all still holds: no
+# bundled system qualifies as M3.2's diffraction-limited reference.
+# tmp_probes/optiland_exit_pupil_probe.py measured every system in
+# optiland.samples.objectives on axis at 550 nm and the best is WideAngle100FOV
+# at 0.36 waves peak-to-valley, against Rayleigh's 0.25.
+#
+# What CHE-56 changes is that an unnamed prescription is no longer refused: a
+# caller may pass a canonical `OpticalSystemSpec` (or its serialized mapping)
+# through `config['prescription']`. What is still refused is an arbitrary
+# Python Optiland object through the `system` input port -- that is not a
+# validated contract, and the canonical schema exists precisely so it does not
+# need to be.
+_SUPPORTED_SAMPLES = prescription_names()
 
-# M3-SINGLET-REF, frozen by M3.2 in benchmarks/slice_protocol.yaml. Plano-convex,
-# convex toward the collimated side (the low-aberration orientation), real
-# refractive surfaces because CHE-30 ruled out surface_type='paraxial' as an OPL
-# source. IdealMaterial keeps it independent of a glass catalog. Scaled to 1/10 of
-# a 25 mm-radius prescription -- since CHE-40 that is a cost choice rather than a
-# numerical necessity, but the frozen protocol still names these numbers.
-_SINGLET_REFRACTIVE_INDEX = 1.5168
-_SINGLET_RADIUS_MM = 2.5
-_SINGLET_CENTER_THICKNESS_MM = 0.2
-_SINGLET_F_NUMBER = 9.7
+# M3-SINGLET-REF's numbers (frozen by M3.2 in benchmarks/slice_protocol.yaml)
+# moved to the prescription itself, registry/prescriptions.py, so there is one
+# definition rather than a copy here and a construction site there.
 
 _SUPPORTED_DEVICE = "cpu"
 _SUPPORTED_DTYPE = "float64"
@@ -207,6 +220,7 @@ _MISSING_WAVEFRONT_METADATA = ["amplitude", "polarization", "pupil_mask"]
 # "image_surface" so that L1-RAY-01's recorded scientific fingerprint
 # (43dab1ee...) reproduces bit-identically -- M3.3 adds a plane, it does not move
 # the existing one.
+_DEFAULT_SAMPLE = "ReverseTelephoto"
 _SUPPORTED_HANDOFF_PLANES = ("image_surface", "exit_pupil")
 _DEFAULT_HANDOFF_PLANE = "image_surface"
 
@@ -270,17 +284,21 @@ class OptilandRayResult(BaseModel):
     failure: OptilandRayFailure | None = None
 
 
-def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any, Any]:
+def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any]:
     """Lazily import optiland (and torch, only if requested).
 
     Never called at module import time -- only from run()/estimate(). Returns
-    (optiland.backend, optiland.samples.objectives, optiland.backend.utils,
-    torch-module-or-None).
+    (optiland.backend, optiland.backend.utils, torch-module-or-None).
+
+    ``optiland.samples`` is deliberately absent since CHE-56: system
+    construction goes through the canonical prescription registry and the
+    generic builder, which imports the construction API it needs itself. This
+    function covers the backend state and array-conversion surface that the
+    trace/export path uses.
     """
     try:
         import optiland.backend as be  # type: ignore[import-untyped]
         import optiland.backend.utils as be_utils  # type: ignore[import-untyped]
-        from optiland.samples import objectives  # type: ignore[import-untyped]
     except Exception as exc:
         raise AdapterDependencyError(
             f"optiland could not be imported: {type(exc).__name__}: {exc}. "
@@ -302,7 +320,7 @@ def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any, Any]:
                 f"must be installed separately: {type(exc).__name__}: {exc}"
             ) from exc
 
-    return be, objectives, be_utils, torch_module
+    return be, be_utils, torch_module
 
 
 class HandoffPlaneError(RuntimeError):
@@ -318,49 +336,38 @@ class HandoffPlaneError(RuntimeError):
         self.code = code
 
 
-def _build_m3_singlet_ref(objectives_module: Any, be: Any) -> Any:
-    """The M3-SINGLET-REF prescription from `benchmarks/slice_protocol.yaml`.
+def _prescription_from_config(config: Mapping[str, Any]) -> OpticalSystemSpec:
+    """The canonical prescription this request names, or supplies inline.
 
-    Built here rather than imported because Optiland ships no diffraction-limited
-    sample (see the module-level note on `_ADAPTER_OWNED_SAMPLES`). Every number
-    comes from the frozen protocol; the aperture is derived from the f-number
-    rather than restated, so the two cannot drift apart silently.
+    ``config['prescription']`` accepts either an :class:`OpticalSystemSpec` or a
+    serialized mapping, which is parsed through
+    :meth:`OpticalSystemSpec.from_dict` so its schema version is checked rather
+    than assumed. ``config['sample']`` names one of the registered canonical
+    prescriptions. Supplying both is a conflict, not a precedence question, and
+    is rejected.
     """
-    from optiland.materials import IdealMaterial
-    from optiland.optic import Optic
-
-    del objectives_module  # resolved by name, not by attribute lookup
-
-    effective_focal_length_mm = _SINGLET_RADIUS_MM / (_SINGLET_REFRACTIVE_INDEX - 1.0)
-    back_focal_length_mm = (
-        effective_focal_length_mm - _SINGLET_CENTER_THICKNESS_MM / _SINGLET_REFRACTIVE_INDEX
-    )
-    entrance_pupil_diameter_mm = effective_focal_length_mm / _SINGLET_F_NUMBER
-
-    optic = Optic("M3SingletRef")
-    optic.surfaces.add(index=0, radius=be.inf, thickness=be.inf)
-    optic.surfaces.add(
-        index=1,
-        radius=_SINGLET_RADIUS_MM,
-        thickness=_SINGLET_CENTER_THICKNESS_MM,
-        material=IdealMaterial(n=_SINGLET_REFRACTIVE_INDEX),
-        is_stop=True,
-    )
-    # Rear vertex: glass -> air, then the image plane one back focal length on.
-    optic.surfaces.add(index=2, radius=be.inf, thickness=back_focal_length_mm)
-    optic.surfaces.add(index=3, radius=be.inf, thickness=0.0)
-    optic.set_aperture(aperture_type="EPD", value=entrance_pupil_diameter_mm)
-    optic.fields.set_type(field_type="angle")
-    optic.fields.add(y=0.0)
-    optic.wavelengths.add(value=_DEFAULT_WAVELENGTH, is_primary=True)
-    return optic
+    inline = config.get("prescription")
+    sample_name = config.get("sample")
+    if inline is not None and sample_name is not None:
+        raise PrescriptionError(
+            "PRESCRIPTION_CONFLICTING_SOURCES",
+            "config['prescription'] and config['sample'] both name a system",
+            path="config",
+            expected=(
+                "exactly one of config['prescription'] (an inline canonical "
+                "prescription) or config['sample'] (a registered prescription name)"
+            ),
+        )
+    if inline is not None:
+        if isinstance(inline, OpticalSystemSpec):
+            return inline
+        return OpticalSystemSpec.from_dict(inline)
+    return resolve_prescription(str(sample_name or _DEFAULT_SAMPLE))
 
 
-def _resolve_lens(sample_name: str, objectives_module: Any, be: Any) -> Any:
-    """Build the named system, from the bundle or from this adapter's own set."""
-    if sample_name in _ADAPTER_OWNED_SAMPLES:
-        return _build_m3_singlet_ref(objectives_module, be)
-    return getattr(objectives_module, sample_name)()
+def _resolve_lens(spec: OpticalSystemSpec) -> Any:
+    """Build the system through the one generic construction path."""
+    return build_optiland_system(spec)
 
 
 def _resolve_exit_pupil(lens: Any, be_utils: Any, image_plane_z_mm: float) -> dict[str, Any]:
@@ -997,16 +1004,16 @@ class OptilandAdapter:
 
         started = time.perf_counter()
         backend_name = str(request.config.get("backend", "numpy"))
-        sample_name = str(request.config.get("sample", "ReverseTelephoto"))
+        # Already validated by _capability_problems, so this cannot raise here.
+        prescription = _prescription_from_config(request.config)
+        sample_name = prescription.name
         wavelength = float(request.config.get("wavelength", _DEFAULT_WAVELENGTH))
         hx = float(request.config.get("Hx", _DEFAULT_HX))
         hy = float(request.config.get("Hy", _DEFAULT_HY))
         num_rays = int(request.config.get("num_rays", _DEFAULT_NUM_RAYS))
         handoff_plane = str(request.config.get("handoff_plane", _DEFAULT_HANDOFF_PLANE))
 
-        be, objectives, be_utils, torch_module = _import_optiland(
-            need_torch=backend_name == "torch"
-        )
+        be, be_utils, torch_module = _import_optiland(need_torch=backend_name == "torch")
 
         try:
             package_version = version("optiland")
@@ -1029,7 +1036,7 @@ class OptilandAdapter:
             )
 
         try:
-            lens = _resolve_lens(sample_name, objectives, be)
+            lens = _resolve_lens(prescription)
 
             design_parameter_tensors: dict[str, Any] = {}
             for name, value in request.design_parameters.items():
@@ -1067,6 +1074,15 @@ class OptilandAdapter:
         diagnostics: dict[str, Any] = {
             "backend_used": backend_name,
             "sample": sample_name,
+            # CHE-56: which prescription actually built the system, and a digest
+            # of its canonical normalization. Two runs that report the same
+            # fingerprint built the same optical system.
+            "prescription_spec_version": OPTICAL_SYSTEM_SPEC_VERSION,
+            "prescription_fingerprint": prescription.fingerprint(),
+            "prescription_source": (
+                "config['prescription']" if request.config.get("prescription") is not None
+                else "config['sample']"
+            ),
             "requested_num_rays": num_rays,
             "Hx": hx,
             "Hy": hy,
@@ -1277,15 +1293,26 @@ class OptilandAdapter:
                 )
             )
 
-        sample_name = request.config.get("sample", "ReverseTelephoto")
-        if sample_name not in _SUPPORTED_SAMPLES:
+        # System construction: either a registered canonical prescription named
+        # by config['sample'], or one supplied inline through
+        # config['prescription']. Both are validated here, before any solver
+        # import, so a malformed prescription can never produce a partially
+        # constructed lens (CHE-56).
+        try:
+            _prescription_from_config(request.config)
+        except PrescriptionError as exc:
+            code = (
+                "OPTILAND_UNSUPPORTED_SAMPLE"
+                if exc.code == "PRESCRIPTION_NAME_UNKNOWN"
+                else "OPTILAND_INVALID_PRESCRIPTION"
+            )
+            problems.append((code, str(exc)))
+        except ValidationError as exc:
             problems.append(
                 (
-                    "OPTILAND_UNSUPPORTED_SAMPLE",
-                    f"config['sample']={sample_name!r} is not in the validated "
-                    f"set {_SUPPORTED_SAMPLES!r}; only bundled "
-                    "optiland.samples.objectives systems that have actually "
-                    "been probed are supported.",
+                    "OPTILAND_INVALID_PRESCRIPTION",
+                    "config['prescription'] is not a valid canonical optical-system "
+                    f"specification ({OPTICAL_SYSTEM_SPEC_VERSION}): {exc}",
                 )
             )
 
@@ -1307,12 +1334,14 @@ class OptilandAdapter:
             problems.append(
                 (
                     "OPTILAND_CUSTOM_SYSTEM_NOT_IMPLEMENTED",
-                    "A custom lens prescription via the optional 'system' "
-                    "input port is not implemented/validated by this adapter "
-                    "(knowledge/solvers/optiland/capability_notes.md lists a "
-                    "hand-built, non-sample lens prescription as 'not yet "
-                    "exercised'); only the bundled sample selected via "
-                    "config['sample'] is supported.",
+                    "The optional 'system' input port is not implemented: it "
+                    "would carry an arbitrary solver object, which has no typed "
+                    "contract and no validation. Since CHE-56 a custom lens IS "
+                    "supported -- as a canonical prescription "
+                    f"({OPTICAL_SYSTEM_SPEC_VERSION}) passed through "
+                    "config['prescription'], or by name through "
+                    "config['sample']. See "
+                    "docs/prescriptions/canonical_optical_systems.md.",
                 )
             )
 

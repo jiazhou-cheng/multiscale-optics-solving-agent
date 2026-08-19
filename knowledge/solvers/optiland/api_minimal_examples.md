@@ -156,6 +156,45 @@ interaction class**: every surface reports
 from the type. Detect it geometrically (a 45-degree fold deviates the chief ray
 by 90 degrees) or from `material_post`.
 
+## 7b. Building a system from a canonical prescription (CHE-56)
+
+This repository no longer calls `surfaces.add` outside the builder. The supported
+route is a typed prescription plus one generic construction call:
+
+```python
+from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
+from multiscale_optics_agent.core.optical_system import (
+    ApertureSpec, FieldSpec, IdealMaterialSpec, OpticalSystemSpec,
+    PlaneGeometrySpec, SphericalGeometrySpec, SurfaceSpec, WavelengthSpec,
+)
+
+spec = OpticalSystemSpec(
+    name='singlet',
+    surfaces=(
+        SurfaceSpec(
+            geometry=SphericalGeometrySpec(radius_mm=20.0),
+            thickness_mm=4.0,
+            material=IdealMaterialSpec(refractive_index=1.5168),
+            is_stop=True,
+        ),
+        SurfaceSpec(geometry=PlaneGeometrySpec(), thickness_mm=38.0),
+    ),
+    aperture=ApertureSpec(value_mm=10.0),
+    fields=(FieldSpec(y_deg=0.0),),
+    wavelengths=(WavelengthSpec(value_um=0.55, is_primary=True),),
+)
+lens = build_optiland_system(spec)          # an ordinary optiland Optic
+rays = lens.trace(Hx=0.0, Hy=0.0, wavelength=0.55, num_rays=16)
+```
+
+An even asphere is `EvenAsphereGeometrySpec(radius_mm=…, conic=…,
+coefficients=(…,))` with the series starting at r^2; a grating is
+`GratingInteractionSpec(order=…, period_um=…, groove_orientation_rad=…)` on a
+plane or spherical base, with the period in **micrometres**. Registered systems
+are `resolve_prescription('ReverseTelephoto' | 'M3SingletRef')`. Full guide:
+`docs/prescriptions/canonical_optical_systems.md`. Construction evidence:
+`probes/system_construction_probe.py` and `expected/system_construction_probe.json`.
+
 ## 8. Full-fidelity tutorial reproductions
 
 41 executable reproductions of the official Optiland tutorial index live under

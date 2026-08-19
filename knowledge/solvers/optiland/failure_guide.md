@@ -381,6 +381,59 @@ numpy:
 | `GeometricMTF.freq` / `.mtf` | flat `(256,)` / per-field `[sagittal, tangential]`, ending at the incoherent cutoff |
 | `Tolerancing` / `MonteCarlo.get_results()` | pandas `DataFrame`; `perturbation_type` is a **display label** ("Radius of Curvature, Surface 1"), not the `add_perturbation` keyword, and operand columns are prefixed by declaration order ("0: f2") |
 
+## A surface keyword that does not belong to the surface type is dropped
+
+**Symptom:** a prescription traces successfully and gives the wrong answer.
+
+`GeometryFactory.create` keeps only the kwargs that are dataclass fields of the
+geometry config for the requested `surface_type`, so `coefficients=[...]` on a
+`standard` surface, or any misspelled keyword, is discarded with no error and no
+warning. The resulting geometry has no attribute to inspect afterwards
+(`geometry_has_coefficients_attribute` is `False`).
+
+**Fix:** validate the prescription before construction and assemble the keyword
+set per surface type explicitly. In this repository that is
+`core/optical_system.py` + `adapters/optiland_builder.py`; see
+`probes/system_construction_probe.py` for the measurement.
+
+## `Material('SK1')` silently returns SK16
+
+**Symptom:** a system traces with a glass you did not ask for.
+
+`Material.__init__` defaults to `robust_search=True`. The lookup is a substring
+filter plus a Levenshtein ranking, and the best row wins even when nothing matched
+exactly; the only notice is a `print` ("Warning: No exact matches found for
+material SK1"), which is not a `warning` and cannot be caught with
+`warnings.catch_warnings`.
+
+**Fix:** require `material_data['similarity_score'] == 0`, and pin the resolved
+`material_data['filename']` if the glass matters. Do not compare against
+`material_data['name']` alone -- `N-BK7` legitimately resolves to a row named
+`N-BK7 (SCHOTT)`. `robust_search=False` is a blunter alternative: it raises when
+more than one row survives the *substring* filter, which is 7 rows for `SK15`
+even though only one is exact.
+
+## `ValueError: No matches found for material <name>`
+
+**Symptom:** a bare `ValueError` from deep inside `Material._retrieve_file`
+crossing an adapter boundary.
+
+Raised when the substring filter returns nothing at all (e.g. `N-BK7X`). It is
+not a solver failure -- it is an unresolvable prescription -- so it should be
+translated into a structured capability/validation error at the boundary rather
+than propagated as a bare `ValueError`.
+
+## There is no aspheric grating in 0.6.0
+
+**Symptom:** an aspheric grating prescription traces, and the asphere is ignored.
+
+`surface_type='grating'` selects `PlaneGrating` (infinite base radius) or
+`StandardGratingGeometry` (finite), and `SurfaceFactory` derives
+`DiffractiveInteractionModel` from the same string. There is no even-asphere
+grating geometry, so a request for one either loses the grating (if the surface
+type stays `even_asphere`) or loses the aspheric terms (if it becomes `grating`).
+Refuse it; do not pick one.
+
 ## A custom operand's `input_data` keys are its callable's parameter names
 
 **Symptom:** `TypeError: spot_ellipse_ratio() got an unexpected keyword argument 'optic'`.

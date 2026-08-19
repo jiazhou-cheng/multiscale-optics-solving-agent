@@ -81,7 +81,21 @@ Grounded in the real `optiland` 0.6.0 API surface and the probes in
   under the torch backend; no CUDA device available to test). `be.set_device`
   exists and accepts `'cpu'`; no other device has been exercised.
 - ~~Broad hand-built prescription coverage.~~ **Substantially addressed by
-  CHE-57**: the 41 tutorial reproductions build systems from 4 to 44 surfaces
+  CHE-57, and now a validated repository capability (CHE-56/PB5)**: every
+  adapter-owned system is built from a canonical prescription
+  (`core/optical_system.py`, schema `optical-system-spec/1`) through one generic
+  builder (`adapters/optiland_builder.py`). Plane, spherical/conic and
+  even-aspheric geometry; refractive and grating interactions; air, ideal and
+  catalog materials; a surface stop; `EPD`; angular fields; and a wavelength list
+  with one primary are each exercised with a closed-form or independent-oracle
+  check (`tests/test_optiland_canonical_prescriptions.py`,
+  `probes/system_construction_probe.py`). `ReverseTelephoto` built from its
+  canonical prescription is structurally equal to the bundled sample's
+  `Optic.to_dict()` and traces element-wise identically; `M3SingletRef`
+  reproduces `benchmarks/slice_protocol.yaml`'s frozen geometry and the M1
+  scientific-array hash. What is *not* admitted by that path is listed under
+  "Still not exercised" and in `docs/prescriptions/canonical_optical_systems.md`.
+  CHE-57's original note follows.: the 41 tutorial reproductions build systems from 4 to 44 surfaces
   covering spherical, plane, even-aspheric, polynomial, Zernike-freeform, plane
   and tilted mirror surfaces; ideal, Abbe and catalog materials; `EPD`,
   `imageFNO` and `objectNA` apertures; angle and object-height fields;
@@ -159,8 +173,15 @@ misleading. Every one has a reproduction and recorded evidence under
   assertion is not a validation of a hand-written derivative — compare against a
   finite difference of `sag()`.
 
-## Still not exercised (CHE-57 scope boundary)
+## Still not exercised (CHE-57 / CHE-56 scope boundary)
 
+- Construction features outside the Phase 3 canonical schema: decentres and
+  tilts, coordinate breaks, `imageFNO`/`objectNA` apertures, object-height and
+  image-height fields, the `paraxial`/thin-lens and `phase` interaction models,
+  coatings and BSDFs on a canonical prescription, and any geometry beyond plane /
+  spherical-conic / even-asphere. Several of these were *demonstrated* by CHE-57's
+  tutorial reproductions but are not admitted by the validated builder, which is
+  a different claim.
 - GRIN media (`optiland.propagation.grin`), coordinate breaks, NURBS, Forbes
   Q-polynomial, Chebyshev, toroidal, biconic, grid-sag and odd-asphere
   geometries, and `optiland.sources`.
