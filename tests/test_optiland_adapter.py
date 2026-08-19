@@ -296,6 +296,82 @@ def test_unvalidated_design_parameter_path_is_rejected_eagerly() -> None:
         adapter.run(request)
 
 
+def test_unsupported_device_rejected_eagerly_on_default_numpy_backend() -> None:
+    adapter = OptilandAdapter()
+    request = ModelRunRequest(
+        run_id="test-run",
+        node_id="lens",
+        inputs={},
+        config={"device": "gpu"},
+        design_parameters={},
+        require_gradients=False,
+    )
+    with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
+        mock_import.side_effect = AssertionError(
+            "solver import must not be attempted for an unsupported device"
+        )
+        with pytest.raises(UnsupportedCapabilityError, match="device"):
+            adapter.run(request)
+    mock_import.assert_not_called()
+
+    report = adapter.validate_request(request)
+    assert not report.valid
+    assert any(issue.code == "OPTILAND_UNSUPPORTED_DEVICE" for issue in report.errors)
+
+
+def test_unsupported_dtype_rejected_eagerly_on_default_numpy_backend() -> None:
+    adapter = OptilandAdapter()
+    request = ModelRunRequest(
+        run_id="test-run",
+        node_id="lens",
+        inputs={},
+        config={"dtype": "float32"},
+        design_parameters={},
+        require_gradients=False,
+    )
+    with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
+        mock_import.side_effect = AssertionError(
+            "solver import must not be attempted for an unsupported dtype"
+        )
+        with pytest.raises(UnsupportedCapabilityError, match="dtype"):
+            adapter.run(request)
+    mock_import.assert_not_called()
+
+    report = adapter.validate_request(request)
+    assert not report.valid
+    assert any(issue.code == "OPTILAND_UNSUPPORTED_DTYPE" for issue in report.errors)
+
+
+def test_unsupported_device_rejected_eagerly_on_torch_autodiff_backend() -> None:
+    """The device gate is independent of `backend`: CHE-55 (M3.5) closes the gap
+    where only the numpy default path had been exercised by a device-rejection
+    test, leaving the torch/autodiff entry path unverified even though
+    `_capability_problems` checks `config['device']` unconditionally, before the
+    backend-specific branch.
+    """
+    adapter = OptilandAdapter()
+    request = ModelRunRequest(
+        run_id="test-run",
+        node_id="lens",
+        inputs={},
+        config={"backend": "torch", "device": "cuda"},
+        design_parameters={"surfaces.surfaces[1].geometry.radius": 2.5},
+        require_gradients=True,
+    )
+    with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
+        mock_import.side_effect = AssertionError(
+            "solver import must not be attempted for an unsupported device, "
+            "even on the torch/autodiff backend"
+        )
+        with pytest.raises(UnsupportedCapabilityError, match="device"):
+            adapter.run(request)
+    mock_import.assert_not_called()
+
+    report = adapter.validate_request(request)
+    assert not report.valid
+    assert any(issue.code == "OPTILAND_UNSUPPORTED_DEVICE" for issue in report.errors)
+
+
 def test_spec_matches_registry_entry(registry) -> None:
     adapter = OptilandAdapter()
     assert adapter.spec.id == "M_RAY_OPTILAND"

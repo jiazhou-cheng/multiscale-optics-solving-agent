@@ -29,13 +29,17 @@ Two entry points expose that one path:
   can be compared for bit-identical scientific output.
 
 Any other propagation kernel (``transform_propagate``/Fresnel, or anything
-else in ``chromatix.functional``), any vector/polarized field, and any
-gradient request are deliberately unimplemented and raise
-``UnsupportedCapabilityError`` *before* Chromatix is imported or called. This
-is a narrower surface than the ``M_WAVE_CHROMATIX`` registry entry describes
-(``approximation: vector_wave``, ``dtypes: [complex64, complex128]``); see
-the module-level ``KNOWN_REGISTRY_DISCREPANCIES`` note below for specifics
-this adapter discovered that the registry entry does not yet reflect.
+else in ``chromatix.functional``), any vector/polarized field, any
+gradient request, and any ``config['device']`` other than ``'cpu'`` are
+deliberately unimplemented and raise ``UnsupportedCapabilityError`` *before*
+Chromatix is imported or called -- this matches the registered
+``M_WAVE_CHROMATIX`` entry (``approximation: scalar_wave``,
+``devices: [cpu]``, ``dtypes: [complex64]``). A ``complex128`` input array
+is accepted rather than rejected: Chromatix's own ``ScalarField.__init__``
+unconditionally downcasts it to ``complex64`` before propagation, and this
+adapter reports the resulting numeric truncation in
+``ModelRunResult.diagnostics["complex64_input_truncation"]`` (CHE-35) rather
+than silently absorbing or refusing it.
 
 Conventions declared by this adapter (repository scientific-contract requirements)
 --------------------------------------------------------------------
@@ -196,18 +200,6 @@ _OUTPUT_MODES = ("full", "same")
 # estimator and routinely proposes grids two orders of magnitude larger than a
 # band-limited input actually needs (see conventions.md).
 _DEFAULT_MAX_OUTPUT_PIXELS = 16_777_216
-
-# Discovered while implementing this adapter, not yet reflected in
-# src/multiscale_optics_agent/registry/models.yaml (which this task does not
-# own). See the final implementation report for the literal proposed diff.
-KNOWN_REGISTRY_DISCREPANCIES = (
-    "registry declares dtypes: [complex64, complex128], but "
-    "chromatix.core.field.ScalarField.__init__ unconditionally does "
-    "`self.u = jnp.asarray(u, dtype=jnp.complex64)`; a complex128 input is "
-    "silently downcast to complex64 by Chromatix itself. This adapter "
-    "cannot prevent that (it is inside Chromatix's own Field constructor); "
-    "it only surfaces a warning when this will happen."
-)
 
 
 def _do_import_chromatix() -> tuple[Any, Any, Any, Any, Any]:
@@ -1158,6 +1150,19 @@ class ChromatixAdapter:
                 "(knowledge/solvers/chromatix/expected/gradient_probe.json); "
                 "that path is not implemented by this adapter and asm_propagate "
                 "has no such evidence. require_gradients=True is rejected."
+            )
+
+        device = config.get("device", _BASELINE_DEVICE)
+        if device != _BASELINE_DEVICE:
+            raise UnsupportedCapabilityError(
+                "M_WAVE_CHROMATIX adapter only implements config['device'] == "
+                f"{_BASELINE_DEVICE!r}; got {device!r}. No GPU/TPU execution has been "
+                "exercised for this adapter (no GPU was available in the probing "
+                "container -- see knowledge/solvers/chromatix/capability_notes.md). "
+                "Unlike run_standalone, this graph-facing path used to report "
+                "whatever jax.default_backend() happened to be rather than gating "
+                "on the request; it no longer lets an installed GPU-enabled jaxlib "
+                "silently change what this adapter executes."
             )
 
         if "optical_surface" in request.inputs:

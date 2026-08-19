@@ -1,7 +1,6 @@
 # Repository Instructions — Canonical Shared Context
 
-This is the single repository-wide instruction source for Codex and Claude Code.
-Task-specific scope lives in Linear and in files explicitly linked by the Linear issue.
+This is the single repository-wide instruction source for Codex and Claude Code; task-specific scope lives in Linear and in files explicitly linked by the Linear issue.
 
 ## Mission
 
@@ -25,8 +24,8 @@ Task-specific scope lives in Linear and in files explicitly linked by the Linear
 - Task goal, acceptance criteria, non-goals, and ownership: the Linear issue.
 - Scientific details for a task: only files linked by that issue.
 - Package API truth: pinned installed behavior, official versioned docs, and executable probes.
-- Existing code is evidence, not automatically the intended design.
-- Surface any conflict between these sources; do not silently choose one.
+- Existing code is evidence, not automatically the intended design; surface
+  any conflict between these sources rather than silently choosing one.
 
 ## Execution Environment — Container Only
 
@@ -51,44 +50,28 @@ Task-specific scope lives in Linear and in files explicitly linked by the Linear
 
 ## Test Command Surface
 
-The suite is tiered by pytest marker (CHE-52/53/54; full rationale and runtime
+The suite is tiered by pytest marker (CHE-52/53/54; rationale and runtime
 tables in `docs/testing/test_audit.md` and `docs/testing/tier_restructure.md`).
-Pick the command by what you just did, not by habit:
 
-- **Required after every change** — Tier A, the fast development gate (499
-  tests, ~31s measured via `./run.sh`):
-  ```bash
-  ./run.sh pytest -q -m "not slow and not benchmark and not fmmax and not fdtdx and not sax"
-  ```
-- **Subsystem-specific** — Tier B, run when you touched that subsystem
-  specifically (each independently invocable; overlaps with Tier A and with
-  each other by design):
-  ```bash
-  ./run.sh pytest -q -m optiland     # real Optiland ray-tracing engine
-  ./run.sh pytest -q -m chromatix    # real Chromatix wave-propagation engine
-  ./run.sh pytest -q -m coupler      # C_RAY_TO_WAVE / C_WAVE_TO_RAY physics and protocol
-  ./run.sh pytest -q -m "fmmax or fdtdx or sax"   # out-of-current-scope solver adapters
-  ./run.sh pytest -q -m slow         # individually expensive characterization/convergence tests
-  ```
-- **Milestone / full regression** — Tier C, before closing a milestone or
-  merging a PR that touches shared contracts (627 tests, ~11 minutes; includes
-  the four real-solver benchmark reproductions in `tests/benchmarks/`, run via
-  `-m benchmark` on their own):
-  ```bash
-  ./run.sh pytest -q
-  ```
+- **Tier A** (required after every change, 499 tests, ~31s):
+  `./run.sh pytest -q -m "not slow and not benchmark and not fmmax and not fdtdx and not sax"`
+- **Tier B** (subsystem-specific; independently invocable, overlaps Tier A by design):
+  `-m optiland` (Optiland), `-m chromatix` (Chromatix), `-m coupler`
+  (C_RAY_TO_WAVE/C_WAVE_TO_RAY), `-m "fmmax or fdtdx or sax"` (out-of-scope
+  solver adapters), `-m slow` (expensive characterization/convergence tests)
+- **Tier C** (milestone/full regression before merging a PR touching shared
+  contracts, 627 tests, ~11 min): `./run.sh pytest -q` (includes the four
+  real-solver benchmark reproductions in `tests/benchmarks/`, run alone via `-m benchmark`)
 
 This is orthogonal to the `jax`/`torch`/`integration` markers, which mean
-"requires that optional install," not "is slow" or "is out of scope" — a test
-can be both `chromatix` (current-milestone, Tier-A-eligible) and `jax`+`integration`
-(needs the optional extra) at once.
+"requires that optional install," not "is slow" or "is out of scope."
 
 ## Context Loading
 
 - Do not read every file under `docs/` or `knowledge/` by default.
 - Start with this file, the Linear issue, its linked spec, and the files/tests directly involved.
-- Load a solver or coupler card only when the issue uses that solver or coupler.
-- Load minimal API examples and failure guides only after the adapter path is selected.
+- Load a solver or coupler card only when the issue uses that solver or coupler,
+  and minimal API examples/failure guides only after the adapter path is selected.
 - Long paper, catalog, benchmark, and historical architecture documents are reference material, not startup context.
 
 ## Required Workflow
@@ -140,8 +123,8 @@ For the current slice:
 - The entire sequential ray trace to a declared pupil/reference plane is one model node.
 - Individual refractive surfaces are internal ray-model data by default, not graph nodes.
 - A surface becomes a graph boundary only when it is independently simulated, replaced by another physical model, or emits/consumes a reusable typed artifact.
-- The ray-to-wave transformation is a coupler because it changes representation and carries physical assumptions.
-- Chromatix propagation is a separate model node.
+- The ray-to-wave transformation is a coupler because it changes representation
+  and carries physical assumptions; Chromatix propagation is a separate model node.
 
 Split a code module when it mixes scientific contracts, imports multiple solver families, cannot be tested independently, or requires unrelated changes to evolve. Do not split solely to make every file small.
 
@@ -159,8 +142,8 @@ Do not add a large universal type system to complete a narrow issue.
 ## Existing Ray-Wave Code
 
 - Treat `ray_wave`, `ray_ewave`, and similarly named code as untrusted until characterized.
-- Preserve names and numerical behavior during the audit.
-- Determine actual inputs, outputs, units, phase sign, amplitude weighting, interpolation, and differentiability.
+- Preserve names and numerical behavior during the audit while determining actual
+  inputs, outputs, units, phase sign, amplitude weighting, interpolation, and differentiability.
 - Add characterization tests before renaming, merging, or optimizing.
 - Map the implementation to `C_RAY_TO_WAVE` only after its semantics are known.
 
@@ -169,8 +152,7 @@ Do not add a large universal type system to complete a narrow issue.
 A narrow adapter is complete only when it has:
 
 - A typed request and result contract.
-- A pinned package version or commit.
-- One import probe and one minimal forward probe.
+- A pinned package version or commit, one import probe, and one minimal forward probe.
 - Explicit conventions and supported devices/dtypes.
 - One analytic or independently reviewed validation case.
 - Structured failure behavior.
@@ -187,11 +169,8 @@ Every PR states:
 - Risks and intentionally excluded work.
 - Agent involvement and follow-up issues.
 
-Review against the linked Linear issue. Classify feedback as:
-
-- Must fix before merge.
-- Should fix soon.
-- Safe to merge.
+Classify feedback against the linked Linear issue as: must fix before merge,
+should fix soon, or safe to merge.
 
 ## GPU server resource policy
 
@@ -200,18 +179,17 @@ memory. Stability is more important than parallelism.
 
 When working on this machine:
 
-- Never run multiple GPU-consuming jobs concurrently.
-- Run GPU jobs sequentially, never in parallel.
+- Never run multiple GPU-consuming jobs concurrently; always run them sequentially.
+- Do not use more than 2 GPUs in this project; configure visibility via the
+  container (`--gpus`/`NVIDIA_VISIBLE_DEVICES` through `run.sh`), not host state.
 - Never launch training, inference, CUDA, PyTorch, JAX, or similar workloads
   as background jobs.
-- Before starting a GPU-intensive command, run:
-    nvidia-smi
-    free -h
-- Check whether another GPU job is already running before launching one.
+- Before starting a GPU-intensive command, run `nvidia-smi` and `free -h`, and
+  check whether another GPU job is already running.
 - If substantial GPU or system memory is already occupied, ask me before
   starting another workload.
-- Do not use agent teams or parallel agents for tasks that execute code.
-- Subagents may only be used for read-only analysis and must not launch
+- Do not use agent teams or parallel agents for tasks that execute code;
+  subagents may only be used for read-only analysis, never to launch
   compute-intensive processes.
 - Do not use nohup, &, screen, tmux, or other mechanisms to leave compute
   jobs running without explicit permission.

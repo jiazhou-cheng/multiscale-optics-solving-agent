@@ -37,6 +37,14 @@ couplers:
       artifact: complex_field
       provides_metadata:
         [wavelength, sample_pitch, coordinate_frame, phasor, polarization, normalization]
+    # CHE-55 (M3.5): pure NumPy, no device/backend branch anywhere in this
+    # coupler. ComplexField.__post_init__ force-casts the output field to
+    # complex128 regardless of input dtype; RayBundle geometry is float64.
+    # Both to_artifact_record paths hard-code device=Device.CPU. This is
+    # descriptive metadata only (nothing in the loader or this coupler reads
+    # it back to gate execution).
+    devices: [cpu]
+    dtypes: [float64, complex128]
     derivative:
       mode: finite_difference
       verified: false
@@ -97,6 +105,14 @@ couplers:
       artifact: ray_bundle
       provides_metadata:
         [wavelength, coordinates, directions, amplitude, optical_path_length, normalization]
+    # CHE-55 (M3.5): pure NumPy, no device/backend branch anywhere in this
+    # coupler. The input ComplexField is always complex128 (forced by
+    # ComplexField.__post_init__ upstream); RayBundle.__post_init__ likewise
+    # force-casts amplitude to complex128 and coordinates/directions to
+    # float64. to_artifact_record hard-codes device=Device.CPU. Descriptive
+    # metadata only, matching C_RAY_TO_WAVE.
+    devices: [cpu]
+    dtypes: [float64, complex128]
     derivative:
       # `surrogate`, not `native_autodiff`: the estimator differentiates a
       # fixed-direction surrogate of the objective, not the objective itself.

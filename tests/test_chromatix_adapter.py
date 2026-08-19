@@ -259,6 +259,14 @@ def test_missing_chromatix_dependency_surfaces_as_adapter_dependency_error(
             id="vector-field-requested",
         ),
         pytest.param({}, id="propagation-key-missing"),
+        # CHE-55 (M3.5): the graph-facing path used to have no device gate at
+        # all, unlike run_standalone's CHROMATIX_UNSUPPORTED_DEVICE check --
+        # it would silently report whatever jax.default_backend() happened to
+        # be. Proves that gap is closed.
+        pytest.param(
+            {"propagation": "angular_spectrum", "z_m": 1.0e-4, "device": "gpu"},
+            id="gpu-device-requested",
+        ),
     ],
 )
 def test_unsupported_capability_rejected_before_any_chromatix_call(

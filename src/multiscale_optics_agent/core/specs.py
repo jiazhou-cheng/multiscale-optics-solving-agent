@@ -174,6 +174,8 @@ class CouplerSpec(StrictModel):
     approximation: ApproximationClass = ApproximationClass.TRANSFORMATION
     source: PortSpec
     target: PortSpec
+    devices: list[Device] = Field(default_factory=list)
+    dtypes: list[str] = Field(default_factory=list)
     derivative: DerivativeSpec
     validity: ValiditySpec = Field(default_factory=ValiditySpec)
     cost_model: CostModelSpec = Field(default_factory=CostModelSpec)
