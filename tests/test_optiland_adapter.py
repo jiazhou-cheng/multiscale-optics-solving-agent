@@ -28,6 +28,7 @@ optiland = pytest.importorskip("optiland")
 from conftest import load_probe_expected  # noqa: E402
 
 from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # noqa: E402
+from multiscale_optics_agent.adapters import optiland_adapter  # noqa: E402
 from multiscale_optics_agent.adapters.optiland_adapter import (  # noqa: E402
     OptilandAdapter,
     OptilandRayRequest,
@@ -35,6 +36,11 @@ from multiscale_optics_agent.adapters.optiland_adapter import (  # noqa: E402
 from multiscale_optics_agent.core.errors import (  # noqa: E402
     AdapterDependencyError,
     UnsupportedCapabilityError,
+)
+from multiscale_optics_agent.core.precision import (  # noqa: E402
+    ArrayNamespace,
+    DeviceKind,
+    Precision,
 )
 from multiscale_optics_agent.core.specs import ArtifactKind  # noqa: E402
 
@@ -166,7 +172,26 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
 
 
 @pytest.mark.torch
-def test_gradient_matches_recorded_probe_within_known_tolerance() -> None:
+@pytest.mark.parametrize(
+    ("dtype", "objective_rel", "grad_rel"),
+    [
+        # The recorded probe never called set_precision, so it ran at Optiland's
+        # torch DEFAULT, which is float32 (measured: be.get_precision() -> 32
+        # after set_backend('torch'); tmp_probes/pb4b_default_precision.py).
+        # Asking for float32 therefore reproduces the record bit-identically, and
+        # this row is the unchanged regression lock.
+        ("float32", 1e-6, 1e-6),
+        # The adapter's default is float64 and, since CHE-61, it now genuinely
+        # traces in float64 instead of reporting float64 over a float32 trace.
+        # These two bounds are the MEASURED difference between the two paths
+        # (1.3e-05 on the objective, 2.3e-06 on the gradient --
+        # tmp_probes/pb4b_grad_precision.py), not a relaxation: the float64
+        # result is the more accurate of the two, and the record is what moved
+        # relative to it.
+        ("float64", 1e-4, 1e-5),
+    ],
+)
+def test_gradient_matches_recorded_probe_within_known_tolerance(dtype, objective_rel, grad_rel) -> None:
     """Reproduce knowledge/solvers/optiland/probes/gradient_probe.py through the adapter.
 
     This is a regression lock on a *recorded* directional-derivative check,
@@ -191,7 +216,14 @@ def test_gradient_matches_recorded_probe_within_known_tolerance() -> None:
         run_id="grad-test",
         node_id="lens",
         inputs={},
-        config={"backend": "torch", "wavelength": 0.55, "num_rays": 64, "Hx": 0.0, "Hy": 0.0},
+        config={
+            "backend": "torch",
+            "dtype": dtype,
+            "wavelength": 0.55,
+            "num_rays": 64,
+            "Hx": 0.0,
+            "Hy": 0.0,
+        },
         design_parameters={parameter_name: expected["r0"]},
         require_gradients=True,
     )
@@ -204,12 +236,12 @@ def test_gradient_matches_recorded_probe_within_known_tolerance() -> None:
     assert isinstance(objective_tensor, torch.Tensor)
     assert design_tensor.requires_grad
 
-    assert objective_tensor.item() == pytest.approx(expected["objective_value"], rel=1e-6)
+    assert objective_tensor.item() == pytest.approx(expected["objective_value"], rel=objective_rel)
 
     objective_tensor.backward()
     grad_ad = design_tensor.grad.item()
 
-    assert grad_ad == pytest.approx(expected["grad_native_autodiff"], rel=1e-6)
+    assert grad_ad == pytest.approx(expected["grad_native_autodiff"], rel=grad_rel)
 
     relative_error = abs(grad_ad - expected["grad_finite_difference"]) / abs(
         expected["grad_finite_difference"]
@@ -219,6 +251,18 @@ def test_gradient_matches_recorded_probe_within_known_tolerance() -> None:
         "known, not-yet-root-caused 1.11e-03 tolerance recorded in "
         "knowledge/solvers/optiland/expected/gradient_probe.json."
     )
+
+    # The new guarantee: the precision the run REPORTS is the precision it ran
+    # in, observed from the traced tensors rather than echoed from the request.
+    execution = result.diagnostics["execution"]
+    assert execution["requested"]["precision"] == Precision.parse(dtype)
+    assert execution["resolved"]["precision"] == Precision.parse(dtype)
+    assert execution["actual"]["dtype"] == dtype
+    assert execution["applied_to_optiland"]["get_precision"] == dtype
+    assert execution["mismatches"] == []
+    # And the autograd leaf matches it, so torch cannot promote mid-graph and
+    # differentiate a different number than the one that was set.
+    assert str(design_tensor.dtype) == f"torch.{dtype}"
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +340,16 @@ def test_unvalidated_design_parameter_path_is_rejected_eagerly() -> None:
         adapter.run(request)
 
 
-def test_unsupported_device_rejected_eagerly_on_default_numpy_backend() -> None:
+def test_cuda_rejected_eagerly_on_the_numpy_backend() -> None:
+    """CHE-61 (PB4b) replaces CHE-55's blanket device gate with the real reason.
+
+    A CUDA request is no longer refused because "no GPU was available when
+    probing"; it is refused on the numpy backend because Optiland's own
+    `set_device` raises `BackendCapabilityError` there (measured,
+    tmp_probes/pb4b_probe.py). The request is wrong in a way no container can
+    fix, and the error now says which knob is missing rather than which machine
+    was unavailable.
+    """
     adapter = OptilandAdapter()
     request = ModelRunRequest(
         run_id="test-run",
@@ -310,44 +363,88 @@ def test_unsupported_device_rejected_eagerly_on_default_numpy_backend() -> None:
         mock_import.side_effect = AssertionError(
             "solver import must not be attempted for an unsupported device"
         )
-        with pytest.raises(UnsupportedCapabilityError, match="device"):
+        with pytest.raises(UnsupportedCapabilityError, match="cuda"):
             adapter.run(request)
     mock_import.assert_not_called()
 
     report = adapter.validate_request(request)
     assert not report.valid
-    assert any(issue.code == "OPTILAND_UNSUPPORTED_DEVICE" for issue in report.errors)
+    codes = {issue.code for issue in report.errors}
+    assert "OPTILAND_UNSUPPORTED_NAMESPACE_FOR_DEVICE" in codes
+    message = next(
+        issue.message
+        for issue in report.errors
+        if issue.code == "OPTILAND_UNSUPPORTED_NAMESPACE_FOR_DEVICE"
+    )
+    assert "torch" in message
 
 
-def test_unsupported_dtype_rejected_eagerly_on_default_numpy_backend() -> None:
+def test_float32_is_now_a_supported_precision_not_a_rejected_one() -> None:
+    """The inverse of CHE-55's dtype gate, and the point of PB4b.
+
+    `set_precision` accepts float32 and float64. Refusing float32 was a project
+    limitation, not a package one, and PB4b removes it -- so this asserts
+    acceptance where the old test asserted rejection.
+    """
+    adapter = OptilandAdapter()
+    for dtype in ("float32", "float64"):
+        request = ModelRunRequest(
+            run_id="test-run",
+            node_id="lens",
+            inputs={},
+            config={"dtype": dtype},
+            design_parameters={},
+            require_gradients=False,
+        )
+        report = adapter.validate_request(request)
+        assert report.valid, f"{dtype} should be executable: {report.errors}"
+
+
+def test_float16_is_rejected_because_optiland_has_no_float16_path() -> None:
+    """Not a policy decision this project is free to revisit by adding a cast.
+
+    `optiland.backend.set_precision` is typed `Literal['float32','float64']` and
+    raises `ValueError("Precision must be 'float32' or 'float64'.")` for anything
+    else. Accepting float16 at the project boundary and casting it up would be
+    advertising support for a computation that never happens.
+    """
     adapter = OptilandAdapter()
     request = ModelRunRequest(
         run_id="test-run",
         node_id="lens",
         inputs={},
-        config={"dtype": "float32"},
+        config={"dtype": "float16"},
         design_parameters={},
         require_gradients=False,
     )
     with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
         mock_import.side_effect = AssertionError(
-            "solver import must not be attempted for an unsupported dtype"
+            "solver import must not be attempted for an unsupported precision"
         )
-        with pytest.raises(UnsupportedCapabilityError, match="dtype"):
+        with pytest.raises(UnsupportedCapabilityError, match="fp16"):
             adapter.run(request)
     mock_import.assert_not_called()
 
     report = adapter.validate_request(request)
     assert not report.valid
-    assert any(issue.code == "OPTILAND_UNSUPPORTED_DTYPE" for issue in report.errors)
+    codes = {issue.code for issue in report.errors}
+    assert "OPTILAND_UNSUPPORTED_PRECISION" in codes
+    message = next(
+        issue.message for issue in report.errors if issue.code == "OPTILAND_UNSUPPORTED_PRECISION"
+    )
+    # The remedy names what Optiland can do, so the caller can act on it.
+    assert "float32" in message and "float64" in message
 
 
-def test_unsupported_device_rejected_eagerly_on_torch_autodiff_backend() -> None:
-    """The device gate is independent of `backend`: CHE-55 (M3.5) closes the gap
-    where only the numpy default path had been exercised by a device-rejection
-    test, leaving the torch/autodiff entry path unverified even though
-    `_capability_problems` checks `config['device']` unconditionally, before the
-    backend-specific branch.
+def test_cuda_on_the_torch_backend_is_gated_on_the_container_not_the_request() -> None:
+    """The two reasons a CUDA request can fail are now distinguishable.
+
+    Optiland *can* execute on CUDA through its torch backend, so this request is
+    well-formed. Whether it runs depends on whether the container has a device --
+    an environment fact, reported as one. Either outcome is acceptable here and
+    the test asserts the right one for the image it is running in; what it will
+    not tolerate is a silent CPU fallback, which is why the success branch
+    asserts the resolved device really is cuda.
     """
     adapter = OptilandAdapter()
     request = ModelRunRequest(
@@ -358,18 +455,27 @@ def test_unsupported_device_rejected_eagerly_on_torch_autodiff_backend() -> None
         design_parameters={"surfaces.surfaces[1].geometry.radius": 2.5},
         require_gradients=True,
     )
-    with patch("multiscale_optics_agent.adapters.optiland_adapter._import_optiland") as mock_import:
-        mock_import.side_effect = AssertionError(
-            "solver import must not be attempted for an unsupported device, "
-            "even on the torch/autodiff backend"
-        )
-        with pytest.raises(UnsupportedCapabilityError, match="device"):
-            adapter.run(request)
-    mock_import.assert_not_called()
-
     report = adapter.validate_request(request)
+    reason = optiland_adapter._cuda_unavailable_reason()
+
+    if reason is None:
+        assert report.valid, report.errors
+        resolved = optiland_adapter._resolve_optiland_execution(request.config)
+        assert resolved.device.kind is DeviceKind.CUDA
+        assert resolved.namespace is ArrayNamespace.TORCH
+        return
+
     assert not report.valid
-    assert any(issue.code == "OPTILAND_UNSUPPORTED_DEVICE" for issue in report.errors)
+    codes = {issue.code for issue in report.errors}
+    assert "OPTILAND_CUDA_UNAVAILABLE" in codes
+    message = next(
+        issue.message for issue in report.errors if issue.code == "OPTILAND_CUDA_UNAVAILABLE"
+    )
+    # Names the container, not the capability, and points at the way to get one.
+    assert "--gpu" in message
+    assert "no silent fallback" in message
+    with pytest.raises(UnsupportedCapabilityError, match="CUDA|cuda"):
+        adapter.run(request)
 
 
 def test_spec_matches_registry_entry(registry) -> None:
@@ -467,9 +573,34 @@ def _fake_optiland_import(values, *, paraxial=None):
     """
 
     class Backend:
+        """Models the backend surface the adapter actually drives.
+
+        CHE-61 added `set_precision`/`get_precision` to that surface: the adapter
+        now tells Optiland which precision to execute in instead of reporting
+        "float64" while leaving the real setting untouched. `set_device` is
+        deliberately absent, mirroring the real numpy backend, where it raises
+        `BackendCapabilityError` -- so a test would fail loudly if the adapter
+        ever called it off the torch path.
+        """
+
+        precision = "float64"
+
         @staticmethod
         def set_backend(name):
             assert name == "numpy"
+
+        @classmethod
+        def set_precision(cls, precision):
+            assert precision in ("float32", "float64")
+            cls.precision = precision
+
+        @classmethod
+        def get_precision(cls):
+            # An int width, matching the real package: set_precision takes
+            # 'float64' but get_precision answers 64. The double reproduces the
+            # asymmetry rather than smoothing it over, so the adapter is exercised
+            # against the API it actually calls.
+            return 64 if cls.precision == "float64" else 32
 
     class BackendUtils:
         @staticmethod

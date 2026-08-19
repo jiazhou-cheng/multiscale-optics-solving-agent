@@ -24,10 +24,17 @@ while a P0 model/coupler lacks tests")
   and grating interactions, air/ideal/catalog materials, one stop, EPD
   aperture, angular fields, wavelengths with one primary) are rejected eagerly
   with a structured ``PrescriptionError`` rather than approximated.
-- Only ``config["device"] == "cpu"`` and ``config["dtype"] == "float64"`` are
-  supported (matching what was actually probed); GPU execution was never
-  tested (no CUDA device in the probing container) and is rejected eagerly
-  rather than silently attempted.
+- Device and precision are negotiated against Optiland's real capability
+  declaration (``core/capabilities.py::OPTILAND_CAPABILITIES``) rather than
+  compared with two string constants -- CHE-61 (PB4b), replacing CHE-55's
+  blanket gate. ``float32``/``float64`` on ``cpu``, and either precision on
+  ``cuda`` through the torch backend, are executable; the defaults are still
+  ``cpu``/``float64``, so an existing request means exactly what it always
+  meant. ``float16`` is refused because Optiland has no float16 path to promote
+  into (``set_precision`` is typed ``Literal['float32','float64']``), and
+  ``cuda`` on the numpy backend is refused because ``set_device`` raises
+  ``BackendCapabilityError`` there. A ``cuda`` request in a container without a
+  device fails with a distinct code from a ``cuda`` request that is malformed.
 - Only one design-parameter path is supported for the differentiable
   (torch-backend) case: ``surfaces.surfaces[<index>].geometry.radius`` on the
   selected sample lens, matching
@@ -65,6 +72,20 @@ Consequently:
   process. This adapter must never be called concurrently from multiple
   threads with different backends -- that restriction is inherited directly
   from optiland, not invented here.
+- **The torch backend defaults to float32; the numpy backend defaults to
+  float64.** Measured on the pinned install (``be.get_precision()`` returns 32
+  after ``set_backend('torch')`` and 64 after ``set_backend('numpy')`` --
+  ``tmp_probes/pb4b_default_precision.py``). Before CHE-61 this adapter never
+  called ``set_precision`` at all while reporting ``dtype: 'float64'`` in its
+  diagnostics, so **every torch-backend run traced in float32 under a float64
+  label**. The recorded gradient-probe evidence in
+  ``knowledge/solvers/optiland/expected/gradient_probe.json`` is therefore the
+  float32 path, and ``config['dtype']='float32'`` reproduces it bit-identically;
+  the float64 default now genuinely runs float64 and differs from that record by
+  1.3e-05 relative on the objective and 2.3e-06 on the gradient
+  (``tmp_probes/pb4b_grad_precision.py``). ``set_precision`` is now called
+  explicitly on every run, like ``set_backend``, so the label and the arithmetic
+  agree.
 - Converting a torch tensor to NumPy for on-disk ``ArtifactRecord``
   persistence goes through ``optiland.backend.utils.to_numpy``, which
   internally calls ``tensor.detach().cpu().numpy()`` (verified by reading its
@@ -152,7 +173,9 @@ from multiscale_optics_agent.adapters.base import (
     RunStatus,
 )
 from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
+from multiscale_optics_agent.core.arrays import array_state, dtype_of, numpy_dtype
 from multiscale_optics_agent.core.artifacts import ArtifactRecord
+from multiscale_optics_agent.core.capabilities import OPTILAND_CAPABILITIES
 from multiscale_optics_agent.core.errors import (
     AdapterDependencyError,
     UnsupportedCapabilityError,
@@ -162,6 +185,14 @@ from multiscale_optics_agent.core.optical_system import (
     OPTICAL_SYSTEM_SPEC_VERSION,
     OpticalSystemSpec,
     PrescriptionError,
+)
+from multiscale_optics_agent.core.precision import (
+    ArrayNamespace,
+    CapabilityError,
+    DeviceKind,
+    DType,
+    ExecutionRequest,
+    ResolvedExecution,
 )
 from multiscale_optics_agent.core.specs import ArtifactKind, Device, Framework, ModelSpec
 from multiscale_optics_agent.registry.loader import Registry
@@ -198,8 +229,20 @@ _SUPPORTED_SAMPLES = prescription_names()
 # moved to the prescription itself, registry/prescriptions.py, so there is one
 # definition rather than a copy here and a construction site there.
 
-_SUPPORTED_DEVICE = "cpu"
-_SUPPORTED_DTYPE = "float64"
+#: The DEFAULT device and precision, no longer the only supported ones (CHE-61).
+#: Optiland's own API is `set_precision(Literal['float32','float64'])` and
+#: `set_device(str)` (torch backend only, `BackendCapabilityError` otherwise), so
+#: what this adapter may execute is declared once in
+#: `core/capabilities.py::OPTILAND_CAPABILITIES` and validated from there. These
+#: two constants remain the defaults, which is what keeps every existing request
+#: -- and L1-RAY-01's recorded fingerprint -- byte-identical.
+_DEFAULT_DEVICE = "cpu"
+_DEFAULT_DTYPE = "float64"
+_SUPPORTED_DEVICE = _DEFAULT_DEVICE
+_SUPPORTED_DTYPE = _DEFAULT_DTYPE
+
+#: float64 direction-norm bound, unchanged. A float32 trace cannot meet it and
+#: must not be asked to: see `_direction_norm_tolerance`.
 _DIRECTION_NORM_TOLERANCE = 1e-12
 _GEOMETRY_M_PER_MM = 1e-3
 _WAVELENGTH_M_PER_UM = 1e-6
@@ -282,6 +325,187 @@ class OptilandRayResult(BaseModel):
     summary_metrics: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     failure: OptilandRayFailure | None = None
+
+
+_BACKEND_NAMESPACE = {
+    "numpy": ArrayNamespace.NUMPY,
+    "torch": ArrayNamespace.TORCH,
+}
+
+
+def _direction_norm_tolerance(dtype: DType) -> float:
+    """Direction unit-norm bound appropriate to the precision actually traced in.
+
+    The float64 constant (1e-12) stays exactly as it was. A float32 trace cannot
+    satisfy it and it would be wrong to want it to: Optiland normalizes in
+    float32, so ``|d| - 1`` sits at a few float32 epsilons before this adapter
+    ever sees the rays. ``64 * eps`` is that round-off with headroom, derived
+    rather than chosen, and it reduces to the historical value for float64.
+    """
+    import numpy as np
+
+    eps = float(np.finfo(numpy_dtype(dtype)).eps)
+    return max(_DIRECTION_NORM_TOLERANCE, 64.0 * eps)
+
+
+def _resolve_optiland_execution(config: Mapping[str, Any]) -> ResolvedExecution:
+    """Negotiate ``config['device'] / config['dtype'] / config['backend']``.
+
+    One place, one capability table. Before CHE-61 this was two ``!=``
+    comparisons against string constants, which is why the adapter reported
+    "cpu"/"float64" whatever Optiland was actually told to do -- and it was never
+    told anything, because ``set_device``/``set_precision`` were never called.
+
+    ``config['backend']`` selects the array namespace, and that pairing is
+    enforced rather than assumed: ``set_device`` raises
+    ``BackendCapabilityError`` on the numpy backend, so ``device='cuda'`` with
+    ``backend='numpy'`` is refused here instead of failing inside Optiland.
+    """
+    backend_name = str(config.get("backend", "numpy"))
+    namespace = _BACKEND_NAMESPACE.get(backend_name)
+    execution = ExecutionRequest.from_config(MODEL_ID, config)
+    return OPTILAND_CAPABILITIES.resolve(
+        ExecutionRequest(
+            component=MODEL_ID,
+            precision=execution.precision,
+            device=execution.device,
+            namespace=namespace,
+            bridge_policy=execution.bridge_policy,
+        )
+    )
+
+
+def _apply_optiland_execution(
+    be: Any, torch_module: Any, resolved: ResolvedExecution, backend_name: str
+) -> dict[str, Any]:
+    """Drive Optiland's real execution controls and report what it actually did.
+
+    ``set_backend``, ``set_precision`` and ``set_device`` are all process-global
+    and none is thread-safe (Optiland's own docs). They are therefore set
+    explicitly on every run -- never inherited from whatever a previous run in
+    this process left behind -- exactly as ``set_backend`` already was.
+
+    The return value is *observed*: ``get_device()``/``get_precision()`` read
+    back from Optiland rather than echoing the request, because a request and a
+    result are different facts and PB4a showed what happens when a project
+    conflates them.
+    """
+    be.set_backend(backend_name)
+
+    applied: dict[str, Any] = {
+        "set_backend": backend_name,
+        "set_precision": str(resolved.precision.real_dtype),
+        "set_device": None,
+    }
+    # Optiland spells precision as a dtype name; the project spells it as a
+    # policy. This is the one place the two vocabularies meet.
+    be.set_precision(str(resolved.precision.real_dtype))
+
+    if resolved.namespace is ArrayNamespace.TORCH:
+        device_string = str(resolved.device)
+        if resolved.device.kind is DeviceKind.CUDA:
+            _require_cuda(torch_module, resolved)
+        be.set_device(device_string)
+        applied["set_device"] = device_string
+        applied["get_device"] = str(be.get_device())
+    else:
+        # set_device raises BackendCapabilityError on the numpy backend, so it is
+        # not called at all rather than called-and-caught.
+        applied["get_device"] = "cpu (numpy backend has no device concept)"
+    # get_precision returns an int width (32 / 64) on the pinned install, NOT the
+    # dtype name set_precision takes -- an asymmetry worth normalizing here so the
+    # diagnostics read in one vocabulary. Both spellings are accepted because the
+    # setter's and getter's disagreement is exactly the kind of thing a minor
+    # release changes, and a diagnostics field is not worth crashing a trace over.
+    observed = be.get_precision()
+    applied["get_precision_raw"] = observed
+    applied["get_precision"] = (
+        f"float{int(observed)}" if isinstance(observed, int) else str(observed)
+    )
+    return applied
+
+
+def _cuda_unavailable_reason() -> str | None:
+    """Why torch cannot reach a CUDA device here, or ``None`` if it can.
+
+    Called only when a request actually asks for CUDA, so the default CPU path
+    never pays for a torch import. Importing torch *is* how this question gets
+    answered, which is why the eager gate can be import-free for every other
+    request but not for this one -- and it is still eager, since it happens
+    before any Optiland call.
+    """
+    try:
+        import torch
+    except ImportError as exc:  # pragma: no cover - torch is pinned in both images
+        return f"torch is not importable ({exc})"
+    if torch.version.cuda is None or "+cpu" in torch.__version__:
+        return (
+            f"torch is a CPU-only build ({torch.__version__}); the default "
+            "agent_solver image installs it from the CPU wheel index"
+        )
+    if not torch.cuda.is_available():
+        return "torch.cuda.is_available() is False (no CUDA device attached to this container)"
+    return None
+
+
+def _require_cuda(torch_module: Any, resolved: ResolvedExecution) -> None:
+    """Refuse a CUDA request the installed torch cannot actually serve.
+
+    The default ``agent_solver`` image installs torch from the CPU-only wheel
+    index, where ``torch.cuda.is_available()`` is ``False`` and
+    ``be.set_device('cuda')`` would either raise from deep inside torch or -- on
+    a half-provisioned image -- succeed and then fail at the first kernel. Both
+    are worse than a named capability error here.
+    """
+    if torch_module is None:  # pragma: no cover - guarded by _import_optiland
+        raise CapabilityError(
+            code="OPTILAND_CUDA_REQUIRES_TORCH",
+            component=MODEL_ID,
+            message="a CUDA request needs the torch backend, which was not imported.",
+            requested=resolved.device,
+        )
+    if not torch_module.cuda.is_available():
+        raise CapabilityError(
+            code="OPTILAND_CUDA_UNAVAILABLE",
+            component=MODEL_ID,
+            message=(
+                f"config['device']={str(resolved.device)!r} was requested but this "
+                f"torch install cannot reach a CUDA device (torch "
+                f"{torch_module.__version__}, torch.version.cuda="
+                f"{torch_module.version.cuda!r}, torch.cuda.is_available()=False)."
+            ),
+            requested=resolved.device,
+            supported=["cpu"],
+            evidence="docker/Dockerfile installs torch from the CPU-only wheel index",
+            remedy=(
+                "Run in the CUDA image: `./run.sh --gpu ...` (see "
+                "docs/testing/gpu_environment.md). There is deliberately no "
+                "silent fallback to the CPU."
+            ),
+        )
+
+
+def _host_array(be_utils: Any, value: Any, *, dtype: Any = None) -> Any:
+    """Copy solver data to the host for persistence, preserving its precision.
+
+    This replaces ``np.asarray(be_utils.to_numpy(x), dtype=np.float64)``, which
+    did three separable things in one expression: a device-to-host transfer, a
+    precision force, and (for a torch tensor) an autodiff graph break. Only the
+    first is actually required to write a ``.npz``.
+
+    Dropping the ``dtype=np.float64`` is a no-op for the default numpy/float64
+    path -- the arrays already are float64, so L1-RAY-01's recorded fingerprint
+    is unchanged -- and is what lets a float32 trace be persisted as float32
+    rather than silently gaining ten digits it never computed.
+
+    ``dtype`` is still available for the few quantities that are deliberately
+    computed at reference precision regardless of the trace; each such call site
+    says why.
+    """
+    import numpy as np
+
+    host = np.asarray(be_utils.to_numpy(value))
+    return host if dtype is None else host.astype(dtype)
 
 
 def _import_optiland(*, need_torch: bool) -> tuple[Any, Any, Any]:
@@ -481,10 +705,13 @@ def _project_rays_to_plane(rays: Any, be_utils: Any, target_z_mm: float) -> dict
     """
     import numpy as np
 
-    x = np.asarray(be_utils.to_numpy(rays.x), dtype=np.float64)
-    y = np.asarray(be_utils.to_numpy(rays.y), dtype=np.float64)
-    z = np.asarray(be_utils.to_numpy(rays.z), dtype=np.float64)
-    direction_z = np.asarray(be_utils.to_numpy(rays.N), dtype=np.float64)
+    # Precision preserved: this projection feeds the EXPORTED exit-pupil
+    # positions, so widening here would make the exit_pupil handoff plane report
+    # float64 for a float32 trace while image_surface reported float32.
+    x = _host_array(be_utils, rays.x)
+    y = _host_array(be_utils, rays.y)
+    z = _host_array(be_utils, rays.z)
+    direction_z = _host_array(be_utils, rays.N)
 
     if np.any(direction_z == 0.0):
         raise HandoffPlaneError(
@@ -495,8 +722,8 @@ def _project_rays_to_plane(rays: Any, be_utils: Any, target_z_mm: float) -> dict
 
     step_mm = (target_z_mm - z) / direction_z
     return {
-        "x_mm": x + np.asarray(be_utils.to_numpy(rays.L), dtype=np.float64) * step_mm,
-        "y_mm": y + np.asarray(be_utils.to_numpy(rays.M), dtype=np.float64) * step_mm,
+        "x_mm": x + _host_array(be_utils, rays.L) * step_mm,
+        "y_mm": y + _host_array(be_utils, rays.M) * step_mm,
         "z_mm": np.full_like(x, target_z_mm),
         "max_abs_step_mm": float(np.max(np.abs(step_mm))),
     }
@@ -589,6 +816,11 @@ def _resolve_object_space_reference(
         )
 
     def to_array(value: Any) -> Any:
+        # Deliberately float64, and NOT the trace's precision: this is a
+        # regenerated launch state used to compute the object-space OPL
+        # reference, which is a piston-and-tilt correction of order 1e4 waves.
+        # Computing that reference in float32 would inject an error larger than
+        # the wavefront it corrects. Declared here rather than inherited.
         return np.asarray(be_utils.to_numpy(value), dtype=np.float64)
 
     x0, y0, z0 = to_array(launch.x), to_array(launch.y), to_array(launch.z)
@@ -710,6 +942,11 @@ def _resolve_ray_pupil_sampling(
 
         distribution = create_distribution("hexapolar")
         distribution.generate_points(num_rays)
+        # Also a float64 reference by declaration: these are regenerated
+        # normalized pupil coordinates used to assign hexapolar RING INDICES by
+        # comparing r against j / num_rings (CHE-47). That comparison is a
+        # tolerance test on a ratio, so it is computed at reference precision
+        # independently of what the trace ran in.
         pupil_x = np.asarray(be_utils.to_numpy(distribution.x), dtype=np.float64)
         pupil_y = np.asarray(be_utils.to_numpy(distribution.y), dtype=np.float64)
     except Exception as exc:
@@ -1013,6 +1250,11 @@ class OptilandAdapter:
         num_rays = int(request.config.get("num_rays", _DEFAULT_NUM_RAYS))
         handoff_plane = str(request.config.get("handoff_plane", _DEFAULT_HANDOFF_PLANE))
 
+        # Negotiated before any solver call. Cannot raise here: the same call
+        # already ran inside _capability_problems above.
+        resolved = _resolve_optiland_execution(request.config)
+        requested_execution = ExecutionRequest.from_config(MODEL_ID, request.config)
+
         be, be_utils, torch_module = _import_optiland(need_torch=backend_name == "torch")
 
         try:
@@ -1020,11 +1262,14 @@ class OptilandAdapter:
         except PackageNotFoundError:
             package_version = "unknown"
 
-        # optiland.backend.set_backend mutates global, process-wide module
-        # state and is documented as not thread-safe (conventions.md). Set it
-        # explicitly on every run, even for the numpy default, so a previous
-        # run's backend choice in this process can never silently leak in.
-        be.set_backend(backend_name)
+        # set_backend / set_precision / set_device all mutate global, process-wide
+        # module state and none is thread-safe (conventions.md). All three are set
+        # explicitly on every run, even at the defaults, so a previous run's
+        # choices in this process can never silently leak in. This is also the
+        # first time this adapter has driven the latter two at all: before CHE-61
+        # it reported "cpu"/"float64" while leaving Optiland on whatever it
+        # happened to be set to.
+        applied_execution = _apply_optiland_execution(be, torch_module, resolved, backend_name)
 
         warnings: list[str] = [_OPD_WARNING]
         if backend_name == "numpy":
@@ -1045,8 +1290,14 @@ class OptilandAdapter:
                 surface_index = int(match.group(1))
                 surface = lens.surfaces.surfaces[surface_index]
                 if backend_name == "torch":
+                    # The leaf must match the precision the trace runs in, or
+                    # torch promotes mid-graph and the gradient is computed
+                    # against a different number than the one that was set.
                     tensor = torch_module.tensor(
-                        float(value), dtype=torch_module.float64, requires_grad=True
+                        float(value),
+                        dtype=getattr(torch_module, str(resolved.precision.real_dtype)),
+                        requires_grad=True,
+                        device=str(resolved.device),
                     )
                     surface.geometry.radius = tensor
                     design_parameter_tensors[name] = tensor
@@ -1088,14 +1339,45 @@ class OptilandAdapter:
             "Hy": hy,
             "wavelength_native_units": wavelength,
             "package_version": package_version,
-            "device": _SUPPORTED_DEVICE,
+            # Requested / resolved / actual, kept apart (PB4b section 12). The
+            # flat "device"/"dtype" keys are retained for compatibility and now
+            # carry the RESOLVED values rather than two hard-coded constants.
+            "device": str(resolved.device),
             "cpu_device": _cpu_device_name(),
-            "dtype": _SUPPORTED_DTYPE,
+            "dtype": str(resolved.precision.real_dtype),
+            "execution": {
+                "requested": requested_execution.as_dict(),
+                "resolved": resolved.as_dict(),
+                "applied_to_optiland": applied_execution,
+                # "actual" is filled in below, from the traced arrays themselves.
+            },
             "seed": int(request.config.get("seed", _BASELINE_SEED)),
             "seed_semantics": (
                 "recorded; Optiland hexapolar sampler is deterministic and uses no RNG"
             ),
         }
+
+        # PB4b section 13: the observed placement, read off the traced arrays, and
+        # a mismatch against the request made visible rather than reported as
+        # success. Optiland has no equivalent of the klujax hazard, but the rule
+        # is the same one and it is cheap to hold here too.
+        actual_state = array_state(rays.x)
+        diagnostics["execution"]["actual"] = actual_state.as_dict()
+        mismatches = []
+        if actual_state.device.kind is not resolved.device.kind:
+            mismatches.append(f"device resolved {resolved.device} but traced {actual_state.device}")
+        if actual_state.dtype is not resolved.precision.real_dtype:
+            mismatches.append(
+                f"precision resolved {resolved.precision.real_dtype} "
+                f"but traced {actual_state.dtype}"
+            )
+        diagnostics["execution"]["mismatches"] = mismatches
+        if mismatches:
+            warnings.append(
+                "requested/resolved execution does not match what Optiland actually "
+                f"produced: {'; '.join(mismatches)}. The artifact records the ACTUAL "
+                "values; treat any downstream precision or device claim as the actual one."
+            )
 
         if backend_name == "torch" and request.require_gradients:
             objective_tensor = (rays.x**2 + rays.y**2).mean()
@@ -1271,27 +1553,32 @@ class OptilandAdapter:
                 )
             )
 
-        device = request.config.get("device", _SUPPORTED_DEVICE)
-        if device != _SUPPORTED_DEVICE:
-            problems.append(
-                (
-                    "OPTILAND_UNSUPPORTED_DEVICE",
-                    f"config['device']={device!r} is not implemented; only "
-                    "'cpu' has been exercised for this adapter (no CUDA "
-                    "device was available when probing this pinned install -- "
-                    "see knowledge/solvers/optiland/capability_notes.md).",
-                )
-            )
-
-        dtype = request.config.get("dtype", _SUPPORTED_DTYPE)
-        if dtype != _SUPPORTED_DTYPE:
-            problems.append(
-                (
-                    "OPTILAND_UNSUPPORTED_DTYPE",
-                    f"config['dtype']={dtype!r} is not implemented; only "
-                    f"{_SUPPORTED_DTYPE!r} has been exercised for this adapter.",
-                )
-            )
+        # CHE-61: device and precision are negotiated against Optiland's real
+        # capability declaration instead of compared with two string constants.
+        # What changes for the caller: 'cuda' and 'float32' are now accepted
+        # where Optiland can execute them, and 'float16' is refused with the
+        # reason -- set_precision is literally Literal['float32','float64'], so
+        # there is no float16 path to promote into. What does NOT change: the
+        # defaults, so an existing request means exactly what it always meant.
+        if backend_name in _SUPPORTED_BACKENDS:
+            try:
+                resolved = _resolve_optiland_execution(request.config)
+            except CapabilityError as exc:
+                problems.append((f"OPTILAND_{exc.code}", str(exc)))
+            else:
+                if resolved.device.kind is DeviceKind.CUDA:
+                    reason = _cuda_unavailable_reason()
+                    if reason is not None:
+                        problems.append(
+                            (
+                                "OPTILAND_CUDA_UNAVAILABLE",
+                                f"config['device']={str(resolved.device)!r} is executable "
+                                "for this adapter, but not in this container: "
+                                f"{reason}. Run `./run.sh --gpu ...` (see "
+                                "docs/testing/gpu_environment.md). There is "
+                                "deliberately no silent fallback to the CPU.",
+                            )
+                        )
 
         # System construction: either a registered canonical prescription named
         # by config['sample'], or one supplied inline through
@@ -1387,16 +1674,25 @@ class OptilandAdapter:
         entrance_pupil_diameter_m = image_space.get("entrance_pupil_diameter_m")
         object_at_infinity = image_space.get("object_at_infinity")
 
+        # The explicit execution -> serialization boundary for the trace. The
+        # dtype the solver produced is preserved: forcing float64 here was the
+        # single line that made a float32 or GPU trace indistinguishable from a
+        # float64 host one downstream. For the default numpy/float64 path this is
+        # a no-op, so L1-RAY-01's recorded fingerprint is unchanged.
+        traced_state = array_state(rays.x)
         native = {
-            "x": np.asarray(be_utils.to_numpy(rays.x), dtype=np.float64),
-            "y": np.asarray(be_utils.to_numpy(rays.y), dtype=np.float64),
-            "z": np.asarray(be_utils.to_numpy(rays.z), dtype=np.float64),
-            "L": np.asarray(be_utils.to_numpy(rays.L), dtype=np.float64),
-            "M": np.asarray(be_utils.to_numpy(rays.M), dtype=np.float64),
-            "N": np.asarray(be_utils.to_numpy(rays.N), dtype=np.float64),
-            "intensity": np.asarray(be_utils.to_numpy(rays.i), dtype=np.float64),
-            "wavelength_um": np.asarray(be_utils.to_numpy(rays.w), dtype=np.float64),
-            "opd_native": np.asarray(be_utils.to_numpy(rays.opd), dtype=np.float64),
+            name: _host_array(be_utils, value)
+            for name, value in (
+                ("x", rays.x),
+                ("y", rays.y),
+                ("z", rays.z),
+                ("L", rays.L),
+                ("M", rays.M),
+                ("N", rays.N),
+                ("intensity", rays.i),
+                ("wavelength_um", rays.w),
+                ("opd_native", rays.opd),
+            )
         }
         shapes = {name: array.shape for name, array in native.items()}
         if not native["x"].size:
@@ -1411,11 +1707,15 @@ class OptilandAdapter:
 
         direction_norm = np.sqrt(native["L"] ** 2 + native["M"] ** 2 + native["N"] ** 2)
         max_direction_norm_error = float(np.max(np.abs(direction_norm - 1.0)))
-        if backend_name == "numpy" and max_direction_norm_error > _DIRECTION_NORM_TOLERANCE:
+        # Bound scaled to the precision the trace ACTUALLY ran in. The float64
+        # value is untouched; a float32 trace is held to float32 round-off
+        # instead of being failed for arithmetic it never claimed to do.
+        norm_tolerance = _direction_norm_tolerance(dtype_of(native["L"]))
+        if backend_name == "numpy" and max_direction_norm_error > norm_tolerance:
             raise ValueError(
                 "Optiland direction vectors are not unit norm: "
                 f"max error {max_direction_norm_error:.17g} exceeds "
-                f"{_DIRECTION_NORM_TOLERANCE:.1e}."
+                f"{norm_tolerance:.1e} for {dtype_of(native['L'])}."
             )
 
         # At the image surface the exported coordinates are the traced ones,
@@ -1532,9 +1832,32 @@ class OptilandAdapter:
             shape=tuple(native["x"].shape),
             dtype=str(native["x"].dtype),
             framework=Framework.PYTORCH if backend_name == "torch" else Framework.NUMPY,
-            device=Device.CPU,
+            # OBSERVED, from the traced tensors, not from the request. A torch
+            # trace pinned to cuda:0 says so here; before CHE-61 this was
+            # hard-coded to CPU and a GPU trace was indistinguishable from a host
+            # one in the record it produced.
+            device=traced_state.device.to_spec_device(),
             units="SI for position and wavelength; dimensionless direction/intensity; native OPD",
             metadata={
+                # Where the trace actually executed, and the fact that the .npz
+                # alongside it is an explicit persistence copy rather than
+                # evidence that the computation happened on the host.
+                "execution": traced_state.as_dict(),
+                "serialization": {
+                    "boundary": "explicit_persistence",
+                    "host_copy": traced_state.namespace is not ArrayNamespace.NUMPY,
+                    "kind": (
+                        "serialization"
+                        if traced_state.namespace is not ArrayNamespace.NUMPY
+                        else "already_on_host"
+                    ),
+                    "reason": "npz persistence requires host bytes",
+                    "mechanism": (
+                        "optiland.backend.utils.to_numpy, which calls "
+                        "tensor.detach().cpu().numpy() -- a host transfer AND an "
+                        "autodiff graph break, both confined to this boundary"
+                    ),
+                },
                 "length_unit": "m",
                 "native_length_unit": "mm",
                 "native_to_si_scale": _GEOMETRY_M_PER_MM,
