@@ -1,0 +1,68 @@
+# GPU overlay for the agent_solver_gpu dev container (CHE-60 / PB4a).
+#
+# This file is an *overlay*, not a replacement: docker/Dockerfile.gpu installs
+# docker/requirements.txt first (the single source of truth for every pinned
+# solver version) and then applies this file to swap the CPU-only numerical
+# backends for CUDA-enabled ones. No scientific package version is duplicated
+# here, so a solver bump in requirements.txt does not silently skip the GPU
+# image.
+#
+# Two packages, and only two, differ between the CPU and GPU images:
+#
+#   1. torch  -- docker/Dockerfile installs it from the CPU-only wheel index
+#      (`https://download.pytorch.org/whl/cpu`), which yields `2.13.0+cpu` with
+#      `torch.cuda.is_available() == False`. Optiland's differentiable backend
+#      (`optiland.backend.set_device('cuda')`) needs a CUDA build. Installed by
+#      Dockerfile.gpu from the cu126 index rather than pinned here, because it
+#      needs `--index-url`.
+#
+#   2. jaxlib's CUDA plugin -- `jax==0.6.2` in requirements.txt resolves a
+#      CPU-only jaxlib, so `jax.default_backend()` is `'cpu'` and Chromatix has
+#      no GPU to run on. The `jax[cuda12]` extra adds the two plugin packages
+#      below plus the bundled `nvidia-*` CUDA runtime wheels.
+#
+# Host/driver compatibility (verified on the target host 2026-08-19):
+#   Host driver 550.163.01 (CUDA 12.4), 8x NVIDIA RTX A6000, sm_86.
+#   - torch 2.13.0 publishes no cu124 wheel; cu126 is the lowest available 12.x
+#     build for this pinned version (cu129 is the only other option). cu126 runs
+#     on a 12.4 driver via CUDA minor-version compatibility, which requires
+#     driver >= 525.60.13 for any CUDA 12.x build.
+#   - jax-cuda12-plugin has the same >= 525.60.13 floor.
+#   Both floors are satisfied. If the host driver is ever downgraded below
+#   525.60.13, this image stops working and the CPU image must be used instead.
+#
+# Version pinning rationale: the plugin packages must match the pinned
+# `jax==0.6.2`/`jaxlib==0.6.2` exactly -- JAX enforces this and a mismatch is a
+# hard import-time error, not a soft fallback.
+jax-cuda12-plugin==0.6.2
+jax-cuda12-pjrt==0.6.2
+
+# ptxas + nvlink, required by XLA to compile any GPU kernel.
+#
+# This is NOT redundant with the plugin above, and its absence is the least
+# obvious failure mode in this whole image. Measured while building it:
+# `jax.devices()` returned `[CudaDevice(id=0)]` and every device-enumeration
+# check passed, but the first jitted computation died with
+#
+#   XlaRuntimeError: UNAVAILABLE: No PTX compilation provider is available.
+#   Neither ptxas/nvlink nor nvjtlink is available.
+#
+# i.e. the GPU was visible but unusable. Device enumeration only needs the
+# driver and the CUDA runtime libraries, both of which torch's cu126 wheels
+# already supply -- so a GPU-availability probe that stops at `jax.devices()`
+# reports success on an image that cannot execute a single kernel. This is why
+# tests/test_gpu_environment.py asserts on real kernel execution, not just
+# device presence.
+#
+# The canonical fix is the `jax-cuda12-plugin[with-cuda]` extra (equivalently
+# `jax[cuda12]`), which is deliberately NOT used here: it would pull its own
+# `nvidia-*` CUDA library set and fight torch's pinned 12.6.x versions, with
+# pip silently picking one winner for libraries both frameworks load. Since
+# torch cu126 already installs cublas/cufft/nvrtc/nvjitlink at 12.6.x, only the
+# compiler binaries are actually missing, so this pins just those.
+#
+# Version chosen to match the 12.6 family torch installed
+# (nvidia-nvjitlink-cu12 12.6.85, nvidia-cuda-nvrtc-cu12 12.6.85). This wheel
+# unpacks to site-packages/nvidia/cuda_nvcc/bin/, which is one of the paths XLA
+# already searches relative to the plugin, so no PATH or env var is needed.
+nvidia-cuda-nvcc-cu12==12.6.85

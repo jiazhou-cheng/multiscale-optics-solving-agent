@@ -45,7 +45,7 @@ This is the single repository-wide instruction source for Codex and Claude Code;
 - The default path reuses the existing `agent_solver` image. Run with `--rebuild` after changing `docker/Dockerfile`, dependency files, or when the image does not exist.
 - The repository is mounted at `/workspace`, which is also the container working directory, so source edits are visible immediately to the editable install.
 - Host-side work is limited to editing files, Git/Linear operations, and invoking Docker through `run.sh`; scientific or project-code execution remains containerized.
-- Do not assume GPU access. Enable or change GPU flags only when the issue and host environment explicitly support it, and record the actual device used.
+- Do not assume GPU access, and record the actual device used. The default image is CPU-only by construction; GPU work uses the opt-in `agent_solver_gpu` image via `./run.sh --gpu ...` (`MOA_GPUS` picks devices, max 2). Setup, evidence, and two traps that silently disable the GPU: `docs/testing/gpu_environment.md`.
 - If a required check cannot run through `./run.sh`, report a structured environment/setup failure instead of silently falling back to the host.
 
 ## Test Command Surface
@@ -63,8 +63,7 @@ tables in `docs/testing/test_audit.md` and `docs/testing/tier_restructure.md`).
   contracts, 627 tests, ~11 min): `./run.sh pytest -q` (includes the four
   real-solver benchmark reproductions in `tests/benchmarks/`, run alone via `-m benchmark`)
 
-This is orthogonal to the `jax`/`torch`/`integration` markers, which mean
-"requires that optional install," not "is slow" or "is out of scope."
+This is orthogonal to the `jax`/`torch`/`integration` markers, which mean "requires that optional install," not "is slow" or "is out of scope" — and to `gpu` (CHE-60), which means "needs an attached CUDA device." Enabling the GPU mutates process-global JAX state, so `gpu` tests run only in a dedicated `./run.sh --gpu pytest -q -m gpu` session and skip whenever anything else is selected with them; that skip is what keeps every other tier command green unchanged.
 
 ## Context Loading
 

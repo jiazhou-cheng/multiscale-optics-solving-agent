@@ -1,0 +1,81 @@
+# Image: agent_solver_gpu  (CHE-60 / PB4a)
+#
+# The CUDA-enabled sibling of docker/Dockerfile. It exists as a *separate*
+# image rather than as CUDA wheels swapped into `agent_solver` for two reasons:
+#
+#   1. The repository contract requires that "existing CPU/high-precision
+#      behavior does not regress." Keeping `agent_solver` byte-for-byte
+#      unchanged makes that true by construction rather than by test.
+#   2. The CUDA wheels add roughly an order of magnitude to the image size
+#      (bundled `nvidia-*` runtime libraries). Every CPU-only run -- which is
+#      still the default, and all of Tier A -- would otherwise pay that cost.
+#
+# GPU execution is therefore opt-in at two levels: this image must be built
+# (`./run.sh --gpu --rebuild ...`) and the container must be given devices
+# (`./run.sh --gpu ...` passes `--gpus`). Neither happens by default.
+#
+# Deliberately NOT based on an `nvidia/cuda` base image: the CUDA runtime
+# libraries these two frameworks need arrive as `nvidia-*` pip wheels pulled in
+# by `torch` and `jax-cuda12-plugin`, so a CUDA base image would install a
+# second, unused system copy. Only the driver comes from the host, injected by
+# the nvidia container runtime.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Identical system-package set to the CPU image; see docker/Dockerfile for why
+# each is needed (gmsh dlopens a real OpenGL/X11 stack at import time).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ca-certificates \
+        libglu1-mesa \
+        libgl1 \
+        libxrender1 \
+        libxcursor1 \
+        libxinerama1 \
+        libxft2 \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# --- dependency layer (cache key: requirements.txt + requirements-gpu.txt) ---
+# Order mirrors the CPU image: torch first from its own index, then the pinned
+# solver set, then the GPU overlay. requirements.txt does not declare torch (see
+# its Optiland section), so installing torch first does not get it overwritten
+# -- Dockerfile.gpu's own smoke test below fails the build if that ever changes
+# and a `+cpu` torch wins.
+#
+# cu126 rather than cu124: torch 2.13.0 publishes no cu124 wheel. See
+# docker/requirements-gpu.txt for the full driver-compatibility argument.
+# Split into three RUN layers rather than one `&&` chain, unlike the CPU image:
+# these downloads are multi-gigabyte, and separate layers mean an interrupted or
+# timed-out build resumes at the last completed step instead of re-downloading
+# everything. Each layer is independently cache-keyed on its own inputs.
+COPY docker/requirements.txt /tmp/requirements.txt
+COPY docker/requirements-gpu.txt /tmp/requirements-gpu.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu126 \
+        torch==2.13.0
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-gpu.txt
+
+# Build-time assertion, not a runtime check: catch a silently-CPU image at build
+# time instead of discovering it halfway through a GPU validation run. This
+# cannot verify `torch.cuda.is_available()` (no GPU is attached during
+# `docker build`), only that CUDA-enabled *builds* were installed -- which is
+# exactly the failure mode a dependency-resolution change would introduce.
+RUN python -c "\
+import torch, importlib.util;\
+assert torch.version.cuda is not None, f'torch has no CUDA build: {torch.__version__}';\
+assert '+cpu' not in torch.__version__, f'CPU-only torch won resolution: {torch.__version__}';\
+assert importlib.util.find_spec('jax_cuda12_plugin') is not None, 'jax CUDA12 plugin missing';\
+print('GPU image deps OK:', torch.__version__, 'cuda', torch.version.cuda)"
+
+# --- source layer (cache key: everything else) ---
+COPY . /workspace
+RUN pip install --no-cache-dir --no-deps -e .
+
+CMD ["bash"]
