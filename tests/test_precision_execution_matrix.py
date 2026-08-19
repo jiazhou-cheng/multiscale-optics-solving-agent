@@ -12,8 +12,8 @@ PB4b section 18 requires:
    reference to within a tolerance *derived from measurement*?
 
 Every tolerance below is annotated with the number it came from
-(``tmp_probes/pb4b_tolerance.py`` on the host and
-``tmp_probes/pb4b_tolerance_gpu.py`` on an RTX A6000; 16x16 grid, 500 nm,
+(``benchmarks/probes/precision/tolerance.py`` on the host and
+``benchmarks/probes/precision/tolerance_gpu.py`` on an RTX A6000; 16x16 grid, 500 nm,
 1 um pitch, all errors relative to peak against a float64 reference):
 
 =============================  ==========  ====================

@@ -36,3 +36,6 @@ checkpoints/
 *.tar.gz
 *.tgz
 *.zip
+
+# Local Claude Code agent settings (not part of the project contract)
+.claude/

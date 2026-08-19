@@ -38,7 +38,7 @@ models:
     # package exposes. `optiland.backend.set_precision` is typed
     # Literal['float32','float64'] and `set_device` is torch-backend-only
     # (BackendCapabilityError otherwise) -- both measured on the pinned install,
-    # tmp_probes/pb4b_probe.py. Real adapter-driven traces of M3SingletRef ran on
+    # benchmarks/probes/precision/optiland_capability.py. Real adapter-driven traces of M3SingletRef ran on
     # cuda:0 at both precisions with the placement read back off the traced
     # tensors (tests/test_precision_gpu_pipeline.py::TestOptilandOnTheGpu).
     #
@@ -139,7 +139,7 @@ models:
     # dtypes stays [complex64] and that is the substantive claim. Chromatix's
     # ScalarField.__init__ is `jnp.asarray(u, dtype=jnp.complex64)`
     # unconditionally; Field.build handed a complex128 array returns complex64
-    # even with jax_enable_x64 enabled (measured, tmp_probes/pb4b_probe2.py). So
+    # even with jax_enable_x64 enabled (measured, benchmarks/probes/precision/chromatix_capability.py). So
     # complex128 is INGESTIBLE but not supported, and it is recorded as a lossy
     # bridge rather than listed here. Authoritative form:
     # core/capabilities.py::CHROMATIX_CAPABILITIES.

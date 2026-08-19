@@ -9,8 +9,8 @@ component supports the same combination, which PB4a measured to be false:
   no float16 path at all;
 * Chromatix's ``ScalarField.__init__`` casts unconditionally to ``complex64``,
   including when handed a ``complex128`` array with ``jax_enable_x64`` on
-  (measured, ``tmp_probes/pb4b_probe2.py``) -- there is no complex128 path at
-  all;
+  (measured, ``benchmarks/probes/precision/chromatix_capability.py``) -- there is
+  no complex128 path at all;
 * a JAX array on ``cuda:0`` and a NumPy array on the host are both "GPU-capable
   float32" under the old vocabulary, and only one of them can enter Chromatix
   without a host round trip.

@@ -27,8 +27,8 @@ optiland = pytest.importorskip("optiland")
 
 from conftest import load_probe_expected  # noqa: E402
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # noqa: E402
 from multiscale_optics_agent.adapters import optiland_adapter  # noqa: E402
+from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # noqa: E402
 from multiscale_optics_agent.adapters.optiland_adapter import (  # noqa: E402
     OptilandAdapter,
     OptilandRayRequest,
@@ -177,7 +177,7 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
     [
         # The recorded probe never called set_precision, so it ran at Optiland's
         # torch DEFAULT, which is float32 (measured: be.get_precision() -> 32
-        # after set_backend('torch'); tmp_probes/pb4b_default_precision.py).
+        # after set_backend('torch'); benchmarks/probes/precision/default_precision.py).
         # Asking for float32 therefore reproduces the record bit-identically, and
         # this row is the unchanged regression lock.
         ("float32", 1e-6, 1e-6),
@@ -185,7 +185,7 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
         # traces in float64 instead of reporting float64 over a float32 trace.
         # These two bounds are the MEASURED difference between the two paths
         # (1.3e-05 on the objective, 2.3e-06 on the gradient --
-        # tmp_probes/pb4b_grad_precision.py), not a relaxation: the float64
+        # benchmarks/probes/precision/grad_precision.py), not a relaxation: the float64
         # result is the more accurate of the two, and the record is what moved
         # relative to it.
         ("float64", 1e-4, 1e-5),
@@ -348,9 +348,9 @@ def test_cuda_rejected_eagerly_on_the_numpy_backend() -> None:
     A CUDA request is no longer refused because "no GPU was available when
     probing"; it is refused on the numpy backend because Optiland's own
     `set_device` raises `BackendCapabilityError` there (measured,
-    tmp_probes/pb4b_probe.py). The request is wrong in a way no container can
-    fix, and the error now says which knob is missing rather than which machine
-    was unavailable.
+    benchmarks/probes/precision/optiland_capability.py). The request is wrong in
+    a way no container can fix, and the error now says which knob is missing
+    rather than which machine was unavailable.
     """
     adapter = OptilandAdapter()
     request = ModelRunRequest(

@@ -298,7 +298,7 @@ def test_fp64_is_refused_because_chromatix_has_no_complex128_path(
     `ScalarField.__init__` is `jnp.asarray(u, dtype=jnp.complex64)`
     unconditionally. Handing `Field.build` a complex128 array *with*
     jax_enable_x64 enabled still yields `field.u.dtype == complex64` (measured,
-    tmp_probes/pb4b_probe2.py). So there is no complex128 path to select, and the
+    benchmarks/probes/precision/chromatix_capability.py). So there is no complex128 path to select, and the
     project does not claim one -- which is the whole reason PB4b needs a bridge
     rather than a shared precision.
     """

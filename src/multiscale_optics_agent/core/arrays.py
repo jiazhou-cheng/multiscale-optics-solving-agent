@@ -180,7 +180,7 @@ def matmul_precision_kwargs(namespace: ArrayNamespace) -> dict[str, Any]:
 
     On an Ampere GPU, XLA's default precision for an ``f32``/``c64`` dot is
     **TF32**, which carries a 10-bit mantissa rather than 24. Measured on this
-    host (RTX A6000, ``tmp_probes/pb4b_gpu_matmul.py``), the coupler's
+    host (RTX A6000, ``benchmarks/probes/precision/gpu_matmul.py``), the coupler's
     ``einsum("n,ny,nx->yx", ...)`` over 256 complex64 wavelets returns:
 
         NumPy complex64 (host)      2.6e-07  relative to a complex128 reference

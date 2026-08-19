@@ -8,11 +8,11 @@ compute in, the table records what it computes in.
 This module is the source of truth. ``registry/models.yaml`` and
 ``registry/couplers.yaml`` are downstream reflections of it, updated only after
 the executable tests pass -- never the other way round -- and
-``tests/test_precision_contract.py`` fails if the two disagree.
+``tests/test_registry_matches_capabilities.py`` fails if the two disagree.
 
 Measured facts behind the entries
 ---------------------------------
-Optiland 0.6.0 (``tmp_probes/pb4b_probe.py``, GPU image):
+Optiland 0.6.0 (``benchmarks/probes/precision/optiland_capability.py``, GPU):
     ``set_precision`` is literally ``Literal['float32','float64']`` and raises
     ``ValueError("Precision must be 'float32' or 'float64'.")`` for anything
     else -- so there is **no float16 path** and this project will not invent
@@ -22,7 +22,8 @@ Optiland 0.6.0 (``tmp_probes/pb4b_probe.py``, GPU image):
     ``Tensor`` on ``cuda:0`` in the selected precision (both float32 and
     float64 confirmed).
 
-Chromatix 0.6.0 @ d24bdf0 (``tmp_probes/pb4b_probe2.py``, GPU image):
+Chromatix 0.6.0 @ d24bdf0
+(``benchmarks/probes/precision/chromatix_capability.py``, GPU):
     ``ScalarField.__init__`` does ``jnp.asarray(u, dtype=jnp.complex64)``
     unconditionally. Handing ``Field.build`` a ``complex128`` array *with*
     ``jax_enable_x64=True`` still yields ``field.u.dtype == complex64``. There
@@ -85,8 +86,8 @@ OPTILAND_CAPABILITIES = ComponentCapabilities(
     evidence=(
         "optiland 0.6.0 set_precision is Literal['float32','float64'] and "
         "set_device raises BackendCapabilityError on the numpy backend "
-        "(tmp_probes/pb4b_probe.py, agent_solver_gpu, RTX A6000, "
-        "torch 2.13.0+cu126)"
+        "(benchmarks/probes/precision/optiland_capability.py, agent_solver_gpu, "
+        "RTX A6000, torch 2.13.0+cu126)"
     ),
     notes=(
         "float16 is refused, not promoted: geometry, OPL and direction cosines "
@@ -120,8 +121,9 @@ CHROMATIX_CAPABILITIES = ComponentCapabilities(
         "chromatix 0.6.0 @ d24bdf0 ScalarField.__init__ is "
         "`jnp.asarray(u, dtype=jnp.complex64)`; Field.build(complex128 array) "
         "returns complex64 even under jax_enable_x64=True, and asm_propagate "
-        "returns complex64 on cuda:0 (tmp_probes/pb4b_probe2.py, "
-        "agent_solver_gpu, jax 0.6.2 backend gpu)"
+        "returns complex64 on cuda:0 "
+        "(benchmarks/probes/precision/chromatix_capability.py, agent_solver_gpu, "
+        "jax 0.6.2 backend gpu)"
     ),
     notes=(
         "Requested device must never be reported as actual: PB4a measured "

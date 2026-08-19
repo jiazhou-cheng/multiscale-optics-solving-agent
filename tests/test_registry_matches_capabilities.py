@@ -142,7 +142,7 @@ def test_the_documented_capability_table_matches_the_generated_one():
             f"{component}: the documented table row is stale.\n"
             f"  doc:       {cells}\n"
             f"  generated: {expected}\n"
-            "Regenerate with tmp_probes/pb4b_capability_table.py."
+            "Regenerate with benchmarks/probes/precision/capability_table.py."
         )
 
 

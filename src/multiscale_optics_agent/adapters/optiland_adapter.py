@@ -75,7 +75,7 @@ Consequently:
 - **The torch backend defaults to float32; the numpy backend defaults to
   float64.** Measured on the pinned install (``be.get_precision()`` returns 32
   after ``set_backend('torch')`` and 64 after ``set_backend('numpy')`` --
-  ``tmp_probes/pb4b_default_precision.py``). Before CHE-61 this adapter never
+  ``benchmarks/probes/precision/default_precision.py``). Before CHE-61 this adapter never
   called ``set_precision`` at all while reporting ``dtype: 'float64'`` in its
   diagnostics, so **every torch-backend run traced in float32 under a float64
   label**. The recorded gradient-probe evidence in
@@ -83,7 +83,7 @@ Consequently:
   float32 path, and ``config['dtype']='float32'`` reproduces it bit-identically;
   the float64 default now genuinely runs float64 and differs from that record by
   1.3e-05 relative on the objective and 2.3e-06 on the gradient
-  (``tmp_probes/pb4b_grad_precision.py``). ``set_precision`` is now called
+  (``benchmarks/probes/precision/grad_precision.py``). ``set_precision`` is now called
   explicitly on every run, like ``set_backend``, so the label and the arithmetic
   agree.
 - Converting a torch tensor to NumPy for on-disk ``ArtifactRecord``

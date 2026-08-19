@@ -62,7 +62,7 @@ Source artifact (observed dtype/device/namespace) -------------+
 
 ## Component capability table
 
-Generated from `core/capabilities.py` by `tmp_probes/pb4b_capability_table.py`.
+Generated from `core/capabilities.py` by `benchmarks/probes/precision/capability_table.py`.
 `tests/test_registry_matches_capabilities.py` fails if `registry/models.yaml` or
 `registry/couplers.yaml` disagrees with it.
 
@@ -102,7 +102,7 @@ Device-to-namespace constraints:
 `ValueError("Precision must be 'float32' or 'float64'.")` otherwise. `set_device`
 raises `BackendCapabilityError` on the numpy backend. With
 `set_backend('torch'); set_device('cuda')`, arrays land on `cuda:0` at the
-selected precision. Evidence: `tmp_probes/pb4b_probe.py`.
+selected precision. Evidence: `benchmarks/probes/precision/optiland_capability.py`.
 
 **There is no float16 path.** FP16 is refused, not promoted. Geometry, OPL and
 direction cosines all accumulate; float16 carries ~3 decimal digits and an OPL
@@ -110,21 +110,21 @@ here spans ~1e4 waves.
 
 **The torch backend defaults to float32; the numpy backend defaults to float64.**
 `be.get_precision()` returns 32 after `set_backend('torch')` and 64 after
-`set_backend('numpy')` (`tmp_probes/pb4b_default_precision.py`). Before CHE-61
+`set_backend('numpy')` (`benchmarks/probes/precision/default_precision.py`). Before CHE-61
 the adapter never called `set_precision` while reporting `dtype: 'float64'`, so
 **every torch-backend run traced in float32 under a float64 label**. The recorded
 gradient probe in `knowledge/solvers/optiland/expected/gradient_probe.json` is
 therefore the float32 path; `config['dtype']='float32'` reproduces it
 bit-identically, and the float64 default now genuinely runs float64, differing by
 1.3e-05 relative on the objective and 2.3e-06 on the gradient
-(`tmp_probes/pb4b_grad_precision.py`).
+(`benchmarks/probes/precision/grad_precision.py`).
 
 ### Chromatix 0.6.0 @ d24bdf0
 
 `ScalarField.__init__` is `jnp.asarray(u, dtype=jnp.complex64)`
 **unconditionally**. Handing `Field.build` a `complex128` array *with*
 `jax_enable_x64=True` still yields `field.u.dtype == complex64`
-(`tmp_probes/pb4b_probe2.py`).
+(`benchmarks/probes/precision/chromatix_capability.py`).
 
 **There is no complex128 path at any device**, so the project does not claim one.
 An FP64 request is refused on precision grounds, not device grounds. A
@@ -240,7 +240,7 @@ that came back rather than the one that was asked for, and raises
 On Ampere, XLA's default precision for an `f32`/`c64` dot is **TF32**: a 10-bit
 mantissa rather than 24. Measured for the coupler's
 `einsum("n,ny,nx->yx", ...)` over 256 complex64 wavelets, against a complex128
-reference (`tmp_probes/pb4b_gpu_matmul.py`):
+reference (`benchmarks/probes/precision/gpu_matmul.py`):
 
 | path | relative error |
 | --- | --- |
@@ -257,8 +257,8 @@ knob — one operation, one "and mean it" flag that differs by namespace.
 
 ## Measured tolerances
 
-Never chosen. Sources: `tmp_probes/pb4b_tolerance.py` (host),
-`tmp_probes/pb4b_tolerance_gpu.py` (device). 16×16 grid, 500 nm, 1 µm pitch,
+Never chosen. Sources: `benchmarks/probes/precision/tolerance.py` (host),
+`benchmarks/probes/precision/tolerance_gpu.py` (device). 16×16 grid, 500 nm, 1 µm pitch,
 errors relative to peak against a float64 reference.
 
 | path | max error | reference |
