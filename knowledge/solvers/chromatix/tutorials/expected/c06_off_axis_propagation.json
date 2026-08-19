@@ -1,0 +1,220 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "observed=1089.536 expected=1089.536 (rel=1e-09)",
+      "kind": "reference",
+      "name": "field_width_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=544.768 expected=544.768 (rel=1e-09)",
+      "kind": "reference",
+      "name": "aperture_width_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=108953.6 expected=108953.6 (rel=1e-09)",
+      "kind": "reference",
+      "name": "propagation_distance_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "field.spatial_limits rounds to [(-544, 543), (-544, 543)]; upstream prints [(-544, 543), (-544, 543)]",
+      "kind": "reference",
+      "name": "spatial_limits_match_upstream",
+      "passed": true
+    },
+    {
+      "detail": "shifted_field.spatial_limits rounds to [(-544, 543), (0, 1088)]; upstream prints [(-544, 543), (0, 1088)]",
+      "kind": "reference",
+      "name": "shifted_spatial_limits_match_upstream",
+      "passed": true
+    },
+    {
+      "detail": "shifted_field.u is bit-identical to field.u; only spatial_limits move. shift_grid declares where the window sits, it does not translate the data -- which is why the upstream cell plots field.amplitude with a shifted extent rather than plotting shifted_field.",
+      "kind": "analytic",
+      "name": "shift_grid_relabels_coordinates_without_touching_the_field",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "on_axis_output_finite",
+      "passed": true
+    },
+    {
+      "detail": "output shape (1024, 1024) with mode='same' against the (1024, 1024) input -- the crop happens inside Chromatix, unlike mode='full'",
+      "kind": "invariant",
+      "name": "mode_same_returns_the_input_shape",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (2097152,)",
+      "kind": "invariant",
+      "name": "shifted_outputs_finite",
+      "passed": true
+    },
+    {
+      "detail": "Pearson r = 0.998428 between the modified-transfer-kernel and chirp-z amplitudes for the same displaced window: the two independent algorithms agree on where the light goes",
+      "kind": "analytic",
+      "name": "the_modified_kernel_and_the_czt_compute_the_same_structure",
+      "passed": true
+    },
+    {
+      "detail": "the CZT output is smaller by an amplitude factor of 1.2686 (power ratio 1.6127 = 1.2686^2), and even after removing that scale a 4.6% RMS residual remains. Nothing upstream or in the docstrings mentions a normalisation difference, so a consumer that treats use_czt=True as a drop-in alternative will be 27% off in amplitude.",
+      "kind": "analytic",
+      "name": "but_they_disagree_on_amplitude_normalisation",
+      "passed": true
+    },
+    {
+      "detail": "measured displacement matches lambda*|kykx|*z to 0.08% at all three sweep points, and misses |kykx|/(2*pi/lambda)*z by at least 528%. Measured 265.83, 532.30, 1063.15 against 266.00, 532.00, 1064.00 (frequency reading) and 42.34, 84.67, 169.34 (angular reading).",
+      "kind": "analytic",
+      "name": "asm_propagate_kykx_is_a_spatial_frequency_in_cycles_per_length",
+      "passed": true
+    },
+    {
+      "detail": "every sweep point used a NEGATIVE kykx_x and produced a POSITIVE displacement: kykx=-0.004589 -> +265.83, kykx=-0.009178 -> +532.30, kykx=-0.018356 -> +1063.15",
+      "kind": "analytic",
+      "name": "the_displacement_is_opposite_in_sign_to_kykx",
+      "passed": true
+    },
+    {
+      "detail": "observed=544.8392197752893 expected=544.7748097276827 (rel=0.02)",
+      "kind": "analytic",
+      "name": "plane_wave_kykx_is_an_angular_wavenumber_in_radians_per_length",
+      "passed": true
+    },
+    {
+      "detail": "plane_wave(kykx=0.0591) at lambda=0.532 displaces the beam 544.84 over z=108953.6, matching the ANGULAR reading 544.77 and not the frequency reading 3422.88. asm_propagate's kykx is the other way round. The two parameters share a name and differ by a factor of 2*pi/lambda vs lambda, i.e. 2*pi in the sin(theta) relation.",
+      "kind": "analytic",
+      "name": "the_two_kykx_conventions_differ_by_two_pi",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "untilted_on_axis_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "tilted_on_axis_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "tilted_shift_matching_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "tilted_shift_opposite_finite",
+      "passed": true
+    },
+    {
+      "detail": "power captured: untilted on-axis 0.9459, tilted on-axis 0.4986, tilted with the matching shift 0.9447, tilted with the opposite shift 0.0163. The correctly shifted window recovers as much as the untilted case; the on-axis window loses half the beam and the wrongly shifted one loses almost all of it. That is what off-axis propagation is for, stated as numbers.",
+      "kind": "analytic",
+      "name": "the_correctly_shifted_window_recovers_the_tilted_beam",
+      "passed": true
+    }
+  ],
+  "demonstrates": "chromatix.shift_grid, Field.spatial_limits, and asm_propagate(shift_yx=..., bandlimit=..., kykx=..., use_czt=..., output_dx=..., mode='same') for a laterally displaced output window.",
+  "level": "advanced",
+  "metrics": {
+    "aperture_width": 544.768,
+    "asm_kykx_angular_wavenumber_max_relative_error": 5.286701892469956,
+    "asm_kykx_spatial_frequency_max_relative_error": 0.0007968267542259627,
+    "asm_kykx_sweep": {
+      "10": {
+        "kykx_x": -0.01835643796992481,
+        "measured_shift": 1063.1521763335036,
+        "power": 0.9921934604644775,
+        "predicted_angular_wavenumber_reading": 169.34085944977667,
+        "predicted_spatial_frequency_reading": 1064.0
+      },
+      "2.5": {
+        "kykx_x": -0.004589109492481203,
+        "measured_shift": 265.825082575035,
+        "power": 0.9921934604644775,
+        "predicted_angular_wavenumber_reading": 42.33521486244417,
+        "predicted_spatial_frequency_reading": 266.0
+      },
+      "5": {
+        "kykx_x": -0.009178218984962405,
+        "measured_shift": 532.2977507876999,
+        "power": 0.9921935200691223,
+        "predicted_angular_wavenumber_reading": 84.67042972488834,
+        "predicted_spatial_frequency_reading": 532.0
+      }
+    },
+    "czt_amplitude_rms": 0.0004971902723773053,
+    "czt_power": 0.2934461832046509,
+    "czt_shifted_shape": [
+      1024,
+      1024
+    ],
+    "field_width": 1089.536,
+    "input_power": 1.0000056028366089,
+    "kernel_amplitude_rms": 0.0006314018211773833,
+    "kernel_over_czt_power_ratio": 1.612747678851806,
+    "kernel_power": 0.47325465083122253,
+    "kernel_shifted_shape": [
+      1024,
+      1024
+    ],
+    "kernel_vs_czt_correlation": 0.9984276483201635,
+    "kernel_vs_czt_optimal_amplitude_scale": 1.268601501061852,
+    "kernel_vs_czt_residual_after_scaling": 0.045900785873466236,
+    "on_axis_power": 0.9458597898483276,
+    "on_axis_shape": [
+      1024,
+      1024
+    ],
+    "plane_wave_kykx_x": 0.05905249348852994,
+    "plane_wave_measured_shift": 544.8392197752893,
+    "plane_wave_predicted_angular_reading": 544.7748097276827,
+    "plane_wave_predicted_frequency_reading": 3422.878293421609,
+    "power_captured_per_window": {
+      "tilted_on_axis": 0.4986463189125061,
+      "tilted_shift_matching": 0.9446927905082703,
+      "tilted_shift_opposite": 0.016289765015244484,
+      "untilted_on_axis": 0.9458597898483276
+    },
+    "propagation_distance": 108953.6,
+    "shift_grid_leaves_u_unchanged": true,
+    "shift_yx": [
+      0.0,
+      544.768
+    ],
+    "shifted_spatial_limits": [
+      [
+        -544,
+        543
+      ],
+      [
+        0,
+        1088
+      ]
+    ],
+    "spacing": 1.064,
+    "spatial_limits": [
+      [
+        -544,
+        543
+      ],
+      [
+        -544,
+        543
+      ]
+    ],
+    "wavenumber": 11.810498697705988
+  },
+  "notes": [],
+  "slug": "c06_off_axis_propagation",
+  "title": "Off-Axis Propagation",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/off_axis_propagation/"
+}

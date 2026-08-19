@@ -1,0 +1,225 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "field.shape == (512, 512), upstream prints (512, 512)",
+      "kind": "reference",
+      "name": "plane_wave_shape_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "field.power == 1.0000118 against the 1.0000002 the docs page prints -- a 1.2e-5 difference. Both are the float32 normalisation residue of a 512x512 plane wave, so the physics is identical and only the last digits differ: the published page was built from a different commit than the pinned d24bdf0. Recorded rather than papered over, because a reader comparing digit-for-digit would otherwise think something was wrong.",
+      "kind": "reference",
+      "name": "plane_wave_power_is_unity_but_not_upstreams_exact_digits",
+      "passed": true
+    },
+    {
+      "detail": "type(field).__name__ == 'ScalarField'",
+      "kind": "invariant",
+      "name": "a_bare_float_spectrum_gives_a_ScalarField",
+      "passed": true
+    },
+    {
+      "detail": "field.u.dtype == complex64 under jax_enable_x64=False",
+      "kind": "invariant",
+      "name": "the_default_complex_dtype_is_complex64",
+      "passed": true
+    },
+    {
+      "detail": "type ChromaticScalarField, shape (512, 512, 2); upstream prints ChromaticScalarField and (512, 512, 2)",
+      "kind": "reference",
+      "name": "a_Spectrum_gives_a_ChromaticScalarField_with_a_trailing_wavelength_axis",
+      "passed": true
+    },
+    {
+      "detail": "field.dx == [[0.30000001192092896, 0.30000001192092896], [0.30000001192092896, 0.30000001192092896]]; upstream prints [[0.3 0.3] [0.3 0.3]]",
+      "kind": "reference",
+      "name": "chromatic_dx_is_one_row_per_wavelength",
+      "passed": true
+    },
+    {
+      "detail": "field.power == [1.0000118017196655, 1.0000118017196655] for densities [0.6000000238418579, 0.4000000059604645]; upstream prints [[[1.0000002 1.0000002]]]. The density weights do NOT scale Field.power.",
+      "kind": "reference",
+      "name": "chromatic_power_is_unity_per_wavelength_regardless_of_density",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.0 expected=1.0 (rel=1e-05)",
+      "kind": "analytic",
+      "name": "the_density_weights_enter_through_intensity_not_power",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.10638781995842744 expected=0.1059638129340278 (rel=0.01)",
+      "kind": "analytic",
+      "name": "square_pupil_transmits_its_geometric_area_fraction",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.10638809204101562 expected=0.1059638129340278 (rel=0.01)",
+      "kind": "analytic",
+      "name": "the_pupil_w_argument_is_a_full_width_in_the_same_unit_as_dx",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (512, 512)",
+      "kind": "invariant",
+      "name": "propagated_field_finite",
+      "passed": true
+    },
+    {
+      "detail": "shape (512, 512) and dx [0.30000001192092896, 0.30000001192092896] unchanged -- unlike transform_propagate, which rescales dx (conventions.md)",
+      "kind": "invariant",
+      "name": "transfer_propagate_preserves_shape_and_sample_pitch",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.9999903356607116 expected=1.0 (rel=0.0001)",
+      "kind": "analytic",
+      "name": "transfer_propagate_conserves_discrete_power",
+      "passed": true
+    },
+    {
+      "detail": "max |u_OpticalSystem - u_functional| = 0.000e+00 for PlaneWave -> FFLens versus plane_wave -> ff_lens. The two APIs are interchangeable, which is what lets the adapter use the functional one while the docs teach the element one.",
+      "kind": "analytic",
+      "name": "the_elements_layer_reproduces_the_functional_layer_exactly",
+      "passed": true
+    },
+    {
+      "detail": "shape (256, 256), range [0.0000, 1.0000]",
+      "kind": "invariant",
+      "name": "siemens_star_is_a_normalised_test_target",
+      "passed": true
+    },
+    {
+      "detail": "BasicSensor, Optical4FSystemPSF and Microscope all construct with the pinned signatures; ClearThinSample is importable",
+      "kind": "invariant",
+      "name": "the_systems_layer_classes_construct",
+      "passed": true
+    }
+  ],
+  "demonstrates": "chromatix.functional.plane_wave / square_pupil / transfer_propagate, the Spectrum density weighting and ChromaticScalarField, and the chromatix.elements / chromatix.systems composition layer (OpticalSystem, PlaneWave, FFLens, ClearThinSample, BasicSensor, Microscope, Optical4FSystemPSF, utils.siemens_star).",
+  "level": "beginner",
+  "metrics": {
+    "basic_sensor_fields": [
+      "reduce_axis",
+      "reduce_parallel_axis_name",
+      "resampler",
+      "resampling_method",
+      "shape",
+      "shot_noise_mode",
+      "spacing"
+    ],
+    "chromatic_density": [
+      0.6000000238418579,
+      0.4000000059604645
+    ],
+    "chromatic_dx": [
+      [
+        0.30000001192092896,
+        0.30000001192092896
+      ],
+      [
+        0.30000001192092896,
+        0.30000001192092896
+      ]
+    ],
+    "chromatic_field_class": "ChromaticScalarField",
+    "chromatic_intensity_mean": 4.238552355673164e-05,
+    "chromatic_power": [
+      [
+        [
+          1.0000118017196655,
+          1.0000118017196655
+        ]
+      ]
+    ],
+    "chromatic_shape": [
+      512,
+      512,
+      2
+    ],
+    "chromatix_version": "0.6.0",
+    "constructed_elements": [
+      "BasicSensor",
+      "ClearThinSample",
+      "Microscope",
+      "Optical4FSystemPSF"
+    ],
+    "elements_vs_functional_max_abs_deviation": 0.0,
+    "microscope_fields": [
+      "NA",
+      "convolution_axes",
+      "f",
+      "fast_fft_shape",
+      "n",
+      "padding_ratio",
+      "sensor",
+      "spectrum",
+      "system_psf",
+      "taper_width"
+    ],
+    "optical_4f_psf_fields": [
+      "f_tube",
+      "phase",
+      "shape",
+      "spacing"
+    ],
+    "power_ratio": 0.9999903356607116,
+    "propagated_dx": [
+      0.30000001192092896,
+      0.30000001192092896
+    ],
+    "propagated_power": 0.10638804733753204,
+    "propagated_shape": [
+      512,
+      512
+    ],
+    "pupil_nonzero_fraction": 0.10638809204101562,
+    "pupil_power": 0.10638907551765442,
+    "pupil_predicted_fraction": 0.1059638129340278,
+    "pupil_side_pixels": 166.66666666666669,
+    "scalar_dx": [
+      0.30000001192092896,
+      0.30000001192092896
+    ],
+    "scalar_field_class": "ScalarField",
+    "scalar_intensity_mean": 4.238552355673164e-05,
+    "scalar_power": [
+      [
+        1.0000118017196655
+      ]
+    ],
+    "scalar_shape": [
+      512,
+      512
+    ],
+    "scalar_spectrum_density": [
+      1.0
+    ],
+    "scalar_spectrum_wavelength": [
+      0.5320000052452087
+    ],
+    "scalar_u_dtype": "complex64",
+    "scalar_u_shape": [
+      512,
+      512
+    ],
+    "siemens_star_max": 1.0,
+    "siemens_star_min": 0.0,
+    "siemens_star_shape": [
+      256,
+      256
+    ],
+    "system_field_shape": [
+      128,
+      128
+    ]
+  },
+  "notes": [
+    "Field.intensity sums the density-weighted per-wavelength intensities, so a two-wavelength field with densities summing to 1 has the same mean intensity as the equivalent monochromatic field, while Field.power stays 1 PER wavelength. A consumer that multiplies power by density double-counts."
+  ],
+  "slug": "c00_chromatix_101",
+  "title": "Chromatix 101",
+  "url": "https://chromatix.readthedocs.io/en/latest/101/"
+}

@@ -1,0 +1,159 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "observed=-0.008620689371678274 expected=0.0 (abs=0.25)",
+      "kind": "analytic",
+      "name": "the_input_beam_starts_centred",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (512, 512)",
+      "kind": "invariant",
+      "name": "sas_output_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (512, 512)",
+      "kind": "invariant",
+      "name": "fresnel_output_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (4608, 4608)",
+      "kind": "invariant",
+      "name": "asm_output_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=372.0 expected=372.7055198885912 (rel=0.005)",
+      "kind": "analytic",
+      "name": "sas_peak_matches_z_tan_theta",
+      "passed": true
+    },
+    {
+      "detail": "observed=373.618305080116 expected=372.7055198885912 (rel=0.005)",
+      "kind": "analytic",
+      "name": "sas_core_centroid_matches_z_tan_theta",
+      "passed": true
+    },
+    {
+      "detail": "observed=372.0 expected=372.7055198885912 (rel=0.005)",
+      "kind": "analytic",
+      "name": "asm_peak_matches_z_tan_theta",
+      "passed": true
+    },
+    {
+      "detail": "observed=373.2473807616792 expected=372.7055198885912 (rel=0.005)",
+      "kind": "analytic",
+      "name": "asm_core_centroid_matches_z_tan_theta",
+      "passed": true
+    },
+    {
+      "detail": "observed=373.618305080116 expected=373.2473807616792 (rel=0.005)",
+      "kind": "analytic",
+      "name": "sas_and_asm_agree_with_each_other_on_the_displacement",
+      "passed": true
+    },
+    {
+      "detail": "observed=350.0 expected=350.22862676548476 (rel=0.005)",
+      "kind": "analytic",
+      "name": "fresnel_peak_matches_z_sin_theta_not_z_tan_theta",
+      "passed": true
+    },
+    {
+      "detail": "transform_propagate puts the peak at 350.000, which is z*sin(theta) = 350.229 to 0.05%, not the geometric z*tan(theta) = 372.706: a 6.1% position error at 20 degrees. Its output coordinate is the direction-cosine (Fourier) mapping x' = lambda*z*f_x, correct only in the paraxial limit. SAS and ASM both give the geometric position. A coupler chaining propagators must not mix them.",
+      "kind": "analytic",
+      "name": "the_single_fft_fresnel_propagator_mis_places_a_tilted_beam",
+      "passed": true
+    },
+    {
+      "detail": "observed=8.0 expected=8.0 (rel=1e-06)",
+      "kind": "analytic",
+      "name": "sas_rescales_its_output_pitch_by_exactly_the_requested_magnification",
+      "passed": true
+    },
+    {
+      "detail": "ASM dx 0.250000 == input 0.250000, shape [4608, 4608] vs input (512, 512) -- the padded grid, as conventions.md records. SAS instead reaches the same distance on a [512, 512] grid with dx scaled by 8.",
+      "kind": "invariant",
+      "name": "asm_preserves_its_sample_pitch_and_pads_instead",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.9989825232079316 expected=1.0 (rel=0.002)",
+      "kind": "analytic",
+      "name": "asm_conserves_discrete_power",
+      "passed": true
+    },
+    {
+      "detail": "power ratios: SAS 0.960462, Fresnel 0.970447, ASM 0.998983. Field.power is a sum over the sampled window only (conventions.md), so this is a truncation diagnostic and not an energy violation -- and it is why the FULL-window centroids sas 366.1, fresnel 343.8, asm 351.4 all sit below the analytic 372.7 while the peaks do not.",
+      "kind": "analytic",
+      "name": "the_scaling_methods_lose_a_few_percent_to_their_own_windowing",
+      "passed": true
+    }
+  ],
+  "demonstrates": "chromatix.functional.propagation.transform_propagate_sas versus transform_propagate and asm_propagate on the same tilted-aperture problem, plane_wave(kykx=...) for a tilted illumination, and the output-pitch rescaling each method applies.",
+  "level": "advanced",
+  "metrics": {
+    "aperture_width": 8.0,
+    "fresnel_geometric_position_error_fraction": 0.06092080389734585,
+    "input_displacement": {
+      "core90_centroid_x": -0.008620689371678274,
+      "full_centroid_x": 0.0,
+      "peak_x": -3.25,
+      "window_half_width": 63.75
+    },
+    "input_dx": 0.25,
+    "input_power": 68.0625,
+    "l_box": 128.0,
+    "magnification": 8,
+    "n_box": 512,
+    "predicted_geometric_shift": 372.7055198885912,
+    "predicted_paraxial_shift": 350.22862676548476,
+    "propagation_distance": 1024.0,
+    "propagators": {
+      "asm": {
+        "core90_centroid_x": 373.2473807616792,
+        "dx": 0.25,
+        "full_centroid_x": 351.3957197320084,
+        "peak_x": 372.0,
+        "power": 67.99324798583984,
+        "shape": [
+          4608,
+          4608
+        ],
+        "window_half_width": 575.75
+      },
+      "fresnel": {
+        "core90_centroid_x": 350.3863852302453,
+        "dx": 2.0,
+        "full_centroid_x": 343.7896620791489,
+        "peak_x": 350.0,
+        "power": 66.0510482788086,
+        "shape": [
+          512,
+          512
+        ],
+        "window_half_width": 510.0
+      },
+      "sas": {
+        "core90_centroid_x": 373.618305080116,
+        "dx": 2.0,
+        "full_centroid_x": 366.0607539880908,
+        "peak_x": 372.0,
+        "power": 65.37145233154297,
+        "shape": [
+          512,
+          512
+        ],
+        "window_half_width": 510.0
+      }
+    },
+    "tilt_deg": 20.0,
+    "wavelength": 0.5
+  },
+  "notes": [],
+  "slug": "c05_scalable_angular_spectrum",
+  "title": "Scalable Angular Spectrum",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/sas/"
+}
