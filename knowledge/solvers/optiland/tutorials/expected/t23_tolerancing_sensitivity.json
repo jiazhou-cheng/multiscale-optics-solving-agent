@@ -1,0 +1,111 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "99 rows == 3 perturbations x 33 steps",
+      "kind": "invariant",
+      "name": "every_perturbation_sample_produced_a_row",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (99, 4)",
+      "kind": "invariant",
+      "name": "all_numeric_result_columns_finite",
+      "passed": true
+    },
+    {
+      "detail": "f2 rises monotonically from 33.4699 to 69.5588 mm as R1 goes 15.0 -> 30.0 mm, at all 33 samples: flattening a positive surface weakens the system",
+      "kind": "analytic",
+      "name": "focal_length_increases_monotonically_with_the_first_radius",
+      "passed": true
+    },
+    {
+      "detail": "1/f2 against 1/R1 fits a straight line with max residual 1.041e-17 (0.000% of 1/f). The fitted slope 0.465037 is the surface's (n-1) contribution to system power, which is what thin-lens theory predicts and no Optiland accessor was asked for.",
+      "kind": "analytic",
+      "name": "system_power_is_affine_in_the_first_surface_curvature",
+      "passed": true
+    },
+    {
+      "detail": "f2 varies by 0.000e+00 mm over a +/-0.05 rad x-tilt of surface 1: a rotation about an axis through the vertex leaves the paraxial power alone",
+      "kind": "analytic",
+      "name": "surface_tilt_does_not_change_first_order_power",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot size 0.004338 mm at tilt +0.0000 rad is the minimum over the sweep, rising to 0.025669 mm at +0.0500 rad",
+      "kind": "analytic",
+      "name": "spot_size_is_minimised_at_zero_tilt",
+      "passed": true
+    },
+    {
+      "detail": "max |spot(-t) - spot(+t)| = 4.198e-16 mm against a peak of 0.025669 mm: an on-axis field cannot distinguish the sign of a tilt at leading order",
+      "kind": "analytic",
+      "name": "spot_degradation_is_even_in_the_tilt",
+      "passed": true
+    },
+    {
+      "detail": "f2 moves 0.1470 mm over a 2->5 mm thickness change against 36.0888 mm over the radius sweep: thickness enters only through the second-order (n-1)^2 t/(n R1 R2) term",
+      "kind": "analytic",
+      "name": "element_thickness_is_a_far_weaker_lever_than_curvature",
+      "passed": true
+    },
+    {
+      "detail": "observed=49.999783071431914 expected=49.999783071431914 (rel=1e-12)",
+      "kind": "invariant",
+      "name": "the_optic_is_restored_to_nominal_after_the_sweep",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.tolerancing.{Tolerancing,RangeSampler,SensitivityAnalysis}: add_perturbation('radius'|'tilt'|'thickness', sampler, surface_number, axis=), add_operand('f2'|'rms_spot_size'|'OPD_difference', input_data, target=), and get_results() -> pandas.DataFrame.",
+  "level": "intermediate",
+  "metrics": {
+    "columns": [
+      "perturbation_type",
+      "perturbation_value",
+      "0: f2",
+      "1: rms spot size",
+      "2: OPD difference"
+    ],
+    "f2_after_analysis_mm": 49.999783071431914,
+    "f2_column": "0: f2",
+    "f2_over_radius_sweep_mm": [
+      33.469944503835116,
+      69.55879438703832
+    ],
+    "f2_spread_over_radius_mm": 36.0888498832032,
+    "f2_spread_over_thickness_mm": 0.14698615300962814,
+    "f2_spread_over_tilt_mm": 0.0,
+    "inverse_f_linear_fit_max_residual": 1.0408340855860843e-17,
+    "inverse_f_vs_inverse_r_intercept": -0.0011248970280397042,
+    "inverse_f_vs_inverse_r_slope": 0.4650367321263949,
+    "nominal_f2_mm": 49.999783071431914,
+    "num_rows": 99,
+    "perturbation_types": [
+      "Radius of Curvature, Surface 1",
+      "Tilt X, Surface 1",
+      "Thickness, Surface 1"
+    ],
+    "radius_sweep_mm": [
+      15.0,
+      30.0
+    ],
+    "spot_at_max_tilt_mm": 0.025669234928459895,
+    "spot_at_zero_tilt_mm": 0.004338400902229881,
+    "spot_column": "1: rms spot size",
+    "steps_per_perturbation": 33,
+    "thickness_sweep_mm": [
+      2.0,
+      5.0
+    ],
+    "tilt_spot_asymmetry_mm": 4.198030811863873e-16,
+    "tilt_sweep_rad": [
+      -0.05,
+      0.05
+    ],
+    "upstream_steps_per_perturbation": 128
+  },
+  "notes": [],
+  "slug": "t23_tolerancing_sensitivity",
+  "title": "Tolerancing, Sensitivity Analyses",
+  "url": "https://www.optiland.org/tutorials/tolerancing-sensitivity"
+}

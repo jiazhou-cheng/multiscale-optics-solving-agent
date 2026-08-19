@@ -14,6 +14,10 @@ Refresh the recorded evidence with
 
     ./run.sh python knowledge/solvers/optiland/tutorials/run_all.py --write-expected
 
+A reproduction that is genuinely stochastic declares its own ``metric_rtol`` in
+its ``TutorialMeta`` (with the reason in its docstring); everything else replays
+at the deterministic budget.
+
 Reproductions marked ``slow`` in their ``TutorialMeta`` are routed to the
 ``slow`` marker and so are excluded from the Tier A gate; the rest run in Tier A.
 Reproductions marked ``needs_torch`` additionally carry the ``torch`` marker.
@@ -98,7 +102,9 @@ def test_tutorial_reproduction(path: Path) -> None:
     assert {c["name"] for c in recorded["checks"]} == {c.name for c in result.checks}
     assert all(c["passed"] for c in recorded["checks"])
 
-    rtol = LOOSE_METRIC_RTOL if meta.needs_torch else METRIC_RTOL
+    rtol = meta.metric_rtol
+    if rtol is None:
+        rtol = LOOSE_METRIC_RTOL if meta.needs_torch else METRIC_RTOL
     observed = dict(_flatten(result.metrics))
     for key, want in _flatten(recorded["metrics"]):
         assert key in observed, f"{meta.slug}: recorded metric {key} is no longer produced"

@@ -1,0 +1,75 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "10 operands == 3 fields x 3 wavelengths + 1 f2",
+      "kind": "invariant",
+      "name": "one_opd_operand_per_field_and_wavelength_plus_the_focal_length",
+      "passed": true
+    },
+    {
+      "detail": "observed=100.11347666643937 expected=100.0 (rel=0.003)",
+      "kind": "reference",
+      "name": "optimized_focal_length_reaches_the_declared_100mm_target",
+      "passed": true
+    },
+    {
+      "detail": "sum of squared residuals 1.859783e+05 -> 1.024928e+02, a 99.9449% reduction (upstream claims >99.9%)",
+      "kind": "reference",
+      "name": "merit_function_improves_by_more_than_99p9_percent",
+      "passed": true
+    },
+    {
+      "detail": "RMS wavefront error at the edge field 308.5233 -> 3.7222 waves, a 82.9x improvement, measured through wavefront.OPD rather than through the optimized operands",
+      "kind": "analytic",
+      "name": "rms_wavefront_error_improves_by_more_than_an_order_of_magnitude",
+      "passed": true
+    },
+    {
+      "detail": "back spacing 96.1089 in [0, 1000], radii 85.6965 and -919.2289 in [-1000, 1000]",
+      "kind": "invariant",
+      "name": "all_variables_end_inside_their_declared_bounds",
+      "passed": true
+    },
+    {
+      "detail": "EFL 100.1135 mm > 0 with a convex front surface (R1 = 85.6965 mm)",
+      "kind": "analytic",
+      "name": "the_optimized_singlet_is_still_a_positive_lens",
+      "passed": true
+    },
+    {
+      "detail": "LeastSquares merit 1.035373e+02 vs OptimizerGeneric 1.024928e+02 (both from 1.859783e+05); EFL 100.0101 mm",
+      "kind": "invariant",
+      "name": "least_squares_reaches_a_comparable_solution",
+      "passed": true
+    },
+    {
+      "detail": "draw, RayFan.view and SpotDiagram.view completed on the optimized lens",
+      "kind": "qualitative",
+      "name": "post_optimization_analyses_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optimization.OptimizationProblem with 'OPD_difference' and 'f2' operands, add_variable(optic, 'thickness'|'radius', surface_number, min_val, max_val), OptimizerGeneric vs LeastSquares, problem.info().",
+  "level": "intermediate",
+  "metrics": {
+    "efl_after_least_squares_mm": 100.01010869196637,
+    "efl_after_mm": 100.11347666643937,
+    "efl_before_mm": 116.0819499760542,
+    "merit_after": 102.49275230792314,
+    "merit_after_least_squares": 103.5372608654442,
+    "merit_before": 185978.34779221908,
+    "merit_reduction_fraction": 0.9994488995438199,
+    "num_operands": 10,
+    "num_variables": 3,
+    "optimized_back_spacing_mm": 96.10894849385083,
+    "optimized_radius_1_mm": 85.6964878362315,
+    "optimized_radius_2_mm": -919.2288697031424,
+    "rms_wavefront_after_waves": 3.722209184521384,
+    "rms_wavefront_before_waves": 308.52329663602296
+  },
+  "notes": [],
+  "slug": "t17_simple_optimization",
+  "title": "Simple Optimization",
+  "url": "https://www.optiland.org/tutorials/simple-optimization"
+}

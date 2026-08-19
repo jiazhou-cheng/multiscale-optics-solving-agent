@@ -1,0 +1,95 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (51040,)",
+      "kind": "invariant",
+      "name": "uncoated_intensity_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (51040,)",
+      "kind": "invariant",
+      "name": "simple_intensity_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (51040,)",
+      "kind": "invariant",
+      "name": "fresnel_intensity_finite",
+      "passed": true
+    },
+    {
+      "detail": "rays.i = 0.999783880 on average with NO coating anywhere, spanning [0.999768424, 0.999799372]. There is a small ray-dependent factor of order 2e-4 even on an uncoated system, so `rays.i == 1` is not a safe uncoated baseline -- the uncoated trace has to be measured, which is what the ratio test below does.",
+      "kind": "invariant",
+      "name": "an_uncoated_doublet_is_close_to_but_not_exactly_unit_transmittance",
+      "passed": true
+    },
+    {
+      "detail": "rays.i(SimpleCoating) / rays.i(uncoated) = 0.216000000000000 for every one of 51040 rays, against the declared product 0.5*0.6*0.8*0.9 = 0.216: max deviation 5.551e-17",
+      "kind": "analytic",
+      "name": "simple_coating_transmittances_multiply_exactly_over_the_uncoated_baseline",
+      "passed": true
+    },
+    {
+      "detail": "the ratio spans 1.110e-16 across the whole pupil: SimpleCoating is a scalar intensity factor, not a physical model",
+      "kind": "analytic",
+      "name": "simple_coating_has_no_angle_or_wavelength_dependence",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.808743090933164 expected=0.8095776254768281 (rel=0.02)",
+      "kind": "analytic",
+      "name": "fresnel_coated_transmission_matches_the_four_interface_product",
+      "passed": true
+    },
+    {
+      "detail": "0.2160 (declared SimpleCoating product) < 0.8087 (real Fresnel) < 1.0 (uncoated)",
+      "kind": "invariant",
+      "name": "fresnel_transmission_is_between_the_uncoated_and_simple_cases",
+      "passed": true
+    },
+    {
+      "detail": "['Optic.set_polarization is deprecated and will be removed in v0.7.0; use optic.updater.set_polarization() instead.']",
+      "kind": "invariant",
+      "name": "optic_set_polarization_is_deprecated_in_favour_of_updater",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.808743090933164 expected=0.808743090933164 (rel=0.0, abs=0.0)",
+      "kind": "invariant",
+      "name": "the_deprecated_alias_produces_identical_numbers",
+      "passed": true
+    }
+  ],
+  "demonstrates": "coatings.SimpleCoating(transmittance, reflectance), the string form coating='fresnel', Optic.updater.set_polarization, and rays.i as a multiplicative per-surface intensity factor.",
+  "level": "intermediate",
+  "metrics": {
+    "expected_simple_product": 0.216,
+    "fresnel_max_intensity": 0.8095775787822059,
+    "fresnel_mean_intensity": 0.808743090933164,
+    "fresnel_min_intensity": 0.807826822809518,
+    "fresnel_num_rays": 51040,
+    "n_bk7_at_550nm": 1.5185223876207927,
+    "n_sf2_at_550nm": 1.6517416788523134,
+    "predicted_fresnel_transmission": 0.8095776254768281,
+    "set_polarization_deprecation": [
+      "Optic.set_polarization is deprecated and will be removed in v0.7.0; use optic.updater.set_polarization() instead."
+    ],
+    "simple_max_intensity": 0.2159566642496588,
+    "simple_mean_intensity": 0.2159533181108859,
+    "simple_min_intensity": 0.2159499795306693,
+    "simple_num_rays": 51040,
+    "simple_over_uncoated_ratio_max": 0.21600000000000005,
+    "simple_over_uncoated_ratio_min": 0.21599999999999994,
+    "uncoated_intensity_deficit": 0.0002161198570099776,
+    "uncoated_max_intensity": 0.999799371526198,
+    "uncoated_mean_intensity": 0.99978388014299,
+    "uncoated_min_intensity": 0.9997684237530987,
+    "uncoated_num_rays": 51040
+  },
+  "notes": [],
+  "slug": "t18_introduction_to_coatings",
+  "title": "Introduction to Coatings",
+  "url": "https://www.optiland.org/tutorials/introduction-to-coatings"
+}

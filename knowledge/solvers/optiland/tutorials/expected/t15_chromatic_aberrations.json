@@ -1,0 +1,75 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "observed=-0.7894270279486917 expected=-0.789 (abs=0.0005)",
+      "kind": "reference",
+      "name": "singlet_longitudinal_colour_matches_upstream_minus_0p789",
+      "passed": true
+    },
+    {
+      "detail": "observed=-0.015169903720472444 expected=-0.015 (abs=0.0005)",
+      "kind": "reference",
+      "name": "doublet_longitudinal_colour_matches_upstream_minus_0p015",
+      "passed": true
+    },
+    {
+      "detail": "|LchC| 0.7894 mm (singlet) -> 0.0152 mm (doublet): 52x better",
+      "kind": "analytic",
+      "name": "the_doublet_is_an_order_of_magnitude_more_achromatic",
+      "passed": true
+    },
+    {
+      "detail": "F-to-C axial focus spread measured from real traced rays: -0.8467 mm (singlet) vs 0.0005 mm (doublet), a 1562x collapse -- reproduced without calling aberrations at all",
+      "kind": "analytic",
+      "name": "traced_focal_spread_confirms_the_aberration_coefficient",
+      "passed": true
+    },
+    {
+      "detail": "traced F-C spread -0.8467 mm vs first-order LchC -0.7894 mm (ratio 1.073); they are the same physical quantity to first order, differing by the higher-order colour the coefficient omits",
+      "kind": "analytic",
+      "name": "traced_spread_and_lchc_agree_in_magnitude_for_the_singlet",
+      "passed": true
+    },
+    {
+      "detail": "observed=-0.7894270279486917 expected=-0.7890974018334425 (rel=0.1)",
+      "kind": "analytic",
+      "name": "singlet_colour_matches_the_thin_lens_minus_f_over_V_estimate",
+      "passed": true
+    },
+    {
+      "detail": "singlet.draw(wavelengths=[...]) and RayFan(...).view() completed",
+      "kind": "qualitative",
+      "name": "singlet_draw_and_rayfan_render_headless",
+      "passed": true
+    },
+    {
+      "detail": "doublet.draw(wavelengths=[...]) and RayFan(...).view() completed",
+      "kind": "qualitative",
+      "name": "doublet_draw_and_rayfan_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "sum(Optic.aberrations.LchC()) as first-order longitudinal colour, multi-wavelength systems via repeated wavelengths.add, the material tuple form ('SF2', 'schott'), and Optic.draw(wavelengths=[...]).",
+  "level": "intermediate",
+  "metrics": {
+    "doublet_efl_mm": 20.0059952749227,
+    "doublet_lchc_mm": -0.015169903720472444,
+    "doublet_traced_C_line_focus_mm": 0.016900679256562055,
+    "doublet_traced_F_line_focus_mm": 0.01744283676201087,
+    "doublet_traced_F_minus_C_focus_mm": 0.0005421575054488162,
+    "nsf6_abbe_number": 25.35972929463037,
+    "nsf6_n_d": 1.8051801846158335,
+    "singlet_efl_mm": 20.011296497592262,
+    "singlet_lchc_mm": -0.7894270279486917,
+    "singlet_predicted_lchc_from_thin_lens": -0.7890974018334425,
+    "singlet_traced_C_line_focus_mm": 0.15519790141478823,
+    "singlet_traced_F_line_focus_mm": -0.6915000559542269,
+    "singlet_traced_F_minus_C_focus_mm": -0.8466979573690152,
+    "traced_spread_ratio": 1561.71951667088
+  },
+  "notes": [],
+  "slug": "t15_chromatic_aberrations",
+  "title": "Chromatic Aberrations",
+  "url": "https://www.optiland.org/tutorials/chromatic-aberrations"
+}

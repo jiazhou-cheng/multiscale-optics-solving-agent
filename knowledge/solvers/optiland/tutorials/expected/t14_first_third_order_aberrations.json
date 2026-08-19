@@ -1,0 +1,282 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (5,)",
+      "kind": "invariant",
+      "name": "seidels_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (72,)",
+      "kind": "invariant",
+      "name": "named_coefficients_finite",
+      "passed": true
+    },
+    {
+      "detail": "seidels() returns 5 values (S1 spherical, S2 coma, S3 astigmatism, S4 Petzval, S5 distortion)",
+      "kind": "analytic",
+      "name": "there_are_five_primary_seidel_sums",
+      "passed": true
+    },
+    {
+      "detail": "every named accessor returns 6 values for a 8-surface system: {'TSC': 6, 'SC': 6, 'CC': 6, 'TCC': 6, 'TAC': 6, 'AC': 6, 'TPC': 6, 'PC': 6, 'DC': 6, 'TAchC': 6, 'LchC': 6, 'TchC': 6}. The system aberration is their sum.",
+      "kind": "invariant",
+      "name": "named_coefficients_are_per_surface_not_per_system",
+      "passed": true
+    },
+    {
+      "detail": "TCC/CC = [3. 3. 3. 3. 3. 3.] per surface; max deviation from 3 is 0.000e+00",
+      "kind": "analytic",
+      "name": "tangential_coma_is_three_times_sagittal_coma",
+      "passed": true
+    },
+    {
+      "detail": "SC/TSC = 5.600000 per surface vs -1/u' = 5.600000 (max deviation 8.882e-16)",
+      "kind": "analytic",
+      "name": "SC_is_TSC_over_minus_final_marginal_slope",
+      "passed": true
+    },
+    {
+      "detail": "AC/TAC = 5.600000 per surface vs -1/u' = 5.600000 (max deviation 0.000e+00)",
+      "kind": "analytic",
+      "name": "AC_is_TAC_over_minus_final_marginal_slope",
+      "passed": true
+    },
+    {
+      "detail": "PC/TPC = 5.600000 per surface vs -1/u' = 5.600000 (max deviation 8.882e-16)",
+      "kind": "analytic",
+      "name": "PC_is_TPC_over_minus_final_marginal_slope",
+      "passed": true
+    },
+    {
+      "detail": "LchC/TAchC = 5.600000 per surface vs -1/u' = 5.600000 (max deviation 8.882e-16)",
+      "kind": "analytic",
+      "name": "LchC_is_TAchC_over_minus_final_marginal_slope",
+      "passed": true
+    },
+    {
+      "detail": "all 24 longitudinal/transverse ratios across spherical, astigmatism, Petzval and axial colour agree to 8.882e-16, at 5.600000",
+      "kind": "analytic",
+      "name": "the_same_conversion_factor_governs_four_unrelated_aberration_types",
+      "passed": true
+    },
+    {
+      "detail": "observed=-0.008730734086632885 expected=-0.008730429131853144 (rel=0.001)",
+      "kind": "analytic",
+      "name": "optiland_petzval_coefficient_matches_the_prescription_petzval_sum",
+      "passed": true
+    },
+    {
+      "detail": "Petzval radius 1/P = 174.491 mm = 1.745 x the 100.001 mm EFL. Positive, i.e. the field curves inward, as an all-positive-power uncorrected triplet must, and on the scale of the focal length rather than orders away from it.",
+      "kind": "analytic",
+      "name": "petzval_radius_is_positive_and_of_order_the_focal_length",
+      "passed": true
+    },
+    {
+      "detail": "sum(LchC) = 0.403850 mm is 0.404% of the 100.001 mm focal length -- a telescope objective is achromatized by construction, so the residual must be small rather than a particular sign",
+      "kind": "analytic",
+      "name": "axial_colour_is_a_small_residual_of_the_focal_length",
+      "passed": true
+    }
+  ],
+  "demonstrates": "Optic.aberrations.seidels() and the named third-order coefficients TSC/SC/CC/TCC/TAC/AC/TPC/PC/DC/TAchC/LchC/TchC, all returned as per-surface arrays rather than system scalars.",
+  "level": "intermediate",
+  "metrics": {
+    "coeff_AC": [
+      -0.006830758897041661,
+      -0.009279524318358797,
+      0.003729162040131299,
+      -0.016184720098476504,
+      0.014050182419487531,
+      -0.008669691680095442
+    ],
+    "coeff_CC": [
+      -0.024909013250597526,
+      0.020114495036737682,
+      0.004052712710227666,
+      0.08930405555128919,
+      -0.09344905072003368,
+      0.0009330371403555834
+    ],
+    "coeff_DC": [
+      -0.0001503328084967948,
+      0.00014427515064975688,
+      -0.0001593273094638781,
+      0.00011105925490621316,
+      -9.870480463899925e-05,
+      0.000254007800399707
+    ],
+    "coeff_LchC": [
+      -1.0603396388191118,
+      -0.6274065018917692,
+      -0.32243131047660056,
+      -1.4258652694028575,
+      3.9261635613834387,
+      -0.08627095625594769
+    ],
+    "coeff_PC": [
+      -0.010360884424738535,
+      -0.0005278106891364332,
+      -0.009159174673299412,
+      -0.0030327758569123633,
+      0.006537491378302541,
+      0.007812420179151315
+    ],
+    "coeff_SC": [
+      -2.848525718262621,
+      -1.3673150951044866,
+      0.138119957521321,
+      -15.45301494959616,
+      19.491437929223572,
+      -0.0031489826237248593
+    ],
+    "coeff_TAC": [
+      -0.001219778374471725,
+      -0.0016570579139926422,
+      0.0006659217928805891,
+      -0.0028901285890136613,
+      0.002508961146337059,
+      -0.0015481592285884716
+    ],
+    "coeff_TAchC": [
+      -0.18934636407484134,
+      -0.11203687533781591,
+      -0.05757701972796438,
+      -0.2546187981076531,
+      0.7011006359613282,
+      -0.0154055279028478
+    ],
+    "coeff_TCC": [
+      -0.07472703975179258,
+      0.06034348511021305,
+      0.012158138130682998,
+      0.2679121666538676,
+      -0.28034715216010103,
+      0.0027991114210667504
+    ],
+    "coeff_TPC": [
+      -0.0018501579329890238,
+      -9.425190877436306e-05,
+      -0.0016355669059463234,
+      -0.0005415671173057791,
+      0.001167409174696882,
+      0.001395075031991306
+    ],
+    "coeff_TSC": [
+      -0.5086653068326108,
+      -0.24416340984008686,
+      0.024664278128807317,
+      -2.759466955285028,
+      3.4806139159327802,
+      -0.0005623183256651534
+    ],
+    "coeff_TchC": [
+      -0.009272169790900934,
+      0.00922974156688774,
+      -0.009460772314110862,
+      0.00824017524364942,
+      -0.018823457721032492,
+      0.025561908698491505
+    ],
+    "coefficient_lengths": {
+      "AC": 6,
+      "CC": 6,
+      "DC": 6,
+      "LchC": 6,
+      "PC": 6,
+      "SC": 6,
+      "TAC": 6,
+      "TAchC": 6,
+      "TCC": 6,
+      "TPC": 6,
+      "TSC": 6,
+      "TchC": 6
+    },
+    "efl_mm": 100.0012614217989,
+    "final_marginal_ray_slope": -0.17857142857142855,
+    "lchc_sum_over_efl": 0.004038447903509328,
+    "longitudinal_over_transverse_ratios": {
+      "AC_over_TAC": [
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005
+      ],
+      "LchC_over_TAchC": [
+        5.600000000000001,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.600000000000001,
+        5.6000000000000005
+      ],
+      "PC_over_TPC": [
+        5.600000000000001,
+        5.600000000000001,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005
+      ],
+      "SC_over_TSC": [
+        5.6000000000000005,
+        5.6000000000000005,
+        5.600000000000001,
+        5.6000000000000005,
+        5.6000000000000005,
+        5.6000000000000005
+      ]
+    },
+    "num_seidel_sums": 5,
+    "num_surfaces": 8,
+    "optiland_PC_sum": -0.008730734086632885,
+    "paraxial_image_height_mm": 1.7454980260753565,
+    "petzval_radius_mm": 174.49104236564895,
+    "petzval_sum_closed_form_per_mm": 0.005730953213658286,
+    "petzval_sum_per_surface": [
+      0.0068010024473437024,
+      0.0003464609430426723,
+      0.006012186490568807,
+      0.0019907485866609686,
+      -0.004291283739944428,
+      -0.005128161514013439
+    ],
+    "predicted_PC_sum_from_petzval": -0.008730429131853144,
+    "seidels": [
+      -0.0027070700792154283,
+      -0.0014120584042932433,
+      -0.0014786575595888759,
+      -0.000556807020831179,
+      3.606331548428746e-05
+    ],
+    "sum_AC": -0.023185350534353576,
+    "sum_CC": -0.003953763532021082,
+    "sum_DC": 0.0001009772833560049,
+    "sum_LchC": 0.403849884537152,
+    "sum_PC": -0.008730734086632885,
+    "sum_SC": -0.04244685884209863,
+    "sum_TAC": -0.004140241166848853,
+    "sum_TAchC": 0.07211605081020575,
+    "sum_TCC": -0.01186129059606323,
+    "sum_TPC": -0.0015590596583273015,
+    "sum_TSC": -0.0075797962218032006,
+    "sum_TchC": 0.00547542568298438,
+    "tcc_over_cc": [
+      3.0,
+      3.0,
+      3.0,
+      3.0,
+      3.0,
+      3.0
+    ]
+  },
+  "notes": [
+    "The comparison against an uncorrected singlet of the same power lives in t15_chromatic_aberrations, where upstream publishes both numbers."
+  ],
+  "slug": "t14_first_third_order_aberrations",
+  "title": "1st & 3rd Order Aberrations",
+  "url": "https://www.optiland.org/tutorials/first-third-order-aberrations"
+}

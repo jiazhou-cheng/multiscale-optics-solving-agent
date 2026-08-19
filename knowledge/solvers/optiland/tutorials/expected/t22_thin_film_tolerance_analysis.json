@@ -1,0 +1,114 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "all finite over shape (131,)",
+      "kind": "invariant",
+      "name": "nominal_reflectance_finite",
+      "passed": true
+    },
+    {
+      "detail": "max R = 0.9945% over the declared 420-680 nm target band, against the tutorial's R < 1% specification (mean 0.3866%)",
+      "kind": "reference",
+      "name": "the_nominal_design_meets_its_declared_R_below_1_percent_spec",
+      "passed": true
+    },
+    {
+      "detail": "91 rows == 7 layers x 13 RangeSampler steps",
+      "kind": "invariant",
+      "name": "sensitivity_sweep_covers_every_layer_at_every_sample",
+      "passed": true
+    },
+    {
+      "detail": "max delta-R per layer over +/-3% thickness: Layer 0 thickness=0.371%, Layer 1 thickness=0.341%, Layer 2 thickness=0.091%, Layer 3 thickness=0.274%, Layer 4 thickness=0.049%, Layer 5 thickness=0.737%, Layer 6 thickness=0.164%. Most sensitive: Layer 5 thickness.",
+      "kind": "analytic",
+      "name": "every_layer_has_a_nonzero_but_bounded_sensitivity",
+      "passed": true
+    },
+    {
+      "detail": "all 7 zero-perturbation rows reproduce the nominal R(550 nm) = 0.002693946 to 0.000e+00: layer thicknesses are restored after each sample rather than drifting",
+      "kind": "analytic",
+      "name": "the_sweep_restores_state_between_samples",
+      "passed": true
+    },
+    {
+      "detail": "150 rows == 150 requested iterations",
+      "kind": "invariant",
+      "name": "monte_carlo_produced_the_requested_number_of_trials",
+      "passed": true
+    },
+    {
+      "detail": "yield (fraction of trials with R < 1%) per wavelength: 0: R@430.0nm 91.3%, 1: R@480.0nm 100.0%, 2: R@550.0nm 100.0%, 3: R@620.0nm 93.3%, 4: R@670.0nm 90.0%. Upstream's conclusion -- '+/-2% thickness control keeps reflectance well within spec' -- stated as numbers.",
+      "kind": "reference",
+      "name": "two_percent_thickness_control_keeps_reflectance_within_spec",
+      "passed": true
+    },
+    {
+      "detail": "random thickness errors can only move a reflectance minimum away from its optimum, so the ensemble mean must exceed the nominal at every wavelength",
+      "kind": "analytic",
+      "name": "the_perturbed_mean_is_worse_than_nominal_at_every_wavelength",
+      "passed": true
+    }
+  ],
+  "demonstrates": "thin_film.tolerancing.{ThinFilmTolerancing,ThinFilmSensitivityAnalysis,ThinFilmMonteCarlo}, tolerancing.perturbation.{RangeSampler,DistributionSampler}, ThinFilmOperand.reflectance, and pandas DataFrame results via get_results().",
+  "level": "intermediate",
+  "metrics": {
+    "mc_columns": [
+      "0: R@430.0nm",
+      "1: R@480.0nm",
+      "2: R@550.0nm",
+      "3: R@620.0nm",
+      "4: R@670.0nm"
+    ],
+    "mc_iterations": 150,
+    "mc_max_R_percent": {
+      "0: R@430.0nm": 2.390939086353905,
+      "1: R@480.0nm": 0.9305704627336758,
+      "2: R@550.0nm": 0.7341005725669938,
+      "3: R@620.0nm": 1.3931464559249291,
+      "4: R@670.0nm": 2.390390420683434
+    },
+    "mc_mean_R_percent": {
+      "0: R@430.0nm": 0.4095474445205343,
+      "1: R@480.0nm": 0.252212555373964,
+      "2: R@550.0nm": 0.2971452616620941,
+      "3: R@620.0nm": 0.6506070671129434,
+      "4: R@670.0nm": 0.45158570427341216
+    },
+    "mc_yield_fraction": {
+      "0: R@430.0nm": 0.9133333333333333,
+      "1: R@480.0nm": 1.0,
+      "2: R@550.0nm": 1.0,
+      "3: R@620.0nm": 0.9333333333333333,
+      "4: R@670.0nm": 0.9
+    },
+    "most_sensitive_layer": "Layer 5 thickness",
+    "nominal_R_at_550nm_percent": 0.2693945651138301,
+    "nominal_max_R_percent_in_band": 0.9944572223630224,
+    "nominal_mean_R_percent_in_band": 0.3866049130581311,
+    "num_layers": 7,
+    "num_zero_perturbation_rows": 7,
+    "sensitivity_max_delta_R_percent_per_layer": {
+      "Layer 0 thickness": 0.3712180263205956,
+      "Layer 1 thickness": 0.34083582739586166,
+      "Layer 2 thickness": 0.0905688100533676,
+      "Layer 3 thickness": 0.2735353720068228,
+      "Layer 4 thickness": 0.04921972749199434,
+      "Layer 5 thickness": 0.7368838988845173,
+      "Layer 6 thickness": 0.16420022795163233
+    },
+    "sensitivity_operand_columns": [
+      "0: R@450.0nm",
+      "1: R@550.0nm",
+      "2: R@650.0nm"
+    ],
+    "sensitivity_rows": 91,
+    "stack_summary": "ThinFilmStack Summary\n---------------------\nIncident:  IdealMaterial\nSubstrate: N-BK7\nLayers:\n  1. MgF2 (94.6 nm)\n  2. Al2O3 (319.7 nm)\n  3. MgF2 (17.7 nm)\n  4. Al2O3 (196.1 nm)\n  5. MgF2 (26.3 nm)\n  6. Al2O3 (170.9 nm)\n  7. MgF2 (190.4 nm)\n---------------------\nTotal Thickness: 1015.7 nm",
+    "upstream_mc_iterations": 500,
+    "zero_perturbation_max_deviation_from_nominal": 0.0
+  },
+  "notes": [],
+  "slug": "t22_thin_film_tolerance_analysis",
+  "title": "Thin Film Tolerance Analysis",
+  "url": "https://www.optiland.org/tutorials/thin-film-tolerance-analysis"
+}

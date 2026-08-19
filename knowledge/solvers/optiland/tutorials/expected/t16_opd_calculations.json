@@ -1,0 +1,150 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "wavefront.OPDFan(lens).view() completed",
+      "kind": "qualitative",
+      "name": "opd_fan_renders_headless",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (721,)",
+      "kind": "invariant",
+      "name": "opd_Hy_0_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (721,)",
+      "kind": "invariant",
+      "name": "opd_Hy_0p7_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (721,)",
+      "kind": "invariant",
+      "name": "opd_Hy_1_finite",
+      "passed": true
+    },
+    {
+      "detail": "OPD at the pupil centre = 0.000e+00 waves; a chief-ray-referenced wavefront has no piston by construction",
+      "kind": "analytic",
+      "name": "opd_is_referenced_to_the_chief_ray_and_zero_at_the_pupil_centre",
+      "passed": true
+    },
+    {
+      "detail": "on-axis peak-to-valley 0.2165: order-unity, so the unit is waves. The raw RealRays.opd accumulator for the same system is a millimetre-scale absolute path (see conventions.md), a different quantity with a different reference.",
+      "kind": "analytic",
+      "name": "opd_is_in_waves_not_millimetres",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.13371400244029388 expected=0.13371400244029388 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "opd_rms_accessor_is_unweighted_sqrt_mean_square_Hy_0",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.18506092648870298 expected=0.18506092648870298 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "opd_rms_accessor_is_unweighted_sqrt_mean_square_Hy_0p7",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.4302959631334137 expected=0.4302959631334137 (rel=1e-09)",
+      "kind": "analytic",
+      "name": "opd_rms_accessor_is_unweighted_sqrt_mean_square_Hy_1",
+      "passed": true
+    },
+    {
+      "detail": "rms() vs piston-removed std per field: Hy_0 0.133714 vs 0.066401, Hy_0p7 0.185061 vs 0.174518, Hy_1 0.430296 vs 0.402579. OPD.rms() is sqrt(mean(opd^2)) with the mean left in, so it is NOT the conventional piston-removed RMS wavefront error; a Marechal or Strehl estimate built on it would be wrong.",
+      "kind": "analytic",
+      "name": "opd_rms_includes_piston_and_is_not_the_conventional_rms_wavefront_error",
+      "passed": true
+    },
+    {
+      "detail": "max |pupil coordinate| = 8.4075: WavefrontData.pupil_x/pupil_y are physical millimetres on the reference sphere, not normalised Px/Py",
+      "kind": "invariant",
+      "name": "pupil_coordinates_are_in_millimetres_not_normalised",
+      "passed": true
+    },
+    {
+      "detail": "mean RealRays.opd = 335128.7 waves absolute against a 0.2165-wave wavefront peak-to-valley: mixing the two would conjugate or piston-shift a coupler's input",
+      "kind": "analytic",
+      "name": "raw_realrays_opd_is_thousands_of_waves_where_the_wavefront_is_units",
+      "passed": true
+    },
+    {
+      "detail": "normalised |<W*y>| on axis = 1.011e-17: the on-axis wavefront of a rotationally symmetric system has no odd (coma-like) content",
+      "kind": "analytic",
+      "name": "on_axis_wavefront_is_even_in_the_pupil_coordinate",
+      "passed": true
+    },
+    {
+      "detail": "normalised |<W*y>| = 0.249560 at Hy=1.0 against 1.011e-17 on axis: coma is odd in the pupil coordinate, and it is what the tutorial's 3D plot at the edge field is showing",
+      "kind": "analytic",
+      "name": "edge_field_wavefront_acquires_odd_coma_like_content",
+      "passed": true
+    },
+    {
+      "detail": "peak-to-valley OPD 0.2165 -> 0.8786 -> 1.9526 waves for Hy = 0, 0.7, 1.0",
+      "kind": "analytic",
+      "name": "aberration_grows_monotonically_with_field",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.wavefront.OPDFan and wavefront.OPD(optic, field=(Hx,Hy), wavelength=...) with .view(projection='2d'|'3d', num_points=...), .rms(), and .data.opd -- chief-ray-referenced, in waves.",
+  "level": "intermediate",
+  "metrics": {
+    "num_surfaces": 11,
+    "odd_in_y_fraction_edge_field": 0.24955951713359636,
+    "odd_in_y_fraction_on_axis": 1.0105617463474849e-17,
+    "opd_by_field": {
+      "Hy_0": {
+        "max_pupil_radius": 8.407530262846024,
+        "max_waves": 0.0,
+        "mean_waves": -0.11606152866466225,
+        "min_waves": -0.21653235977865345,
+        "num_pupil_points": 721,
+        "ptv_waves": 0.21653235977865345,
+        "pupil_coordinate_max_abs_mm": 8.40753026284602,
+        "rms_accessor_waves": 0.13371400244029388,
+        "rms_piston_removed_waves": 0.06640147598227539,
+        "rms_recomputed_waves": 0.13371400244029388,
+        "value_at_pupil_centre_waves": 0.0
+      },
+      "Hy_0p7": {
+        "max_pupil_radius": 13.09039640483393,
+        "max_waves": 0.49985517196062274,
+        "mean_waves": 0.06157190604130342,
+        "min_waves": -0.3787911151915782,
+        "num_pupil_points": 721,
+        "ptv_waves": 0.8786462871522009,
+        "pupil_coordinate_max_abs_mm": 13.087071785098239,
+        "rms_accessor_waves": 0.18506092648870298,
+        "rms_piston_removed_waves": 0.1745177552551546,
+        "rms_recomputed_waves": 0.18506092648870298,
+        "value_at_pupil_centre_waves": -0.05733438763918562
+      },
+      "Hy_1": {
+        "max_pupil_radius": 22.37462675730659,
+        "max_waves": 1.1805322590750922,
+        "mean_waves": 0.15193802494121503,
+        "min_waves": -0.7720712558560975,
+        "num_pupil_points": 721,
+        "ptv_waves": 1.9526035149311896,
+        "pupil_coordinate_max_abs_mm": 22.37266723436389,
+        "rms_accessor_waves": 0.4302959631334137,
+        "rms_piston_removed_waves": 0.4025785047240784,
+        "rms_recomputed_waves": 0.4302959631334137,
+        "value_at_pupil_centre_waves": -0.4321502242598775
+      }
+    },
+    "raw_realrays_opd_max_mm": 196.92169944125723,
+    "raw_realrays_opd_mean_waves": 335128.7065663984,
+    "raw_realrays_opd_min_mm": 196.92157788876293
+  },
+  "notes": [],
+  "slug": "t16_opd_calculations",
+  "title": "OPD Calculations",
+  "url": "https://www.optiland.org/tutorials/opd-calculations"
+}

@@ -72,6 +72,12 @@ class TutorialMeta:
     slow: bool = False
     #: True when the reproduction needs the torch backend (optional install).
     needs_torch: bool = False
+    #: Relative tolerance for replaying this reproduction's recorded metrics.
+    #: Leave None for a deterministic reproduction (the regression test then uses
+    #: a float64-reassociation budget). Set it when the reproduction is genuinely
+    #: stochastic -- e.g. Optiland's numba-backed BSDF scattering, whose RNG is
+    #: not reachable from numpy's seed -- and say why in the module docstring.
+    metric_rtol: float | None = None
 
 
 @dataclass

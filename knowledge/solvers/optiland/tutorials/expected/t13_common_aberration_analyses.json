@@ -1,0 +1,219 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "shape (3, 3) == (3, 3)",
+      "kind": "invariant",
+      "name": "spot_tables_are_field_by_wavelength",
+      "passed": true
+    },
+    {
+      "detail": "(3, 3) == (3, 3)",
+      "kind": "invariant",
+      "name": "rms_and_geometric_tables_have_the_same_shape",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (18,)",
+      "kind": "invariant",
+      "name": "spot_tables_finite",
+      "passed": true
+    },
+    {
+      "detail": "geometric (max excursion) >= RMS (quadratic mean) in all 9 field x wavelength cells; worst margin 1.992768e-03 mm",
+      "kind": "analytic",
+      "name": "geometric_radius_bounds_rms_radius_everywhere",
+      "passed": true
+    },
+    {
+      "detail": "RMS spot radius at the edge field [0.01323623 0.01211669 0.01364868] exceeds the on-axis [0.00379134 0.00429369 0.00619562] at every wavelength",
+      "kind": "analytic",
+      "name": "spot_size_grows_off_axis",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (384,)",
+      "kind": "invariant",
+      "name": "distortion_finite",
+      "passed": true
+    },
+    {
+      "detail": "on-axis distortion per wavelength = [0.0, 0.0, 0.0] %: an axial point has no transverse reference to be distorted against",
+      "kind": "analytic",
+      "name": "distortion_curve_starts_at_zero_on_axis",
+      "passed": true
+    },
+    {
+      "detail": "|distortion| at the edge field exceeds its value at half field, at every wavelength: edge [0.0641, 0.06202, 0.06174] % vs half [0.01641, 0.01544, 0.01491] %",
+      "kind": "analytic",
+      "name": "distortion_grows_monotonically_with_field",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (96,)",
+      "kind": "invariant",
+      "name": "rms_wfe_vs_field_finite",
+      "passed": true
+    },
+    {
+      "detail": "96 entries == 32 field samples x 3 wavelengths",
+      "kind": "invariant",
+      "name": "rms_wavefront_error_is_keyed_by_field_and_wavelength",
+      "passed": true
+    },
+    {
+      "detail": "RMS wavefront error rises from [0.203666, 0.177477, 0.270991] waves on axis to [0.623767, 0.43451, 0.287992] waves at the edge",
+      "kind": "analytic",
+      "name": "wavefront_error_grows_off_axis",
+      "passed": true
+    },
+    {
+      "detail": "RayFan(lens).view() completed; data type dict, all finite=True",
+      "kind": "invariant",
+      "name": "RayFan_runs_headlessly_with_finite_data",
+      "passed": true
+    },
+    {
+      "detail": "YYbar(lens).view() completed; data type dict, all finite=True",
+      "kind": "invariant",
+      "name": "YYbar_runs_headlessly_with_finite_data",
+      "passed": true
+    },
+    {
+      "detail": "GridDistortion(lens).view() completed; data type dict, all finite=True",
+      "kind": "invariant",
+      "name": "GridDistortion_runs_headlessly_with_finite_data",
+      "passed": true
+    },
+    {
+      "detail": "FieldCurvature(lens).view() completed; data type list, all finite=True",
+      "kind": "invariant",
+      "name": "FieldCurvature_runs_headlessly_with_finite_data",
+      "passed": true
+    },
+    {
+      "detail": "RmsSpotSizeVsField(lens).view() completed; data type list, all finite=True",
+      "kind": "invariant",
+      "name": "RmsSpotSizeVsField_runs_headlessly_with_finite_data",
+      "passed": true
+    },
+    {
+      "detail": "PupilAberration(lens).view() completed; data type dict, all finite=True",
+      "kind": "invariant",
+      "name": "PupilAberration_runs_headlessly_with_finite_data",
+      "passed": true
+    }
+  ],
+  "demonstrates": "optiland.analysis.{SpotDiagram,RayFan,YYbar,Distortion,GridDistortion,FieldCurvature,RmsSpotSizeVsField,RmsWavefrontErrorVsField,PupilAberration}, and the [field][wavelength] indexing of SpotDiagram.geometric_spot_radius / rms_spot_radius.",
+  "level": "intermediate",
+  "metrics": {
+    "FieldCurvature_data_type": "list",
+    "GridDistortion_data_type": "dict",
+    "PupilAberration_data_type": "dict",
+    "RayFan_data_type": "dict",
+    "RmsSpotSizeVsField_data_type": "list",
+    "YYbar_data_type": "dict",
+    "distortion_max_abs_percent": [
+      0.06410276103010121,
+      0.06202477227770242,
+      0.061737521692055
+    ],
+    "distortion_num_curves": 3,
+    "distortion_on_axis_percent": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "distortion_points_per_curve": 128,
+    "fields": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.7
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "geometric_spot_radius_mm": [
+      [
+        0.00597244087781173,
+        0.006286457711247717,
+        0.009319114400643258
+      ],
+      [
+        0.03928464835617618,
+        0.04075295155639047,
+        0.04772194200606705
+      ],
+      [
+        0.018909146395329878,
+        0.022501847359635008,
+        0.036545592330568866
+      ]
+    ],
+    "rms_spot_radius_mm": [
+      [
+        0.0037913354614484123,
+        0.0042936895642576465,
+        0.0061956187556729036
+      ],
+      [
+        0.015824800293446215,
+        0.016918412809703645,
+        0.01922116587383654
+      ],
+      [
+        0.013236232767092992,
+        0.012116688566407262,
+        0.013648684944411656
+      ]
+    ],
+    "rms_wfe_edge_field_waves": [
+      0.6237666726548099,
+      0.43451032941319745,
+      0.287992409133255
+    ],
+    "rms_wfe_num_entries": 96,
+    "rms_wfe_num_field_samples": 32,
+    "rms_wfe_on_axis_waves": [
+      0.2036663391555414,
+      0.17747708204720378,
+      0.2709910741457328
+    ],
+    "rms_wfe_wavelengths_um": [
+      0.48,
+      0.55,
+      0.65
+    ],
+    "spot_table_shape": [
+      3,
+      3
+    ],
+    "wavefront_data_class": "WavefrontData",
+    "wavefront_data_fields": [
+      "E_exits",
+      "intensity",
+      "opd",
+      "prt_matrix",
+      "pupil_x",
+      "pupil_y",
+      "pupil_z",
+      "radius"
+    ],
+    "wavefront_opd_samples_per_field": 469,
+    "wavelengths_um": [
+      0.48,
+      0.55,
+      0.65
+    ]
+  },
+  "notes": [],
+  "slug": "t13_common_aberration_analyses",
+  "title": "Common Aberration Analyses",
+  "url": "https://www.optiland.org/tutorials/common-aberration-analyses"
+}

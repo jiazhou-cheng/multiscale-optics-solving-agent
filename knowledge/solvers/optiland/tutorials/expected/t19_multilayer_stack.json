@@ -1,0 +1,130 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "20 layers == 2 x 10 pairs",
+      "kind": "invariant",
+      "name": "ten_pairs_give_twenty_layers",
+      "passed": true
+    },
+    {
+      "detail": "max |t_layer - lambda_ref/(4 n)| = 0.000e+00 um over all 20 layers, with n taken at the declared 0.6 um reference",
+      "kind": "analytic",
+      "name": "qwot_thickness_is_reference_wavelength_over_four_n",
+      "passed": true
+    },
+    {
+      "detail": "R = 99.978% at 0.6 um and normal incidence: the defining property of a 10-pair quarter-wave dielectric mirror",
+      "kind": "analytic",
+      "name": "quarter_wave_stack_is_a_high_reflector_at_the_reference_wavelength",
+      "passed": true
+    },
+    {
+      "detail": "R falls from 99.978% at 0.6 um to 3.291% at 1.2 um, on its way back towards the 4.063% bare-substrate value",
+      "kind": "analytic",
+      "name": "reflectance_collapses_outside_the_stop_band",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (3000,)",
+      "kind": "invariant",
+      "name": "rtRTA_s_finite",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (3000,)",
+      "kind": "invariant",
+      "name": "rtRTA_p_finite",
+      "passed": true
+    },
+    {
+      "detail": "max |R + T + A - 1| over 1000 wavelengths: s 1.110e-16, p 1.110e-16",
+      "kind": "analytic",
+      "name": "energy_is_conserved_for_both_polarizations_at_45_degrees",
+      "passed": true
+    },
+    {
+      "detail": "mean R at 45 deg: s 43.754% > p 25.848%, as the larger s-polarized Fresnel amplitude at every interface requires",
+      "kind": "analytic",
+      "name": "s_reflects_more_than_p_at_oblique_incidence",
+      "passed": true
+    },
+    {
+      "detail": "max |R_s - R_p| = 1.804e-14 at normal incidence but 0.9955 at 45 degrees: there is no plane of incidence to distinguish them at 0 deg",
+      "kind": "analytic",
+      "name": "s_and_p_are_degenerate_at_normal_incidence",
+      "passed": true
+    },
+    {
+      "detail": "all three SpectralAnalyzer/ThinFilmStack figures completed under Agg (map_view reduced from the tutorial's 1000x300 grid to 200x60 for runtime)",
+      "kind": "qualitative",
+      "name": "plot_structure_wavelength_view_and_map_view_render_headless",
+      "passed": true
+    }
+  ],
+  "demonstrates": "ThinFilmStack(reference_wl_um=...), add_layer_qwot, plot_structure, and thin_film.SpectralAnalyzer.wavelength_view / map_view with wavelength_unit='nm'|'wavenumber' and polarization=['s','p'].",
+  "level": "intermediate",
+  "metrics": {
+    "bare_substrate_reflectance_at_1p2um": 0.040630550513677414,
+    "layer_thickness_um": [
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564
+    ],
+    "max_energy_residual_p": 1.1102230246251565e-16,
+    "max_energy_residual_s": 1.1102230246251565e-16,
+    "max_qwot_error_um": 0.0,
+    "max_s_minus_p_at_45deg": 0.995501241724363,
+    "max_s_minus_p_at_normal": 1.8041124150158794e-14,
+    "mean_R_p_at_45deg": 0.2584759192589874,
+    "mean_R_s_at_45deg": 0.4375399154519101,
+    "num_layers": 20,
+    "qwot_closed_form_um": [
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564,
+      0.06238974881183305,
+      0.10154545411465564
+    ],
+    "reference_wl_um": 0.6,
+    "reflectance_at_1p2um": 0.03291448224747212,
+    "reflectance_at_reference": 0.9997790509789024,
+    "stack_summary": "ThinFilmStack Summary\n---------------------\nIncident:  IdealMaterial\nSubstrate: N-BK7\nLayers:\n  1. TiO2 (62.4 nm)\n  2. SiO2 (101.5 nm)\n  3. TiO2 (62.4 nm)\n  4. SiO2 (101.5 nm)\n  5. TiO2 (62.4 nm)\n  6. SiO2 (101.5 nm)\n  7. TiO2 (62.4 nm)\n  8. SiO2 (101.5 nm)\n  9. TiO2 (62.4 nm)\n  10. SiO2 (101.5 nm)\n  11. TiO2 (62.4 nm)\n  12. SiO2 (101.5 nm)\n  13. TiO2 (62.4 nm)\n  14. SiO2 (101.5 nm)\n  15. TiO2 (62.4 nm)\n  16. SiO2 (101.5 nm)\n  17. TiO2 (62.4 nm)\n  18. SiO2 (101.5 nm)\n  19. TiO2 (62.4 nm)\n  20. SiO2 (101.5 nm)\n---------------------\nTotal Thickness: 1639.4 nm"
+  },
+  "notes": [],
+  "slug": "t19_multilayer_stack",
+  "title": "Multilayer Stack",
+  "url": "https://www.optiland.org/tutorials/multilayer-stack"
+}
