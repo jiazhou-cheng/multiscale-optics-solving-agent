@@ -1,0 +1,118 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "observed=1089.536 expected=1089.536 (rel=1e-09)",
+      "kind": "reference",
+      "name": "field_width_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=544.768 expected=544.768 (rel=1e-09)",
+      "kind": "reference",
+      "name": "aperture_width_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=108953.6 expected=108953.6 (rel=1e-09)",
+      "kind": "reference",
+      "name": "propagation_distance_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "the Matsushima-Shimobaba band limit is 0.018796 cycles per length unit against a Nyquist frequency of 0.469925, a ratio of 0.04000. Over 96.00% of the sampled band the un-band-limited kernel is undersampled and wraps energy back into the window. That is why this example exists.",
+      "kind": "analytic",
+      "name": "at_this_distance_the_transfer_function_needs_band_limiting",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (2097152,)",
+      "kind": "invariant",
+      "name": "on_axis_outputs_finite",
+      "passed": true
+    },
+    {
+      "detail": "both outputs are (1024, 1024) at dx 1.064000",
+      "kind": "invariant",
+      "name": "mode_same_preserves_shape_and_pitch_for_both",
+      "passed": true
+    },
+    {
+      "detail": "normalised RMS difference 6.87% between bandlimit=False and bandlimit=True. It is not a no-op, and at this z it is not a small correction either.",
+      "kind": "analytic",
+      "name": "band_limiting_changes_the_result_substantially",
+      "passed": true
+    },
+    {
+      "detail": "discrete power 0.954334 (plain ASM) -> 0.945860 (BLAS), a 0.89% reduction. The excess in the plain result is the aliased content wrapped back into the window: band limiting discards the undersampled part of the transfer function rather than synthesising anything.",
+      "kind": "analytic",
+      "name": "band_limiting_removes_energy_rather_than_adding_it",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "off_axis_outputs_finite",
+      "passed": true
+    },
+    {
+      "detail": "normalised RMS difference 6.87% on axis versus 9.02% with shift_yx=(0, D/2), a factor of 1.31. A displaced window samples a steeper part of the transfer function, so it is further past the band limit.",
+      "kind": "analytic",
+      "name": "band_limiting_matters_more_in_a_displaced_window",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1024, 1024)",
+      "kind": "invariant",
+      "name": "tilted_outputs_finite",
+      "passed": true
+    },
+    {
+      "detail": "with the tilt in y, the on-axis window captures 0.4986 of the power and the y-shifted window 0.9447, a factor of 1.89. This is the y-axis counterpart of the x-axis result in c06, so the shift/tilt pairing is not an accident of one axis.",
+      "kind": "analytic",
+      "name": "a_y_tilt_needs_a_y_shift_to_be_recovered",
+      "passed": true
+    }
+  ],
+  "demonstrates": "asm_propagate(bandlimit=True|False) and its interaction with shift_yx and kykx: the Matsushima-Shimobaba band limit that keeps a long-distance angular-spectrum transfer function from aliasing.",
+  "level": "advanced",
+  "metrics": {
+    "analytic_band_limit": 0.018796052702061795,
+    "aperture_width": 544.768,
+    "band_limit_over_nyquist": 0.0399980001499875,
+    "field_width": 1089.536,
+    "input_power": 1.0000056028366089,
+    "nyquist_frequency": 0.4699248120300752,
+    "off_axis_blas_power": 0.47325465083122253,
+    "off_axis_normalised_rms_difference": 0.09024791314356126,
+    "off_axis_over_on_axis_difference": 1.3136772543731812,
+    "off_axis_plain_power": 0.48013928532600403,
+    "on_axis_blas_dx": 1.0640000104904175,
+    "on_axis_blas_power": 0.9458597898483276,
+    "on_axis_normalised_rms_difference": 0.06869869508901781,
+    "on_axis_plain_dx": 1.0640000104904175,
+    "on_axis_plain_power": 0.9543343186378479,
+    "on_axis_shape": [
+      1024,
+      1024
+    ],
+    "pad_width": [
+      512,
+      512
+    ],
+    "padded_pixels": 2048,
+    "padded_width": 2179.072,
+    "propagation_distance": 108953.6,
+    "spacing": 1.064,
+    "tilt_kykx": [
+      -0.009178218984962405,
+      0.0
+    ],
+    "tilted_on_axis_power": 0.4986462891101837,
+    "tilted_shifted_power": 0.944692850112915
+  },
+  "notes": [],
+  "slug": "c07_bandlimited_angular_spectrum",
+  "title": "Bandlimited Angular Spectrum (BLAS)",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/bandlimited_angular_spectrum/"
+}

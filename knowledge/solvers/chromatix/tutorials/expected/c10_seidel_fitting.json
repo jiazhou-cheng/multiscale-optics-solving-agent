@@ -1,0 +1,164 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "(1152, 1152); upstream prints (1152, 1152)",
+      "kind": "reference",
+      "name": "the_simulation_shape_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "observed=1.11 expected=1.11 (rel=1e-09)",
+      "kind": "reference",
+      "name": "the_simulation_spacing_matches_upstream",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1000,)",
+      "kind": "invariant",
+      "name": "loss_history_finite",
+      "passed": true
+    },
+    {
+      "detail": "observed=1053.2672119140625 expected=1048.5734 (rel=0.05)",
+      "kind": "reference",
+      "name": "initial_loss_matches_upstreams_1048p57",
+      "passed": true
+    },
+    {
+      "detail": "observed=0.784138560295105 expected=0.84318376 (rel=0.3)",
+      "kind": "reference",
+      "name": "converged_loss_matches_upstreams_0p843",
+      "passed": true
+    },
+    {
+      "detail": "observed=4.550079119852744e-05 expected=7.5156146e-05 (rel=0.5)",
+      "kind": "reference",
+      "name": "mean_coefficient_error_matches_upstreams_7p52e_minus_5",
+      "passed": true
+    },
+    {
+      "detail": "estimated [0.425995, 0.413996, 0.411996, 0.002, 0.0] against upstream's published [0.42599541, 0.41199559, 0.40799564, 0.0019999836, 1.6298145e-09] (atol 0.02)",
+      "kind": "reference",
+      "name": "the_estimated_coefficients_match_upstreams_published_values",
+      "passed": true
+    },
+    {
+      "detail": "1053.2672 -> 0.784139, a 1343x reduction",
+      "kind": "invariant",
+      "name": "the_loss_falls_by_more_than_three_orders_of_magnitude",
+      "passed": true
+    },
+    {
+      "detail": "|grad| in [4.664e+00, 9.371e+02] at the first step over all five Seidel coefficients",
+      "kind": "analytic",
+      "name": "every_coefficient_receives_a_finite_gradient",
+      "passed": true
+    },
+    {
+      "detail": "the two coefficients whose truth is 0 come back at [0.00199997, 0.0], while the three whose truth is 0.423352 come back at [0.425995, 0.413996, 0.411996]",
+      "kind": "analytic",
+      "name": "the_fit_separates_present_from_absent_aberrations",
+      "passed": true
+    },
+    {
+      "detail": "upstream's loop passes the INITIAL opt_state on every iteration because its update() returns only (model, metrics). Rebinding the state -- the intended Adam pattern -- raises the final loss from 0.784139 to 9.387870 and the mean squared coefficient error from 4.550079e-05 to 2.321077e-02. With the state frozen every step is a fresh bias-corrected Adam step, i.e. sign descent at a fixed step of lr, which escapes the local minimum that accumulated moments settle into. The published numbers depend on this.",
+      "kind": "analytic",
+      "name": "threading_the_adam_state_through_makes_the_fit_worse",
+      "passed": true
+    },
+    {
+      "detail": "dropping the eqx.tree_at(..., jnp.abs(...)) step raises the mean squared coefficient error from 4.550079e-05 to 3.150956e-01 (final loss 0.784139 -> 1.210140), with negative coefficients present: True. The projection is part of the method, not decoration -- and eqx.tree_at is how a constraint is applied to an equinox.Module between optimizer steps.",
+      "kind": "analytic",
+      "name": "the_eqx_tree_at_non_negativity_projection_is_load_bearing",
+      "passed": true
+    }
+  ],
+  "demonstrates": "chromatix.utils.seidel_aberrations(shape, spacing, wavelength, n, f, NA, coefficients, u, v) inside a differentiable forward model, and the eqx.tree_at projection pattern for a non-negativity constraint.",
+  "level": "advanced",
+  "metrics": {
+    "coefficients_estimated": [
+      0.425995409488678,
+      0.41399556398391724,
+      0.4119955897331238,
+      0.0019999740179628134,
+      9.7136976240364e-10
+    ],
+    "coefficients_truth": [
+      0.4233521521091461,
+      0.4233521521091461,
+      0.4233521521091461,
+      0.0,
+      0.0
+    ],
+    "final_loss": 0.784138560295105,
+    "first_gradient": [
+      8.063644409179688,
+      560.29638671875,
+      7.635956764221191,
+      4.663669586181641,
+      937.0999145507812
+    ],
+    "initial_loss": 1053.2672119140625,
+    "loss_at_iterations": [
+      1053.2672119140625,
+      524.8558349609375,
+      41.36566925048828,
+      23.000577926635742,
+      10.786858558654785,
+      3.250826597213745,
+      0.784138560295105,
+      0.784138560295105
+    ],
+    "max_iterations": 1000,
+    "mean_coefficient_error": 4.550079119852744e-05,
+    "psf_shape": [
+      1152,
+      1152
+    ],
+    "recovered_at_nonzero_truth": [
+      0.425995409488678,
+      0.41399556398391724,
+      0.4119955897331238
+    ],
+    "recovered_at_zero_truth": [
+      0.0019999740179628134,
+      9.7136976240364e-10
+    ],
+    "simulation_shape": [
+      1152,
+      1152
+    ],
+    "simulation_spacing": 1.1111111111111112,
+    "threaded_adam_coefficients": [
+      0.24183009564876556,
+      0.3165828287601471,
+      0.26103508472442627,
+      0.21297204494476318,
+      4.510616054176353e-05
+    ],
+    "threaded_adam_final_loss": 9.387869834899902,
+    "threaded_adam_mean_coefficient_error": 0.023210773943380867,
+    "unprojected_coefficients": [
+      -0.4999944567680359,
+      0.4199954867362976,
+      -0.42399540543556213,
+      0.0699995681643486,
+      -6.675720420901143e-09
+    ],
+    "unprojected_final_loss": 1.210139513015747,
+    "unprojected_has_negative_coefficients": true,
+    "unprojected_mean_coefficient_error": 0.31509561002951897,
+    "upstream_estimated": [
+      0.42599541,
+      0.41199559,
+      0.40799564,
+      0.0019999836,
+      1.6298145e-09
+    ]
+  },
+  "notes": [],
+  "slug": "c10_seidel_fitting",
+  "title": "Seidel Fitting",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/seidel_fitting/"
+}

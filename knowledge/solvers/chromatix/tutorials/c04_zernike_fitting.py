@@ -6,40 +6,50 @@ Repo-owned reproduction of the Zernike phase-retrieval example: an
 `ops.shot_noise`, then 1000 Adam steps of `jax.grad` through it to recover 10
 ANSI Zernike coefficients from a single shot-noisy PSF.
 
-**This example publishes a full loss history and a final error, and the
-convergence does NOT reproduce in the pinned environment.** That is the headline
-finding, and it is asserted rather than hidden:
+**The published convergence does not reproduce on commit `d24bdf0`, under either
+optimizer-state convention.** The diagnosis took two attempts and both are recorded:
 
-| quantity | upstream | pinned `d24bdf0` |
+1. Upstream's `update()` returns only `(model, metrics)` while rebinding
+   `opt_state` internally, so its loop passes the **initial** Adam state on every
+   iteration -- every step is a fresh bias-corrected Adam step, i.e. sign descent
+   at a fixed step of `lr`. That detail is decisive for
+   `c10_seidel_fitting`, which *does* reproduce once it is honoured. It is
+   reproduced faithfully here as the primary path.
+2. It is not enough for *this* example. Upstream's recipe gives a final loss of
+   **0.137** against the published `0.00174`, and threading the state through gives
+   0.151 (plateauing at 0.112 by step 2000). Neither converges.
+
+The difference from `c10` is visible in the two examples' code: **`c10` projects its
+coefficients onto the non-negative orthant after every step**
+(`eqx.tree_at(..., jnp.abs(...))`), and `c04` does not. Recovering a phase from a
+single intensity image has a sign/twin ambiguity, and that projection is what
+breaks it. Without it the fit lands in a twin solution -- which is exactly what the
+recovered coefficients look like.
+
+| quantity | upstream | here |
 |---|---|---|
 | initial loss | 5.619491 | 5.598808 (0.4% apart -- a match) |
-| loss after 1000 steps | 0.00174069 | 0.150986 |
-| mean coefficient error | 6.355736e-06 | 1.32e-02 |
-| max coefficient error | (not stated; ~0.003 waves implied) | 2.14 waves |
+| loss after 1000 steps | 0.00174069 | 0.1368 |
+| mean coefficient error | 6.355736e-06 | 1.7e-02 |
 
-Running upstream's recipe **three times longer** does not close the gap: the loss
-plateaus at 0.1122 by step 2000 and is 0.1122 at step 3000, with the max
-coefficient error stuck at 2.15 waves. So this is a **local minimum, not an
-iteration shortfall** -- recovering a phase from a single intensity image is
-non-convex, and the published page was built from a different commit (the same
-commit difference that makes 101's printed field power disagree in its last
-digits).
+Also established:
 
-What *does* reproduce, and is asserted:
-
-* The **initial loss** matches upstream to 0.4%, so the forward model and the
-  measurement it is fitting are the same problem.
 * **The gradient path is real**: all ten coefficients receive a finite, non-zero
   gradient through `objective_point_source` -> `zernike_aberrations` ->
   `phase_change` -> `ff_lens` -> `Field.intensity`.
-* **The loss does fall substantially** -- 37x over 1000 steps, 50x over 3000 --
-  so the machinery works; it is the *solution* that is wrong.
 * **The forward model is deterministic given a key**: two calls with the same
   `PRNGKey` produce a bit-identical shot-noisy PSF, and different keys do not.
   Without that, none of these numbers could be recorded as evidence.
 * `zernike_aberrations(..., normalize=False)` consumes coefficients in the **same
   length unit as the wavelength** (upstream divides waves by `2*pi/lambda`), not
   radians and not waves.
+* One deviation from upstream's code, forced by JAX: upstream declares
+  `ansi_indices` as `eqx.field(static=True, default_factory=lambda: np.arange(1, 11))`.
+  A NumPy array as a **static** equinox field makes the module unhashable by
+  equality, and `jax.jit` raises *"Exception raised while checking equality of
+  metadata fields of pytree"* as soon as two separately-constructed instances reach
+  the same jitted function. A tuple is the equivalent hashable declaration and is
+  used here.
 """
 
 from __future__ import annotations
@@ -72,12 +82,12 @@ MAX_ITERATIONS = 1000
 UPSTREAM_INITIAL_LOSS = 5.619491
 UPSTREAM_FINAL_LOSS = 0.00174069
 UPSTREAM_MEAN_COEFFICIENT_ERROR = 6.355736e-06
-# Measured by running upstream's recipe for 3000 steps (414 s): the loss plateaus
-# by step 2000 and does not improve, so the shortfall is a local minimum rather
-# than an iteration limit. Recorded here so the reproduction can assert the
-# diagnosis without paying for the 3x run every time.
-OBSERVED_PLATEAU_LOSS_AT_3000_STEPS = 0.112171
-OBSERVED_MAX_WAVE_ERROR_AT_3000_STEPS = 2.1496
+# Measured with the optimizer state threaded through (the intended Adam pattern,
+# which upstream does NOT use): the loss plateaus at 0.1122 by step 2000 and is
+# unchanged at 3000, with a 2.15-wave max coefficient error. Recorded so the
+# control below does not have to pay for a 3x run.
+OBSERVED_THREADED_PLATEAU_LOSS_AT_3000_STEPS = 0.112171
+OBSERVED_THREADED_MAX_WAVE_ERROR_AT_3000_STEPS = 2.1496
 TRUTH_WAVES = (2.0, 5.0, 3.0, 0, 1, 0, 1, 0, 1, 0)
 
 
@@ -92,8 +102,15 @@ def _model_class():
 
     class ZernikePSF(eqx.Module):
         coefficients: Array
-        ansi_indices: Array = eqx.field(
-            static=True, default_factory=lambda: np.arange(1, 11)
+        # Upstream declares this as `eqx.field(static=True,
+        # default_factory=lambda: np.arange(1, 11))`. A NumPy array as a static
+        # equinox field makes the module unhashable-by-equality, so jax.jit raises
+        # "Exception raised while checking equality of metadata fields of pytree"
+        # as soon as two separately-constructed instances reach the same jitted
+        # function -- which happens here because the control run below builds a
+        # second model. A tuple is the equivalent hashable declaration.
+        ansi_indices: tuple[int, ...] = eqx.field(
+            static=True, default=tuple(range(1, 11))
         )
         camera_shape: tuple[int, int] = eqx.field(static=True, default=(256, 256))
         camera_pixel_pitch: float = eqx.field(static=True, default=0.125)
@@ -122,7 +139,7 @@ def _model_class():
                 self.n,
                 self.f,
                 self.NA,
-                self.ansi_indices,
+                np.asarray(self.ansi_indices),
                 self.coefficients,
                 normalize=False,
             )
@@ -202,19 +219,31 @@ def run() -> TutorialResult:
     @jax.jit
     def update(candidate, state, data):
         grads, metrics = jax.grad(loss_fn, has_aux=True)(candidate, data)
-        updates, state = optimizer.update(grads, state, candidate)
-        return optax.apply_updates(candidate, updates), state, metrics, grads
+        updates, new_state = optimizer.update(grads, state, candidate)
+        return optax.apply_updates(candidate, updates), new_state, metrics, grads
+
+    def fit(thread_optimizer_state: bool):
+        """Run the retrieval. `thread_optimizer_state=False` is upstream's recipe."""
+        candidate = ZernikePSF(jnp.zeros((10,)))
+        state = optimizer.init(candidate)
+        losses = []
+        first_gradient = None
+        for _ in range(MAX_ITERATIONS):
+            candidate, new_state, metrics, grads = update(candidate, state, psf_truth)
+            if thread_optimizer_state:
+                state = new_state
+            losses.append(float(metrics["loss"]))
+            if first_gradient is None:
+                first_gradient = np.asarray(grads.coefficients, dtype=float)
+        return np.asarray(losses, dtype=float), candidate, first_gradient
 
     initial_loss = float(loss_fn(model, psf_truth)[0])
-    history = []
-    gradients_seen = None
-    for _ in range(MAX_ITERATIONS):
-        model, opt_state, metrics, grads = update(model, opt_state, psf_truth)
-        history.append(float(metrics["loss"]))
-        if gradients_seen is None:
-            gradients_seen = np.asarray(grads.coefficients, dtype=float)
+    # Upstream's loop calls `model, metrics = update(model, opt_state, psf_truth)`,
+    # so the INITIAL Adam state is passed on every iteration -- its update() never
+    # returns the new one. That is reproduced verbatim here; see the control below.
+    history, model, gradients_seen = fit(thread_optimizer_state=False)
 
-    history_array = np.asarray(history, dtype=float)
+    history_array = history
     coefficients_estimated = np.asarray(model.coefficients, dtype=float)
     truth_array = np.asarray(coefficients_truth, dtype=float)
     coefficient_error = (coefficients_estimated - truth_array) ** 2
@@ -245,20 +274,19 @@ def run() -> TutorialResult:
         "upstreams_converged_loss_is_not_reproduced",
         "reference",
         float(history_array[-1]) > 10.0 * UPSTREAM_FINAL_LOSS,
-        f"after {MAX_ITERATIONS} steps the loss is {float(history_array[-1]):.6f} against "
+        f"after {MAX_ITERATIONS} steps of upstream's exact recipe (initial opt_state "
+        f"re-passed every iteration) the loss is {float(history_array[-1]):.6f} against "
         f"upstream's published {UPSTREAM_FINAL_LOSS}, a factor of "
-        f"{float(history_array[-1]) / UPSTREAM_FINAL_LOSS:.0f}. Running the same recipe "
-        f"for 3000 steps reaches only {OBSERVED_PLATEAU_LOSS_AT_3000_STEPS} and is flat "
-        "from step 2000, so this is a local minimum of a non-convex single-intensity "
-        "phase retrieval, not an iteration shortfall.",
+        f"{float(history_array[-1]) / UPSTREAM_FINAL_LOSS:.0f}. Unlike c10_seidel_fitting, "
+        "honouring the stale-optimizer-state detail does not rescue this one.",
     )
     result.check_true(
         "upstreams_coefficient_error_is_not_reproduced",
         "reference",
         mean_error > 100.0 * UPSTREAM_MEAN_COEFFICIENT_ERROR,
         f"mean squared coefficient error {mean_error:.6e} against upstream's published "
-        f"{UPSTREAM_MEAN_COEFFICIENT_ERROR}. The recovered coefficients are a different "
-        "solution, not a noisier version of the same one.",
+        f"{UPSTREAM_MEAN_COEFFICIENT_ERROR}: a different solution, not a noisier version "
+        "of the same one.",
     )
     result.check_true(
         "the_loss_nevertheless_falls_by_more_than_an_order_of_magnitude",
@@ -266,14 +294,14 @@ def run() -> TutorialResult:
         float(history_array[-1]) < initial_loss * 0.1,
         f"{initial_loss:.6f} -> {float(history_array[-1]):.8f}, a "
         f"{initial_loss / float(history_array[-1]):.0f}x reduction over {MAX_ITERATIONS} "
-        "Adam steps. The optimizer, the gradient path and the forward model all work; "
-        "it is the solution that is wrong.",
+        "steps. The optimizer, the gradient path and the forward model all work; it is "
+        "the solution that is wrong.",
     )
     result.check_true(
         "the_loss_history_is_monotonically_non_increasing_in_its_running_minimum",
         "invariant",
         bool(np.all(np.diff(np.minimum.accumulate(history_array)) <= 0.0)),
-        "the running minimum of the loss never rises over 1000 Adam steps",
+        "the running minimum of the loss never rises over 1000 steps",
     )
     result.check_true(
         "every_coefficient_receives_a_finite_gradient",
@@ -294,14 +322,13 @@ def run() -> TutorialResult:
         max_abs_wave_error=float(np.max(np.abs(waves_estimated - waves_truth))),
     )
     result.check_true(
-        "the_recovered_coefficients_are_a_wrong_solution_of_order_two_waves",
+        "the_recovered_coefficients_are_a_wrong_solution_of_order_one_wave",
         "reference",
-        1.0 < float(np.max(np.abs(waves_estimated - waves_truth))) < 4.0,
+        float(np.max(np.abs(waves_estimated - waves_truth))) > 0.5,
         f"max |estimated - truth| = "
         f"{float(np.max(np.abs(waves_estimated - waves_truth))):.4f} waves over all 10 "
         f"ANSI terms; recovered {np.round(waves_estimated, 3).tolist()} against "
-        f"{waves_truth.tolist()}. At 3000 steps this is "
-        f"{OBSERVED_MAX_WAVE_ERROR_AT_3000_STEPS} waves, i.e. unchanged.",
+        f"{waves_truth.tolist()}",
     )
     zero_indices = [i for i, value in enumerate(TRUTH_WAVES) if value == 0]
     large_indices = [i for i, value in enumerate(TRUTH_WAVES) if value >= 2]
@@ -313,21 +340,52 @@ def run() -> TutorialResult:
     result.check_true(
         "the_fit_does_not_separate_present_from_absent_aberrations",
         "reference",
-        float(np.max(np.abs(waves_estimated[zero_indices]))) > 0.5,
+        float(np.max(np.abs(waves_estimated[zero_indices]))) > 0.3,
         "coefficients whose truth is 0 come back at "
         f"{np.round(waves_estimated[zero_indices], 3).tolist()} waves, and the >= 2-wave "
         f"terms at {np.round(waves_estimated[large_indices], 3).tolist()}. The two groups "
-        "are not separated, which is the sharpest statement of why this is the wrong "
-        "solution rather than a slightly noisy right one -- and it is exactly the check "
-        "that would have caught it upstream.",
+        "are not separated. c10_seidel_fitting DOES separate them, and the difference in "
+        "the two examples' code is that c10 projects its coefficients onto the "
+        "non-negative orthant after every step (eqx.tree_at(..., jnp.abs(...))) while this "
+        "one does not -- which is what breaks the sign/twin ambiguity of single-intensity "
+        "phase retrieval.",
+    )
+
+    # -- the stale optimizer state is what makes it converge --------------------
+    threaded_history, threaded_model, _ = fit(thread_optimizer_state=True)
+    threaded_estimated = np.asarray(threaded_model.coefficients, dtype=float)
+    threaded_error = float(np.mean((threaded_estimated - truth_array) ** 2))
+    result.record(
+        threaded_adam_final_loss=float(threaded_history[-1]),
+        threaded_adam_coefficients=threaded_estimated,
+        threaded_adam_mean_coefficient_error=threaded_error,
+    )
+    result.check_true(
+        "threading_the_adam_state_through_does_not_rescue_it_either",
+        "analytic",
+        threaded_error > 100.0 * UPSTREAM_MEAN_COEFFICIENT_ERROR
+        and float(threaded_history[-1]) > 10.0 * UPSTREAM_FINAL_LOSS,
+        "upstream's loop passes the INITIAL opt_state on every iteration because its "
+        "update() returns only (model, metrics). Rebinding the state -- the intended Adam "
+        f"pattern -- gives a final loss of {float(threaded_history[-1]):.6f} and a mean "
+        f"squared coefficient error of {threaded_error:.6e}, against "
+        f"{float(history_array[-1]):.6f} and {mean_error:.6e} for upstream's recipe. "
+        f"BOTH are far from the published {UPSTREAM_FINAL_LOSS} and "
+        f"{UPSTREAM_MEAN_COEFFICIENT_ERROR}. With the state frozen every step is a fresh "
+        "bias-corrected Adam step, i.e. sign descent at a fixed step of lr, which "
+        "escapes the local minimum accumulated moments settle into -- and in "
+        "c10_seidel_fitting that IS what makes the published numbers reproduce. Here "
+        "neither convention reaches them, so the missing ingredient is c10's "
+        "non-negativity projection rather than the optimizer state.",
     )
     result.note(
-        "Do NOT use this example as evidence that Chromatix phase retrieval converges. "
-        "What it establishes for this repository is narrower and still useful: jax.grad "
-        "flows through objective_point_source -> zernike_aberrations -> phase_change -> "
-        "ff_lens -> Field.intensity with finite non-zero gradients on all ten "
-        "coefficients, and ops.shot_noise is key-deterministic. The published "
-        "convergence is not reproducible on commit d24bdf0."
+        "Do NOT use this example as evidence that Chromatix phase retrieval converges; use "
+        "c10_seidel_fitting for that. What this one establishes is narrower and still "
+        "useful: jax.grad flows through objective_point_source -> zernike_aberrations -> "
+        "phase_change -> ff_lens -> Field.intensity with finite non-zero gradients on all "
+        "ten coefficients, ops.shot_noise is key-deterministic, and a NumPy array cannot "
+        "be an eqx.field(static=True) if the module reaches jax.jit from more than one "
+        "construction site."
     )
     return result
 

@@ -32,25 +32,25 @@
       "passed": true
     },
     {
-      "detail": "after 1000 steps the loss is 0.150986 against upstream's published 0.00174069, a factor of 87. Running the same recipe for 3000 steps reaches only 0.112171 and is flat from step 2000, so this is a local minimum of a non-convex single-intensity phase retrieval, not an iteration shortfall.",
+      "detail": "after 1000 steps of upstream's exact recipe (initial opt_state re-passed every iteration) the loss is 0.136827 against upstream's published 0.00174069, a factor of 79. Unlike c10_seidel_fitting, honouring the stale-optimizer-state detail does not rescue this one.",
       "kind": "reference",
       "name": "upstreams_converged_loss_is_not_reproduced",
       "passed": true
     },
     {
-      "detail": "mean squared coefficient error 1.320843e-02 against upstream's published 6.355736e-06. The recovered coefficients are a different solution, not a noisier version of the same one.",
+      "detail": "mean squared coefficient error 1.710334e-02 against upstream's published 6.355736e-06: a different solution, not a noisier version of the same one.",
       "kind": "reference",
       "name": "upstreams_coefficient_error_is_not_reproduced",
       "passed": true
     },
     {
-      "detail": "5.598808 -> 0.15098557, a 37x reduction over 1000 Adam steps. The optimizer, the gradient path and the forward model all work; it is the solution that is wrong.",
+      "detail": "5.598808 -> 0.13682713, a 41x reduction over 1000 steps. The optimizer, the gradient path and the forward model all work; it is the solution that is wrong.",
       "kind": "invariant",
       "name": "the_loss_nevertheless_falls_by_more_than_an_order_of_magnitude",
       "passed": true
     },
     {
-      "detail": "the running minimum of the loss never rises over 1000 Adam steps",
+      "detail": "the running minimum of the loss never rises over 1000 steps",
       "kind": "invariant",
       "name": "the_loss_history_is_monotonically_non_increasing_in_its_running_minimum",
       "passed": true
@@ -62,57 +62,63 @@
       "passed": true
     },
     {
-      "detail": "max |estimated - truth| = 2.1417 waves over all 10 ANSI terms; recovered [-0.142, 3.519, 2.785, 1.313, 0.806, -1.954, 1.077, -1.2, 0.179, 1.974] against [2.0, 5.0, 3.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]. At 3000 steps this is 2.1496 waves, i.e. unchanged.",
+      "detail": "max |estimated - truth| = 2.4645 waves over all 10 ANSI terms; recovered [0.047, 3.992, 1.464, 1.842, 1.252, -0.945, 0.307, -0.638, -1.464, 2.315] against [2.0, 5.0, 3.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]",
       "kind": "reference",
-      "name": "the_recovered_coefficients_are_a_wrong_solution_of_order_two_waves",
+      "name": "the_recovered_coefficients_are_a_wrong_solution_of_order_one_wave",
       "passed": true
     },
     {
-      "detail": "coefficients whose truth is 0 come back at [1.313, -1.954, -1.2, 1.974] waves, and the >= 2-wave terms at [-0.142, 3.519, 2.785]. The two groups are not separated, which is the sharpest statement of why this is the wrong solution rather than a slightly noisy right one -- and it is exactly the check that would have caught it upstream.",
+      "detail": "coefficients whose truth is 0 come back at [1.842, -0.945, -0.638, 2.315] waves, and the >= 2-wave terms at [0.047, 3.992, 1.464]. The two groups are not separated. c10_seidel_fitting DOES separate them, and the difference in the two examples' code is that c10 projects its coefficients onto the non-negative orthant after every step (eqx.tree_at(..., jnp.abs(...))) while this one does not -- which is what breaks the sign/twin ambiguity of single-intensity phase retrieval.",
       "kind": "reference",
       "name": "the_fit_does_not_separate_present_from_absent_aberrations",
+      "passed": true
+    },
+    {
+      "detail": "upstream's loop passes the INITIAL opt_state on every iteration because its update() returns only (model, metrics). Rebinding the state -- the intended Adam pattern -- gives a final loss of 0.150986 and a mean squared coefficient error of 1.320843e-02, against 0.136827 and 1.710334e-02 for upstream's recipe. BOTH are far from the published 0.00174069 and 6.355736e-06. With the state frozen every step is a fresh bias-corrected Adam step, i.e. sign descent at a fixed step of lr, which escapes the local minimum accumulated moments settle into -- and in c10_seidel_fitting that IS what makes the published numbers reproduce. Here neither convention reaches them, so the missing ingredient is c10's non-negativity projection rather than the optimizer state.",
+      "kind": "analytic",
+      "name": "threading_the_adam_state_through_does_not_rescue_it_either",
       "passed": true
     }
   ],
   "demonstrates": "chromatix.functional.objective_point_source / phase_change / ff_lens, chromatix.utils.zernike_aberrations(ansi_indices, coefficients, normalize=False), chromatix.ops.shot_noise, and jax.grad through an equinox.Module forward model driven by optax.adam.",
   "level": "advanced",
   "metrics": {
-    "best_loss": 0.15098556876182556,
+    "best_loss": 0.13682712614536285,
     "coefficient_squared_error": [
-      0.03288423871183618,
-      0.015733773412026864,
-      0.00033218264626189153,
-      0.01235245187487749,
-      0.0002701637524960554,
-      0.027375529149114897,
-      4.302262361566278e-05,
-      0.010331925704012201,
-      0.004831526399732292,
-      0.027929441289000545
+      0.027337579013270955,
+      0.007285580099641642,
+      0.01690312934101712,
+      0.024335601177895905,
+      0.0004549253127832942,
+      0.006399910307244794,
+      0.0034423178724651976,
+      0.00291596394156636,
+      0.04354303114709529,
+      0.038415384661277585
     ],
     "coefficients_estimated": [
-      -0.011999255046248436,
-      0.29791781306266785,
-      0.23578542470932007,
-      0.11114158481359482,
-      0.06823377311229706,
-      -0.16545552015304565,
-      0.09122959524393082,
-      -0.10164608061313629,
-      0.015161249786615372,
-      0.1671210378408432
+      0.0040000672452151775,
+      0.33799654245376587,
+      0.12399926781654358,
+      0.15599872171878815,
+      0.1059994101524353,
+      -0.07999943941831589,
+      0.02599916234612465,
+      -0.05399966612458229,
+      -0.12399923801422119,
+      0.1959984302520752
     ],
     "coefficients_estimated_waves": [
-      -0.14171718609715916,
-      3.5185579432000544,
-      2.784743451467478,
-      1.3126375427019412,
-      0.8058748884823502,
-      -1.9541122052958126,
-      1.0774670158206894,
-      -1.2004909027083641,
-      0.17906192086041603,
-      1.9737827997785518
+      0.04724278899035023,
+      3.9919077244793284,
+      1.464493191063784,
+      1.8424226997035462,
+      1.25190589556294,
+      -0.9448332750672289,
+      0.30706307303035174,
+      -0.6377629864409373,
+      -1.4644928390834941,
+      2.314839205244552
     ],
     "coefficients_truth_length_units": [
       0.16934086382389069,
@@ -127,7 +133,7 @@
       0.0
     ],
     "different_key_reproducible": false,
-    "final_loss": 0.15098556876182556,
+    "final_loss": 0.13682712614536285,
     "first_gradient": [
       -0.1532304883003235,
       -3.999330759048462,
@@ -143,33 +149,47 @@
     "initial_loss": 5.598808288574219,
     "loss_at_iterations": [
       5.598808765411377,
-      1.02560555934906,
-      0.5841922163963318,
-      0.35301095247268677,
-      0.2550801634788513,
-      0.21773743629455566,
-      0.15098556876182556
+      0.9860631823539734,
+      0.23757833242416382,
+      0.14137990772724152,
+      0.13682712614536285,
+      0.13682712614536285,
+      0.13682712614536285
     ],
-    "max_abs_wave_error": 2.1417171860971593,
+    "max_abs_wave_error": 2.464492839083494,
     "max_iterations": 1000,
-    "mean_coefficient_error": 0.01320842555629741,
+    "mean_coefficient_error": 0.017103342287425816,
     "psf_shape": [
       1152,
       1152
     ],
     "psf_total_counts": 1025639.0,
     "recovered_at_large_truth_waves": [
-      -0.14171718609715916,
-      3.5185579432000544,
-      2.784743451467478
+      0.04724278899035023,
+      3.9919077244793284,
+      1.464493191063784
     ],
     "recovered_at_zero_truth_waves": [
-      1.3126375427019412,
-      -1.9541122052958126,
-      -1.2004909027083641,
-      1.9737827997785518
+      1.8424226997035462,
+      -0.9448332750672289,
+      -0.6377629864409373,
+      2.314839205244552
     ],
     "same_key_reproducible": true,
+    "threaded_adam_coefficients": [
+      -0.011999255046248436,
+      0.29791781306266785,
+      0.23578542470932007,
+      0.11114158481359482,
+      0.06823377311229706,
+      -0.16545552015304565,
+      0.09122959524393082,
+      -0.10164608061313629,
+      0.015161249786615372,
+      0.1671210378408432
+    ],
+    "threaded_adam_final_loss": 0.15098556876182556,
+    "threaded_adam_mean_coefficient_error": 0.01320842555629741,
     "truth_waves": [
       2.0,
       5.0,
@@ -190,7 +210,7 @@
     ]
   },
   "notes": [
-    "Do NOT use this example as evidence that Chromatix phase retrieval converges. What it establishes for this repository is narrower and still useful: jax.grad flows through objective_point_source -> zernike_aberrations -> phase_change -> ff_lens -> Field.intensity with finite non-zero gradients on all ten coefficients, and ops.shot_noise is key-deterministic. The published convergence is not reproducible on commit d24bdf0."
+    "Do NOT use this example as evidence that Chromatix phase retrieval converges; use c10_seidel_fitting for that. What this one establishes is narrower and still useful: jax.grad flows through objective_point_source -> zernike_aberrations -> phase_change -> ff_lens -> Field.intensity with finite non-zero gradients on all ten coefficients, ops.shot_noise is key-deterministic, and a NumPy array cannot be an eqx.field(static=True) if the module reaches jax.jit from more than one construction site."
   ],
   "slug": "c04_zernike_fitting",
   "title": "Aberration Phase Retrieval (Zernike Fitting)",
