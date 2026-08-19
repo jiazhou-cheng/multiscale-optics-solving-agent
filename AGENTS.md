@@ -49,6 +49,40 @@ Task-specific scope lives in Linear and in files explicitly linked by the Linear
 - Do not assume GPU access. Enable or change GPU flags only when the issue and host environment explicitly support it, and record the actual device used.
 - If a required check cannot run through `./run.sh`, report a structured environment/setup failure instead of silently falling back to the host.
 
+## Test Command Surface
+
+The suite is tiered by pytest marker (CHE-52/53/54; full rationale and runtime
+tables in `docs/testing/test_audit.md` and `docs/testing/tier_restructure.md`).
+Pick the command by what you just did, not by habit:
+
+- **Required after every change** — Tier A, the fast development gate (499
+  tests, ~31s measured via `./run.sh`):
+  ```bash
+  ./run.sh pytest -q -m "not slow and not benchmark and not fmmax and not fdtdx and not sax"
+  ```
+- **Subsystem-specific** — Tier B, run when you touched that subsystem
+  specifically (each independently invocable; overlaps with Tier A and with
+  each other by design):
+  ```bash
+  ./run.sh pytest -q -m optiland     # real Optiland ray-tracing engine
+  ./run.sh pytest -q -m chromatix    # real Chromatix wave-propagation engine
+  ./run.sh pytest -q -m coupler      # C_RAY_TO_WAVE / C_WAVE_TO_RAY physics and protocol
+  ./run.sh pytest -q -m "fmmax or fdtdx or sax"   # out-of-current-scope solver adapters
+  ./run.sh pytest -q -m slow         # individually expensive characterization/convergence tests
+  ```
+- **Milestone / full regression** — Tier C, before closing a milestone or
+  merging a PR that touches shared contracts (627 tests, ~11 minutes; includes
+  the four real-solver benchmark reproductions in `tests/benchmarks/`, run via
+  `-m benchmark` on their own):
+  ```bash
+  ./run.sh pytest -q
+  ```
+
+This is orthogonal to the `jax`/`torch`/`integration` markers, which mean
+"requires that optional install," not "is slow" or "is out of scope" — a test
+can be both `chromatix` (current-milestone, Tier-A-eligible) and `jax`+`integration`
+(needs the optional extra) at once.
+
 ## Context Loading
 
 - Do not read every file under `docs/` or `knowledge/` by default.
