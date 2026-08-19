@@ -148,3 +148,212 @@ pytest process.
 restores the previous value afterward. Any other JAX-based adapter test
 that depends on default (non-x64) precision should do the same rather than
 assuming a clean process.
+
+---
+
+# CHE-57 (PB6) failure guide additions
+
+Every entry below was hit while reproducing Chromatix 101 and all 15 documented
+examples against the pinned commit `d24bdf0`. Each has an executable reproduction
+under `knowledge/solvers/chromatix/tutorials/` and recorded evidence in `expected/`.
+
+## A tilted beam lands in the wrong place after `transform_propagate`
+
+**Symptom:** the beam is 6% short of `z * tan(theta)` at 20 degrees; the error grows
+with angle and vanishes as the angle does.
+
+**Cause:** the single-FFT Fresnel propagator's output coordinate is the
+direction-cosine (Fourier) mapping `x' = lambda * z * f_x`, so it reports
+`z * sin(theta)`, not the geometric `z * tan(theta)`.
+
+**Fix:** use `asm_propagate` or `transform_propagate_sas` when the geometric
+position matters; they agree with `z * tan(theta)` and with each other to 0.3%.
+Never mix the two coordinate conventions in one chain.
+
+**Reproduction:** `tutorials/c05_scalable_angular_spectrum.py`.
+
+## A `kykx` tilt is off by a factor of `2*pi`
+
+**Symptom:** the beam moves `2*pi` times too far or too little, or in the wrong
+direction.
+
+**Cause:** `plane_wave(kykx=)` is an **angular wavenumber** (radians per length,
+`sin theta = kykx/k0`) while `asm_propagate(kykx=)` is a **spatial frequency**
+(cycles per length, `sin theta = lambda*kykx`). The `asm_propagate` displacement is
+also opposite in sign to the parameter.
+
+**Fix:** convert explicitly at the boundary. See the measured sweep in
+`conventions.md`, "`kykx` means two different things".
+
+## `use_czt=True` gives an amplitude 14x different from `use_czt=False`
+
+**Symptom:** two calls that differ only in `use_czt` produce fields whose norms
+differ by an order of magnitude, while looking identical when each is normalised.
+
+**Cause:** the modified-kernel and chirp-z implementations of scaled/shifted
+propagation do not share a normalisation. Upstream's own example prints
+`3.1434343` and `44.420246` and compares only after normalising.
+
+**Fix:** normalise before comparing, and do not read either norm as a physical
+power. Both agree with an independent brute-force oversampled BLAS propagation at
+r = 0.9999, so neither is "the wrong one" -- they are on different scales.
+
+**How to detect earlier:** assert on a normalised quantity, or compare `Field.power`
+against an independent computation.
+
+## `asm_propagate` output is aliased at long range
+
+**Symptom:** structure appears that is not in the physics -- wrapped energy, ringing
+that changes with padding.
+
+**Cause:** without `bandlimit=True` the transfer function is sampled far past its
+Matsushima-Shimobaba limit. At `z = 100*D` with 512 px of padding on a 1024 px
+window, that limit is **4% of Nyquist**.
+
+**Fix:** pass `bandlimit=True`, and expect it to *remove* power (0.89% here) --
+that is the aliased content, not a loss of signal. It matters more off axis.
+
+## `Field.power` does not include the `Spectrum` density weights
+
+**Symptom:** a chromatic radiometric budget comes out double-counted.
+
+**Cause:** `Field.power` is 1.0 **per wavelength** regardless of `density`; the
+weights enter `Field.intensity`, which sums over the wavelength axis.
+
+**Fix:** never multiply `power` by `density`. Use `intensity` for a weighted
+quantity.
+
+## `VectorField.u`'s components are in the opposite order to this project's
+
+**Symptom:** an x-polarized field appears to be z-polarized, or a coupler's Jones
+vector is reversed.
+
+**Cause:** Chromatix orders the trailing axis `(E_z, E_y, E_x)`; this project uses
+`(E_x, E_y, E_z)`.
+
+**Fix:** transpose at the boundary. Established by measurement from three entry
+points -- `cf.linear(0)`, `gaussian_plane_wave(amplitude=[0,0,1])`, and
+`modified_born_series.solve()`'s output -- see `conventions.md`, "Polarization".
+
+## `modified_born_series` raises a broadcasting `TypeError`, or its output looks transposed
+
+**Symptom:** `TypeError: mul got incompatible shapes for broadcasting:
+(320, 405, 1, 3), (3, 320, 405, 1)` from `split_trans_long_ft`.
+
+**Cause:** despite `solve()`'s docstring ("the first (left-most) axis the
+polarization vector"), both the input current density and the returned field are
+**component-last** `(*spatial, 3)`.
+
+**Fix:** build the source component-last and index the result with `[..., i]`.
+
+Two neighbouring traps in the same module:
+
+- `Source(current_density=..., k0=...)` takes a **current density**, not a field.
+  `Source(field=...)` raises `TypeError`. It stores
+  `field = -1j/k0 * 1e-6 * c * mu_0 * current_density`.
+- `add_absorbing_bc` **pads** the sample: `[256, 341, 1]` becomes `(320, 405, 1)` at
+  `thickness=2.0`. Use `Sample.ROI` (a tuple of slices) to recover the original
+  region; indexing the padded array with an un-padded mask raises `IndexError`.
+
+**Reproduction:** `tutorials/c15_modified_born_series.py`.
+
+## An `equinox.Module` with a NumPy array as a static field breaks `jax.jit`
+
+**Symptom:** `ValueError: Exception raised while checking equality of metadata
+fields of pytree. Make sure that metadata fields are hashable and have simple
+equality semantics. (Note: arrays cannot be passed as metadata fields!)` -- but only
+once a *second* instance of the module reaches the same jitted function.
+
+**Cause:** `eqx.field(static=True, default_factory=lambda: np.arange(1, 11))` makes
+the module unhashable-by-equality. A single instance works; two do not. The
+upstream Zernike-fitting example declares `ansi_indices` this way.
+
+**Fix:** use a tuple (or any hashable) for the static field and convert inside the
+forward pass.
+
+## `optax` optimizer state silently frozen
+
+**Symptom:** an Adam loop converges much better -- or much worse -- than expected,
+and the difference does not respond to `maxiter`.
+
+**Cause:** two of the four Chromatix optimization examples define
+
+```python
+@jax.jit
+def update(model, opt_state, data):
+    grads, metrics = jax.grad(loss_fn, has_aux=True)(model, data)
+    updates, opt_state = optimizer.update(grads, opt_state, model)
+    model = optax.apply_updates(model, updates)
+    return model, metrics          # <-- opt_state is NOT returned
+```
+
+and call it as `model, metrics = update(model, opt_state, data)`, so the **initial**
+optimizer state is re-passed on every iteration. Every step is then a fresh
+bias-corrected Adam step -- effectively sign descent at a fixed step of `lr` -- and
+the moment estimates never accumulate.
+
+**Consequence:** this is not a cosmetic bug. `c10_seidel_fitting` reproduces its
+published numbers **only** with the state frozen (final loss 0.784 vs 9.39 when
+threaded), while `c03` and `c09` thread it correctly. Before trusting any published
+Chromatix optimization result, check whether its `update()` returns the new state.
+
+**Reproductions:** `tutorials/c04_zernike_fitting.py`, `tutorials/c10_seidel_fitting.py`.
+
+## `scikit-image` is not installed
+
+**Symptom:** `ModuleNotFoundError: No module named 'skimage'` from the Fourier
+ptychography and DMD examples, which use `skimage.data.camera()`, `moon()` and
+`cat()` as targets.
+
+**Fix:** substitute a deterministic target (`chromatix.utils.siemens_star` is
+bundled and works well). Note that upstream's published loss/correlation values are
+properties of those photographs and cannot be reproduced against a different
+target -- only the behavioural claims can.
+
+## `pollen_3d`'s occupancy and `radius` are both counter-intuitive
+
+**Symptom:** `count_nonzero` reports 52% of a "small object" volume occupied, and
+reducing `radius` makes the object *bigger*.
+
+**Cause:** `pollen_3d` returns a real `float64` field, not a mask, and it contains
+subnormal doubles down to `4.9e-324`. Its `radius` is not an object radius: at the
+default `0.8` the phantom is compact and interior, and at `0.25` it fills the whole
+volume and clips against the boundary.
+
+**Fix:** measure occupancy above a threshold relative to the maximum, and keep
+`radius` at or above the default if the phantom must be paddable. Note also that
+upstream colourises it through `np.angle`, which is identically 0 for a
+non-negative real array -- that plot's hue axis carries no information.
+
+## An unseeded `filaments_3d` cannot be a fixture
+
+**Symptom:** a phantom-based test is flaky.
+
+**Cause:** the documented example calls `filaments_3d` without a seed.
+
+**Fix:** the signature *does* accept `seed=` (the Holoscope example uses
+`seed=972920147`) and is bit-reproducible with it. Always pass one.
+
+## `defocused_ramps` requires exactly six `delta` entries
+
+**Symptom:** `IndexError: list index out of range` from
+`chromatix/utils/initializers.py`.
+
+**Cause:** the function indexes `delta[ramp_idx]` for six fixed ramps, so the
+six-view geometry is structural rather than configurable.
+
+**Fix:** pass a 6-element `delta`.
+
+## An FFT-built convolution target is circularly shifted
+
+**Symptom:** a hologram appears not to form at the requested voxel.
+
+**Cause:** `jnp.fft.fftn(kernel, s=sample.shape)` places the kernel's **origin** at
+index 0 rather than centring it, so the circular convolution translates every
+feature by half the kernel width on each axis. The CGH example's three seeded
+voxels end up 12 voxels away from where the blobs actually are.
+
+**Fix:** `fftshift` the kernel before transforming, or evaluate quality at the
+shifted coordinates. Verified: at the shifted centres the optimized intensity is
+75x, 195x and 155x the volume mean; at the seeded coordinates one of the three
+shows no enhancement at all.

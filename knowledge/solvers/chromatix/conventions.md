@@ -64,6 +64,103 @@ Two consequences for coupler design:
    sampling of the resulting field"). Any coupler chaining propagators must
    track `field.dx` explicitly rather than assuming it is constant.
 
+## `kykx` means two different things (CHE-57)
+
+`kykx` appears on both `plane_wave` and `asm_propagate` and the two are a factor of
+`2*pi` apart. Established by sweeping three values and measuring unclipped lateral
+displacements over a known distance:
+
+| function | unit of `kykx` | relation to tilt |
+|---|---|---|
+| `plane_wave(..., kykx=)` | angular wavenumber, radians per length | `sin(theta) = kykx / (2*pi/lambda)` |
+| `asm_propagate(..., kykx=)` | **spatial frequency, cycles per length** | `sin(theta) = lambda * kykx` |
+
+For `asm_propagate` the displacement is also **opposite in sign** to the parameter.
+Measured at `lambda = 0.532`, `z = 108953.6`:
+
+| `kykx_x` | `lambda*|k|*z` | `|k|/(2*pi/lambda)*z` | measured |
+|---|---|---|---|
+| -0.004589 | 266.00 | 42.34 | **265.83** |
+| -0.009178 | 532.00 | 84.67 | **532.30** |
+| -0.018356 | 1064.00 | 169.34 | **1063.15** |
+
+Reading either convention for the other is a `2*pi` position error. Evidence:
+`tutorials/c06_off_axis_propagation.py`, cross-checked against
+`tutorials/c05_scalable_angular_spectrum.py` where the upstream example writes
+`kx = 2*pi/lambda * sin(20 deg)` for `plane_wave` and gets a 20-degree beam.
+
+## `transform_propagate` reports the paraxial position (CHE-57)
+
+The single-FFT Fresnel propagator's output coordinate is the direction-cosine
+(Fourier) mapping `x' = lambda * z * f_x`, so a tilted beam lands at
+`z * sin(theta)` rather than the geometric `z * tan(theta)`. Measured at
+`theta = 20 deg`, `z = 1024`: peak at **350.000**, which is `z*sin(theta) = 350.229`
+to 0.05% and **6.1% short** of `z*tan(theta) = 372.706`.
+
+`transform_propagate_sas` and `asm_propagate` both give the geometric position and
+agree with each other and with `z*tan(theta)` to 0.3% -- from two completely
+different discretisations. Any coupler chaining propagators must not mix the two
+coordinate conventions. Evidence: `tutorials/c05_scalable_angular_spectrum.py`.
+
+SAS additionally rescales its output pitch by **exactly** the magnification the
+caller asks for (`dx_out / dx_in = 8.000000` for `M_box = 8`), where ASM instead
+preserves the pitch and pays with a padded grid.
+
+## Rescaled/shifted propagation: the two paths disagree in amplitude (CHE-57)
+
+`asm_propagate(output_dx=..., shift_yx=...)` has two implementations, selected by
+`use_czt`. They agree on **structure** (r = 0.998-0.9999, normalised RMSE 7.5e-06)
+and **disagree on amplitude by a large factor**: at 4x zoom the CZT output's norm is
+`44.409` against the modified kernel's `3.1434`, i.e. 14.13x.
+
+This is upstream-known: the "Scaled and Shifted Free-Space Propagation" example's
+own printed output is `3.1434343` and `44.420246`, and it compares the two only
+after normalising each by its own norm. It is documented nowhere else.
+**Never treat `use_czt=True` as a drop-in alternative, and never read either norm
+as a physical power.** Both were separately verified against an independent
+4096x4096 brute-force BLAS propagation and agree with it at r = 0.9999.
+
+Evidence: `tutorials/c08_rescaled_propagation.py`, `tutorials/c06_off_axis_propagation.py`.
+
+## Band limiting is not optional at long range (CHE-57)
+
+`asm_propagate(bandlimit=True)` applies the Matsushima-Shimobaba limit
+`f <= 1/(lambda*sqrt((2z/L_pad)^2 + 1))`. At `z = 100*D` on a 1024 px window with
+512 px padding that limit is **4.0% of Nyquist**, i.e. 96% of the sampled band is
+undersampled and the un-band-limited kernel wraps energy back into the window.
+
+Measured consequences: `bandlimit=True` changes the amplitude by 6.9% RMS on axis
+and 9.0% with a displaced window, and **removes** 0.89% of the discrete power --
+it discards the aliased content rather than synthesising anything. Band limiting
+matters *more* off axis, because a displaced window samples a steeper part of the
+transfer function. Evidence: `tutorials/c07_bandlimited_angular_spectrum.py`.
+
+## `Spectrum` density weights do not scale `Field.power` (CHE-57)
+
+For a `ChromaticScalarField` built with
+`Spectrum(wavelength=[0.532, 0.512], density=[0.6, 0.4])`, `Field.power` is
+**1.0 per wavelength**, not density-weighted. The weights enter through
+`Field.intensity`, which sums over the trailing wavelength axis -- so a
+two-wavelength field whose densities sum to 1 has the same *mean intensity* as the
+equivalent monochromatic field while its *power* stays 1 per wavelength. A consumer
+that multiplies `power` by `density` double-counts.
+
+`Field.dx` for a chromatic field is `(num_wavelengths, 2)`, one row per wavelength.
+Evidence: `tutorials/c00_chromatix_101.py`.
+
+## The `elements`/`systems` layer equals the `functional` layer (CHE-57)
+
+`OpticalSystem([PlaneWave(...), FFLens(...)])()` and
+`ff_lens(plane_wave(...), ...)` produce **bit-identical** fields (max
+`|delta u| = 0`). The two APIs are interchangeable, which is what allows the
+adapter to use the functional one while the documentation teaches the element one.
+
+Field names read off the pinned dataclasses rather than the docs:
+`Optical4FSystemPSF(shape, spacing, f_tube, phase)` and
+`Microscope(system_psf, sensor, f, n, NA, spectrum, padding_ratio, ...)` --
+`padding_ratio` lives on `Microscope`, not on `Optical4FSystemPSF`, and `spectrum`
+is required. Evidence: `tutorials/c00_chromatix_101.py`.
+
 ## Phase / Fourier sign convention
 
 From `inspect.getsource(compute_asm_propagator)`: the forward angular
@@ -127,10 +224,39 @@ this default.
 
 `VectorField` and elements like `jones_vector`, `linear_polarizer`,
 `quarterwave_plate`, `halfwave_plate` exist (see `api_minimal_examples.md`
-function list). **Not probed in this pass** — no Jones-basis ordering or
-propagation-frame convention has been verified yet. Treat any
-vector/polarization claim in the model registry as unverified until a
-dedicated probe is added (see `solver_card.yaml` `not_yet_probed`).
+function list).
+
+### Component order established (CHE-57)
+
+**`VectorField.u`'s trailing axis is ordered `(E_z, E_y, E_x)`** — the *reverse* of
+this project's `(E_x, E_y, E_z)`. Any coupler must transpose it.
+
+Established from three independent entry points:
+
+- `cf.linear(0)` (x-polarized) into `plane_wave(scalar=False)` puts 100.0% of the
+  field energy at component index **2** and 0.0% at indices 0 and 1
+  (`tutorials/c11_polarized_multislice.py`).
+- `gaussian_plane_wave(amplitude=jnp.array([0.0, 0.0, 1.0]), scalar=False)` likewise
+  gives an x-polarized pupil (`tutorials/c12_high_na_psf.py`).
+- The upstream birefringence example's own code corroborates it: it normalises by
+  `field.u[90, 90, 2]` to set the *x* amplitude and labels `amplitude[..., 2]` as
+  "Amplitude Ex".
+- `chromatix.experimental.modified_born_series.solve()` uses the same ordering for
+  its own output (`tutorials/c15_modified_born_series.py`).
+
+This matches, and now measures, the note `capability_notes.md` recorded from
+reading `high_na_ff_lens`'s source during CHE-18.
+
+### Tensorial propagation verified (CHE-57)
+
+`cf.polarized_multislice_thick_sample` with a per-voxel 3x3 permittivity tensor
+converts **2.17%** of an x-polarized input's energy into the `E_y`/`E_z` components
+the input did not have, and the four differently-oriented uniaxial beads of the
+upstream example give `|E_y|^2` responses spanning **1022x** — so the crystal
+orientation genuinely enters the calculation rather than being averaged away. The
+assembled tensor is symmetric per voxel to 1.3e-07 relative with 24.8% off-diagonal
+content. Output phase is wrapped into `[-pi, pi]`. Evidence:
+`tutorials/c11_polarized_multislice.py`.
 
 ## Numerical dtype
 

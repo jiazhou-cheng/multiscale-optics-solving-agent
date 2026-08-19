@@ -50,7 +50,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
-from _harness import TutorialMeta, TutorialResult, standalone_main
+from _optiland_harness import TutorialMeta, TutorialResult, standalone_main
 
 TUTORIAL = TutorialMeta(
     slug="t07_anti_reflective_coating",

@@ -1,0 +1,141 @@
+{
+  "all_checks_passed": true,
+  "checks": [
+    {
+      "detail": "import skimage.data -> ModuleNotFoundError: No module named 'skimage'. Upstream's camera()/moon() sample is unavailable, so a deterministic siemens_star amplitude and radial-cosine phase are substituted and upstream's published losses are recorded for reference rather than asserted.",
+      "kind": "invariant",
+      "name": "scikit_image_is_not_available_in_the_pinned_environment",
+      "passed": true
+    },
+    {
+      "detail": "4.20% of the sample amplitude's spectral energy is above the NA/lambda = 0.5639 cycles/um coherent cutoff (Nyquist is 1.6667). Without that, Fourier ptychography would have nothing to recover and every check below would be vacuous.",
+      "kind": "analytic",
+      "name": "the_sample_carries_energy_the_pupil_cannot_pass",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (121, 512, 512)",
+      "kind": "invariant",
+      "name": "measured_images_finite",
+      "passed": true
+    },
+    {
+      "detail": "121 illuminations from an 11x11 kykx grid, matching upstream's '121 measured images'",
+      "kind": "reference",
+      "name": "an_eleven_by_eleven_grid_gives_121_illuminations",
+      "passed": true
+    },
+    {
+      "detail": "only 0.724% of the on-axis image's spectral energy sits above the 0.5639 cycles/um cutoff, against 4.20% in the sample. ff_lens(..., NA=0.3) really is limiting the transferred band.",
+      "kind": "analytic",
+      "name": "the_brightfield_image_is_band_limited_by_the_pupil",
+      "passed": true
+    },
+    {
+      "detail": "RMS difference from the on-axis image: 1.426833e-06 for the adjacent tilt and 2.591150e-05 for the extreme corner tilt, against an image RMS of 2.612210e-05. The 121 measurements are not 121 copies, and the difference grows with tilt as the shifted pupil samples a different part of the sample spectrum.",
+      "kind": "analytic",
+      "name": "tilting_the_illumination_changes_which_frequencies_get_through",
+      "passed": true
+    },
+    {
+      "detail": "all finite over shape (1210,)",
+      "kind": "invariant",
+      "name": "loss_history_finite",
+      "passed": true
+    },
+    {
+      "detail": "mean loss per sweep of all 121 images: 2.272e-10 -> 8.267e-12 -> 6.784e-12 -> 5.485e-12 -> 4.279e-12 -> 3.214e-12 -> 2.327e-12 -> 1.634e-12 -> 1.120e-12 -> 7.553e-13, a 301x reduction over 10 sweeps. Upstream reports 1.84e-10 -> 6.69e-12 -> 8.81e-13 ... on its own sample; the trajectory shape matches even though the absolute values cannot.",
+      "kind": "invariant",
+      "name": "the_sweep_mean_loss_falls_monotonically_by_orders_of_magnitude",
+      "passed": true
+    },
+    {
+      "detail": "Pearson r with the true amplitude: 0.945776 for the initial brightfield guess -> 0.992469 for the reconstruction",
+      "kind": "analytic",
+      "name": "the_reconstruction_matches_the_true_amplitude_better_than_the_initial_guess",
+      "passed": true
+    },
+    {
+      "detail": "spectral energy above the 0.5639 cycles/um single-image cutoff: 0.7236% in the brightfield measurement versus 3.3573% in the reconstruction, a factor of 4.6. Synthesising a wider aperture than any single measurement provides is the entire point of Fourier ptychography, and it is checkable with no reference value at all.",
+      "kind": "analytic",
+      "name": "the_reconstruction_recovers_frequencies_no_single_image_carries",
+      "passed": true
+    }
+  ],
+  "demonstrates": "cx.plane_wave(kykx=) tilted illumination, amplitude_change + phase_change for a complex sample, a two-lens 4f system via ff_lens(..., NA=), jax.vmap over 121 illuminations, and SGD reconstruction of amplitude and phase through the forward model.",
+  "level": "advanced",
+  "metrics": {
+    "amplitude_range": [
+      0.0,
+      1.0
+    ],
+    "brightfield_energy_above_cutoff": 0.007236319437065557,
+    "brightfield_rms": 2.6122102625437406e-05,
+    "centre_illumination_index": 60,
+    "coherent_cutoff_cycles_per_um": 0.5639097744360901,
+    "extreme_illumination_rms_difference": 2.591149932059261e-05,
+    "images_shape": [
+      121,
+      512,
+      512
+    ],
+    "initial_amplitude_correlation": 0.9457759758238469,
+    "kykx_range": [
+      -3.1415927410125732,
+      3.1415927410125732
+    ],
+    "learning_rate": 10000000000000.0,
+    "neighbour_illumination_rms_difference": 1.4268334110985195e-06,
+    "num_illuminations": 121,
+    "num_sweeps": 10,
+    "nyquist_cycles_per_um": 1.6666666666666667,
+    "phase_range": [
+      2.557924279398325e-10,
+      3.141592573749925
+    ],
+    "pupil_NA": 0.3,
+    "reconstructed_amplitude_correlation": 0.9924692695576431,
+    "reconstructed_amplitude_range": [
+      -0.296657532453537,
+      1.6038352251052856
+    ],
+    "reconstructed_phase_range": [
+      -1.6192172765731812,
+      1.5950769186019897
+    ],
+    "reconstruction_energy_above_cutoff": 0.03357334754975544,
+    "reconstruction_over_brightfield_high_frequency": 4.639561291032498,
+    "sample_energy_above_cutoff": 0.042036068810775484,
+    "skimage_import_error": "ModuleNotFoundError: No module named 'skimage'",
+    "substituted_sample": "siemens_star(512) amplitude, radial cosine phase",
+    "sweep_mean_losses": [
+      2.2719837861483509e-10,
+      8.26668421238993e-12,
+      6.783561039913619e-12,
+      5.484976213411921e-12,
+      4.279378606877584e-12,
+      3.213525530257492e-12,
+      2.3274427233829475e-12,
+      1.6343738576443794e-12,
+      1.1204511140977339e-12,
+      7.552995153258495e-13
+    ],
+    "total_updates": 1210,
+    "upstream_losses": [
+      1.8397162959704616e-10,
+      6.692484674081234e-12,
+      8.807251260754823e-13,
+      7.475818466877449e-13,
+      6.836539255712648e-13,
+      6.424953884892615e-13,
+      6.116519508762852e-13,
+      5.859798865755217e-13,
+      5.633953590114538e-13
+    ],
+    "upstream_sample": "skimage.data.camera() amplitude, skimage.data.moon() phase"
+  },
+  "notes": [],
+  "slug": "c01_fourier_ptychography",
+  "title": "Fourier Ptychography",
+  "url": "https://chromatix.readthedocs.io/en/latest/examples/fourier_ptychography/"
+}

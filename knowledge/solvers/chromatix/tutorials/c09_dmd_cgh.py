@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
-from _harness import TutorialMeta, TutorialResult, pin_jax_precision, standalone_main
+from _chromatix_harness import TutorialMeta, TutorialResult, pin_jax_precision, standalone_main
 
 pin_jax_precision()
 

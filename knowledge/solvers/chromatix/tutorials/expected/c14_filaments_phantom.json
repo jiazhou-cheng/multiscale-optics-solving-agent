@@ -32,7 +32,7 @@
       "passed": true
     },
     {
-      "detail": "two identical calls to filaments_3d return bit-identical arrays: True. Occupancy 903169 vs 903169 (relative spread 0.0000). filaments_3d exposes no seed argument, so this is the only way to know -- and if it is False, a filament phantom cannot be frozen as a bit-exact repository fixture, exactly as optiland.scatter cannot.",
+      "detail": "two identical UNSEEDED calls to filaments_3d return bit-identical arrays: True. Occupancy 903169 vs 903169 (relative spread 0.0000). The signature does accept a `seed` -- the Holoscope example passes seed=972920147 -- but this docs page never does, so measuring is the only way to know what the default gives. If it is False, an unseeded filament phantom cannot be frozen as a bit-exact repository fixture.",
       "kind": "invariant",
       "name": "the_generators_reproducibility_is_recorded_either_way",
       "passed": true

@@ -14,12 +14,11 @@ and one of them turns out not to hold:
   substantially more voxels than 5. That is the only check establishing the
   parameter does anything.
 * **The occupancy scales with `radius`** in the same way.
-* **Reproducibility is measured, not assumed.** ``filaments_3d`` takes no seed
-  argument, so this reproduction checks directly whether two identical calls agree,
-  and records the verdict. Whatever the answer, a downstream test must be written
-  to match it -- and if it is not reproducible, a filament phantom cannot be a
-  bit-exact fixture (the same conclusion the Optiland BSDF work reached for
-  ``optiland.scatter``).
+* **Reproducibility is measured, not assumed.** The signature *does* accept a
+  ``seed`` (the Holoscope example uses ``filaments_3d(..., seed=972920147)``), but
+  the docs page reproduced here never passes one, so this reproduction checks
+  directly whether two identical unseeded calls agree and records the verdict.
+  Whatever the answer, a downstream test must be written to match it.
 * The projection the example plots and its ``z = 84`` slice are non-empty.
 """
 
@@ -31,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import numpy as np
-from _harness import TutorialMeta, TutorialResult, pin_jax_precision, standalone_main
+from _chromatix_harness import TutorialMeta, TutorialResult, pin_jax_precision, standalone_main
 
 pin_jax_precision()
 
@@ -142,12 +141,13 @@ def run() -> TutorialResult:
         "the_generators_reproducibility_is_recorded_either_way",
         "invariant",
         True,
-        f"two identical calls to filaments_3d return bit-identical arrays: {identical}. "
-        f"Occupancy {int(np.count_nonzero(array))} vs {int(np.count_nonzero(replay))} "
-        f"(relative spread {occupancy_spread:.4f}). filaments_3d exposes no seed "
-        "argument, so this is the only way to know -- and if it is False, a filament "
-        "phantom cannot be frozen as a bit-exact repository fixture, exactly as "
-        "optiland.scatter cannot.",
+        f"two identical UNSEEDED calls to filaments_3d return bit-identical arrays: "
+        f"{identical}. Occupancy {int(np.count_nonzero(array))} vs "
+        f"{int(np.count_nonzero(replay))} (relative spread {occupancy_spread:.4f}). The "
+        "signature does accept a `seed` -- the Holoscope example passes "
+        "seed=972920147 -- but this docs page never does, so measuring is the only way to "
+        "know what the default gives. If it is False, an unseeded filament phantom cannot "
+        "be frozen as a bit-exact repository fixture.",
     )
 
     # -- the two views the example plots ---------------------------------------

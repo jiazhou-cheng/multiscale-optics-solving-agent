@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _harness import emit, iter_tutorial_modules  # noqa: E402
+from _optiland_harness import emit, iter_tutorial_modules  # noqa: E402
 
 
 def main() -> int:

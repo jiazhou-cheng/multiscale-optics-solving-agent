@@ -99,16 +99,90 @@ The same class of caveat applies to `thick_plano_convex_lens`, which is
 implemented through an ABCD matrix and `ray_transfer` rather than a
 surface-resolved wave-optical prescription.
 
+## Exercised and validated by CHE-57 (PB6)
+
+Chromatix 101 plus all 15 documented examples are reproduced as repo-owned
+executable code with 205 declared checks (46 against published upstream values,
+84 analytic, 75 invariant, 0 qualitative-only). See `tutorials/README.md` for the
+inventory and outcome classification. Newly confirmed working, each with recorded
+evidence:
+
+- **Propagators beyond `asm_propagate`**: `transfer_propagate`,
+  `transform_propagate`, `transform_propagate_sas`, and the rescaled/shifted forms
+  `asm_propagate(output_dx=, shift_yx=, use_czt=)` and
+  `transfer_propagate(output_dx=, shift_yx=)`. Band limiting (`bandlimit=`) and the
+  `shift_grid` coordinate relabelling. Each carries a caveat -- see
+  `conventions.md` and "Confirmed NOT trustworthy" below.
+- **Vector fields and polarization**: `VectorField`, `cf.linear`,
+  `plane_wave(scalar=False)`, `gaussian_plane_wave(amplitude=, scalar=False)`, and
+  `polarized_multislice_thick_sample` with a per-voxel 3x3 permittivity tensor.
+  The `(E_z, E_y, E_x)` component order is now **established by measurement** from
+  three independent entry points (`conventions.md`, "Polarization").
+- **Chromatic batched propagation**: `ChromaticScalarField` via `Spectrum`, its
+  `(num_wavelengths, 2)` `dx`, and the fact that density weights enter
+  `Field.intensity` and not `Field.power`.
+- **`z`-batched propagation**: a 1D `z` adds a leading batch axis, so one call
+  produces a whole 3D stack and one `jax.grad` differentiates all planes at once
+  (verified on 40- and 51-plane stacks).
+- **Gradients through many more paths than the original probe**: `jax.grad` flows
+  through `objective_point_source -> zernike_aberrations -> phase_change ->
+  ff_lens -> intensity` (10 parameters), through `phase_change -> ff_lens ->
+  transfer_propagate` over 51 planes (65536 parameters), through
+  `amplitude_change(binarize(...)) -> asm_propagate` (a **surrogate** gradient
+  through a hard threshold), and through a two-lens 4f system to a sample's
+  amplitude and phase. All with finite non-zero gradients.
+- **The `elements`/`systems` composition layer**, verified **bit-identical** to the
+  equivalent `functional` calls: `OpticalSystem`, `PlaneWave`, `FFLens`,
+  `BasicSensor`, `Optical4FSystemPSF`, `Microscope`, `ClearThinSample`.
+- **Utilities**: `siemens_star`, `zernike_aberrations`, `seidel_aberrations`,
+  `defocused_ramps`, `center_crop`, `sigmoid_taper`, `pollen_3d`, `filaments_3d`,
+  `Field.spatial_limits` / `spatial_shape` / `extent`.
+- **`chromatix.ops`**: `shot_noise` (key-deterministic) and `binarize` (a hard
+  two-level threshold carrying a surrogate gradient).
+- **`chromatix.experimental.modified_born_series`** -- the only full-wave solver in
+  the package. Validated against a closed form: on a homogeneous domain the solved
+  field's axial phase gradient is `12.5656` against the analytic `k0*n = 12.5664`
+  (0.006%), and its two algorithms (fixed point and BiCGStab) agree at a complex
+  overlap above 0.99.
+
+## Confirmed NOT trustworthy in the pinned commit (CHE-57)
+
+Each of these runs without error and is wrong or misleading. Full detail in
+`conventions.md` and `failure_guide.md`.
+
+- **`transform_propagate` mis-places a tilted beam** by `tan - sin`: 6.1% at 20
+  degrees. Its output coordinate is the paraxial direction-cosine mapping.
+- **`asm_propagate`'s `kykx` is a spatial frequency while `plane_wave`'s is an
+  angular wavenumber** -- same name, factor of `2*pi`, opposite displacement sign.
+- **`use_czt=True` is not a drop-in for the modified-kernel shifted propagation**:
+  a 14.13x amplitude-scale difference at 4x zoom. Upstream-known but documented
+  only in one example's printed output.
+- **`high_na_ff_lens` is still not sampling-independent** (re-confirmed
+  independently of CHE-18: `Iz/Ix` moves 3.2x under pure pupil refinement).
+- **`modified_born_series.solve()`'s docstring contradicts its own layout** --
+  it returns component-last `(*spatial, 3)`, not polarization-first, and its input
+  current density must be component-last too.
+- **`pollen_3d` returns a real array full of subnormals** with a
+  counter-intuitive `radius` (smaller = larger object).
+- **Two of the four optimization examples pass a stale `opt_state`**, and one of
+  them depends on that to converge at all.
+
 ## Not yet exercised in this repository
 
 - GPU/TPU execution (this environment has CPU only; `jax.devices()` reports
-  a single `TFRT_CPU_0`).
-- Vector fields / polarization elements.
-- Chromatic (multi-wavelength) batched propagation.
+  a single `TFRT_CPU_0`). `jax_enable_x64=True` end to end.
 - Airy-pattern / hard-aperture diffraction comparison — listed as a required
   probe in `knowledge/solver_cards/chromatix.yaml`, still not implemented.
   The Gaussian benchmark deliberately uses a smooth, band-limited field and
   therefore says nothing about how this path handles a sharp aperture edge.
-- Any gradient through `asm_propagate`. The one gradient probe covers
-  `thin_lens -> transform_propagate`, which neither adapter entry point
-  implements.
+  (CHE-35's `m3_pupil_to_focus` probe does reach 0.990 of the analytic Airy peak
+  for a clear circular aperture, so this gap is narrower than it was.)
+- A **gradient through `asm_propagate`** specifically. CHE-57 adds gradients
+  through `transfer_propagate` (c03), `ff_lens` (c01, c04, c10) and
+  `asm_propagate` in the DMD example (c09) -- but the last is a forward-only
+  hologram optimization, not the directional-derivative convergence study the
+  repository gradient contract requires.
+- Reading a genuine vendor image: `scikit-image` is **not installed**, so the two
+  examples that need `skimage.data` (`c01`, `c09`) use substituted targets.
+- `optiland`-style multi-device or sharded execution, and anything in
+  `chromatix.experimental` other than `modified_born_series`.

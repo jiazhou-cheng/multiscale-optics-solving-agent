@@ -1,8 +1,8 @@
-"""CHE-57 (PB6): the repo-owned Optiland tutorial reproductions, as a regression gate.
+"""CHE-57 (PB6): the repo-owned Chromatix example reproductions, as a regression gate.
 
 Each test executes one reproduction from
-`knowledge/solvers/optiland/tutorials/` against the pinned `optiland==0.6.0`
-install and asserts two things:
+`knowledge/solvers/chromatix/tutorials/` against the pinned `chromatix==0.6.0`
+install (commit `d24bdf0`) and asserts two things:
 
 1. every validation check the reproduction declares still passes, and
 2. the recorded evidence in `knowledge/solvers/optiland/tutorials/expected/`
@@ -12,7 +12,7 @@ install and asserts two things:
 
 Refresh the recorded evidence with
 
-    ./run.sh python knowledge/solvers/optiland/tutorials/run_all.py --write-expected
+    ./run.sh python knowledge/solvers/chromatix/tutorials/run_all.py --write-expected
 
 A reproduction that is genuinely stochastic declares its own ``metric_rtol`` in
 its ``TutorialMeta`` (with the reason in its docstring); everything else replays
@@ -20,7 +20,8 @@ at the deterministic budget.
 
 Reproductions marked ``slow`` in their ``TutorialMeta`` are routed to the
 ``slow`` marker and so are excluded from the Tier A gate; the rest run in Tier A.
-Reproductions marked ``needs_torch`` additionally carry the ``torch`` marker.
+All of these reproductions exercise the real Chromatix engine through JAX, so every
+test carries the ``chromatix`` and ``jax`` markers on top of ``integration``.
 """
 
 from __future__ import annotations
@@ -33,15 +34,16 @@ from pathlib import Path
 import pytest
 
 TUTORIAL_DIR = (
-    Path(__file__).resolve().parents[1] / "knowledge" / "solvers" / "optiland" / "tutorials"
+    Path(__file__).resolve().parents[1] / "knowledge" / "solvers" / "chromatix" / "tutorials"
 )
 sys.path.insert(0, str(TUTORIAL_DIR))
 
-pytest.importorskip("optiland")
+pytest.importorskip("chromatix")
+pytest.importorskip("jax")
 
-from _optiland_harness import expected_path, load_tutorial_module, tutorial_module_paths  # noqa: E402
+from _chromatix_harness import expected_path, load_tutorial_module, tutorial_module_paths  # noqa: E402
 
-pytestmark = [pytest.mark.optiland, pytest.mark.integration]
+pytestmark = [pytest.mark.chromatix, pytest.mark.jax, pytest.mark.integration]
 
 # Relative tolerance for replaying a recorded numeric metric. Optiland's numpy
 # path is deterministic, so this is a float64-reassociation budget, not a
@@ -102,9 +104,7 @@ def test_tutorial_reproduction(path: Path) -> None:
     assert {c["name"] for c in recorded["checks"]} == {c.name for c in result.checks}
     assert all(c["passed"] for c in recorded["checks"])
 
-    rtol = meta.metric_rtol
-    if rtol is None:
-        rtol = LOOSE_METRIC_RTOL if meta.needs_torch else METRIC_RTOL
+    rtol = meta.metric_rtol if meta.metric_rtol is not None else METRIC_RTOL
     observed = dict(_flatten(result.metrics))
     for key, want in _flatten(recorded["metrics"]):
         assert key in observed, f"{meta.slug}: recorded metric {key} is no longer produced"
@@ -116,9 +116,27 @@ def test_tutorial_reproduction(path: Path) -> None:
                 math.isnan(got) and math.isnan(want)
             ), f"{meta.slug}: metric {key} changed: {got!r} != {want!r}"
         else:
+            # abs_tol is scaled to the recorded magnitude so a metric whose true
+            # value is ~0 (a residual, a symmetry error) is not compared at 1e-12.
             assert math.isclose(
-                float(got), float(want), rel_tol=rtol, abs_tol=1e-12
+                float(got), float(want), rel_tol=rtol, abs_tol=max(1e-9, 1e-6 * abs(want))
             ), f"{meta.slug}: metric {key} drifted: {got!r} vs recorded {want!r}"
+
+
+def test_jax_x64_is_pinned_off() -> None:
+    """The recorded numbers assume complex64.
+
+    `sax.saxtypes.core` sets `jax_enable_x64=True` as an import side effect and the
+    adapter registry imports every adapter eagerly, so collection order could
+    otherwise flip this process-wide (see `conventions.md`, "Numerical dtype").
+    The harness pins it at import; this asserts the pin held.
+    """
+    import jax
+
+    from _chromatix_harness import pin_jax_precision
+
+    pin_jax_precision()
+    assert jax.config.jax_enable_x64 is False
 
 
 def test_every_expected_file_has_a_reproduction() -> None:

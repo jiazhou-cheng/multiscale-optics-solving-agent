@@ -28,11 +28,27 @@ supported_regimes:
   - signed paraxial focusing through an ideal thin-lens phase
   - fixed Gaussian grid/padding/determinism scaling
 package_reported_unverified_regimes:
-  - vector fields and polarization elements
-  - GPU and TPU execution
-  - Fourier/Fresnel kernels other than the independently checked paraxial oracle
-  - thick lenses, gratings, polarizers, sensors, and objective sources
-  - batched wavelength and multi-depth fields
+  # CHE-57 (PB6) moved most of this list into verified_by_che57_example_reproductions
+  # below. What genuinely remains unverified:
+  - GPU and TPU execution (no accelerator in this container; jax.devices() reports one TFRT_CPU_0)
+  - jax_enable_x64=True end to end (pinned False everywhere; see conventions.md)
+  - thick lenses, gratings and the objective/sensor chain beyond what the examples exercise
+  - reading a genuine vendor image (scikit-image is NOT installed; see failure_guide.md)
+  - anything in chromatix.experimental other than modified_born_series
+verified_by_che57_example_reproductions:
+  # 16 repo-owned reproductions of Chromatix 101 and all 15 documented examples,
+  # 205 declared checks (46 reference / 84 analytic / 75 invariant / 0
+  # qualitative-only). See tutorials/README.md for the inventory, the upstream
+  # claims that do NOT reproduce, and the two environment blockers.
+  - "propagators: transfer_propagate, transform_propagate, transform_propagate_sas, and the rescaled/shifted asm_propagate(output_dx, shift_yx, use_czt) and transfer_propagate(output_dx, shift_yx) forms, plus bandlimit= and shift_grid"
+  - "vector fields and polarization: VectorField, cf.linear, plane_wave(scalar=False), gaussian_plane_wave(amplitude, scalar=False), polarized_multislice_thick_sample -- and the (E_z, E_y, E_x) component order now ESTABLISHED BY MEASUREMENT from three entry points"
+  - "chromatic fields: ChromaticScalarField via Spectrum, its (num_wavelengths, 2) dx, and the fact that density weights enter Field.intensity and NOT Field.power"
+  - "z-batched propagation: a 1D z adds a leading batch axis, verified on 40- and 51-plane stacks with one jax.grad over all planes"
+  - "gradients through objective_point_source -> zernike_aberrations/seidel_aberrations -> phase_change -> ff_lens -> intensity, through phase_change -> ff_lens -> transfer_propagate over 51 planes, through amplitude_change(binarize(...)) -> asm_propagate (a SURROGATE gradient through a hard threshold), and through a two-lens 4f system to a sample amplitude and phase"
+  - "the elements/systems layer, verified BIT-IDENTICAL to the equivalent functional calls: OpticalSystem, PlaneWave, FFLens, BasicSensor, Optical4FSystemPSF, Microscope"
+  - "utils: siemens_star, zernike_aberrations, seidel_aberrations, defocused_ramps, center_crop, sigmoid_taper, pollen_3d, filaments_3d, Field.spatial_limits/spatial_shape/extent"
+  - "ops: shot_noise (key-deterministic) and binarize (hard threshold with a surrogate gradient)"
+  - "chromatix.experimental.modified_born_series: the only full-wave solver in the package, validated against a closed form (axial phase gradient 12.5656 vs the analytic k0*n = 12.5664, 0.006%) with its two algorithms agreeing at a complex overlap above 0.99"
 derivative:
   mode: native_autodiff
   mechanism: jax.grad through Field pytrees (Field is an equinox Module)
@@ -45,6 +61,23 @@ derivative:
     gradient-verification policy (needs multiple step sizes, a convergence table,
     and an ill-conditioned case) and does not cover asm_propagate, vector
     fields, or phase masks. Do not set verified: true from this alone.
+
+    CHE-57 broadens the evidence considerably without changing this verdict:
+    jax.grad now demonstrably flows through phase masks (65536 parameters over a
+    51-plane stack), through zernike_aberrations and seidel_aberrations, through
+    a two-lens 4f system to a sample's amplitude and phase, and through
+    chromatix.ops.binarize via a surrogate gradient. All with finite non-zero
+    gradients. None of those is a convergence study either, so verified stays
+    false.
+  optimizer_hazard: >
+    CHE-57: two of the four Chromatix optimization examples pass a STALE optax
+    state -- their update() rebinds opt_state internally but returns only
+    (model, metrics), so the loop re-passes the initial Adam state every
+    iteration and the moment estimates never accumulate. This is not cosmetic:
+    the Seidel-fitting example reproduces its published numbers ONLY with the
+    state frozen (final loss 0.784 vs 9.39 threaded). Before trusting any
+    published Chromatix optimization result, check whether its update() returns
+    the new state. See failure_guide.md.
 devices_reported_by_package: [cpu, gpu, tpu]
 devices_tested: [cpu]
 dtypes_validated_for_m1: [complex64]
@@ -54,6 +87,13 @@ known_conventions: see conventions.md
 cost_scaling: "O(batch * pixels * log(pixels)) for FFT-based propagators (transform_propagate, asm_propagate)"
 limitations_and_failure_modes: see failure_guide.md
 validated_probe_ids:
+  - >
+    chromatix example reproductions c00-c15 (CHE-57 / PB6; Chromatix 101 plus all
+    15 documented examples, reimplemented as repo-owned executable code with 205
+    declared checks -- 46 against published upstream values, 84 analytic, 75
+    invariant, 0 qualitative-only -- gated by tests/test_chromatix_tutorials.py.
+    Inventory, outcome classification, unreproducible upstream claims and
+    environment blockers in tutorials/README.md)
   - import_probe (passed, 2026-07-30)
   - propagation_probe (passed, 2026-07-30; not yet compared to an analytic oracle)
   - gradient_probe (passed for one narrow path, 2026-07-30)
@@ -149,7 +189,13 @@ not_yet_probed:
     vector field / polarization paths other than high_na_ff_lens, which was
     probed by L1-WAVE-01 Case 3 and is listed under known_defective
   - batched wavelength (chromatic) propagation
-  - any gradient through asm_propagate (the one gradient probe covers transform_propagate)
+  - >
+    a directional-derivative CONVERGENCE STUDY through asm_propagate. CHE-57 adds
+    working gradients through transfer_propagate, ff_lens and asm_propagate (the
+    DMD example), but those are forward hologram optimizations, not the
+    multiple-step-size convergence table the repository gradient contract requires.
+  - jax_enable_x64=True end to end
+  - "reading a genuine vendor image: scikit-image is not installed, so the two examples that need skimage.data use substituted targets (see tutorials/README.md)"
 adapter_location: src/multiscale_optics_agent/adapters/chromatix_adapter.py
 standalone_baseline:
   entry_point: ChromatixAdapter.run_standalone (ChromatixWaveRequest -> ChromatixWaveResult)

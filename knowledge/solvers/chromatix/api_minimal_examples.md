@@ -48,10 +48,21 @@ Full probe: `probes/propagation_probe.py`; captured output:
 
 ## 3. Batched / vectorized example
 
-Not yet executed in this repository. `z` accepts a 1D array per the
-`asm_propagate`/`transform_propagate` docstrings ("a 1D array of distances,
-in which case a batch dimension will be added"); this should be probed
-before an adapter relies on it.
+**Verified by CHE-57.** A 1D `z` adds a leading batch axis, so one propagation call
+produces a whole 3D stack and one `jax.grad` differentiates every plane at once:
+
+```python
+z = jnp.linspace(0.0, 100.0e4, num=51)
+field = cx.transfer_propagate(field, z, n, pad_width=0, mode="same")
+field.intensity.shape   # -> (51, 256, 256, 1, 1)
+```
+
+Confirmed on a 51-plane `transfer_propagate` stack
+(`tutorials/c03_computer_generated_holography.py`, which reproduces upstream's
+printed `(51, 256, 256)`) and a 40-plane `objective_point_source` stack at
+1920x1920 (`tutorials/c02_holoscope.py`). `jax.vmap` over an illumination
+parameter also works: `tutorials/c01_fourier_ptychography.py` vmaps 121 tilted
+illuminations through a full 4f system.
 
 ## 4. Gradient example
 
@@ -81,3 +92,113 @@ Not yet exercised.
 ## 6. Common error signatures and repairs
 
 See `failure_guide.md`.
+
+## 7. Chromatic (multi-wavelength) fields
+
+```python
+from chromatix import Spectrum
+
+field = cx.plane_wave(
+    shape=(512, 512), dx=0.3,
+    spectrum=Spectrum(wavelength=[0.532, 0.512], density=[0.6, 0.4]),
+)
+type(field).__name__   # -> 'ChromaticScalarField'
+field.shape            # -> (512, 512, 2)   trailing wavelength axis
+field.dx               # -> [[0.3, 0.3], [0.3, 0.3]]   one ROW per wavelength
+field.power            # -> 1.0 PER WAVELENGTH, not density-weighted
+```
+
+The `density` weights enter `Field.intensity` (which sums over the wavelength axis),
+**not** `Field.power`. See `conventions.md`. Evidence:
+`tutorials/c00_chromatix_101.py`.
+
+## 8. The `elements`/`systems` layer, and its equivalence to `functional`
+
+```python
+from chromatix.elements import PlaneWave, FFLens
+from chromatix.systems import OpticalSystem
+
+system = OpticalSystem([
+    PlaneWave(shape=(128, 128), dx=0.3, spectrum=0.532),
+    FFLens(f=100.0, n=1.0),
+])
+np.max(np.abs(system().u - cx.ff_lens(cx.plane_wave((128, 128), 0.3, 0.532), 100.0, 1.0).u))
+# -> 0.0   bit-identical
+```
+
+Pinned dataclass fields, read off the installed package rather than the docs:
+`Optical4FSystemPSF(shape, spacing, f_tube, phase)` and
+`Microscope(system_psf, sensor, f, n, NA, spectrum, padding_ratio, taper_width, ...)`.
+`padding_ratio` is on `Microscope`, not `Optical4FSystemPSF`, and `spectrum` is
+required. Evidence: `tutorials/c00_chromatix_101.py`.
+
+## 9. Scaled / shifted / band-limited propagation
+
+```python
+# band-limited, cropped back to the input shape
+out = cx.asm_propagate(field, z, n, pad_width=(512, 512), mode="same", bandlimit=True)
+
+# a zoomed, laterally shifted output window -- two implementations
+yu  = cx.asm_propagate(field, z, n, pad_width=pad, mode="same", bandlimit=True,
+                       output_dx=field.dx / 4, shift_yx=[0.0, w / 2], use_czt=False)
+czt = cx.asm_propagate(field, z, n, pad_width=pad, mode="same", bandlimit=True,
+                       output_dx=field.dx / 4, shift_yx=[0.0, w / 2], use_czt=True)
+np.linalg.norm(yu.amplitude), np.linalg.norm(czt.amplitude)   # -> 3.143, 44.409
+```
+
+**The two paths differ in amplitude by 14.13x** -- normalise before comparing. And
+`asm_propagate`'s `kykx` is a spatial frequency while `plane_wave`'s is an angular
+wavenumber. Both caveats are in `conventions.md` and `failure_guide.md`. Evidence:
+`tutorials/c06_off_axis_propagation.py`, `tutorials/c07_bandlimited_angular_spectrum.py`,
+`tutorials/c08_rescaled_propagation.py`.
+
+## 10. Vector fields
+
+```python
+field = cx.plane_wave((180, 180), 0.065, 0.405, amplitude=cx.linear(0), scalar=False)
+type(field).__name__          # -> 'VectorField'
+field.u.shape                 # -> (180, 180, 3)
+# component order is (E_z, E_y, E_x) -- the REVERSE of this project's convention.
+# cf.linear(0) is x-polarized, so all its energy is at index 2.
+out = cx.polarized_multislice_thick_sample(field, potential, n_background, spacing, NA=NA)
+```
+
+Evidence: `tutorials/c11_polarized_multislice.py`, `tutorials/c12_high_na_psf.py`.
+
+## 11. The full-wave solver (`chromatix.experimental`)
+
+```python
+from chromatix.experimental.modified_born_series.sample import (
+    EmptySample, Source, add_absorbing_bc,
+)
+from chromatix.experimental.modified_born_series.solver import solve
+
+sample = EmptySample([256, 341, 1], wavelength / 8)
+sample = sample.replace(permittivity=refractive_index**2)
+sample = add_absorbing_bc(sample, axis=(0, 1), thickness=2.0, max_extinction=0.25)
+# NOTE: this PADS the sample; use sample.ROI to recover the original region.
+
+current_density = jnp.zeros((*sample.permittivity.shape, 3), dtype=jnp.complex64)  # component LAST
+current_density = current_density.at[entrance, sample.ROI[1], :, 2].set(1.0)
+E = solve(sample, Source(current_density=current_density, k0=2 * jnp.pi / wavelength),
+          maxiter=400, tol=1e-4)
+E.shape   # -> (*spatial, 3)   component LAST, despite the docstring
+```
+
+`Source` takes a **current density**, not a field. Validated against a closed form:
+on a homogeneous domain the axial phase gradient is `12.5656` against the analytic
+`k0*n = 12.5664`. Evidence: `tutorials/c15_modified_born_series.py`.
+
+## 12. Full-fidelity example reproductions
+
+16 executable reproductions of Chromatix 101 and all 15 documented examples live
+under `knowledge/solvers/chromatix/tutorials/`, each printing machine-readable
+evidence. They are the fastest way to find a working minimal example of a
+specific API:
+
+```bash
+./run.sh python knowledge/solvers/chromatix/tutorials/c06_off_axis_propagation.py
+```
+
+See `tutorials/README.md` for the API-to-example index, the coverage table, and the
+list of upstream claims that do not reproduce.
