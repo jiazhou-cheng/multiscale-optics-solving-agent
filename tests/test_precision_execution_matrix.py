@@ -51,8 +51,8 @@ import pytest
 
 from multiscale_optics_agent.core.arrays import array_state, xp_for
 from multiscale_optics_agent.core.capabilities import (
-    CHROMATIX_CAPABILITIES,
     C_RAY_TO_WAVE_CAPABILITIES,
+    CHROMATIX_CAPABILITIES,
 )
 from multiscale_optics_agent.core.precision import (
     ArrayNamespace,
@@ -68,11 +68,11 @@ from multiscale_optics_agent.core.precision import (
 )
 from multiscale_optics_agent.couplers.bridge import bridge_complex_field, bridge_ray_bundle
 from multiscale_optics_agent.couplers.contracts import (
+    PSF,
     ComplexField,
     ContractCode,
     ContractError,
     Frame,
-    PSF,
     RayBundle,
     ReferencePlane,
 )

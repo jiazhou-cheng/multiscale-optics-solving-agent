@@ -191,7 +191,9 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
         ("float64", 1e-4, 1e-5),
     ],
 )
-def test_gradient_matches_recorded_probe_within_known_tolerance(dtype, objective_rel, grad_rel) -> None:
+def test_gradient_matches_recorded_probe_within_known_tolerance(
+    dtype, objective_rel, grad_rel
+) -> None:
     """Reproduce knowledge/solvers/optiland/probes/gradient_probe.py through the adapter.
 
     This is a regression lock on a *recorded* directional-derivative check,
@@ -474,7 +476,7 @@ def test_cuda_on_the_torch_backend_is_gated_on_the_container_not_the_request() -
     # Names the container, not the capability, and points at the way to get one.
     assert "--gpu" in message
     assert "no silent fallback" in message
-    with pytest.raises(UnsupportedCapabilityError, match="CUDA|cuda"):
+    with pytest.raises(UnsupportedCapabilityError, match=r"CUDA|cuda"):
         adapter.run(request)
 
 

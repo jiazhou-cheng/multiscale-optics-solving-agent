@@ -616,16 +616,28 @@ class ExecutionRequest:
             object.__setattr__(self, "bridge_policy", BridgePolicy.SAFE)
 
     @classmethod
-    def from_config(cls, component: str, config: Mapping[str, Any]) -> ExecutionRequest:
+    def from_config(
+        cls,
+        component: str,
+        config: Mapping[str, Any],
+        *,
+        default_precision: Precision = Precision.FP64,
+    ) -> ExecutionRequest:
         """Build from the existing ``config['device'] / config['dtype']`` surface.
 
         Backwards compatible on purpose: every current call site spells its
         precision as a dtype, and those spellings keep working while meaning
         what they always meant.
+
+        ``default_precision`` is per-component and not optional in practice,
+        because the components do not share a default: Optiland's is FP64 and
+        Chromatix's is FP32 (its only precision). A single global default would
+        make every existing Chromatix request look like an FP64 request and be
+        refused.
         """
         precision_value = config.get("precision", config.get("dtype"))
         precision = (
-            Precision.FP64 if precision_value is None else Precision.parse(precision_value)
+            default_precision if precision_value is None else Precision.parse(precision_value)
         )
         policy_value = config.get("bridge_policy")
         policy = BridgePolicy.SAFE if policy_value is None else BridgePolicy(str(policy_value))

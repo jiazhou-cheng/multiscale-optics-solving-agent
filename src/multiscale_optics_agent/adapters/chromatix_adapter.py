@@ -129,12 +129,27 @@ from multiscale_optics_agent.adapters.base import (
     ModelRunResult,
     RunStatus,
 )
+from multiscale_optics_agent.core.arrays import array_state
 from multiscale_optics_agent.core.artifacts import ArtifactRecord
+from multiscale_optics_agent.core.capabilities import CHROMATIX_CAPABILITIES
 from multiscale_optics_agent.core.errors import (
     AdapterDependencyError,
     UnsupportedCapabilityError,
 )
 from multiscale_optics_agent.core.graph import Severity, ValidationIssue, ValidationReport
+from multiscale_optics_agent.core.precision import (
+    ArrayNamespace,
+    BridgePlan,
+    BridgePolicy,
+    CapabilityError,
+    DeviceKind,
+    DevicePlacement,
+    DType,
+    ExecutionRequest,
+    Precision,
+    ResolvedExecution,
+    plan_bridge,
+)
 from multiscale_optics_agent.core.specs import ArtifactKind, Device, Framework, ModelSpec
 from multiscale_optics_agent.registry.loader import Registry
 
@@ -251,6 +266,145 @@ def _import_chromatix() -> tuple[Any, Any, Any, Any, Any]:
             "package literally named 'chromatix' is an unrelated namesquat. "
             f"Underlying error: {exc!r}"
         ) from exc
+
+
+def _resolve_chromatix_execution(config: Mapping[str, Any]) -> ResolvedExecution:
+    """Negotiate ``config['device'] / config['dtype']`` against Chromatix reality.
+
+    The default precision is FP32, not FP64, because ``complex64`` is the only
+    field storage Chromatix has. Defaulting to FP64 here would make every
+    existing request look like a request for a precision the package cannot
+    represent.
+    """
+    return CHROMATIX_CAPABILITIES.resolve(
+        ExecutionRequest.from_config(
+            MODEL_ID, config, default_precision=Precision.FP32
+        )
+    )
+
+
+def _jax_gpu_unavailable_reason() -> str | None:
+    """Why JAX cannot execute on a GPU here, or ``None`` if it can.
+
+    Deliberately stricter than ``jax.devices()``. PB4a measured an image where
+    ``jax.devices()`` returned ``[CudaDevice(id=0)]`` while the first jitted call
+    died with "No PTX compilation provider is available" -- device enumeration
+    needs only the driver, while running a kernel needs ptxas. So this compiles
+    and runs one, which is the only question that matters.
+
+    It also catches the klujax hazard: importing SAX pins
+    ``jax_platform_name='cpu'`` process-globally at import time, after which JAX
+    reports no GPU at all on a GPU host.
+    """
+    try:
+        import jax
+        import jax.numpy as jnp
+    except ImportError as exc:  # pragma: no cover - jax is pinned in both images
+        return f"jax is not importable ({exc})"
+
+    gpus = [device for device in jax.devices() if device.platform == "gpu"]
+    if not gpus:
+        pinned = ""
+        try:
+            if jax.config.read("jax_platform_name") == "cpu":
+                pinned = (
+                    " -- jax_platform_name is pinned to 'cpu' in this process, which "
+                    "importing SAX does at import time via klujax"
+                )
+        except Exception:  # pragma: no cover - defensive on a config API change
+            pass
+        return f"jax reports no gpu device (backend={jax.default_backend()!r}){pinned}"
+
+    try:
+        probe = jnp.ones((4, 4), dtype=jnp.complex64)
+        jax.block_until_ready(jnp.fft.fft2(jax.device_put(probe, gpus[0])))
+    except Exception as exc:
+        return (
+            f"a CUDA device is visible ({gpus[0]}) but cannot execute a kernel: "
+            f"{type(exc).__name__}: {exc}. Enumeration needs only the driver; "
+            "compilation additionally needs ptxas (nvidia-cuda-nvcc-cu12) -- see "
+            "docs/testing/gpu_environment.md"
+        )
+    return None
+
+
+def _jax_device_for(jax: Any, device: DevicePlacement) -> Any:
+    """The concrete JAX device for a resolved placement.
+
+    Placement is explicit rather than left to ``jax.default_backend()``: with a
+    GPU present, JAX puts everything on it by default, so a request for ``cpu``
+    that did not say so would silently run on the GPU -- the same class of error
+    as the reverse, and just as invisible.
+    """
+    platform = "gpu" if device.kind is DeviceKind.CUDA else "cpu"
+    # jax.devices() lists only the DEFAULT platform's devices, so on a GPU host
+    # it never mentions the CPU -- which made an explicit cpu request look
+    # unavailable. jax.devices(platform) is the form that enumerates a specific
+    # one; it raises when that platform has no backend, which is the real answer.
+    try:
+        candidates = list(jax.devices(platform))
+    except RuntimeError:
+        candidates = []
+    if not candidates:
+        raise CapabilityError(
+            code="CHROMATIX_DEVICE_UNAVAILABLE",
+            component=MODEL_ID,
+            message=f"jax reports no {platform} device (backend={jax.default_backend()!r}).",
+            requested=device,
+            supported=[str(candidate) for candidate in jax.devices()],
+        )
+    if device.index is None:
+        return candidates[0]
+    for candidate in candidates:
+        if int(candidate.id) == device.index:
+            return candidate
+    raise CapabilityError(
+        code="CHROMATIX_DEVICE_ORDINAL_UNAVAILABLE",
+        component=MODEL_ID,
+        message=f"jax has no {platform} device with ordinal {device.index}.",
+        requested=device,
+        supported=[str(candidate) for candidate in candidates],
+    )
+
+
+def _plan_input_bridge(input_dtype: DType, config: Mapping[str, Any]) -> BridgePlan:
+    """How the incoming field may enter Chromatix's complex64-only field path.
+
+    The adapter's own input port defaults to ``ALLOW_DOWNCAST`` rather than the
+    project-wide ``SAFE``, and that is a deliberate, narrow exception with
+    history behind it: CHE-35 established that a complex128 input is truncated
+    *inside* ``ScalarField.__init__`` whatever this adapter does, and chose to
+    measure the loss rather than pretend it did not happen. Refusing the input
+    instead would not prevent any truncation, it would only remove the
+    measurement.
+
+    What CHE-61 adds is that the truncation is now also a recorded
+    :class:`BridgePlan` with ``lossy=True``, and that a caller who wants the
+    refusal can have it with ``config['bridge_policy'] = 'safe'``.
+    """
+    policy_value = config.get("bridge_policy")
+    policy = BridgePolicy.ALLOW_DOWNCAST if policy_value is None else BridgePolicy(
+        str(policy_value)
+    )
+    return plan_bridge(
+        # Namespace/device of the source are JAX-on-the-target by the time the
+        # array is built; the dtype is the question this plan answers.
+        array_state_for_dtype(input_dtype),
+        CHROMATIX_CAPABILITIES,
+        policy=policy,
+        compute_dtype=DType.COMPLEX64,
+    )
+
+
+def array_state_for_dtype(dtype: DType) -> Any:
+    """An ``ArrayState`` for a dtype whose buffer has not been created yet.
+
+    Used only for planning the input cast, where the dtype is known from the
+    record and the namespace/device are whatever the plan is about to select.
+    """
+    from multiscale_optics_agent.core.precision import ArrayState
+
+    return ArrayState(dtype, DevicePlacement(DeviceKind.CPU), ArrayNamespace.JAX)
 
 
 def _map_device(backend: str) -> Device:
@@ -1152,18 +1306,35 @@ class ChromatixAdapter:
                 "has no such evidence. require_gradients=True is rejected."
             )
 
-        device = config.get("device", _BASELINE_DEVICE)
-        if device != _BASELINE_DEVICE:
-            raise UnsupportedCapabilityError(
-                "M_WAVE_CHROMATIX adapter only implements config['device'] == "
-                f"{_BASELINE_DEVICE!r}; got {device!r}. No GPU/TPU execution has been "
-                "exercised for this adapter (no GPU was available in the probing "
-                "container -- see knowledge/solvers/chromatix/capability_notes.md). "
-                "Unlike run_standalone, this graph-facing path used to report "
-                "whatever jax.default_backend() happened to be rather than gating "
-                "on the request; it no longer lets an installed GPU-enabled jaxlib "
-                "silently change what this adapter executes."
-            )
+        # CHE-61 (PB4b) replaces CHE-55's blanket `device != 'cpu'` rejection.
+        # The guard is not removed, it is narrowed to what is actually true:
+        # Chromatix executes on CPU and on CUDA (measured: asm_propagate returns
+        # complex64 on cuda:0), and it has NO complex128 path at any device, so an
+        # FP64 request is refused on precision grounds rather than device ones.
+        # CHE-55's stated worry -- that an installed GPU-enabled jaxlib could
+        # silently change what this adapter executes -- is now addressed by
+        # placing the field explicitly and reporting the OBSERVED output device,
+        # instead of by refusing the GPU outright.
+        resolved = _resolve_chromatix_execution(config)
+        if resolved.device.kind is DeviceKind.CUDA:
+            reason = _jax_gpu_unavailable_reason()
+            if reason is not None:
+                raise CapabilityError(
+                    code="CHROMATIX_CUDA_UNAVAILABLE",
+                    component=MODEL_ID,
+                    message=(
+                        f"config['device']={str(resolved.device)!r} is executable for "
+                        f"this adapter, but not in this process: {reason}."
+                    ),
+                    requested=resolved.device,
+                    supported=["cpu"],
+                    remedy=(
+                        "Run in the CUDA container (`./run.sh --gpu ...`, see "
+                        "docs/testing/gpu_environment.md), and do not import SAX "
+                        "before Chromatix in the same process. There is "
+                        "deliberately no silent fallback to the CPU."
+                    ),
+                )
 
         if "optical_surface" in request.inputs:
             raise UnsupportedCapabilityError(
@@ -1172,6 +1343,15 @@ class ChromatixAdapter:
                 "scope; only free-space scalar angular-spectrum propagation "
                 "of 'input_field' is supported."
             )
+
+        # The input dtype gate, planned eagerly from the record's own declaration
+        # so a refused conversion is refused before chromatix is imported rather
+        # than mid-propagation. The same planner runs again on the loaded array in
+        # _run_asm_propagate, where the observed dtype -- not the declared one --
+        # is what gets recorded as provenance.
+        declared = request.inputs.get("input_field")
+        if declared is not None and declared.dtype:
+            _plan_input_bridge(DType.parse(declared.dtype), config)
 
         input_record = request.inputs.get("input_field")
         if input_record is not None and input_record.kind != ArtifactKind.COMPLEX_FIELD:
@@ -1421,6 +1601,15 @@ class ChromatixAdapter:
                     if intensity_norm
                     else 0.0
                 ),
+                "bridge_plan_metadata_key": "execution.input_bridge",
+                "policy_note": (
+                    "accepted under ALLOW_DOWNCAST, this adapter's documented "
+                    "default for its own input port since CHE-35: Chromatix "
+                    "truncates a complex128 array inside ScalarField.__init__ "
+                    "whatever this adapter does, so refusing the input would "
+                    "remove the measurement without preventing the loss. Set "
+                    "config['bridge_policy']='safe' to refuse it instead."
+                ),
                 "scope": (
                     "the input cast only. It does not include the transfer-function "
                     "rounding, which depends on the represented phase and therefore on "
@@ -1475,9 +1664,16 @@ class ChromatixAdapter:
         # 2) -- not a bare (2,) array (verified against the installed
         # package; a bare (2,) array raises "Number of wavelengths does not
         # match" because it is interpreted as one dx value per wavelength).
+        # Resolve and PLACE, in that order. With a GPU present JAX puts arrays
+        # on it by default, so a request for the CPU has to be honoured
+        # explicitly or it silently becomes a GPU run -- the mirror image of the
+        # failure CHE-55 was worried about.
+        resolved = _resolve_chromatix_execution(config)
+        input_plan = _plan_input_bridge(DType.parse(u_in.dtype), config)
+        target_device = _jax_device_for(jax, resolved.device)
         field_in = cf.Field.build(
-            jnp.asarray(u_in, dtype=jnp.complex64),
-            jnp.asarray([[pitch_y_m, pitch_x_m]]),
+            jax.device_put(jnp.asarray(u_in, dtype=jnp.complex64), target_device),
+            jax.device_put(jnp.asarray([[pitch_y_m, pitch_x_m]]), target_device),
             wavelength_m,
         )
         removed_carrier_phase_rad: float | None = None
@@ -1502,6 +1698,15 @@ class ChromatixAdapter:
         else:
             field_out = cf.asm_propagate(field_in, z=z_m, n=refractive_index, pad_width=pad_width)
 
+        # Observed BEFORE anything is copied to the host: this is the one place
+        # that can still tell where the computation actually happened. PB4a's
+        # klujax hazard produces exactly the state where the request said cuda
+        # and this says cpu, and reporting the request here would hide it.
+        output_state = array_state(field_out.u)
+        device_mismatch = output_state.device.kind is not resolved.device.kind
+
+        # From here on the data is on the host, as an explicit serialization
+        # boundary for the .npy artifact -- not because the propagation needed it.
         u_out = np.asarray(jax.device_get(field_out.u))
         dx_out = tuple(
             float(v) for v in np.asarray(jax.device_get(field_out.dx)).reshape(-1).tolist()
@@ -1515,6 +1720,29 @@ class ChromatixAdapter:
         sha256 = self._write_array(u_out, output_path)
 
         output_metadata = {
+            # Requested / resolved / actual, all three kept apart. "actual" is
+            # read off field_out.u; "requested" is what the caller asked for.
+            "execution": {
+                "requested": ExecutionRequest.from_config(
+                    MODEL_ID, config, default_precision=Precision.FP32
+                ).as_dict(),
+                "resolved": resolved.as_dict(),
+                "actual": output_state.as_dict(),
+                "device_mismatch": device_mismatch,
+                "input_bridge": input_plan.as_dict(),
+                "jax_default_backend": jax.default_backend(),
+                "jax_enable_x64": False,
+            },
+            "serialization": {
+                "boundary": "explicit_persistence",
+                "host_copy": output_state.device.kind is not DeviceKind.CPU,
+                "kind": (
+                    "serialization"
+                    if output_state.device.kind is not DeviceKind.CPU
+                    else "already_on_host"
+                ),
+                "reason": "npy persistence requires host bytes",
+            },
             "wavelength": wavelength_m,
             "sample_pitch": dx_out,
             "coordinate_frame": (
@@ -1554,10 +1782,35 @@ class ChromatixAdapter:
             shape=tuple(int(s) for s in u_out.shape),
             dtype=str(u_out.dtype),
             framework=Framework.JAX,
-            device=_map_device(jax.default_backend()),
+            # OBSERVED placement of the output array, not jax.default_backend()
+            # and not the request. jax.default_backend() is a process-wide fact
+            # that says nothing about where THIS array landed, and the request
+            # is the thing being checked.
+            device=output_state.device.to_spec_device(),
             units=None,
             metadata=output_metadata,
         )
+
+        if device_mismatch:
+            # Never silent success reported as CUDA (PB4b section 13). The
+            # canonical way this happens is klujax pinning jax_platform_name to
+            # 'cpu' at import; the run is still a valid complex64 propagation, so
+            # it is surfaced as a warning with the ACTUAL device on the artifact
+            # rather than failed outright, and the caller can gate on
+            # metadata['execution']['device_mismatch'].
+            warnings.append(
+                f"requested device {resolved.device} but the output array landed on "
+                f"{output_state.device}. The artifact records the ACTUAL device. The "
+                "usual cause is a process-global JAX platform pin -- importing SAX "
+                "sets jax_platform_name='cpu' via klujax at import time, before "
+                "Chromatix gets a say. Any GPU-execution claim for this run is false."
+            )
+        # No warning for the input downcast, deliberately. CHE-35 replaced exactly
+        # that warning string with a measured number, on the grounds that the
+        # tolerance budget needs the magnitude and not the prose; PB4b adds the
+        # recorded BridgePlan next to it rather than reinstating the warning. A
+        # caller who wants the conversion refused instead of measured sets
+        # config['bridge_policy']='safe'.
 
         input_edge_energy = self._edge_energy_fraction(u_in)
         output_edge_energy = self._edge_energy_fraction(u_out)

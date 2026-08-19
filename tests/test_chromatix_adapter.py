@@ -259,13 +259,17 @@ def test_missing_chromatix_dependency_surfaces_as_adapter_dependency_error(
             id="vector-field-requested",
         ),
         pytest.param({}, id="propagation-key-missing"),
-        # CHE-55 (M3.5): the graph-facing path used to have no device gate at
-        # all, unlike run_standalone's CHROMATIX_UNSUPPORTED_DEVICE check --
-        # it would silently report whatever jax.default_backend() happened to
-        # be. Proves that gap is closed.
+        # CHE-61 (PB4b): `device: gpu` is NO LONGER in this list. It is not an
+        # unsupported capability any more -- Chromatix executes on CUDA -- so
+        # whether it is refused now depends on the container, which is a
+        # different question with its own test below.
+        # CHE-55's actual concern is covered instead by
+        # test_fp64_is_refused_because_chromatix_has_no_complex128_path and by
+        # the observed-device assertions: the graph path can no longer report a
+        # device it did not run on.
         pytest.param(
-            {"propagation": "angular_spectrum", "z_m": 1.0e-4, "device": "gpu"},
-            id="gpu-device-requested",
+            {"propagation": "angular_spectrum", "z_m": 1.0e-4, "dtype": "complex128"},
+            id="complex128-precision-requested",
         ),
     ],
 )
@@ -284,6 +288,89 @@ def test_unsupported_capability_rejected_before_any_chromatix_call(
 
     with pytest.raises(UnsupportedCapabilityError):
         adapter.run(request)
+
+
+def test_fp64_is_refused_because_chromatix_has_no_complex128_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Refused on PRECISION grounds, at every device, and not fixable by a flag.
+
+    `ScalarField.__init__` is `jnp.asarray(u, dtype=jnp.complex64)`
+    unconditionally. Handing `Field.build` a complex128 array *with*
+    jax_enable_x64 enabled still yields `field.u.dtype == complex64` (measured,
+    tmp_probes/pb4b_probe2.py). So there is no complex128 path to select, and the
+    project does not claim one -- which is the whole reason PB4b needs a bridge
+    rather than a shared precision.
+    """
+    monkeypatch.setattr(
+        mod,
+        "_do_import_chromatix",
+        lambda: (_ for _ in ()).throw(AssertionError("must not import for an FP64 request")),
+    )
+    adapter = mod.get_adapter()
+    for device in ("cpu", "gpu"):
+        request = ModelRunRequest(
+            run_id="fp64-fail",
+            node_id="wave",
+            inputs={},
+            config={
+                "propagation": "angular_spectrum",
+                "z_m": 1.0e-4,
+                "device": device,
+                "dtype": "complex128",
+            },
+        )
+        with pytest.raises(mod.CapabilityError) as excinfo:
+            adapter.run(request)
+        assert excinfo.value.code == "UNSUPPORTED_PRECISION"
+        assert "complex64" in str(excinfo.value)
+
+
+def test_cuda_is_gated_on_the_process_not_on_the_request() -> None:
+    """A CUDA request is well-formed; whether it runs is an environment fact.
+
+    Both outcomes are legitimate and this asserts the right one for the process
+    it is running in. What it does not tolerate is either direction of silence:
+    no pretending the GPU is unsupported when it works, and no reporting success
+    on the host when CUDA was asked for.
+    """
+    adapter = mod.get_adapter()
+    request = ModelRunRequest(
+        run_id="cuda-gate",
+        node_id="wave",
+        inputs={},
+        config={"propagation": "angular_spectrum", "z_m": 1.0e-4, "device": "cuda"},
+    )
+    reason = mod._jax_gpu_unavailable_reason()
+
+    if reason is None:
+        # No exception from the capability gate; the request is admissible.
+        adapter._check_capability(request)
+        return
+
+    with pytest.raises(mod.CapabilityError) as excinfo:
+        adapter._check_capability(request)
+    assert excinfo.value.code == "CHROMATIX_CUDA_UNAVAILABLE"
+    assert "no silent fallback" in str(excinfo.value)
+
+
+def test_gpu_unavailability_names_a_process_global_platform_pin() -> None:
+    """The klujax hazard has to be diagnosable from the message alone.
+
+    PB4a measured `klujax.py:47` running
+    `jax.config.update("jax_platform_name", "cpu")` at import time; klujax is a
+    SAX dependency, so importing SAX makes every later JAX call run on the host
+    with no warning. On a GPU host that is indistinguishable from "no GPU
+    installed" unless the reason says so.
+    """
+    import jax
+
+    reason = mod._jax_gpu_unavailable_reason()
+    if reason is None:
+        pytest.skip("this process has a working GPU, so there is no reason to inspect")
+    if jax.config.read("jax_platform_name") == "cpu":
+        assert "jax_platform_name is pinned" in reason
+        assert "SAX" in reason
 
 
 def test_require_gradients_rejected_before_any_chromatix_call(

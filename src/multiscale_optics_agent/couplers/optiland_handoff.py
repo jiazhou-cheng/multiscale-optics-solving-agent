@@ -276,6 +276,45 @@ def _conventions(record: ArtifactRecord) -> dict[str, Any]:
     return conventions
 
 
+def _plane_tolerance_m(record: ArtifactRecord, declared: DeclaredHandoffPlane) -> float:
+    """Plane-agreement bound scaled to the precision the plane was computed in.
+
+    The declared default (1 pm) rests on a stated premise: "both come from the
+    same float64 protocol literals, so any real disagreement is a modelling
+    error, not round-off". That premise is exactly true for a float64 trace and
+    exactly false for a float32 one, where the exit-pupil position comes out of
+    ``Paraxial.XPL()`` evaluated in float32. Measured on the M3 singlet
+    (CHE-61): the float32 pupil lands 9.2e-11 m from the float64 value, a
+    relative difference of 1.4e-06, i.e. about eleven float32 epsilons.
+
+    So the bound becomes ``64 * eps(dtype) * |z|`` where that exceeds the
+    declared absolute -- round-off on the quantity itself, derived rather than
+    chosen -- and stays at the declared absolute for float64, which is the case
+    every existing caller is in.
+
+    This is a widening of a numerical bound, so it needs a physical argument and
+    not just an arithmetic one. The quantity being bounded is a defocus, whose
+    wavefront error is ``~ (2 pi / lambda) * dz * NA^2 / 2``. At the M3 singlet's
+    550 nm and its NA, 5.2e-10 m of axial offset is of order 1e-4 rad -- four
+    orders below the 2 pi that would matter and five below the Rayleigh quarter
+    wave. A float32 trace cannot place a plane more precisely than this, and
+    refusing it would refuse float32 tracing altogether rather than catch a
+    modelling error.
+
+    An offset from a genuine plane mismatch is a pupil-to-focus distance --
+    millimetres here -- so nothing that this bound now admits is anywhere near
+    what it exists to catch.
+    """
+    dtype = record.dtype
+    if not dtype:
+        return declared.tolerance_m
+    try:
+        eps = float(np.finfo(np.dtype(str(dtype))).eps)
+    except TypeError:  # pragma: no cover - a non-float dtype on a ray record
+        return declared.tolerance_m
+    return max(declared.tolerance_m, 64.0 * eps * abs(declared.z_m))
+
+
 def _check_plane(
     record: ArtifactRecord, conventions: dict[str, Any], declared: DeclaredHandoffPlane
 ) -> None:
@@ -305,13 +344,14 @@ def _check_plane(
             artifact_id=record.id,
         )
     offset = abs(float(produced_z) - declared.z_m)
-    if offset > declared.tolerance_m:
+    tolerance_m = _plane_tolerance_m(record, declared)
+    if offset > tolerance_m:
         raise ContractError(
             ContractCode.REFERENCE_PLANE_MISMATCH,
             (
                 f"handoff plane is at z = {float(produced_z)!r} m but the consumer "
                 f"declared z = {declared.z_m!r} m; offset {offset:.6e} m exceeds "
-                f"tolerance {declared.tolerance_m:.1e} m"
+                f"tolerance {tolerance_m:.1e} m (record dtype {record.dtype!r})"
             ),
             declaration="conventions.reference_plane_z_m",
             artifact_id=record.id,
