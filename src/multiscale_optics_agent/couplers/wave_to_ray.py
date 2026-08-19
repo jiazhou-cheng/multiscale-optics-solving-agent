@@ -34,6 +34,15 @@ from typing import Any
 
 import numpy as np
 
+from multiscale_optics_agent.core.arrays import (
+    dtype_of,
+    matmul_precision_kwargs,
+    namespace_of,
+    numpy_dtype,
+    xp_for,
+)
+from multiscale_optics_agent.core.capabilities import C_WAVE_TO_RAY_CAPABILITIES
+from multiscale_optics_agent.core.precision import ArrayNamespace, DType, Precision
 from multiscale_optics_agent.couplers.contracts import (
     ComplexField,
     ContractCode,
@@ -47,6 +56,7 @@ __all__ = [
     "AngularSpectrum",
     "SamplingDensity",
     "SamplingPerturbation",
+    "compute_precision_for",
     "decompose",
     "draw_indices",
     "sampling_density",
@@ -116,10 +126,10 @@ class AngularSpectrum:
     field entirely, which is the first thing to check if a round trip fails.
     """
 
-    spectrum: np.ndarray
-    direction_v: np.ndarray
-    direction_u: np.ndarray
-    propagating: np.ndarray
+    spectrum: Any
+    direction_v: Any
+    direction_u: Any
+    propagating: Any
     wavelength_m: float
     sample_pitch_m: tuple[float, float]
     grid_shape: tuple[int, int]
@@ -132,15 +142,34 @@ class AngularSpectrum:
         return 2.0 * math.pi / self.wavelength_m
 
     @property
+    def xp(self) -> Any:
+        """The array module this spectrum belongs to -- NumPy on the host, JAX on a GPU."""
+        return xp_for(namespace_of(self.spectrum))
+
+    @property
+    def namespace(self) -> ArrayNamespace:
+        return namespace_of(self.spectrum)
+
+    @property
+    def dtype(self) -> DType:
+        return dtype_of(self.spectrum)
+
+    @property
+    def real_dtype(self) -> DType:
+        """The real dtype matching the spectrum's precision -- float32 for complex64."""
+        return self.dtype.precision.real_dtype
+
+    @property
     def propagating_count(self) -> int:
-        return int(np.count_nonzero(self.propagating))
+        return int(self.xp.count_nonzero(self.propagating))
 
-    def transverse_directions(self) -> np.ndarray:
+    def transverse_directions(self) -> Any:
         """``(M, 2)`` transverse direction cosines of the propagating modes."""
-        dv, du = np.meshgrid(self.direction_v, self.direction_u, indexing="ij")
-        return np.column_stack([du[self.propagating], dv[self.propagating]])
+        xp = self.xp
+        dv, du = xp.meshgrid(self.direction_v, self.direction_u, indexing="ij")
+        return xp.column_stack([du[self.propagating], dv[self.propagating]])
 
-    def propagating_amplitudes(self) -> np.ndarray:
+    def propagating_amplitudes(self) -> Any:
         return self.spectrum[self.propagating]
 
     def as_dict(self) -> dict[str, Any]:
@@ -155,6 +184,17 @@ class AngularSpectrum:
         }
 
 
+def compute_precision_for(spectrum: AngularSpectrum) -> Precision:
+    """The precision this coupler decomposes and re-emits in for ``spectrum``.
+
+    Taken from the field's own dtype and floored at the coupler's declared
+    minimum, so it is distinct from both the accepted input dtype and the
+    emitted output dtype (PB4b section 9).
+    """
+    floor = C_WAVE_TO_RAY_CAPABILITIES.minimum_compute_precision
+    return max([spectrum.dtype.precision, floor], key=lambda p: p.bits)
+
+
 def decompose(
     field: ComplexField, *, perturbation: SamplingPerturbation = SamplingPerturbation()
 ) -> AngularSpectrum:
@@ -167,6 +207,12 @@ def decompose(
     """
     ny, nx = field.shape
     dy, dx = field.sample_pitch_m
+    # One implementation, two namespaces: the FFT, the frequency grid and the
+    # evanescent cut all execute wherever the field already lives, so a GPU
+    # field is decomposed on the GPU with no host round trip and no second
+    # copy of this physics.
+    xp = field.xp
+    real_np = numpy_dtype(field.real_dtype)
 
     # Centered DFT: ifftshift in, fftshift out. See the class docstring.
     #
@@ -176,12 +222,13 @@ def decompose(
     # (1/N) * sum_i U~[m_i]/p[m_i] is an unbiased estimator of sum_m U~[m],
     # which is the field. Note that Parseval then reads
     # sum|U~|^2 = (1/(ny*nx)) sum|u|^2.
-    spectrum = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(field.u))) / (ny * nx)
+    spectrum = xp.fft.fftshift(xp.fft.fft2(xp.fft.ifftshift(field.u))) / (ny * nx)
 
-    # Transverse direction cosines: d = lambda * f.
-    direction_u = np.fft.fftshift(np.fft.fftfreq(nx, d=dx)) * field.wavelength_m
-    direction_v = np.fft.fftshift(np.fft.fftfreq(ny, d=dy)) * field.wavelength_m
-    dv, du = np.meshgrid(direction_v, direction_u, indexing="ij")
+    # Transverse direction cosines: d = lambda * f. Built at the field's own
+    # real precision so a complex64 field does not acquire float64 axes.
+    direction_u = (xp.fft.fftshift(xp.fft.fftfreq(nx, d=dx)) * field.wavelength_m).astype(real_np)
+    direction_v = (xp.fft.fftshift(xp.fft.fftfreq(ny, d=dy)) * field.wavelength_m).astype(real_np)
+    dv, du = xp.meshgrid(direction_v, direction_u, indexing="ij")
     radial = du**2 + dv**2
 
     if perturbation.discard_evanescent:
@@ -190,12 +237,12 @@ def decompose(
         # coupler card rather than silently included.
         propagating = radial < 1.0
     else:
-        propagating = np.ones_like(radial, dtype=bool)
+        propagating = xp.ones_like(radial, dtype=bool)
 
-    mode_power = np.abs(spectrum) ** 2
-    total = float(np.sum(mode_power))
+    mode_power = xp.abs(spectrum) ** 2
+    total = float(xp.sum(mode_power))
     evanescent_fraction = (
-        float(np.sum(mode_power[~propagating]) / total) if total > 0.0 else 0.0
+        float(xp.sum(mode_power[~propagating]) / total) if total > 0.0 else 0.0
     )
 
     return AngularSpectrum(
@@ -222,6 +269,8 @@ def sampling_density(
     *inconsistent* rather than merely slow -- those modes are never drawn and no
     amount of ``1/p`` reweighting can recover them -- so that case is refused.
     """
+    xp = spectrum.xp
+    real_np = numpy_dtype(spectrum.real_dtype)
     amplitudes = spectrum.propagating_amplitudes()
     if amplitudes.size == 0:
         raise ContractError(
@@ -232,20 +281,20 @@ def sampling_density(
         )
 
     if kind is SamplingDensity.UNIFORM:
-        density = np.full(amplitudes.size, 1.0 / amplitudes.size, dtype=np.float64)
+        density = xp.full(amplitudes.size, 1.0 / amplitudes.size, dtype=real_np)
     else:
-        magnitude = np.abs(amplitudes)
-        total = float(np.sum(magnitude))
+        magnitude = xp.abs(amplitudes)
+        total = float(xp.sum(magnitude))
         if total <= 0.0:
             raise ContractError(
                 ContractCode.EMPTY_ENSEMBLE,
                 "spectral magnitude is identically zero; p_mag is undefined",
                 declaration="sampling_density",
             )
-        density = (magnitude / total).astype(np.float64)
+        density = (magnitude / total).astype(real_np)
 
-    nonzero_spectrum = np.abs(amplitudes) > 0.0
-    if np.any(nonzero_spectrum & (density <= 0.0)):
+    nonzero_spectrum = xp.abs(amplitudes) > 0.0
+    if bool(xp.any(nonzero_spectrum & (density <= 0.0))):
         raise ContractError(
             ContractCode.MISSING_DECLARATION,
             (
@@ -257,13 +306,17 @@ def sampling_density(
     return density
 
 
-def draw_indices(
-    density: np.ndarray, count: int, rng: np.random.Generator
-) -> np.ndarray:
+def draw_indices(density: Any, count: int, rng: np.random.Generator) -> np.ndarray:
     """Draw ``count`` spectral-bin indices from ``density``.
 
     Deliberately separate from the core so the core stays a pure function. The
     generator is supplied by the caller; the protocol requires an explicit seed.
+
+    The draw itself is host work by construction -- ``numpy.random.Generator``
+    is what pins the seed, and bitwise reproducibility across devices is worth
+    more here than avoiding one copy of a probability vector. ``np.asarray`` is
+    therefore written out rather than left to happen inside ``rng.choice``, so
+    the host read is visible in the source and not a surprise in a profile.
     """
     if count <= 0:
         raise ContractError(
@@ -271,20 +324,25 @@ def draw_indices(
             f"secondary-ray count must be positive, got {count}",
             declaration="count",
         )
-    return rng.choice(density.size, size=count, p=density)
+    host_density = np.asarray(density, dtype=np.float64)
+    # Renormalize after the float32 -> float64 widening: numpy requires p to sum
+    # to 1 within a tight tolerance, and a complex64 spectrum's density does not
+    # after the cast.
+    host_density = host_density / host_density.sum()
+    return rng.choice(host_density.size, size=count, p=host_density)
 
 
-def enumerate_indices(density: np.ndarray) -> np.ndarray:
+def enumerate_indices(density: Any) -> np.ndarray:
     """Every propagating bin exactly once — the deterministic exactness limit."""
     return np.arange(density.size, dtype=np.int64)
 
 
 def spectrum_to_rays(
     spectrum: AngularSpectrum,
-    indices: np.ndarray,
-    density: np.ndarray,
+    indices: Any,
+    density: Any,
     *,
-    launch_positions_xy_m: np.ndarray | None = None,
+    launch_positions_xy_m: Any = None,
     perturbation: SamplingPerturbation = SamplingPerturbation(),
 ) -> RayBundle:
     """Turn selected spectral modes into rays (SI eqs S4, Algorithm S1 lines 8-13).
@@ -302,6 +360,16 @@ def spectrum_to_rays(
     The ``1/p`` factor is what keeps the estimator unbiased under non-uniform
     sampling. It is not an optimization.
     """
+    xp = spectrum.xp
+    dot = matmul_precision_kwargs(spectrum.namespace)
+    real_np = numpy_dtype(spectrum.real_dtype)
+    complex_dtype = spectrum.dtype
+    complex_np = numpy_dtype(complex_dtype)
+
+    # Bin indices stay host integers whatever the field's namespace: they come
+    # from a NumPy Generator (draw_indices) or from arange, they carry no
+    # precision, and both NumPy and JAX index correctly with a host integer
+    # array. Pushing them to a device would buy nothing and cost a transfer.
     indices = np.asarray(indices, dtype=np.int64)
     if indices.ndim != 1 or indices.size == 0:
         raise ContractError(
@@ -310,7 +378,7 @@ def spectrum_to_rays(
             declaration="indices",
         )
 
-    density = np.asarray(density, dtype=np.float64)
+    density = xp.asarray(density, dtype=real_np)
     all_amplitudes = spectrum.propagating_amplitudes()
     if density.shape != all_amplitudes.shape:
         raise ContractError(
@@ -322,7 +390,7 @@ def spectrum_to_rays(
     # A zero density where the spectrum is nonzero is not slow convergence: those
     # modes are never drawn, and no amount of 1/p reweighting recovers them. The
     # estimator is inconsistent, so it is refused rather than run.
-    if np.any((np.abs(all_amplitudes) > 0.0) & (density <= 0.0)):
+    if bool(xp.any((xp.abs(all_amplitudes) > 0.0) & (density <= 0.0))):
         raise ContractError(
             ContractCode.MISSING_DECLARATION,
             (
@@ -337,25 +405,25 @@ def spectrum_to_rays(
     amplitudes = spectrum.propagating_amplitudes()[indices]
     probabilities = density[indices]
 
-    radial = np.sum(transverse**2, axis=1)
-    if perturbation.discard_evanescent and np.any(radial >= 1.0):
+    radial = xp.sum(transverse**2, axis=1)
+    if perturbation.discard_evanescent and bool(xp.any(radial >= 1.0)):
         raise ContractError(
             ContractCode.NON_UNIT_DIRECTION,
             "selected an evanescent bin; it has no propagation direction",
             declaration="indices",
         )
-    normal = perturbation.normal_sign * np.sqrt(np.clip(1.0 - radial, 0.0, None))
-    directions = np.column_stack([transverse, normal])
+    normal = perturbation.normal_sign * xp.sqrt(xp.clip(1.0 - radial, 0.0, None))
+    directions = xp.column_stack([transverse, normal]).astype(real_np)
 
     if perturbation.apply_importance_weight:
         weighted = amplitudes / probabilities
     else:
-        weighted = amplitudes.astype(np.complex128)
+        weighted = amplitudes.astype(complex_np)
 
     if launch_positions_xy_m is None:
-        launch = np.zeros((1, 2), dtype=np.float64)
+        launch = xp.zeros((1, 2), dtype=real_np)
     else:
-        launch = np.asarray(launch_positions_xy_m, dtype=np.float64)
+        launch = xp.asarray(launch_positions_xy_m, dtype=real_np)
         if launch.ndim != 2 or launch.shape[1] != 2:
             raise ContractError(
                 ContractCode.SHAPE_MISMATCH,
@@ -372,18 +440,21 @@ def spectrum_to_rays(
     # count growing multiplicatively across cascaded planar surfaces
     # (SI Algorithm S1).
     if perturbation.apply_launch_phase:
-        launch_phase = np.exp(1j * wavenumber * (launch @ transverse.T))
+        # Explicit dtype rather than `1j * ...`: see _cis in ray_to_wave.py for
+        # why scalar promotion is not left to decide a contract-visible dtype.
+        projected = xp.matmul(launch, transverse.T, **dot)
+        launch_phase = xp.exp((wavenumber * projected).astype(complex_np) * 1j)
     else:
-        launch_phase = np.ones((launch_count, mode_count), dtype=np.complex128)
+        launch_phase = xp.ones((launch_count, mode_count), dtype=complex_np)
 
     amplitude = (weighted[None, :] * launch_phase).reshape(-1)
-    tiled_directions = np.tile(directions, (launch_count, 1))
+    tiled_directions = xp.tile(directions, (launch_count, 1))
     plane_z = spectrum.reference_plane.z_m
-    positions = np.column_stack(
+    positions = xp.column_stack(
         [
-            np.repeat(launch[:, 0], mode_count),
-            np.repeat(launch[:, 1], mode_count),
-            np.full(launch_count * mode_count, plane_z, dtype=np.float64),
+            xp.repeat(launch[:, 0], mode_count),
+            xp.repeat(launch[:, 1], mode_count),
+            xp.full(launch_count * mode_count, plane_z, dtype=real_np),
         ]
     )
 
@@ -394,7 +465,7 @@ def spectrum_to_rays(
         reference_plane=spectrum.reference_plane,
         frame=Frame(axis_order="flat per-ray arrays"),
         amplitude=amplitude,
-        optical_path_length_m=np.zeros(launch_count * mode_count, dtype=np.float64),
+        optical_path_length_m=xp.zeros(launch_count * mode_count, dtype=real_np),
         optical_path_length_reference=(
             f"zero at the emitting plane {spectrum.reference_plane.name!r}"
         ),
@@ -414,6 +485,14 @@ def spectrum_to_rays(
             "evanescent_power_fraction": spectrum.evanescent_power_fraction,
             "sampled_indices": indices,
             "sampling_probabilities": probabilities,
+            # Requested/resolved/actual for this coupler: the field's own
+            # precision is what it computed in, and the emitted representation
+            # is read off the arrays rather than asserted.
+            "execution": {
+                "input": {"dtype": str(complex_dtype), "namespace": str(spectrum.namespace)},
+                "compute_precision": str(compute_precision_for(spectrum)),
+                "output": {"real_dtype": str(real_np), "complex_dtype": str(complex_np)},
+            },
         },
     )
 
@@ -424,9 +503,9 @@ def wave_to_ray(
     count: int | None = None,
     density_kind: SamplingDensity = SamplingDensity.UNIFORM,
     rng: np.random.Generator | None = None,
-    launch_positions_xy_m: np.ndarray | None = None,
+    launch_positions_xy_m: Any = None,
     perturbation: SamplingPerturbation = SamplingPerturbation(),
-) -> tuple[RayBundle, AngularSpectrum, np.ndarray]:
+) -> tuple[RayBundle, AngularSpectrum, Any]:
     """Convenience wrapper: decompose, build a density, select, emit rays.
 
     ``count=None`` enumerates every propagating bin — the deterministic

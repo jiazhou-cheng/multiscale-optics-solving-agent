@@ -60,10 +60,12 @@ __all__ = [
     "asarray",
     "device_of",
     "dtype_of",
+    "matmul_precision_kwargs",
     "namespace_of",
     "numpy_dtype",
     "to_host_numpy",
     "to_namespace",
+    "verify_dtype",
     "xp_for",
 ]
 
@@ -173,6 +175,79 @@ def numpy_dtype(dtype: DType) -> np.dtype:
     return np.dtype(str(dtype))
 
 
+def matmul_precision_kwargs(namespace: ArrayNamespace) -> dict[str, Any]:
+    """Keyword arguments that make a dot product compute at its declared dtype.
+
+    On an Ampere GPU, XLA's default precision for an ``f32``/``c64`` dot is
+    **TF32**, which carries a 10-bit mantissa rather than 24. Measured on this
+    host (RTX A6000, ``tmp_probes/pb4b_gpu_matmul.py``), the coupler's
+    ``einsum("n,ny,nx->yx", ...)`` over 256 complex64 wavelets returns:
+
+        NumPy complex64 (host)      2.6e-07  relative to a complex128 reference
+        JAX complex64, GPU default  3.5e-04
+        JAX complex64, precision="highest"
+                                    2.3e-07
+
+    So "complex64 on the GPU" was 1500x less accurate than complex64, silently,
+    with the array still reporting ``dtype=complex64``. That is the exact failure
+    mode this contract exists to eliminate: a precision claim that only the
+    dtype label supports. Requesting ``highest`` makes the declared dtype the
+    computed dtype.
+
+    NumPy has no such knob and needs none, so it gets an empty mapping. That
+    keeps one physics implementation -- the operation is identical, only the
+    "and mean it" flag differs by namespace.
+    """
+    if namespace is ArrayNamespace.JAX:
+        return {"precision": "highest"}
+    return {}
+
+
+def verify_dtype(array: Any, requested: DType, *, context: str) -> Any:
+    """Confirm a cast actually happened, and fail structurally when it did not.
+
+    This exists because of one specific silent failure. JAX with
+    ``jax_enable_x64`` disabled -- which is the state the Chromatix adapter
+    *deliberately* enforces on every call, and the state klujax leaves behind --
+    accepts ``astype(float64)`` and returns ``float32``. No warning, no error:
+    the requested precision simply does not happen. Checking the dtype that came
+    back rather than the one that was asked for turns a two-decimal-digit loss
+    into a named capability failure.
+    """
+    observed = dtype_of(array)
+    if observed is requested:
+        return array
+    detail = ""
+    if namespace_of(array) is ArrayNamespace.JAX and requested.precision.bits == 64:
+        try:
+            import jax
+
+            if not bool(jax.config.read("jax_enable_x64")):
+                detail = (
+                    " jax_enable_x64 is disabled in this process, so JAX silently "
+                    "returns float32/complex64 for any 64-bit request. The "
+                    "Chromatix adapter disables it on every call by design, and "
+                    "importing SAX can leave it disabled too."
+                )
+        except ImportError:  # pragma: no cover - jax is pinned in both images
+            pass
+    raise CapabilityError(
+        code="SILENT_DTYPE_DOWNCAST",
+        component=context,
+        message=(
+            f"a cast to {requested} produced {observed} instead, so the requested "
+            f"precision is not actually available here.{detail}"
+        ),
+        requested=requested,
+        supported=[observed],
+        remedy=(
+            "Request the precision this namespace can represent, or enable the "
+            "64-bit mode before any array is created -- never after, since the "
+            "backend caches its configuration."
+        ),
+    )
+
+
 def _torch_dtype(dtype: DType) -> Any:
     import torch
 
@@ -207,7 +282,9 @@ def asarray(
     xp = xp_for(namespace)
     if dtype is None:
         return xp.asarray(value)
-    return xp.asarray(value, dtype=numpy_dtype(dtype))
+    return verify_dtype(
+        xp.asarray(value, dtype=numpy_dtype(dtype)), dtype, context=str(namespace)
+    )
 
 
 def to_namespace(
@@ -282,7 +359,7 @@ def _to_jax(value: Any, source: ArrayState, device: DevicePlacement, dtype: DTyp
         out = jnp.asarray(value)
 
     if dtype is not None and dtype_of(out) is not dtype:
-        out = out.astype(numpy_dtype(dtype))
+        out = verify_dtype(out.astype(numpy_dtype(dtype)), dtype, context="jax")
     if device_of(out) != device and not (
         device.index is None and device_of(out).kind is device.kind
     ):
