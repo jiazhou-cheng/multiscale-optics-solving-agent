@@ -39,9 +39,32 @@ supported_regimes:
   - ray export at the paraxial exit pupil as well as the image surface (see
     exit_pupil_handoff)
 package_reported_unverified_regimes:
-  - optional PyTorch backend, GPU execution, and native autodiff
-  - wavefront/PSF/MTF/Zernike analysis modules
-  - tolerancing and optimization modules
+  # CHE-57 (PB6) moved most of this list into "verified" -- see
+  # tutorials/README.md and capability_notes.md. What remains unverified:
+  - GPU execution (no CUDA device in this container; be.set_device only exercised for 'cpu')
+  - reading a genuine vendor-authored .zmx or .seq file (both catalog tutorials'
+    artifacts are unreachable -- see source_manifest.yaml)
+  - GRIN media, coordinate breaks, NURBS/Forbes/Chebyshev/toroidal/biconic/grid-sag/
+    odd-asphere geometries, optiland.sources, optiland.ml, optiland.solves,
+    optiland.environment air-index models, optiland.apodization,
+    analysis.image_simulation, and the codev fileio path
+  - Optic.draw3D() and visualization.system.optic_viewer_3d (they HANG headlessly)
+verified_by_che57_tutorial_reproductions:
+  # 41 repo-owned reproductions of the frozen official tutorial scope, 459 declared
+  # checks, 0 relying on qualitative evidence alone. See tutorials/README.md.
+  - "wavefront: OPD, OPDFan, ZernikeOPD (standard/fringe/noll), Optic.aberrations (per-surface Seidel and named third-order coefficients)"
+  - "psf: FFTPSF, HuygensPSF, strehl_ratio"
+  - "mtf: FFTMTF, GeometricMTF"
+  - "analysis: SpotDiagram, RayFan, YYbar, Distortion, GridDistortion, FieldCurvature, RmsSpotSizeVsField, RmsWavefrontErrorVsField, PupilAberration"
+  - "thin_film: ThinFilmStack (R+T+A == 1 to 1.1e-16), SpectralAnalyzer, analyze_color, ThinFilmOptimizer with custom registered operands, NeedleSynthesis, ThinFilmTolerancing/SensitivityAnalysis/MonteCarlo"
+  - "tolerancing: Tolerancing, SensitivityAnalysis, MonteCarlo, RangeSampler, DistributionSampler"
+  - "optimization: OptimizerGeneric, LeastSquares, DifferentialEvolution, GlassExpert, operand_registry, pickups, and the radius/thickness/conic/material/decenter/tilt/asphere_coeff/polynomial_coeff/zernike_coeff variables"
+  - "multiconfig: MultiConfiguration, Optic.scale_system"
+  - "polarization: PolarizationState, create_polarization, set_fresnel_coatings, PolarizerCoating, RealRays.update_intensity"
+  - "geometries: plane, standard, even_asphere, polynomial, zernike freeform, mirrors"
+  - "apertures: EPD, imageFNO, objectNA; fields: angle, object_height; obj_space_telecentric"
+  - "extension points: NewtonRaphsonGeometry, BaseCoating and OptimizerGeneric subclasses"
+  - "fileio: save/load_optiland_file (exact round trip), save/load_zemax_file (LOSSY)"
 derivative:
   mode: native_autodiff
   mechanism: >
@@ -50,22 +73,49 @@ derivative:
     (default) has no gradients: `supports_gradients` is False under numpy,
     True under torch (both observed directly, see conventions.md).
   verified: false
+  precision_hazard: >
+    CHE-57: the torch backend DEFAULTS to precision=32. optiland.backend
+    exposes get_precision()/set_precision('float32'|'float64'), and a
+    dtype=torch.float64 parameter tensor is NOT sufficient -- the lens is built
+    with be.array, which follows the global precision, so the whole trace runs
+    in float32. Any gradient claim through this adapter must declare the
+    precision alongside the backend. set_precision is process-global and
+    non-thread-safe in exactly the way set_backend is.
   verified_note: >
     A single directional-derivative probe (probes/gradient_probe.py) passed
     for one path (ReverseTelephoto sample lens, surfaces.surfaces[1]
     radius-of-curvature -> Optic.trace() -> mean(x^2+y^2) RMS-spot proxy at
     Hx=Hy=0), relative error 1.11e-03 against one centered finite-difference
-    step (eps=1e-4). This tolerance is looser than the JAX-based solvers in
-    this repository (typically 1e-4 to 1e-13) -- not yet root-caused; could
-    be non-smoothness near the optical axis, float64 autograd error
-    accumulation through the ray-trace recursion, or something else. Do not
-    set verified: true, and re-check tolerance before relying on this path
-    in a tight optimization loop. This is NOT the full repository gradient
-    test (needs multiple step sizes, a convergence table, and
-    an ill-conditioned case) and covers only this one parameter/objective
-    pair -- not wavefront/OPD export, not every surface type, not GPU.
+    step (eps=1e-4).
+
+    CHE-57 ROOT-CAUSED that tolerance: it is float32 finite-difference
+    cancellation noise, not autodiff error. The probe does not call
+    set_precision, so it ran at the torch backend's default precision=32,
+    where the relative error GROWS as the step shrinks (1.32e-04 at eps=1e-3,
+    1.11e-03 at 1e-4, 3.26e-02 at 1e-5). Under be.set_precision('float64') the
+    same comparison gives 6.24e-05, 6.24e-07 and 6.28e-09, i.e. the O(eps^2)
+    convergence a correct reverse-mode gradient must show. Evidence:
+    tutorials/t10_differentiable_ray_tracing.py.
+
+    verified stays false because this is still NOT the full repository
+    gradient test (it needs the convergence table to live in a test rather
+    than a reproduction, plus a deliberately ill-conditioned case) and it
+    covers only this one parameter/objective pair -- not wavefront/OPD export,
+    not every surface type, not GPU.
+  optimizer_hazard: >
+    CHE-57: optimization.OptimizerGeneric can return success=True with
+    message "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH" at a point
+    1.97x WORSE than its start, on a freeform tilted-mirror system whose merit
+    function is non-smooth (rays vignette in and out as surfaces move). Every
+    maxiter from 60 to 500 stops at the same point and it is inside the declared
+    bounds. res.success is not evidence: record problem.sum_squared() before and
+    after. Evidence: tutorials/t35_three_mirror_anastigmat.py.
 devices_reported_by_package: [cpu, gpu]
 devices_tested: [cpu]
+device_api_note: >
+  CHE-57: optiland.backend.set_device(str) exists and accepts 'cpu'; no other
+  device value has been exercised in this repository. be.supports_gpu remains
+  False in this container under both backends.
 dtypes_validated_for_m1: [float64]
 input_output_artifacts:
   - optiland.rays.real_rays.RealRays (maps to project artifact `ray_bundle`)
@@ -311,6 +361,12 @@ cost_scaling: >-
   prescription CPU scaling at requested hexapolar sampling 8, 16, 32, and 64.
 limitations_and_failure_modes: see failure_guide.md
 validated_probe_ids:
+  - optiland tutorial reproductions t01-t41 (CHE-57 / PB6; the frozen 41-tutorial
+    official scope, reimplemented as repo-owned executable code with 459 declared
+    checks -- 34 against published upstream values, 218 analytic, 189 invariant,
+    18 qualitative -- gated by tests/test_optiland_tutorials.py. Inventory,
+    outcome classification, upstream defects, environment blockers and scope
+    reductions in tutorials/README.md)
   - import_probe (passed, 2026-07-30)
   - raytrace_probe (passed, 2026-07-30; bundled sample system only, not an analytic oracle)
   - gradient_probe (passed for one narrow path with looser-than-JAX tolerance, 2026-07-30)
@@ -349,7 +405,11 @@ not_yet_probed:
     non-vacuous)
   - the object-space reference for a finite-object launch, where the launch state
     is a point rather than a plane
-  - hard-stop / vignetting non-smoothness (existing solver card already flags this as an assumption to check)
+  - hard-stop / vignetting non-smoothness UNDER AUTOGRAD. CHE-57 found the
+    numpy-path consequence (see derivative.optimizer_hazard), but the torch
+    autograd behaviour across a hard stop is still untested.
+  - the full repository gradient test at float64 (CHE-57 established the
+    convergence table in a tutorial reproduction, not in a gradient test)
 adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
 validation_status: environment_verified
 validation_note: >

@@ -61,3 +61,39 @@ sources:
       Independent CHE-17 N-BK7 refractive-index and Sellmeier-dispersion
       reference. The evaluator computes n at 587.6 nm without calling
       Optiland, then uses it in thick-lens EFL/BFL and axial-OPL oracles.
+
+  - url: https://www.optiland.org/tutorials
+    source_type: official_docs
+    ref: "index as of 2026-08-19"
+    retrieved_at: "2026-08-19"
+    usage_note: >
+      CHE-57 (PB6) froze the in-scope Optiland learning material to the 41
+      tutorials this index listed on 2026-08-19: 8 Beginner, 16 Intermediate and
+      17 Advanced. Each tutorial page was fetched, its code blocks and any stated
+      numerical results extracted, and then REIMPLEMENTED as repo-owned
+      executable code under knowledge/solvers/optiland/tutorials/ rather than
+      executed as an upstream notebook. Per AGENTS.md "Sources of Truth" the
+      pinned install won every disagreement: several tutorials call APIs the
+      pinned 0.6.0 does not accept (ThinFilmCoating's stack argument), use units
+      the pinned API does not use (nm vs um), or state results the pinned version
+      does not produce (t28's ~20 um spot claim, t41's 250-iteration
+      convergence, t31's 0.99 contrast floor). One tutorial ships a
+      mathematically incorrect surface normal (t39). All of these are recorded in
+      failure_guide.md and asserted by tests/test_optiland_tutorials.py rather
+      than silently patched. The broader ReadTheDocs Example Gallery is
+      explicitly NOT in this scope.
+
+  - url: https://www.thorlabs.com/_sd.cfm?fileName=20565-S03.zmx&partNumber=MAP051950-A
+    source_type: manufacturer_product_specification
+    retrieved_at: "2026-08-19"
+    usage_note: >
+      The artifact the official "Thorlabs Catalogue" tutorial instructs the
+      reader to load directly with load_zemax_file(url). Fetched from inside the
+      agent_solver container, which DOES have outbound network access: the server
+      answers with a 1313-byte HTML page beginning "<!DOCTYPE html>", not the
+      .zmx payload, so load_zemax_file raises
+      ValueError("Failed to read Zemax file."). Recorded as a blocker rather than
+      worked around silently; tutorials/t24 asserts the failure so a future
+      restoration of direct file serving is detected. Consequence: reading a
+      genuine vendor-authored .zmx remains UNVERIFIED in this repository -- only
+      Optiland's own save_zemax_file output has been parsed back.

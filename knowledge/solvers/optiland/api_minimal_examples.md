@@ -40,7 +40,9 @@ Full probe: `probes/raytrace_probe.py`; captured output:
 
 ## 3. Batched / vectorized example
 
-Not yet executed in this repository.
+Not yet executed in this repository (no batched-system API is used by the current
+slice). Per-ray vectorization is inherent: `Optic.trace` returns whole bundles and
+`Optic.surfaces.{x,y,z,L,M,N,opd,i}` are `(num_surfaces, num_rays)` arrays.
 
 ## 4. Gradient example (opt-in torch backend)
 
@@ -49,7 +51,10 @@ import torch
 import optiland.backend as be
 from optiland.samples.objectives import ReverseTelephoto
 
-be.set_backend('torch')  # required -- the numpy default has no gradients
+be.set_backend('torch')     # required -- the numpy default has no gradients
+be.set_device('cpu')
+be.set_precision('float64')  # CHE-57: the torch backend DEFAULTS to float32
+be.grad_mode.enable()
 
 def rms_spot(radius_value):
     lens = ReverseTelephoto()
@@ -65,11 +70,29 @@ r0.grad.item()                # -> 4.12612817668375e-05
 ```
 
 Centered finite difference at the same point (`eps=1e-4`) gives
-`4.130711772631912e-05` — relative error `1.11e-03`. This is one narrow
-directional-derivative check with a looser tolerance than the JAX-based
-solvers in this repository (not yet root-caused), not the full repository
-gradient test. Full probe: `probes/gradient_probe.py`;
-captured output: `expected/gradient_probe.json`.
+`4.130711772631912e-05` — relative error `1.11e-03`. **That figure is a float32
+artifact, and `probes/gradient_probe.py` does not call `set_precision`.** CHE-57
+established that the torch backend defaults to `precision=32`; adding
+`be.set_precision('float64')` as shown above brings the same comparison to
+`6.24e-07` at `eps=1e-4` and `6.28e-09` at `eps=1e-5`, converging as O(eps^2).
+See `conventions.md` "Torch backend precision defaults to float32" for the full
+table, and `tutorials/t10_differentiable_ray_tracing.py` for the executable form.
+Full probe: `probes/gradient_probe.py`; captured output:
+`expected/gradient_probe.json`.
+
+Backend state is process-global and not thread-safe. Restore it in a `finally`
+block if a test or probe touches it:
+
+```python
+original = be.get_backend()
+try:
+    be.set_backend('torch')
+    be.set_precision('float64')
+    ...
+finally:
+    be.set_precision('float32')
+    be.set_backend(original)
+```
 
 **What happens if torch is not installed was NOT independently verified in
 this pass.** This container has torch installed, so `set_backend('torch')`
@@ -97,3 +120,50 @@ scientific-array SHA-256. The tracked regression fixture
 ## 6. Common error signatures and repairs
 
 See `failure_guide.md`.
+
+## 7. The modern (non-deprecated) construction API
+
+Every `Optic.add_*` / `set_field_type` / `set_thickness` / `update_paraxial` /
+`set_polarization` call is deprecated for removal in 0.7.0. The equivalent modern
+form, verified bit-identical (`tutorials/t01_singlet_lens.py`):
+
+```python
+import numpy as np
+from optiland import optic
+
+lens = optic.Optic(name='singlet')
+lens.surfaces.add(index=0, radius=np.inf, thickness=np.inf)
+lens.surfaces.add(index=1, radius=20.0, thickness=7.0, is_stop=True, material='N-SF11')
+lens.surfaces.add(index=2, radius=np.inf, thickness=18.0)
+lens.surfaces.add(index=3)
+lens.set_aperture(aperture_type='EPD', value=25.0)   # NOT deprecated
+lens.fields.set_type(field_type='angle')
+lens.fields.add(y=0)
+lens.wavelengths.add(value=0.5, is_primary=True)
+lens.updater.update_paraxial()
+```
+
+`surfaces.add` accepts `surface_type=` (`'standard'`, `'even_asphere'`,
+`'polynomial'`, `'zernike'`, ...), `conic=`, `coefficients=`, `aperture=`,
+`coating=`, `bsdf=`, the placement kwargs `thickness=`/`z=`/`y=`/`x=`, and the
+perturbation kwargs `dx=`/`dy=`/`rx=`/`ry=`/`rz=` (tilts in **radians**). Absolute
+(`z=`, `y=`) and relative (`thickness=`, `dy=`) placement of the same system give
+element-wise identical traces (`tutorials/t09_non_rotationally_symmetric.py`).
+
+`material='mirror'` produces a reflective surface, but **no distinct surface or
+interaction class**: every surface reports
+`interaction_model=RefractiveReflectiveModel`, so reflectivity is not detectable
+from the type. Detect it geometrically (a 45-degree fold deviates the chief ray
+by 90 degrees) or from `material_post`.
+
+## 8. Full-fidelity tutorial reproductions
+
+41 executable reproductions of the official Optiland tutorial index live under
+`knowledge/solvers/optiland/tutorials/`, each printing machine-readable evidence.
+They are the fastest way to find a working minimal example of a specific API:
+
+```bash
+./run.sh python knowledge/solvers/optiland/tutorials/t26_zernike_decomposition.py
+```
+
+See `tutorials/README.md` for the API-to-tutorial index and the coverage table.

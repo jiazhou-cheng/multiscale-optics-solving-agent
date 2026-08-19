@@ -51,6 +51,185 @@ Verbatim from `optiland.backend.__doc__` (Kramer Harrison, 2025):
   backend on this CPU-only container -> `supports_gpu=False`,
   `supports_gradients=True`.
 
+## Torch backend precision defaults to float32 (CHE-57)
+
+**This resolves the open item `capability_notes.md` recorded as "root-causing why
+the torch-backend gradient tolerance (1.11e-03) is looser than the JAX-based
+solvers' tolerances in this repository".**
+
+`optiland.backend` exposes `get_precision()` / `set_precision('float32'|'float64')`
+and `set_device(str)` alongside `set_backend`. Under the torch backend
+`get_precision()` returns **`32`** immediately after `set_backend('torch')`:
+single precision is the default, not float64.
+
+`probes/gradient_probe.py` passes a `dtype=torch.float64` parameter tensor, but the
+lens it is traced through is built with `be.array`, which follows the *global*
+precision. The traced objective therefore comes back `torch.float32`, and the
+finite-difference reference is float32 too. Measured at the probe's own operating
+point (`ReverseTelephoto`, surface-1 radius, `mean(x^2+y^2)`, 64 rays):
+
+| precision | eps=1e-3 | eps=1e-4 | eps=1e-5 |
+|---|---|---|---|
+| float32 | 1.32e-04 | **1.11e-03** | 3.26e-02 |
+| float64 | 6.24e-05 | 6.24e-07 | 6.28e-09 |
+
+The 1.11e-03 was **finite-difference cancellation noise, not autodiff error**: at
+float32 the relative error *grows* as the step shrinks. Under
+`be.set_precision('float64')` the directional derivative agrees with a centered
+difference to 6.3e-9 and the error falls quadratically with step size, which is the
+behaviour a correct reverse-mode gradient must show.
+
+Consequences for this project:
+
+- Any gradient claim through Optiland must declare the precision. `set_precision`
+  is as load-bearing as `set_backend`, and it is **process-global** in the same way.
+- A float64 parameter tensor alone is not enough; the whole lens must be built after
+  `set_precision('float64')`.
+- `be.grad_mode` (`enable`/`disable`/`temporary_enable`/`requires_grad`) is a
+  separate global switch again.
+
+Evidence: `knowledge/solvers/optiland/tutorials/t10_differentiable_ray_tracing.py`
+and its recorded output.
+
+## Paraxial cardinal points use two different reference planes (CHE-57)
+
+`Optic.paraxial` reports its cardinal points against **different origins**, and
+mixing them up produces a plausible-looking wrong answer:
+
+- `P1()`, `F1()`, `N1()` are relative to **surface 1** (the first optical surface).
+- `P2()`, `F2()`, `N2()` are relative to the **image surface**. `F2()` is therefore
+  the residual defocus of the *placed* image plane, not a position in prescription z.
+
+With that, the Gaussian conjugate equation `1/s' + 1/s = 1/f` holds **exactly** --
+measured max `|f*(1/s' + 1/s - 1/f)| = 5.0e-16` over 33 object positions -- when `s`
+is measured from `P1` and `s'` from `P2`. Reading either from a surface vertex
+instead gives a 16-61% error, and it is also what makes a naive
+`BFL = F2() - z(last surface)` computation wrong.
+
+Back focal length from the accessors is `BFL = z_image + F2() - z_last_lens_surface`;
+verified against the Edmund #45-362 datasheet value of 47.87 mm.
+
+Evidence: `tutorials/t24_thorlabs_catalogue.py`, `tutorials/t08_edmund_optics_catalogue.py`.
+
+## Even-asphere coefficients start at r^2, not r^4 (CHE-57)
+
+`optiland.geometries.even_asphere.EvenAsphere.sag` is
+
+```python
+r2 = x**2 + y**2
+z = r2 / (self.radius * (1 + be.sqrt(1 - (1 + self.k) * r2 / self.radius**2)))
+for i, Ci in enumerate(self.coefficients):
+    z = z + Ci * r2 ** (i + 1)
+```
+
+The loop index starts at `i = 0`, so **`coefficients[0]` multiplies r^2**. That is
+*not* the Zemax/CODE V even-asphere convention, where the polynomial starts at r^4
+because the r^2 term is degenerate with the base curvature. Transcribing a vendor
+prescription term-for-term into Optiland shifts every coefficient by one order; on
+the tutorial's own coefficient list the two readings differ by up to 13 mm of sag at
+a 10 mm semi-aperture. Verified against both closed forms written out independently.
+
+Evidence: `tutorials/t12_raytracing_aspheres.py`.
+
+## Wavefront OPD vs. the raw `RealRays.opd` accumulator (CHE-57)
+
+These are two different quantities with two different references and two different
+units, and the repository already depends on knowing which is which:
+
+| | `RealRays.opd` | `wavefront.OPD` |
+|---|---|---|
+| quantity | absolute accumulated optical path | wavefront error |
+| reference | the ray launch state (see above) | the **chief ray** -- pupil-centre value is exactly 0 |
+| unit | millimetres | **waves** at the requested wavelength |
+| magnitude on `EyepieceErfle` on axis | 335129 waves | 0.2165 waves peak-to-valley |
+
+Two further specifics:
+
+- `OPD.rms()` is `sqrt(mean(opd**2))` over rays with `intensity > 0` and **leaves
+  piston in**. It is therefore *not* the conventional piston-removed RMS wavefront
+  error: on axis it reads 0.1337 waves where the piston-removed value is 0.0664. A
+  Marechal or Strehl estimate built on `OPD.rms()` is wrong.
+- `WavefrontData.pupil_x` / `pupil_y` are **physical millimetres** on the reference
+  sphere, not normalised `Px`/`Py`.
+
+Evidence: `tutorials/t16_opd_calculations.py`, `tutorials/t25_psf_and_mtf.py`.
+
+## Zernike conventions: only `standard` and `noll` are orthonormal (CHE-57)
+
+`wavefront.ZernikeOPD(zernike_type=...)` supports `standard`, `fringe` and `noll`.
+All three agree on the piston term to 3e-12 (the mean of a wavefront is
+basis-independent), and `standard` and `noll` give *identical* `sqrt(sum_{k>=1} c_k^2)`
+-- they differ only in term ordering, and both are RMS-normalised, so that
+quadrature sum **is** the piston-removed RMS wavefront error.
+
+`fringe` is normalised to unit **peak**, not unit RMS. The same quadrature sum gives
+0.0769 waves where standard/noll give 0.0444: a factor of 1.73. Computing an RMS
+wavefront error from Fringe coefficients the way one legitimately can from Standard
+or Noll coefficients is a silent 1.7x error.
+
+Evidence: `tutorials/t26_zernike_decomposition.py`.
+
+## MTF and PSF grid conventions (CHE-57)
+
+- `GeometricMTF.freq` ends at exactly the incoherent cutoff `1/(lambda * F/#)` and
+  equals its own `cutoff_freq` attribute. `FFTMTF`'s grid extends to **2.02x** that.
+  The two curves are therefore not comparable index-by-index.
+- `FFTMTF.freq` is `(num_fields, 128)` and `FFTMTF.mtf` is one
+  `[sagittal, tangential]` pair per field -- not a flat curve.
+- `FFTPSF` and `HuygensPSF` return **different grid sizes** for the same `num_points`
+  request (256x256 vs 128x128 on `CookeTriplet`) over different physical extents.
+  Compare them by Strehl ratio, or interpolate onto a common physical grid; a
+  pixelwise or pixel-radius comparison is meaningless. Their Strehl ratios agree to
+  21% at the edge field.
+- `FFTPSF.strehl_ratio()` agrees with the Marechal estimate `exp(-(2 pi sigma)^2)`
+  to 7% on axis when `sigma` is the *piston-removed* RMS from `wavefront.OPD`.
+
+Evidence: `tutorials/t25_psf_and_mtf.py`.
+
+## Third-order aberration coefficients are per surface (CHE-57)
+
+`Optic.aberrations.seidels()` returns the five primary Seidel sums, but the twelve
+named accessors (`TSC`, `SC`, `CC`, `TCC`, `TAC`, `AC`, `TPC`, `PC`, `DC`, `TAchC`,
+`LchC`, `TchC`) return **per-surface arrays**; the system aberration is their sum.
+
+Relationships verified against third-order theory on `TripletTelescopeObjective`:
+
+- `TCC == 3 * CC` exactly (tangential coma is three times sagittal coma), per surface.
+- Every longitudinal coefficient is its transverse partner over `-u'`, the final
+  marginal ray slope from `paraxial.marginal_ray()`: `SC/TSC`, `AC/TAC`, `PC/TPC` and
+  `LchC/TAchC` all equal `5.600000` to 8.9e-16, across four physically unrelated
+  aberration types.
+- `sum(PC) == -h_img^2 * P / 2`, where `P = sum (n' - n)/(n n' R)` is the Petzval sum
+  read off the prescription without Optiland, and `h_img` is the paraxial chief-ray
+  image height. This pins what `PC` *means* (edge-field longitudinal sag).
+
+Evidence: `tutorials/t14_first_third_order_aberrations.py`.
+
+## `rays.i` is an amplitude-squared transmission, not an intensity transmittance (CHE-57)
+
+After a *coated* refraction, `RealRays.i` carries `|t|^2`, **not** the intensity
+transmittance `T = 1 - R`. The two differ by the radiance factor
+`n2 cos(th2) / (n1 cos(th1))`, which cancels only when the ray returns to its
+original medium. Verified exactly on plane air/N-BK7 interfaces:
+
+- one interface, image plane left inside the glass: `i = (2/(1+n))^2 = 0.630621`
+- two interfaces, ray back in air: `i = (1 - R)^2 = 0.917021`
+
+Three further specifics:
+
+- An **uncoated** surface applies no Fresnel loss, but `rays.i` is still not exactly
+  1: an uncoated cemented doublet gives 0.999784 with a ray-dependent spread of
+  ~3e-5. A coating can only be validated against a **matched uncoated trace**.
+- `coatings.SimpleCoating(transmittance=t)` is a scalar intensity factor applied
+  multiplicatively per surface, with no angle or wavelength dependence: the ratio to
+  the uncoated baseline equals the declared product to 1e-16.
+- A `ThinFilmCoating` carries its **own** declared incident/substrate materials. The
+  same object attached to interfaces whose media are reversed evaluates the wrong
+  direction and yields `rays.i` ~ 3.6, i.e. a transmittance above unity, silently.
+
+Evidence: `tutorials/t07_anti_reflective_coating.py`, `tutorials/t18_introduction_to_coatings.py`,
+`tutorials/t40_custom_coating_types.py`.
+
 ## Differentiability is opt-in, not automatic
 
 A bare `pip install optiland` gives you the NumPy backend and **zero
