@@ -1,6 +1,27 @@
 schema_version: 1
 protocol_id: M3-SLICE-CPU-V1
 extends: M2-COUPLER-CPU-V1
+
+# ---------------------------------------------------------------------------
+# READ BEFORE FOLLOWING AN `evidence:` POINTER (CHE-62)
+# ---------------------------------------------------------------------------
+# benchmarks/probes/records/m3r_sensor_handoff.json is named as evidence in
+# several places below and DOES NOT EXIST. CHE-38's consolidated record has
+# never landed; the numbers it would hold were measured, but from the staged
+# runs tabulated in benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md section 11, not
+# from that single artifact. Nothing below is retracted -- the pointer is
+# unresolvable, not wrong.
+#
+# Regenerate with `./run.sh python benchmarks/probes/m3r_sensor_handoff.py`
+# (~25 min, CPU, foreground). Tracked in CHE-63; full disposition in
+# benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md item 1.
+unlanded_evidence:
+  - path: benchmarks/probes/records/m3r_sensor_handoff.json
+    issue: CHE-38 (M3.9R)
+    status: never generated
+    surrogate: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md (staged runs, section 11)
+    tracked_by: CHE-63
+
 amendments:
   - id: A1-carrier-conditioned-propagation
     issue: CHE-40 (M3.2A)
@@ -253,6 +274,7 @@ handoff_plane:
         allows 5.317 um here and is satisfied with better than 10x margin, which
         inverts the pupil-plane situation where it bound. M3.9's grid_n = 188 is a
         pupil-grid figure and does not transfer.
+    # UNLANDED -- see unlanded_evidence at the top of this file (CHE-62/CHE-63).
     evidence: benchmarks/probes/records/m3r_sensor_handoff.json
     coupler_card: knowledge/couplers/ray_to_wave/coupler_card.yaml (reconstruction_semantics)
 
@@ -847,6 +869,8 @@ m3_9_convergence:
   # -------------------------------------------------------------------------
   interpretation_superseded_by:
     issue: CHE-38 (M3.9R)
+    # UNLANDED -- see unlanded_evidence at the top of this file (CHE-62/CHE-63).
+    # The report, not the record, is the readable evidence for this amendment.
     record: benchmarks/probes/records/m3r_sensor_handoff.json
     report: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md
     scope_of_everything_below: >-

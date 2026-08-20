@@ -14,6 +14,14 @@ real, but the milestone is not cleanly exitable as it stands.** Six items below
 (R1–R6, "What still has to happen") are open, and two of them repeat failures
 M3 already recorded against itself.
 
+> **CHE-62 update.** R1–R4 are now resolved or explicitly dispositioned and R2/R3
+> are discharged; R5 and R6 remain open and out of CHE-62's scope. Every item
+> below carries its disposition inline. The single reconciled statement of what
+> each M3/M3.5 item *is* now lives in
+> **`benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md`** — read that if this report and
+> another file appear to disagree. CHE-62 changed no tolerance, no gate, and no
+> physics claim.
+
 ---
 
 ## Environment
@@ -41,12 +49,21 @@ numerical cost and found **no shrink was needed**
 
 | Tier | Command | Measured |
 | --- | --- | --- |
-| A (required after every change) | `-m "not slow and not benchmark and not fmmax and not fdtdx and not sax"` | **30.85 s**, 478 passed / 21 skipped / 128 deselected |
+| A (required after every change) | `-m "not slow and not benchmark and not fmmax and not fdtdx and not sax"` | **30.85 s**, 478 passed / 21 skipped / 128 deselected *(as PB3 measured it)* |
 | B (subsystem) | `-m optiland`, `-m chromatix`, `-m coupler`, `-m "fmmax or fdtdx or sax"`, `-m slow` | independently invocable, overlaps A by design |
 | C (full regression) | `./run.sh pytest -q` | 627 tests, ~11 min |
 
 The ≤~3-minute gate is met by ~6×. Slowest single Tier A test is 0.31 s; there
 is no outlier to remove. The 21 Tier A skips are **not** incidental — see L1.
+
+**Re-measured at `ee57e33` (CHE-62): 42.78 s, 670 passed / 54 skipped / 173
+deselected.** The PB3 row above is what PB3 measured and is left as-is for that
+attribution, but it is not the current tree: CHE-55/CHE-60/CHE-61 added tests
+after PB3 ran. The gate is still met by ~4×. The skip total grew from 21 to 54
+for one reason, and it is not a new debt — 21 are still L1's missing record, and
+the other 33 are CHE-60/CHE-61's `gpu` quarantine (8 `test_gpu_environment.py`,
+19 `test_precision_gpu_pipeline.py`, 6 `test_precision_execution_matrix.py`),
+which is designed behavior and did not exist when PB3 measured.
 
 The marker vocabulary is orthogonal on purpose: `jax`/`torch`/`integration`
 mean "needs that optional install", not "slow" or "out of scope"; `gpu` means
@@ -202,16 +219,43 @@ clean baseline. Carried unchanged from M3's L5. `L2-PSF-01` does not depend on
 it, but CHE-38's own acceptance criterion is still open, and the skip count is
 now embedded in M3.5's headline test numbers.
 
+**Disposition (CHE-62): open, deliberately not regenerated, and no longer
+unexplained.** CHE-62 executed no compute; the ~25-min run is tracked in
+**CHE-63**. What it did establish is what actually depends on the record —
+*only* those 21 assertions. `L2-PSF-01` imports the probe as a module and re-runs
+it, and no gate in `manifest.yaml` reads the JSON. The skip message now names
+CHE-38/CHE-62/CHE-63 and prints the regeneration command, so the skip count is
+self-documenting from test output alone. The record is **not** declared
+unnecessary. Item 1 of the disposition doc.
+
 ### L2 — `L2-PSF-01`'s provenance is still from a dirty tree
 `outputs/M3/L2-PSF-01/provenance.json` still records `dirty_worktree: true`
 against `a69fe6d9`. M3's carry-forward #7 said to discharge this "before
 extending the slice, not after". M3.5 extended the slice. Unchanged.
 
-### L3 — The physical-correctness gate's disposition is now ambiguous
+**Disposition (CHE-62): open, tracked in CHE-63 — but the precondition is
+satisfiable for the first time.** Until `ee57e33` this repository never had a
+clean worktree: PB7's probe and two reports were untracked, and `dirty_worktree`
+is `bool(git status --porcelain)`, so `false` was *unreachable* regardless of
+when the re-run was launched (see R3). It is reachable now. CHE-63 also has to
+fix the reason this survived two exits: `outputs/` is gitignored, so even a clean
+re-run's provenance is not durable evidence unless it is committed to a tracked
+path. Item 2 of the disposition doc.
+
+### L3 — ~~The physical-correctness gate's disposition is now ambiguous~~ RESOLVED (CHE-62)
 CHE-48 — decompose the unattributed sensor-plane residual, which *is* M3's L1 —
 is marked Done with no comment, no commit, and no artifact anywhere in the tree.
 Meanwhile `manifest.yaml` and `M3_SLICE_REPORT.md` still record the gate as
 unmet. One of the two is wrong. See R4.
+
+**Resolved: the ticket was wrong.** `git log --all --grep=CHE-48` returns only
+`ec55839`, which *mentions* CHE-48 as a follow-up rather than resolving it, and no
+file in the tree holds a CHE-48 result. The decomposition was never performed, so
+CHE-47's proposed experiment (refit O2 above the frozen 256-ring linear
+interpolation) is still the concrete next step. `manifest.yaml` and
+`M3_SLICE_REPORT.md` were **correct and are unchanged** — nothing is promoted.
+CHE-48 is reopened, and the `1.0e-3` gate is carried into M4 as an explicit open
+limitation on benchmark #3. Item 3 of the disposition doc.
 
 ### L4 — CHE-50's decision is not reflected in the repository
 CHE-50 closed with a decision ("no kernel change for now; revisit when a
@@ -249,9 +293,11 @@ Backlog, none touched.
 Unverified, unchanged. M3.5 touched none of them. **GPU/TPU is no longer on this
 list** — see R6.
 
-### L10 — This report is written against an unmerged stack
+### L10 — ~~This report is written against an unmerged stack~~ DISCHARGED (CHE-62)
 Every M3.5 commit sits on one branch, unmerged. See R2. This is M3's L8
 recurring one milestone later.
+
+**Discharged:** CHE-62 landed the stack on `main`. See R2.
 
 ---
 
@@ -259,33 +305,68 @@ recurring one milestone later.
 
 Ordered by what blocks the gate.
 
-### R1 — Reconcile PB7's scope with PB8's acceptance criterion, and close CHE-58
+### R1 — ~~Reconcile PB7's scope with PB8's acceptance criterion, and close CHE-58~~ PARTLY DISCHARGED (CHE-62)
 CHE-58 is still in **Backlog** while PB8 is blocked by it. Its work is complete
 and its evidence is on disk. Two decisions needed: (a) mark CHE-58 Done; (b)
 amend PB8's PB7 criterion to match what CHE-58 actually scoped — "frozen,
 cross-comparable semantics, tolerances deferred" — and open an M4 ticket for the
 tolerance, which per F2 must wait for a genuinely independent oracle.
 
-### R2 — Land M3.5 on `main`
+**(a) done — and the sentence above is stale:** CHE-58 and CHE-59 are both
+`Done`. **(b) still open:** the PSF tolerance has no ticket yet, and per F2 it
+must not be set against an Optiland PSF route. It belongs to M4 benchmark #3,
+which is where the independent-oracle requirement already lives (M4 carry-forward
+#1); establishing a new PSF tolerance was explicitly out of CHE-62's scope.
+
+### R2 — ~~Land M3.5 on `main`~~ DISCHARGED (CHE-62)
 `main` is still at `ec55839` (M3 exit). All 23 M3.5 commits (CHE-52 → CHE-61)
 are stacked on `chengjiazhou4802/che-61-pb4b-...`. The per-issue branches for
 CHE-55, CHE-56, CHE-57 and CHE-60 exist locally but were never pushed, and
 `che-54`'s branch tip is actually a CHE-56 commit. No PRs. An exit gate
 asserting "PB1–PB7 done" against an unmerged stack is not a gate.
 
-### R3 — Commit PB7's code
+**Discharged:** CHE-62 merged the stack into `main`. `main` was a strict ancestor
+of the branch tip (nothing to reconcile), so the whole M3.5 history landed in
+order. The observations about the stray per-issue branches stand and are
+cosmetic — `che-54`'s tip really is a CHE-56 commit — but the commits themselves
+are all reachable from `main` now, so no work is stranded.
+
+### R3 — ~~Commit PB7's code~~ DISCHARGED (CHE-62)
 `benchmarks/probes/pb7_cooke_triplet_psf_comparison.py` (1983 lines) is
 untracked, on the CHE-61 branch. `outputs/` is gitignored, so PB7's figures and
 JSON are regenerable-only by design — but the written conclusion has been moved
 to `benchmarks/PB7_COOKE_TRIPLET_PSF_REPORT.md` so it is not lost with them.
 
-### R4 — Decide what CHE-48 "Done" means
+**Discharged** at `ee57e33`, together with this report and the PB7 report, which
+were themselves untracked. The probe is committed unreformatted: `ruff` reports
+findings on it and on the already-committed `m3r_sensor_handoff.py` alike, so
+benchmark probes are not under the lint gate and reformatting would have been an
+unrelated change. This also unblocked L2 — a clean worktree is what
+`dirty_worktree: false` requires, and until this commit there wasn't one.
+
+### R4 — ~~Decide what CHE-48 "Done" means~~ RESOLVED (CHE-62)
 Either the residual was decomposed (then the artifact and the `manifest.yaml` /
 `M3_SLICE_REPORT.md` gate language need updating), or it was closed as
 superseded (then say so, and the `1.0e-3` gate carries into M4 as an open
 limitation on benchmark #3). Right now the ticket and the repository disagree.
 Same for CHE-51, canceled with no reason recorded — PB7's "N_f and NA not
 separated here" is a sufficient reason, it just needs writing down.
+
+**Resolved — it is the second branch.** CHE-48 was closed without the
+decomposition being performed (no comment, no commit, no artifact; see L3), so the
+`1.0e-3` gate carries into M4 as an open limitation on benchmark #3 and the
+`manifest.yaml` / `M3_SLICE_REPORT.md` language is **unchanged because it was
+already right**. CHE-48 is reopened so Linear matches the repository.
+
+**CHE-51's rationale is now recorded**, and it is stronger than "not separated
+here". CHE-51's own description makes the three-way comparison a *precondition*
+("the benchmark reference itself has not yet been cross-validated … should be
+completed first"). PB7 ran that comparison, and its outcome — F2, that `FFTPSF`
+and `HuygensPSF` share one Wavefront/OPD front end — removes CHE-51's premise
+rather than satisfying it: a scan built on those two would be circular
+validation. Separating `N_f` from NA needs several systems/wavelengths against a
+genuinely independent oracle, which is the same prerequisite M4 benchmark #3
+already carries. Items 3 and 4 of the disposition doc.
 
 ### R5 — Make CHE-50's decision visible to consumers
 One line in the `C_RAY_TO_WAVE` coupler card and/or the emitted artifact's
@@ -335,4 +416,13 @@ edge".
 6. **Pick up CHE-42, CHE-43, CHE-44, CHE-46 rather than re-deriving their
    scope.** All are scoped and unstarted.
 7. **Discharge L1 and L2** (the missing probe record, the dirty-tree provenance).
-   Both have now survived two milestone exits.
+   Both have now survived two milestone exits. **Now tracked as CHE-63** with
+   the exact commands, rather than as a report footnote — which is how they
+   survived the first two. CHE-63 also requires committing `L2-PSF-01`'s
+   provenance out of gitignored `outputs/`, because non-durable evidence is the
+   mechanism that let L2 recur.
+8. **The `1.0e-3` physical-correctness gate is inherited unmet, not silently
+   resolved.** CHE-48 was closed without decomposing the residual (L3/R4). M4
+   benchmark #3 owns it, and per F2 must not close it against another Optiland
+   PSF method. Read `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` before
+   re-litigating any of the five M3/M3.5 items it covers.

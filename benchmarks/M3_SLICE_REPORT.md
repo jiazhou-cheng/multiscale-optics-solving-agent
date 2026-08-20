@@ -1,8 +1,10 @@
 # M3 exit report — Optiland → C_RAY_TO_WAVE → Chromatix → PSF vertical slice
 
 CHE-39 (M3.10). This report integrates evidence only. Every number in it comes
-from a run recorded in `outputs/M3/L2-PSF-01`, `benchmarks/probes/records/
-m3r_sensor_handoff.json`'s staged runs (`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md`),
+from a run recorded in `outputs/M3/L2-PSF-01`, the staged runs behind
+`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md` (§11 — *not* from
+`benchmarks/probes/records/m3r_sensor_handoff.json`, which has never been
+generated; CHE-62 item 1),
 `benchmarks/probes/records/m3_quadrature_weight.json`, `benchmarks/probes/
 records/m3_psf_verification.json`, or the test suite named beside it.
 
@@ -417,6 +419,11 @@ runs but not from one reproducible artifact. This is why 21 tests in
 depend on this record — it calls the same underlying probe code directly — but
 CHE-38's own acceptance criterion for it is still open.
 
+**Disposition (CHE-62):** unchanged and now justified rather than merely noted.
+Only those 21 assertions read the record; the skip message names the cause and
+the regeneration command; regeneration is tracked in **CHE-63**. See
+`benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1.
+
 ### L6 — The reconstructed sensor field carries no wavefront curvature term
 
 `C_RAY_TO_WAVE`'s sum is linear in the transverse coordinate, so it emits no
@@ -442,6 +449,9 @@ citable commit it now lives in. Re-running the bundle against that commit and
 re-confirming `dirty_worktree: false` with an unchanged fingerprint is carried
 forward rather than blocking this close-out.
 
+**Disposition (CHE-62): still open, now tracked in CHE-63.** See carry-forward
+#7 below and `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 2.
+
 ### L9 — No performance envelope for `L2-PSF-01`
 
 Unlike `L2-COUPLER-01`, this bundle records no timing section — out of scope
@@ -464,6 +474,13 @@ general claim about caustics.
    promotion past "characterized". CHE-47's own suggested experiment — refit
    O2 at higher resolution/order and see whether the gap to O1 closes — is the
    concrete next step, not a repeat of the ray-count ladder.
+
+   **Status (CHE-62): still open, and still exactly this.** CHE-48 was opened for
+   this experiment and marked `Done` with no comment, no commit and no artifact —
+   the decomposition was never performed. CHE-48 is reopened; the `1.0e-3` gate
+   above remains unmet and is carried into M4 as an explicit open limitation. Per
+   PB7 (CHE-58) finding F2, it must not be closed against another Optiland PSF
+   method. See `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 3.
 2. **The negative-control blind-spot audit needs to be a standing practice,
    not a one-time fix.** Three independent instances in M3 alone (M3.8's two,
    CHE-41's off-axis one) found a control that could not fail. CHE-44
@@ -489,3 +506,11 @@ general claim about caustics.
 7. **Re-run `L2-PSF-01` against the now-committed tree for a citable,
    clean-tree fingerprint** (L8), discharged after the fact rather than before
    this close-out — before extending the slice, not after.
+
+   **Status (CHE-62): not discharged; M3.5 extended the slice first.** One thing
+   did change: until `ee57e33` the worktree was never clean (PB7's probe and two
+   reports were untracked), so `dirty_worktree: false` was *unreachable* — the
+   re-run could not have satisfied its own criterion whenever it was launched. It
+   now can. Tracked in **CHE-63**, which also requires committing the provenance
+   out of gitignored `outputs/` so a third recurrence is not possible. See
+   `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 2.

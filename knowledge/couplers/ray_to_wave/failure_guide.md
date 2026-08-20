@@ -57,9 +57,11 @@ reweighting the outer ring to `½` and the central ray to `¾`; the residual sho
 drop by an order of magnitude *and stop depending on the ray count*.
 
 Do not chase this by adding rays — it is first order in the spacing, so 1e-3 on a
-`N_f ≈ 23` system needs of order `10⁶` rays. Measured in CHE-38 (M3.9R); evidence
-in `benchmarks/probes/records/m3r_sensor_handoff.json`
-(`attribution_quadrature_weights`).
+`N_f ≈ 23` system needs of order `10⁶` rays. Measured in CHE-38 (M3.9R). The evidence key is
+`attribution_quadrature_weights` in `benchmarks/probes/records/
+m3r_sensor_handoff.json` — a record that **has never been generated**; read
+`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md` §8.1–8.2 instead until CHE-63
+lands it (disposition: `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1).
 
 **CHE-47 implemented the reweighting this section describes**, as a producer-side
 default: `optiland_handoff.declare_coherent_bundle` folds

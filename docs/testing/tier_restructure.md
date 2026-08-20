@@ -148,3 +148,11 @@ carries none of those markers). PB1's Finding F3 (missing
 affected tests still skip under every tier, as shown in the Tier A run above;
 regenerating that record remains the recommended follow-up issue from PB1 §6,
 out of scope for both PB2 and PB3.
+
+CHE-62 audited those 21 skips rather than leaving the count unexplained: only the
+record-backed assertions in `tests/test_m3r_sensor_handoff.py` depend on the
+record, the skip message now names the cause and the regeneration command, and
+regeneration is tracked in CHE-63. See
+`benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1. Note that Tier A's skip
+total has since grown from 21 to 54: CHE-60/CHE-61 added 33 `gpu`-quarantined
+skips, which are designed behavior and not a debt.

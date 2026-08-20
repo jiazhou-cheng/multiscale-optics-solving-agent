@@ -134,6 +134,19 @@ levels:
           gate (CHE-47 measures 2.2e-3-2.5e-3 at 787,969 rays; a synthetic
           aberration-free bundle reaches 4.07e-4, inside the gate). See
           benchmarks/level2/L2-PSF-01/README.md and the M3 exit report.
+        gate_disposition: >-
+          CHE-62 re-checked this note and it STANDS UNCHANGED. The gate is still
+          unmet; no tolerance is widened and nothing is promoted. CHE-48 -- the
+          ticket that would have decomposed the unattributed half of the residual
+          -- was marked Done with no comment, no commit and no artifact, so the
+          decomposition was never performed and the ticket, not this note, was
+          the thing that was wrong. CHE-48 is reopened. The 1.0e-3
+          fft_oracle_intensity_relative_l2 gate is therefore carried into M4 as an
+          explicit open limitation on benchmark #3, which per PB7 (CHE-58)
+          finding F2 must not close it against another Optiland PSF route --
+          FFTPSF and HuygensPSF share one Wavefront/OPD front end and are not two
+          oracles. Full disposition:
+          benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md item 3.
       - id: L2-META-01
         title: Unit-cell-to-system meta-optic imaging
         graph: [M_RCWA_FMMAX, C_CELL_TO_SURFACE, M_WAVE_CHROMATIX]

@@ -40,10 +40,28 @@ GATE = 1.0e-3
 pytestmark = pytest.mark.coupler
 
 
+#: Why the 21 record-backed tests below skip, stated in the skip itself rather
+#: than only in a milestone report. CHE-38's consolidated record has never
+#: landed; CHE-62 audited what depends on it (only these assertions -- L2-PSF-01
+#: imports the probe as a module and re-runs it, and no gate in
+#: benchmarks/manifest.yaml reads the JSON) and deliberately deferred the ~25 min
+#: regeneration to CHE-63 rather than executing compute in a bookkeeping ticket.
+#: Full disposition: benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md, item 1.
+_MISSING_RECORD_SKIP = (
+    "{path} has never landed (CHE-38's consolidated record). These assertions are "
+    "the single-artifact reproducibility check CHE-38 asked for, so they skip "
+    "rather than xfail -- nothing is expected to fail, the evidence simply has not "
+    "been generated. Regenerate with `./run.sh python "
+    "benchmarks/probes/m3r_sensor_handoff.py` (~25 min, CPU, foreground), then "
+    "commit the record. Tracked in CHE-63; disposition in "
+    "benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md item 1."
+)
+
+
 @pytest.fixture(scope="module")
 def record() -> dict[str, Any]:
     if not RECORD_PATH.exists():
-        pytest.skip(f"{RECORD_PATH.relative_to(ROOT)} is missing; run the probe first")
+        pytest.skip(_MISSING_RECORD_SKIP.format(path=RECORD_PATH.relative_to(ROOT)))
     return json.loads(RECORD_PATH.read_text())
 
 

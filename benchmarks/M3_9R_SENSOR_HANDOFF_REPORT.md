@@ -24,6 +24,14 @@
 > evidence-complete on the physics and **not yet** reproducible from a single
 > committed artifact. Treat §10's verdict as established and §12's checklist as
 > having one item outstanding.
+>
+> **Update (CHE-62).** Still true. The re-run was reviewed and deliberately
+> deferred rather than forgotten: CHE-62 was a bookkeeping ticket that executed no
+> compute, and it confirmed that nothing outside those 21 assertions reads the
+> record — `L2-PSF-01` imports this probe as a module and re-runs it, and no gate
+> in `benchmarks/manifest.yaml` reads the JSON. Regeneration is tracked in
+> **CHE-63**; the disposition is `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md`
+> item 1.
 
 ---
 
@@ -575,14 +583,14 @@ Executed in the `agent_solver` container through `./run.sh`, CPU, float64/comple
 | 14 | "aperture-aware reconstruction required" re-established or downgraded | ✅ **downgraded** §9 |
 | 15 | coupler validity conditions updated from measured evidence | ✅ 3 new conditions, 1 scoped, 3 claims withdrawn |
 | 16 | `0.744` vs `1.0009` no longer attributed to unsupported mechanisms | ✅ §9 |
-| 17 | full regression tests pass | ⬜ **not run** — see §11 |
+| 17 | full regression tests pass | ⬜ **not run** — see §11. Still unverified as of CHE-62; Tier C is the check, carried in CHE-63 |
 
 ## 13. Deliverables
 
 | artifact | path |
 |---|---|
 | probe | `benchmarks/probes/m3r_sensor_handoff.py` |
-| record | `benchmarks/probes/records/m3r_sensor_handoff.json` *(pending)* |
+| record | `benchmarks/probes/records/m3r_sensor_handoff.json` *(never generated — CHE-63)* |
 | arrays | `outputs/M3/CHE-38-M3.9R/arrays.npz` *(pending)* |
 | figures 1–5 | `outputs/M3/CHE-38-M3.9R/` *(pending)* |
 | tests | `tests/test_m3r_sensor_handoff.py` |

@@ -304,7 +304,10 @@ Nyquist limit, which allows `5.317 µm` here and is satisfied with better than 1
 margin. That inverts the pupil-plane situation, and it is why M3.9's `grid_n = 188`
 does not transfer.
 
-Evidence: `benchmarks/probes/records/m3r_sensor_handoff.json`.
+Evidence: `benchmarks/probes/records/m3r_sensor_handoff.json` — **which has never
+been generated.** The figures above come from the staged runs in
+`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md` §11, not from that record. Tracked in
+CHE-63; disposition in `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1.
 
 ---
 
