@@ -149,6 +149,13 @@ affected tests still skip under every tier, as shown in the Tier A run above;
 regenerating that record remains the recommended follow-up issue from PB1 §6,
 out of scope for both PB2 and PB3.
 
+**CHE-64 update on Tier C's cost.** The "627 tests, ~11 min" figure below is
+PB3-era and now understates Tier C by roughly 4x: the suite is 905 tests and at
+least ~44 min of summed per-test time, and the entire increase is CHE-57's 57
+tutorial reproductions (2003 s, 76% of the total). They now carry a `tutorial`
+marker so `-m "not tutorial"` gives an ~11 min regression path again. Full
+per-test inventory and tier review: `docs/testing/test_runtime_audit.md`.
+
 CHE-62 audited those 21 skips rather than leaving the count unexplained: only the
 record-backed assertions in `tests/test_m3r_sensor_handoff.py` depend on the
 record, the skip message now names the cause and the regeneration command, and

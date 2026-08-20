@@ -56,7 +56,12 @@ def _params():
     for path in tutorial_module_paths():
         module = load_tutorial_module(path)
         meta = module.TUTORIAL
-        marks = []
+        # Every reproduction is a pinned-dependency regression gate (CHE-64): it
+        # answers "has the pinned solver changed?", not "is our physics right?".
+        # `slow` is kept alongside so all existing tier commands select exactly
+        # what they did before; `tutorial` is what makes the 2003 s these tests
+        # cost separable from the 164 s of genuine slow physics tests.
+        marks = [pytest.mark.tutorial]
         if meta.slow:
             marks.append(pytest.mark.slow)
         if meta.needs_torch:

@@ -99,6 +99,7 @@ markers = [
   "sax: exercises the SAX photonic-circuit adapter (out of current milestone scope, see AGENTS.md)",
   "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction",
   "slow: individually expensive numerical characterization or convergence test",
+  "tutorial: reproduces an upstream third-party tutorial; a regression gate on the PINNED dependency, not a test of this repository's physics (CHE-64)",
   "gpu: requires a CUDA device attached to the container (`./run.sh --gpu`); auto-skips otherwise",
 ]
 

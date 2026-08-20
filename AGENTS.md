@@ -61,8 +61,7 @@ tables in `docs/testing/test_audit.md` and `docs/testing/tier_restructure.md`).
   (C_RAY_TO_WAVE/C_WAVE_TO_RAY), `-m "fmmax or fdtdx or sax"` (out-of-scope
   solver adapters), `-m slow` (expensive characterization/convergence tests)
 - **Tier C** (milestone/full regression before merging a PR touching shared
-  contracts, 627 tests, ~11 min): `./run.sh pytest -q` (includes the four
-  real-solver benchmark reproductions in `tests/benchmarks/`, run alone via `-m benchmark`)
+  contracts, 905 tests, **~44 min**): `./run.sh pytest -q` (includes the four real-solver benchmark reproductions in `tests/benchmarks/`, run alone via `-m benchmark`). **`-m "not tutorial"`** is Tier C minus the pinned-dependency gate, 848 tests, ~11 min: the 57 `tutorial` tests reproduce upstream Optiland/Chromatix tutorials and are **76% of suite runtime**, so run `-m tutorial` when a pin or `docker/Dockerfile` changes, not every regression. Per-test runtime/memory, the tier review, and the opt-in profiler whose swap guardrail fails a run when the *container's* cgroup swap grows (host swap is non-zero at rest here, so it cannot be the signal): `docs/testing/test_runtime_audit.md` (CHE-64).
 
 This is orthogonal to the `jax`/`torch`/`integration` markers, which mean "requires that optional install," not "is slow" or "is out of scope" — and to `gpu` (CHE-60), which means "needs an attached CUDA device." Enabling the GPU mutates process-global JAX state, so `gpu` tests run only in a dedicated `./run.sh --gpu pytest -q -m gpu` session and skip whenever anything else is selected with them; that skip is what keeps every other tier command green unchanged.
 
