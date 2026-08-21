@@ -46,7 +46,9 @@ the_plane_z_is_not_a_kernel_parameter:
     not an approximation: advancing by arc length s changes the per-ray constant
     phase by k s d_z^2, and s d_z^2 = dz d_z for a plane offset dz = s d_z, which
     is precisely the phase an exact plane wave accumulates over dz. Verified in
-    tests/test_m3r_sensor_handoff.py against a single-ray closed form.
+    archive/tests/gen1/tests/test_m3r_sensor_handoff.py against a single-ray closed
+    form -- archived by CHE-67 and therefore NOT RUNNABLE; the derivation above
+    stands on its own arithmetic and no live test guards it.
   consequence_2_the_output_is_a_free_space_field: >
     A superposition of plane waves solves the Helmholtz equation exactly, so the
     operator is self-consistent in z. Reconstructing at the pupil and propagating
@@ -60,8 +62,110 @@ the_plane_z_is_not_a_kernel_parameter:
     difference against an exact spherical-wave reference at the 5-Airy-radius gate
     edge, while the intensity residual is at 1e-3. A caller who measures a PSF is
     unaffected; a caller who propagates the reconstructed sensor field further is
-    not. Evidence: benchmarks/probes/records/m3r_sensor_handoff.json
-    (experiment_e_shipping_sensor_path.missing_quadratic_phase).
+    not. DISPOSITION (CHE-50): tracked known limitation, no kernel change; see
+    known_limitations.no_wavefront_curvature_term below for the consumer-facing
+    statement and where it is surfaced. Evidence:
+    benchmarks/probes/records/m3r_sensor_handoff.json
+    (experiment_e_shipping_sensor_path.missing_quadratic_phase) -- NOT COMMITTED,
+    see CHE-63; the numbers above are quoted from
+    benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md section 5, which is committed.
+
+# CHE-68 (R5 of the M3.5 exit report). CHE-50 closed with a decision and the
+# decision lived only in a Linear comment, so no consumer could see it. This is
+# that decision, stated where a caller reads. It changes no numerics: the same
+# text is emitted as provenance["validity"] and repeated in the module docstring.
+known_limitations:
+  no_wavefront_curvature_term:
+    issue: CHE-50
+    status: tracked known limitation -- not a confirmed blocker, not a defect
+    decided: no kernel change for now (CHE-50, closed 2026-08-19)
+    statement: >-
+      The reconstructed field is valid AT the declared reference plane, with zero
+      further propagation. It carries no exp(i k r^2 / 2R) term, so a caller who
+      propagates it a further distance is outside what CHE-24/CHE-38 verified in
+      phase -- and will get no warning from |U|^2, where the error does not appear.
+    who_is_affected: >-
+      A consumer that measures an intensity or a PSF at the handoff plane is
+      unaffected. A consumer that composes this field into a further propagation
+      is affected. M4's hybrid compositions are the first such consumer.
+    who_is_not_a_witness: >-
+      PB7 (CHE-58) put three PSF routes on the Cooke Triplet and did NOT see this
+      term, because its post-handoff propagation distance is zero. That is
+      PB7's configuration, not evidence the term is absent from the physics.
+      PB7 finding F3 says so explicitly.
+    measured_impact:
+      system: M3-SINGLET-REF, on axis, 550 nm
+      phase_error_rad: 1.2
+      where: at the 5-Airy-radius gate edge, against an exact spherical-wave reference
+      intensity_residual: 1e-3, converging
+      complex_field_residual: 0.127, flat rather than convergent
+      source: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md section 5 (CHE-38)
+    correct_remedy_today: >-
+      To obtain a field on a different plane, advance the RAY STATE to that plane
+      and reconstruct there. That is exact, not an approximation -- see
+      consequence_1_moving_the_handoff. Do not propagate the reconstructed field
+      as a substitute.
+    revisit_when: >-
+      A propagation-sensitive hybrid composition independently requires it. Either
+      resolution -- emitting the term, or refusing an undeclared further-propagation
+      request -- is new, separately-verified physics and needs its own ticket and
+      its own oracle. Neither is claimed here.
+    surfaced_in:
+      - src/multiscale_optics_agent/couplers/ray_to_wave.py (module docstring; and
+        provenance["validity"] on every emitted ComplexField)
+      - src/multiscale_optics_agent/couplers/ray_to_wave_node.py (module docstring)
+      - knowledge/couplers/ray_to_wave/conventions.md
+      - this card
+    test: tests/test_ray_to_wave.py::test_emitted_field_declares_the_curvature_limitation
+
+  near_grazing_phase_cancellation:
+    issue: CHE-70
+    status: open -- measured defect of the kernel, currently handled at the caller
+    statement: >-
+      The kernel forms each ray's constant phase as k(OPL - d.x0). For a mode with
+      axial direction cosine d_n, propagating a distance Z makes BOTH terms scale
+      as Z/d_n while their difference is only Z*d_n, so the relative precision of
+      the inputs sets the ABSOLUTE error of the phase:
+      delta_phi ~ eps * k * Z / d_n. Near grazing the phase is destroyed, and the
+      kernel does not warn.
+    who_is_affected: >-
+      Any caller whose spectrum reaches grazing incidence. A pupil bundle within a
+      few degrees of the axis (every M3 configuration) is unaffected, which is why
+      this survived M2 and M3. A caller decomposing a field on a subwavelength grid
+      -- where the propagating cone is the full hemisphere -- is affected.
+    who_is_not_a_witness: >-
+      Any intensity-only comparison. The affected bins carry too little power to
+      move |U|^2; CHE-70 measured 2.25e-7 of the field's power in the eight bins
+      that dominate the error. Only a complex-field comparison sees it.
+    measured_impact:
+      grid: 100x100, 250 nm pitch, 500 nm, 50 um propagation (CHE-70 METALENS-AIR-100)
+      offending_bins: >-
+        8 -- the (30,40) and (40,30) Pythagorean triples and their sign variants,
+        where d_u^2 + d_v^2 = 1 exactly, surviving the strict radial < 1 evanescent
+        cut at d_n = 1.05e-8
+      offending_optical_path_m: 4745.3
+      offending_power_fraction: 2.25e-07
+      exactness_limit_without_band_limit: 2.8e-09 relative field error, float64
+      exactness_limit_with_band_limit: 8.9e-14 relative field error, float64
+      float32_phase_representation_error_rad: 7e3
+      source: benchmarks/CHE70_METALENS_BRIDGE_REPORT.md section 6
+    current_handling: >-
+      Declared band limit at the caller, NOT a kernel change.
+      couplers.streaming.grazing_floor_for_phase_budget derives the floor from the
+      compute precision and the axial extent (d_n >= eps*k*Z/phase_budget; float32
+      over 50 um at 0.01 rad gives 7.49e-3, frozen at 1e-2), band_limit_spectrum
+      applies it, and any comparison oracle must apply the identical mask so both
+      routes carry the same modes.
+    revisit_when: >-
+      A ticket decides whether the kernel should refuse such modes, band-limit them
+      itself, or reformulate the constant phase so the cancellation does not occur.
+      Each is a kernel change with its own oracle. Same disposition as CHE-50.
+    surfaced_in:
+      - knowledge/couplers/ray_to_wave/conventions.md (hazard H4)
+      - src/multiscale_optics_agent/couplers/streaming.py (module docstring)
+      - benchmarks/CHE70_METALENS_BRIDGE_REPORT.md
+      - this card
+    test: tests/test_coherent_bridge.py::TestExactnessLimit::test_the_grazing_band_limit_is_what_makes_the_exactness_limit_exact
 
 required_source_metadata:
   - wavelength_m
@@ -141,13 +245,23 @@ reconstruction_semantics:
 supported_regimes:
   - scalar, monochromatic, fully coherent
   - planar reconstruction surface with a single declared normal
-  - CPU, float64 / complex128
+  - CPU, float64 / complex128 (the reference numerics)
+  # CHE-60/CHE-61 (PB4a/PB4b). Was 'CPU, float64 / complex128' alone.
+  - CPU or CUDA, float32 / complex64, with the phase accumulation validated at
+    2e-6 against an analytic reference and a complex64 round trip at 8.3e-07 (L2)
+    on host and device alike -- no GPU penalty, against an enforced 2e-5 bound
+    (docs/precision/precision_device_policy.md)
 unsupported_regimes:
   - vector fields and polarization
   - chromatic / broadband ensembles
   - partially coherent sources
   - curved reconstruction surfaces (see ../wave_to_ray curvature bound)
-  - GPU and TPU
+  # 'GPU and TPU' stood here until CHE-68. GPU is verified; TPU is not.
+  - TPU. Never attempted on any device this project has access to.
+  - float16 input. Promoted to float32 rather than computed in, and refused
+    outright upstream in the ray model.
+  - NumPy on CUDA. NumPy cannot hold device memory, so CUDA is a JAX-only path
+    for this coupler.
 
 validity_conditions:
   - id: sampling_density
@@ -308,8 +422,19 @@ derivative:
     none has been tested. See ../wave_to_ray for the direction where the paper's
     estimator is deliberately biased.
 
-devices_tested: [cpu]
-dtypes_validated: [complex128]
+# CHE-68: was [cpu] / [complex128], which was true at M2 and stale after PB4.
+# core/capabilities.py is the machine-readable source; this card summarises it.
+devices_tested: [cpu, cuda]
+dtypes_validated: [complex128, complex64]
+device_and_precision_note: >
+  CHE-60/CHE-61. complex128 on the CPU remains the reference and is what the
+  analytic oracles below were measured against. complex64 is validated at 2e-6
+  (phase accumulation, analytic reference) and the coupler boundary is tested to
+  stay on the device rather than round-tripping through the host
+  (tests/test_precision_gpu_pipeline.py, tests/test_precision_execution_matrix.py,
+  both marked gpu and not re-run since CHE-60). Requested, resolved and actual
+  are three distinct things: the emitted provenance reads dtype, device and
+  namespace off the produced array and never asserts them from the request.
 validated_probe_ids:
   - >
     engine_independence (passed, 2026-08-12; CHE-24). Static AST scan of the
@@ -504,7 +629,12 @@ observation_side_handoff:
   verified_by: CHE-38 (M3.9R)
   probe: benchmarks/probes/m3r_sensor_handoff.py
   evidence: benchmarks/probes/records/m3r_sensor_handoff.json
-  tests: tests/test_m3r_sensor_handoff.py
+  tests: >-
+    archive/tests/gen1/tests/test_m3r_sensor_handoff.py -- ARCHIVED by CHE-67 and
+    not runnable. 21 of its 27 tests already skipped for the missing record
+    (CHE-63); archiving removed the 6 live ones too, so this verification is now
+    unguarded. Unarchiving is an explicit git mv back under tests/, per
+    archive/tests/gen1/README.md.
   report: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md
   figures: outputs/M3/CHE-38-M3.9R/
   system_verified: M3-SINGLET-REF, on axis, 550 nm
@@ -586,7 +716,10 @@ off_axis_handoff:
   verified_by: CHE-41
   probe: benchmarks/probes/m3_off_axis_handoff.py
   evidence: benchmarks/probes/records/m3_off_axis_handoff.json
-  tests: tests/test_m3_off_axis_handoff.py
+  tests: >-
+    archive/tests/gen1/tests/test_m3_off_axis_handoff.py -- ARCHIVED by CHE-67 and
+    not runnable, so this verification is unguarded. Unarchiving is an explicit
+    git mv back under tests/, per archive/tests/gen1/README.md.
   field_verified: M3-REVERSE-TELEPHOTO, Hx = 0, Hy = 0.2
   geometric_oracle:
     what_it_is: >-

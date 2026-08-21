@@ -31,8 +31,8 @@ prevent.
 
 Namespace matters separately from device because "GPU" is not enough information
 to execute anything. NumPy cannot leave the host; JAX and Torch can be on
-either. PB4a's klujax hazard is precisely the case where the namespace is right
-and the device is silently wrong.
+either. PB4a's platform-pin hazard is precisely the case where the namespace is
+right and the device is silently wrong.
 
 ## Separation of responsibility
 
@@ -208,14 +208,18 @@ Three different facts, never conflated. `metadata['execution']` and adapter
 diagnostics carry all three; the third is always read off the array that was
 produced.
 
-PB4a's hazard is why: `klujax.py:47` runs
-`jax.config.update("jax_platform_name", "cpu")` at **import** time, and klujax is
-a SAX dependency. Importing SAX anywhere in a process silently moves every later
-JAX computation onto the host, with no warning and `JAX_PLATFORMS` never set. Any
-code writing `record.device = requested_device` would report GPU execution that
-never happened. The Chromatix adapter now reads `field_out.u`'s own placement and
-sets `metadata['execution']['device_mismatch']`, warning explicitly and naming
-the pin as the likely cause.
+PB4a's hazard is why. A process-global `jax_platform_name='cpu'` silently moves
+every later JAX computation onto the host, with no warning and `JAX_PLATFORMS`
+never set, so any code writing `record.device = requested_device` would report GPU
+execution that never happened. The Chromatix adapter reads `field_out.u`'s own
+placement and sets `metadata['execution']['device_mismatch']`, warning explicitly
+and naming the pin as the likely cause.
+
+PB4a found this through a dependency that set the pin at *import* time
+(`klujax.py:47`, a SAX dependency). CHE-72 removed SAX and klujax entirely, so
+that particular route is gone — but the policy is unchanged and not contingent on
+it: an env var, another package, or a missing CUDA plugin reaches the same state,
+and "requested" was never evidence of "actual" in the first place.
 
 The GPU availability probe compiles and runs a kernel rather than trusting
 `jax.devices()`, because PB4a measured an image where enumeration returned
@@ -230,7 +234,7 @@ loosen it. Both are fixed rather than tolerated.
 ### 1. JAX drops 64-bit requests without erroring
 
 With `jax_enable_x64` disabled — the state the Chromatix adapter *enforces* on
-every call, and the state klujax leaves behind — `astype(float64)` returns
+every call, and the process-global default — `astype(float64)` returns
 `float32` with only a `UserWarning`. `core.arrays.verify_dtype` checks the dtype
 that came back rather than the one that was asked for, and raises
 `SILENT_DTYPE_DOWNCAST` naming the config option.
@@ -333,7 +337,7 @@ knowable in advance.
 | `UNSUPPORTED_DEVICE` | The component does not execute on this device kind. |
 | `UNSUPPORTED_NAMESPACE_FOR_DEVICE` | The namespace cannot drive that device for this component (Optiland numpy + CUDA). |
 | `OPTILAND_CUDA_UNAVAILABLE` | Well-formed CUDA request, no device in *this container*. Distinct code from a malformed one. |
-| `CHROMATIX_CUDA_UNAVAILABLE` | Same, plus the klujax pin named when it is the cause. |
+| `CHROMATIX_CUDA_UNAVAILABLE` | Same, plus a `jax_platform_name` pin named when it is the cause. |
 | `LOSSY_DOWNCAST_REQUIRED` | SAFE refuses a narrowing conversion. Names `allow_downcast` as the deliberate opt-in. |
 | `STRICT_REPRESENTATION_MISMATCH` | STRICT refuses any implicit dtype conversion. |
 | `STRICT_NAMESPACE_MISMATCH` | STRICT refuses a namespace conversion. |
@@ -354,11 +358,12 @@ knowable in advance.
 ./run.sh pytest -q -m "not slow and not benchmark and not fmmax and not fdtdx and not sax"
 ```
 
-GPU tests need a dedicated session because enabling the GPU means undoing
-klujax's process-global platform pin, which changes what every other test in the
-session computes on. `conftest.py` skips `gpu`-marked tests whenever anything
-else is selected with them, which is what keeps every other tier command green
-unchanged. See `docs/testing/gpu_environment.md`.
+GPU tests need a dedicated session because on the GPU image every computation in
+the process runs on the GPU, and the non-GPU tests' tolerances were derived on the
+CPU. `conftest.py` skips `gpu`-marked tests whenever anything else is selected
+with them, which is what keeps every other tier command green unchanged. See
+`docs/testing/gpu_environment.md`. (Before CHE-72 this was justified by having to
+undo klujax's platform pin; the harness no longer repairs anything.)
 
 ## Non-goals of PB4b
 

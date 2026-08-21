@@ -127,27 +127,31 @@ array of shape `(1, 2)`, e.g. `jnp.asarray([[pitch_y, pitch_x]])`. A bare
 Python/NumPy scalar (square pixel) works unchanged. See
 `chromatix_adapter.py`'s `_run_asm_propagate` for the adapter's use of this.
 
-## `jax_enable_x64` leaks across the test suite via `sax`
+## `jax_enable_x64` leaks across the test suite
 
 **Symptom:** `chromatix.functional.asm_propagate` returns a `complex128`
 output field (instead of the expected `complex64`, per
 `expected/propagation_probe.json`) only when the chromatix adapter's tests
 are run as part of the full repository test suite, not in isolation.
 
-**Cause:** `sax.saxtypes.core` calls
-`jax.config.update("jax_enable_x64", True)` as an import side effect, and
-`multiscale_optics_agent.adapters.registry._discover()` (invoked by
-`test_adapter_registry.py`, which collects/runs before
-`test_chromatix_adapter.py`) imports every `*_adapter.py` module -- including
-`sax_adapter.py` -- just to read `MODEL_ID`. `jax_enable_x64` is a
-process-global flag, so this leaks into unrelated later tests in the same
-pytest process.
+**Cause:** `jax_enable_x64` is a *process-global* flag, so whoever sets it last
+wins for every later test in the same pytest process. Two routes reach it:
+a module that sets it as an import side effect (Python runs a module body once,
+so a later `import` will not re-set it), combined with
+`multiscale_optics_agent.adapters.registry._discover()` importing every
+`*_adapter.py` module just to read `MODEL_ID`; and this repository's own float64
+characterization tests, which set it deliberately.
 
-**Fix:** `tests/test_chromatix_adapter.py` has an autouse fixture that pins
-`jax_enable_x64=False` for the duration of each test in that file and
-restores the previous value afterward. Any other JAX-based adapter test
-that depends on default (non-x64) precision should do the same rather than
-assuming a clean process.
+Historically the import-side-effect offender was `sax.saxtypes.core`
+(`jax.config.update("jax_enable_x64", True)`), reached via `sax_adapter.py`
+during adapter discovery. CHE-72 removed SAX, which closes that specific route
+but not the class of problem.
+
+**Fix:** `chromatix_adapter._do_import_chromatix()` pins `jax_enable_x64=False`
+on every call rather than relying on ambient state, which is what makes the
+adapter correct independently of import and collection order. Any other
+JAX-based code that depends on default (non-x64) precision should assert its own
+requirement the same way rather than assuming a clean process.
 
 ---
 

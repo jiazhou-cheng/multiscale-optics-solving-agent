@@ -358,10 +358,10 @@ def case_chromatix_float32_vs_distance() -> dict[str, Any]:
         pin_wave_engine_precision,
     )
 
-    # CHE-40: jax_enable_x64 is process-global and sax turns it on as an import
-    # side effect. Under x64 these FFTs promote to complex128 and the float32
-    # figures below become meaningless. Pinned here for the same reason
-    # chromatix_adapter has pinned it since M1.
+    # CHE-40: jax_enable_x64 is process-global and something else may turn it on,
+    # possibly as an import side effect. Under x64 these FFTs promote to
+    # complex128 and the float32 figures below become meaningless. Pinned here
+    # for the same reason chromatix_adapter has pinned it since M1.
     pin_wave_engine_precision()
 
     grid = 128

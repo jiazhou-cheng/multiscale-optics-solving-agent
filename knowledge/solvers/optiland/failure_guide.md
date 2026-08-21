@@ -82,7 +82,7 @@ Docker image built without torch installed.
 ## Python version
 
 Optiland's `Requires-Python` is `>=3.10` per its wheel metadata — looser
-than chromatix's `>=3.12` or sax's `>=3.11`. Not a source of conflict in
+than chromatix's `>=3.12`. Not a source of conflict in
 this repository's shared `python:3.12-slim` image, but worth knowing if
 optiland is ever split into its own lighter environment.
 

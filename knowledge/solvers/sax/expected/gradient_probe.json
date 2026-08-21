@@ -1,9 +1,0 @@
-{
-  "parameter": "coupler_ideal coupling (closed-form model, not a full circuit)",
-  "c0": 0.3,
-  "fd_step": 0.0001,
-  "objective_value": 0.7000000000000001,
-  "grad_native_autodiff": -1.0000000000000002,
-  "grad_finite_difference": -1.000000000000445,
-  "relative_error": 4.447553436646398e-13
-}

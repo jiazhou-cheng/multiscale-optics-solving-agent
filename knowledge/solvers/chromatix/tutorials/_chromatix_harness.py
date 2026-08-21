@@ -40,7 +40,7 @@ Run every reproduction and refresh the recorded evidence::
     ./run.sh python knowledge/solvers/chromatix/tutorials/run_all.py --write-expected
 
 ``jax_enable_x64`` is pinned to ``False`` at import, matching
-``tests/test_chromatix_adapter.py``'s autouse fixture: ``sax.saxtypes.core`` sets
+``tests/test_chromatix_adapter.py``'s autouse fixture: another module may set
 it to ``True`` as an import side effect and the adapter registry eagerly imports
 every adapter module, so collection order can otherwise flip it process-wide and
 change these numbers (see ``conventions.md`` "Numerical dtype").
@@ -64,7 +64,7 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 def pin_jax_precision() -> None:
     """Pin `jax_enable_x64=False`, the pinned environment's documented default.
 
-    `sax.saxtypes.core` flips this to True as an import side effect, and
+    Another module may flip this to True as an import side effect, and
     `multiscale_optics_agent.adapters.registry._discover()` imports every adapter
     module eagerly, so a chromatix reproduction can otherwise observe complex128
     output purely because of test collection order.

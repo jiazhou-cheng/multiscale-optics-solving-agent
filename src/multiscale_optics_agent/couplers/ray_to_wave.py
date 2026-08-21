@@ -35,6 +35,35 @@ with the smallest ``cos(theta)`` on that grid. So:
 Choosing silently would have produced a coupler that loses a few percent
 off-axis and round-trips inexactly for a reason no test would name.
 
+Known limitation: no wavefront-curvature term (CHE-50)
+------------------------------------------------------
+The sum is linear in the transverse coordinate, so the reconstructed field
+carries **no** ``exp(i k r^2 / 2R)`` term. The output is valid **at** the
+declared reference plane; it is not a field a caller may propagate a further
+distance and still trust in phase.
+
+This is invisible in ``|U|^2``, which is why every M3 intensity gate converges
+cleanly, and PB7 (CHE-58) confirmed the term does not surface in a PSF -- but
+only because that configuration's post-handoff propagation distance is zero.
+That is a property of the configuration, not of the operator. Measured on
+M3-SINGLET-REF (CHE-38): about 1.2 rad of phase against an exact spherical-wave
+reference at the 5-Airy-radius gate edge, while the intensity residual sits at
+1e-3 and the complex-field residual (~0.127) is flat rather than convergent.
+
+CHE-50 decided **no kernel change for now**. The discrepancy is tracked as a
+known limitation rather than treated as a confirmed blocker, to be re-examined
+when a propagation-sensitive hybrid composition -- M4's, first -- independently
+requires it. Emitting the term, or refusing a further-propagation request, would
+each be new and separately-verified physics, not a fix to verified behaviour.
+
+Until then the limitation is declared rather than silently carried: every
+emitted field states it in ``provenance["validity"]``, and the coupler card
+carries it under ``known_limitations.no_wavefront_curvature_term`` (with the
+derivation under
+``the_plane_z_is_not_a_kernel_parameter.consequence_3_no_wavefront_curvature``).
+To reconstruct on a different plane, advance the **ray state** there and
+reconstruct again -- exact, not an approximation (``consequence_1`` on the card).
+
 This module imports neither Optiland nor Chromatix. The coupler core is the
 physics under test; if it could import an engine, a coupler defect could be
 misattributed to engine behaviour and M1's independence evidence would stop
@@ -475,6 +504,26 @@ def ray_to_wave(
             "perturbation": perturbation.describe(),
             "source_reference_plane": bundle.reference_plane.name,
             "optical_path_length_reference": bundle.optical_path_length_reference,
+            # CHE-50, declared rather than silently carried. Static text derived
+            # from CHE-38's measurement; no numerics read it and none depend on
+            # it, so the kernel is unchanged. See this module's docstring.
+            "validity": {
+                "valid_at": "reference_plane as labelled, with zero further propagation",
+                "wavefront_curvature_term": "absent",
+                "further_propagation_verified": False,
+                "note": (
+                    "The reconstruction is linear in the transverse coordinate and "
+                    "carries no exp(i k r^2 / 2R) term. Invisible in |U|^2; not "
+                    "invisible to a subsequent propagation (~1.2 rad against an "
+                    "exact spherical-wave reference at the 5-Airy-radius gate edge "
+                    "on M3-SINGLET-REF, CHE-38). To move the handoff, advance the "
+                    "ray state to the new plane and reconstruct again."
+                ),
+                "disposition": (
+                    "CHE-50: tracked known limitation, no kernel change. Revisit "
+                    "when a propagation-sensitive hybrid composition requires it."
+                ),
+            },
             # Requested / resolved / actual, all three distinguishable. The
             # input state is what arrived, the compute precision is what the
             # coupler chose, and the output state is read back off the array

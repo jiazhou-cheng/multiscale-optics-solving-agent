@@ -171,16 +171,33 @@ derivative:
 supported_regimes:
   - scalar, monochromatic, fully coherent
   - planar tangent patch
-  - CPU, float64 / complex128
+  - CPU, float64 / complex128 (the reference numerics)
+  # CHE-60/CHE-61 (PB4a/PB4b). Was 'CPU, float64 / complex128' alone.
+  - CPU or CUDA, float32 / complex64, with the round trip measured at 8.3e-07
+    (L2) on host and device alike against an enforced 2e-5 bound
+    (docs/precision/precision_device_policy.md)
 unsupported_regimes:
   - vector fields and polarization
   - chromatic / broadband
   - partial coherence
-  - GPU and TPU
+  # 'GPU and TPU' stood here until CHE-68. GPU is verified; TPU is not.
+  - TPU. Never attempted on any device this project has access to.
+  - NumPy on CUDA. NumPy cannot hold device memory, so CUDA is a JAX-only path
+    for this coupler.
   - conformal DOE inverse design
 
-devices_tested: [cpu]
-dtypes_validated: [complex128]
+# CHE-68: was [cpu] / [complex128], which was true at M2 and stale after PB4.
+# core/capabilities.py is the machine-readable source; this card summarises it.
+devices_tested: [cpu, cuda]
+dtypes_validated: [complex128, complex64]
+device_and_precision_note: >
+  CHE-60/CHE-61. complex128 on the CPU remains the reference, and the stochastic
+  evidence ladder below (exactness limit, unbiasedness, N^-1/2 convergence,
+  variance by sampling density) was established there and is not re-derived at
+  complex64. What is tested on the device is that a wave->ray round trip stays on
+  the GPU with no silent host copy
+  (tests/test_precision_execution_matrix.py, marked gpu, not re-run since
+  CHE-60). Sampling reproducibility is seed-based and independent of device.
 validated_probe_ids:
   - >
     engine_independence (passed, 2026-08-12; CHE-25). AST scan confirms the core

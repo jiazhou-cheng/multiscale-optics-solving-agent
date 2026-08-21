@@ -33,7 +33,19 @@ OUT_MD = ROOT / "docs" / "testing" / "test_inventory.md"
 
 #: Tier A's selection expression, mirrored from AGENTS.md. A test is Tier A iff
 #: it carries none of these markers.
-TIER_A_EXCLUDING_MARKERS = {"slow", "benchmark", "fmmax", "fdtdx", "sax"}
+#:
+#: CHE-67 note: `benchmark`, `fmmax` and `fdtdx` no longer select anything
+#: under `tests/` -- every test carrying them was archived to
+#: `archive/tests/gen1/`, which is outside pytest collection. They are kept in this
+#: set so re-running this script over a *pre-CHE-67* profile still reproduces the
+#: tier labels that `docs/testing/test_inventory.md` was published with. `tutorial`
+#: is deliberately absent: the tutorials are now separated by directory
+#: (`tests_tutorial/`), not by marker, so a profile of that suite should show its
+#: real cost rather than a tier label.
+# `sax` is deliberately absent: CHE-72 deleted the marker with the integration.
+# The historical Tier A expression in docs/testing/ still says `not sax`, which
+# keeps working because an unknown name evaluates false in a `-m` expression.
+TIER_A_EXCLUDING_MARKERS = {"slow", "benchmark", "fmmax", "fdtdx"}
 #: Quarantined to its own session (CHE-60): needs `./run.sh --gpu ... -m gpu`.
 GPU_MARKER = "gpu"
 
@@ -66,7 +78,7 @@ def _tier(markers: set[str]) -> str:
         return "A"
     if "benchmark" in hit:
         return "C (benchmark)"
-    if {"fmmax", "fdtdx", "sax"} & set(hit):
+    if {"fmmax", "fdtdx"} & set(hit):
         return "B (out-of-scope solver)"
     return "B (slow)"
 
@@ -87,7 +99,11 @@ def _first_sentence(text: str) -> str:
 def collect_purposes() -> dict[tuple[str, str], dict[str, str]]:
     """Map (file, test function name) -> purpose text and its provenance."""
     out: dict[tuple[str, str], dict[str, str]] = {}
-    for path in sorted(ROOT.glob("tests/**/*.py")):
+    # Both active test roots: the default suite and the on-demand tutorial suite
+    # (CHE-67). Missing the latter would silently downgrade every tutorial test's
+    # purpose to "derived from the name".
+    paths = sorted(ROOT.glob("tests/**/*.py")) + sorted(ROOT.glob("tests_tutorial/**/*.py"))
+    for path in paths:
         rel = str(path.relative_to(ROOT))
         try:
             tree = ast.parse(path.read_text())

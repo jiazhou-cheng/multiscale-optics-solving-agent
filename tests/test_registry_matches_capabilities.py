@@ -35,7 +35,7 @@ from multiscale_optics_agent.core.specs import Device
 
 pytestmark = pytest.mark.coupler
 
-#: The components PB4b owns. Other registry entries (FMMAX, FDTDX, SAX) are out
+#: The components PB4b owns. Other registry entries (FMMAX, FDTDX) are out
 #: of the current milestone's scope and have no capability declaration yet, so
 #: they are not asserted against one -- rather than being given a placeholder
 #: declaration that would be exactly the unvalidated claim this test forbids.

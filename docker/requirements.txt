@@ -1,6 +1,6 @@
 # Pinned dependency lock for the agent_solver dev container, covering the
 # solver packages characterized by the existing adapters:
-# Chromatix, FMMAX, FDTDX, JAX-FEM, SAX, Optiland.
+# Chromatix, FMMAX, FDTDX, JAX-FEM, Optiland.
 #
 # Regenerate this file (do not hand-edit versions without re-verifying on
 # PyPI/the package's own metadata) whenever a knowledge/solver_cards/*.yaml
@@ -17,10 +17,9 @@
 #     even jax/numpy); this file pins the real dependency set taken from
 #     the project's own environment.yml. petsc4py is intentionally omitted
 #     (no prebuilt wheel; would require compiling PETSc from source).
-#   - sax / optiland: their canonical repos moved GitHub orgs
-#     (flaport/sax -> gdsfactory/sax; HarrisonKramer/optiland ->
-#     optiland/optiland). Both still redirect, but registry/knowledge
-#     entries should cite the new org.
+#   - optiland: its canonical repo moved GitHub orgs
+#     (HarrisonKramer/optiland -> optiland/optiland). The old path still
+#     redirects, but registry/knowledge entries should cite the new org.
 #   - optiland: PyPI package does not depend on torch. The differentiable
 #     GPU backend is opt-in and requires installing torch separately (done
 #     below) and selecting it at runtime.
@@ -39,7 +38,7 @@ pytest-cov==7.1.0
 ruff==0.16.0
 types-PyYAML==6.0.12.20260724
 
-# --- shared JAX-ecosystem stack (satisfies chromatix/fmmax/fdtdx/sax/jax-fem constraints) ---
+# --- shared JAX-ecosystem stack (satisfies chromatix/fmmax/fdtdx/jax-fem constraints) ---
 jax==0.6.2
 numpy==2.2.6
 scipy==1.15.3
@@ -80,18 +79,18 @@ fenics-basix==0.11.0
 pyfiglet==1.0.4
 jax-fem==0.0.12
 
-# --- SAX (M_CIRCUIT_SAX): real PyPI package, repository moved to
-# https://github.com/gdsfactory/sax (flaport/sax now redirects there) ---
-jaxellip==0.0.1
-lark==1.3.1
-natsort==8.4.0
-orjson==3.11.9
-scikit-rf==1.9.0
+# --- shared transitive pins that no single solver block owns ---
+# CHE-72 removed the SAX block that used to declare these. Each is still
+# required by a non-optional dependency of a solver that remains, verified by
+# reverse-dependency query in the built image rather than assumed:
+#   sympy  <- torch
+#   xarray <- tidy3d
+#   pandas <- optiland, tidy3d, seaborn, xarray
+# The SAX-only pins removed with it were jaxellip, lark, natsort, orjson,
+# scikit-rf, klujax and sax.
 sympy==1.14.0
 xarray==2026.4.0  # capped below 2026.5.0: tidy3d==2.12.0 (pulled in by fdtdx) requires xarray<2026.5.0
 pandas==3.0.5
-klujax==0.5.0
-sax==0.18.2
 
 # --- Optiland (M_RAY_OPTILAND): real PyPI package, repository moved to
 # https://github.com/optiland/optiland (HarrisonKramer/optiland now

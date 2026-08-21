@@ -62,9 +62,9 @@ layer and `N` is the end layer. Concretely:
 **This is the opposite of the common RF/photonic-circuit convention**
 where `S11` is a reflection coefficient back into port 1 (see the official
 docs' own warning: "notably different from photonic integrated circuit
-conventions"). A coupler bridging FMMAX's scattering matrix to
-SAX's S-parameter dictionaries (which use `("port_in", "port_out")` tuple
-keys, not `s11`/`s21` indices) must remap explicitly and test the remap,
+conventions"). A coupler bridging FMMAX's scattering matrix to a
+photonic-circuit S-parameter dictionary (which uses `("port_in", "port_out")`
+tuple keys, not `s11`/`s21` indices) must remap explicitly and test the remap,
 not assume index correspondence.
 
 ## Reflection/transmission verified against an analytic oracle

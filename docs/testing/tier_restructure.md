@@ -1,5 +1,16 @@
 # PB2 — Tier A/B/C Restructure
 
+> **Superseded in part by CHE-67 (2026-08-19) and CHE-72 (2026-08-20).** The
+> paths and tier labels below describe the tree as it was profiled. CHE-67
+> archived 288 of these tests to `archive/tests/gen1/` and moved the 60 tutorial
+> tests to `tests_tutorial/`, so a `tests/...` path here may no longer exist.
+> CHE-72 then removed the SAX integration entirely, so the `sax` marker and
+> `test_sax_adapter.py` no longer exist either — the Tier A/B commands quoted
+> below still *run*, because an unknown name evaluates false in a `-m`
+> expression, but `-m sax` now selects nothing. Nothing was re-measured; see
+> `docs/testing/test_archive.md` for the mapping and `AGENTS.md` for the current
+> five-group command surface.
+
 **Issue:** CHE-53 (PB2), milestone M3.5
 **Date:** 2026-08-18
 **Consumes:** `docs/testing/test_audit.md` (CHE-52/PB1) — this document does not

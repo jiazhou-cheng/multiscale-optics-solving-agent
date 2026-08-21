@@ -36,11 +36,11 @@ pytestmark = [pytest.mark.gpu, pytest.mark.integration]
 def _run_in_subprocess(body: str) -> str:
     """Execute `body` in a clean interpreter and return its stdout.
 
-    Needed because the behavior under test is *process-global and
-    irreversible-once-initialized* JAX state. Exercising it in-process would
-    either pin this process to the CPU for every later test or be silently
-    no-opped by an already-initialized backend, depending on ordering. A
-    subprocess makes the characterization order-independent.
+    Needed because the property under test is a fact about JAX's *initial*
+    process-global state, and JAX builds its backend once and caches it. By the
+    time any test in this session runs, that has already happened, so an
+    in-process check would only re-read a decision made during collection. A
+    subprocess makes the check order-independent.
     """
     completed = subprocess.run(
         [sys.executable, "-c", textwrap.dedent(body)],
@@ -164,126 +164,227 @@ def test_a_real_kernel_executes_on_the_gpu() -> None:
     driver, relying on CUDA minor-version compatibility). A matmul is the
     cheapest thing that forces real kernel execution and would surface that as a
     failure here rather than deep inside an Optiland trace in Phase 1.
+
+    CHE-73 widened this from a 64x64 identity multiply to a 1024x1024 `randn`
+    product with an explicit ``torch.cuda.synchronize()``. Both changes matter:
+    the identity case can be satisfied by a cuBLAS path that never leaves the
+    trivial branch, and CUDA launches are *asynchronous*, so without the
+    synchronize a launch failure could surface later, in an unrelated test, as a
+    sticky context error. Two assertions follow, because "on the device" and
+    "numerically right" are different claims.
     """
     import torch
 
+    assert torch.cuda.is_available()
+
     device = torch.device("cuda:0")
-    left = torch.eye(64, device=device, dtype=torch.float32)
-    right = torch.arange(64 * 64, device=device, dtype=torch.float32).reshape(64, 64)
+    generator = torch.Generator(device=device).manual_seed(0)
+    left = torch.randn(1024, 1024, device=device, dtype=torch.float32, generator=generator)
+    right = torch.randn(1024, 1024, device=device, dtype=torch.float32, generator=generator)
 
     product = left @ right
+    torch.cuda.synchronize()
 
     assert product.device.type == "cuda"
-    # Multiplying by the identity must be exact even in float32, so this needs no
-    # tolerance and any mismatch indicates a genuinely broken kernel path.
-    assert torch.equal(product, right)
+
+    # An independent CPU evaluation of the same inputs, so this is a real oracle
+    # rather than a self-comparison. rtol is loose because a 1024-term float32
+    # dot product accumulates differently on the two backends (and XLA/cuBLAS may
+    # use TF32 for the GPU one) -- the point here is "the numbers are the right
+    # numbers", not a precision claim. See docs/precision/ for that.
+    expected = left.cpu() @ right.cpu()
+    torch.testing.assert_close(product.cpu(), expected, rtol=2e-2, atol=2e-2)
 
 
 @pytest.mark.jax
 def test_a_real_jax_computation_executes_on_the_gpu() -> None:
-    """The jax counterpart: confirm a jitted kernel lands on the GPU.
+    """The jax counterpart: confirm a jitted kernel compiles, runs, and lands on the GPU.
 
     Chromatix goes through jax, so torch working proves nothing about it -- the
     two use entirely separate CUDA runtimes (torch's bundled libs versus the
     jax-cuda12 plugin's). Committed arrays report their device, which is what
     Phase 4 will need to assert about Chromatix fields.
+
+    This is the test that catches Trap 1 above. ``jax.devices()`` needs only the
+    driver, so it reports a `CudaDevice` on an image with no PTX compiler, and
+    the failure then appears at the *first jitted call* as
+    ``XlaRuntimeError: No PTX compilation provider is available``. Four separate
+    things are therefore asserted (CHE-73), because each fails independently:
+
+      * JIT **compilation** -- reaching the `x * x` fusion at all;
+      * **execution** to completion, forced by ``block_until_ready()``, since JAX
+        dispatch is async and an unforced error would surface elsewhere;
+      * the process **backend** is the GPU, not a silent CPU fallback;
+      * the **result array's own device**, which is the only one of the four that
+        says where the answer physically is.
+
+    Deliberately *not* sufficient, and the reason this test is shaped this way:
+    ``jax.devices()`` or ``jax.devices()[0].platform == "gpu"``.
     """
     import jax
     import jax.numpy as jnp
 
-    values = jnp.arange(1024, dtype=jnp.float32)
-    total = jax.jit(jnp.sum)(values)
+    squared_sum = jax.jit(lambda x: jnp.sum(x * x))
 
-    assert total.device.platform == "gpu", f"jitted computation ran on {total.device!r}, not a GPU"
-    # 1023*1024/2, exactly representable in float32.
-    assert float(total) == pytest.approx(523776.0)
+    values = jnp.ones((1_000_000,), dtype=jnp.float32)
+    total = squared_sum(values)
+    total.block_until_ready()
+
+    assert jax.default_backend() == "gpu", (
+        f"jax default backend is {jax.default_backend()!r}; the computation fell "
+        "back to the host instead of failing loudly"
+    )
+    assert total.device.platform == "gpu", (
+        f"jitted computation produced its result on {total.device!r}, not a GPU"
+    )
+    # Exact, not approximate: 1e6 ones each squared to 1.0, and every partial sum
+    # stays below 2**24, so float32 represents the whole reduction exactly
+    # whatever order XLA reduces in. A tolerance here would hide a real error.
+    assert float(total) == 1_000_000.0
 
 
-# Deliberately not `sax`-marked despite exercising SAX: the marker is what the
-# conftest conflict guard uses to detect "a SAX test will run in this process,"
-# and these two run SAX in a *subprocess* precisely so they never pin this one.
+#: The CUDA compiler/JIT trio XLA needs for the PTX stage. These three must be
+#: the *same* version: `nvidia-cuda-nvcc-cu12` supplies ptxas/nvlink, and XLA
+#: links the result through nvjitlink. Measured 12.6.85 across all three on the
+#: agent_solver_gpu image, matching the family torch's cu126 wheels install.
+_CUDA_TOOLCHAIN = ("nvidia-cuda-nvcc-cu12", "nvidia-cuda-nvrtc-cu12", "nvidia-nvjitlink-cu12")
+
+#: CUDA *runtime* components, which track the CUDA release and so share its
+#: 12.6.x prefix. Listed separately from the math libraries below because those
+#: version independently of the toolkit (cufft is 11.x, cusolver 11.x) and
+#: asserting "12.6" on them would be false.
+_CUDA_RUNTIME = ("nvidia-cuda-runtime-cu12", "nvidia-cuda-cupti-cu12", "nvidia-nvtx-cu12")
+
+_EXPECTED_CUDA_SERIES = "12.6"
+
+
+@pytest.mark.torch
 @pytest.mark.jax
-def test_importing_sax_silently_pins_jax_to_cpu() -> None:
-    """Characterize a third-party hazard that can silently disable GPU execution.
+def test_one_coherent_cuda_dependency_family(
+    record_property: Callable[[str, object], None],
+) -> None:
+    """torch and JAX must share one CUDA 12.6 stack, not install two competing ones.
 
-    ``klujax.py:47`` runs ``jax.config.update(name="jax_platform_name",
-    val="cpu")`` at import time, and klujax is a hard dependency of SAX. So
-    importing SAX -- an out-of-milestone solver that a graph or test session may
-    load for unrelated reasons -- forces every later JAX computation in that
-    process onto the CPU.
+    This is the dependency-side guard for Trap 1, and it is what makes the
+    minimal-toolchain choice checkable instead of merely documented. The GPU image
+    deliberately does *not* use `jax[cuda12]` / `jax-cuda12-plugin[with-cuda]`,
+    which would pull a second full `nvidia-*` set alongside torch's pinned 12.6.x
+    wheels; pip installs exactly one version per distribution, so the loser is
+    silently overwritten and whichever framework needed the other one breaks at
+    runtime, far from the dependency change that caused it.
 
-    What makes this dangerous rather than merely annoying is that it is
-    completely silent: no warning, no exception, and ``JAX_PLATFORMS`` is never
-    set. Chromatix would keep producing correct-looking numbers at CPU speed
-    while the caller believes it requested a GPU. This test exists so the
-    behavior is pinned as *known* rather than rediscovered; if a future klujax
-    drops the pin, this test fails and the workaround in
-    ``conftest.undo_third_party_jax_platform_pin`` can be deleted.
+    So the failure this catches is a *dependency edit*, not a broken GPU: adding
+    a CUDA extra, or bumping torch to a cu12x that no longer matches nvcc. The
+    versions are recorded via `record_property` as well as asserted, so a run's
+    JUnit XML carries the resolved stack rather than a hand-copied `pip list`.
 
-    Consequence for CHE-60 Phase 4: the Chromatix adapter must report the device
-    its output actually landed on, never the device that was requested.
+    Asserted in three groups because they version on different schedules --
+    treating them uniformly would mean either a false assertion or no assertion.
+    See `docker/requirements-gpu.txt` for the pins and the reasoning.
     """
-    backend = _run_in_subprocess(
+    from importlib.metadata import PackageNotFoundError, version
+
+    import torch
+
+    def installed(name: str) -> str | None:
+        try:
+            return version(name)
+        except PackageNotFoundError:
+            return None
+
+    resolved = {
+        name: installed(name)
+        for name in (*_CUDA_TOOLCHAIN, *_CUDA_RUNTIME, "nvidia-cublas-cu12", "nvidia-cufft-cu12")
+    }
+    for name, found in resolved.items():
+        record_property(name, found)
+    record_property("torch_cuda_version", torch.version.cuda)
+
+    # 1. The PTX toolchain is present at all. Its absence is Trap 1: enumeration
+    #    keeps working and only the first jitted call dies.
+    assert resolved["nvidia-cuda-nvcc-cu12"] is not None, (
+        "nvidia-cuda-nvcc-cu12 is not installed, so XLA has no ptxas/nvlink and "
+        "every jitted GPU computation will fail with 'No PTX compilation provider "
+        "is available' even though jax.devices() reports a CUDA device."
+    )
+
+    # 2. Compiler and JIT-linker agree exactly. A split here is the concrete
+    #    symptom of two CUDA stacks fighting over the same names.
+    toolchain = {name: resolved[name] for name in _CUDA_TOOLCHAIN}
+    assert len(set(toolchain.values())) == 1, (
+        f"the CUDA compiler/JIT toolchain is not one version: {toolchain}. This is "
+        "what installing a second nvidia-* set (e.g. via jax[cuda12]) looks like "
+        "after pip picks one winner per package."
+    )
+
+    # 3. Everything that tracks the CUDA release tracks the *same* release, torch
+    #    included -- torch is the reason 12.6 is the target rather than the latest.
+    assert torch.version.cuda == _EXPECTED_CUDA_SERIES, (
+        f"torch reports CUDA {torch.version.cuda}, not {_EXPECTED_CUDA_SERIES}. If "
+        "this is a deliberate torch bump, re-pin nvidia-cuda-nvcc-cu12 to the "
+        "matching family in docker/requirements-gpu.txt and update this test."
+    )
+    for name in (*_CUDA_TOOLCHAIN, *_CUDA_RUNTIME):
+        found = resolved[name]
+        assert found is not None and found.startswith(f"{_EXPECTED_CUDA_SERIES}."), (
+            f"{name} is {found!r}, outside the CUDA {_EXPECTED_CUDA_SERIES} family "
+            f"torch is built against. Resolved stack: {resolved}"
+        )
+
+
+@pytest.mark.jax
+def test_a_clean_interpreter_reaches_the_gpu_with_no_platform_repair() -> None:
+    """Nothing this project installs or imports may pin JAX off the GPU.
+
+    This replaces two CHE-60 tests that characterized the opposite: SAX's
+    ``klujax`` dependency ran ``jax.config.update("jax_platform_name", "cpu")``
+    at *import* time, so importing SAX silently moved every later JAX
+    computation in the process onto the host, and the pytest harness had to undo
+    that during collection. CHE-72 removed SAX, so the hazard is gone at the
+    source and the harness repairs nothing. What is worth guarding is the
+    property that replaced it: a *fresh* interpreter must reach the GPU on its
+    own.
+
+    Asserted in a subprocess, and importing the project package rather than only
+    ``jax``, because that is the thing that could regress -- a future dependency
+    with the same import-time habit would be caught here. The in-process
+    equivalent is worthless: this session's backend is already initialized by the
+    time any test runs, and JAX builds its backend once and caches it.
+
+    Three facts, because each fails independently (AGENTS.md: precision, dtype,
+    device and namespace are separate concepts, and a requested device is never
+    evidence of an actual one):
+
+      * ``jax_platform_name`` is not pinned to ``'cpu'`` -- nothing repaired it;
+      * the default backend is the GPU;
+      * a jitted kernel's *output array* actually lands on a GPU device, which
+        device enumeration alone does not establish (see Trap 1 in
+        docs/testing/gpu_environment.md).
+    """
+    platform_name, backend, result_platform = _run_in_subprocess(
         """
-        import sax  # noqa: F401  -- imported for its side effect on jax config
+        import multiscale_optics_agent  # noqa: F401  -- must not touch jax config
         import jax
+        import jax.numpy as jnp
+
+        print(jax.config.read("jax_platform_name") or "<unset>")
         print(jax.default_backend())
-        """
-    )
-
-    assert backend == "cpu", (
-        f"expected importing sax to pin jax to cpu, got {backend!r}. If klujax "
-        "no longer pins jax_platform_name, remove the workaround in "
-        "tests/conftest.py::undo_third_party_jax_platform_pin and this test."
-    )
-
-
-@pytest.mark.jax
-def test_jax_platform_pin_is_reversible_only_before_backend_init() -> None:
-    """Pin down *why* the conftest repair must run where it does.
-
-    JAX builds its backend once and caches it, so clearing
-    ``jax_platform_name`` helps only if nothing has initialized the backend yet.
-    Both orders are checked in one subprocess:
-
-      * reset, then first ``devices()`` call  -> GPU is recovered
-      * ``devices()`` first, then reset       -> permanently stuck on CPU
-
-    This is the constraint that forces the repair into
-    ``pytest_collection_modifyitems`` (after collection's SAX import, before any
-    test touches JAX) rather than into a fixture, which would run too late.
-    """
-    early, late = _run_in_subprocess(
-        """
-        import subprocess, sys, textwrap
-
-        def backend_after(script):
-            out = subprocess.run([sys.executable, "-c", textwrap.dedent(script)],
-                                 capture_output=True, text=True, check=True)
-            return out.stdout.strip()
-
-        # Reset before the backend is ever built.
-        print(backend_after('''
-            import sax, jax
-            jax.config.update("jax_platform_name", None)
-            print(jax.default_backend())
-        '''))
-        # Reset after the backend has been built and cached.
-        print(backend_after('''
-            import sax, jax
-            jax.devices()
-            jax.config.update("jax_platform_name", None)
-            print(jax.default_backend())
-        '''))
+        print(jax.jit(jnp.sum)(jnp.arange(8, dtype=jnp.float32)).device.platform)
         """
     ).splitlines()
 
-    assert early == "gpu", (
-        f"clearing jax_platform_name before backend init should recover the GPU, got {early!r}"
+    assert platform_name != "cpu", (
+        "a clean interpreter has jax_platform_name pinned to 'cpu'. Some import "
+        "is setting it process-globally, which silently disables the GPU for "
+        "everything downstream. Find the package that does it (CHE-72 removed "
+        "the previous offender, SAX/klujax) rather than repairing the pin in the "
+        "test harness."
     )
-    assert late == "cpu", (
-        f"clearing jax_platform_name after backend init should NOT recover the "
-        f"GPU (the backend is cached), got {late!r} -- if this now returns 'gpu', "
-        "jax gained the ability to rebuild its backend and the conftest repair "
-        "no longer needs to run during collection."
+    assert backend == "gpu", (
+        f"a clean interpreter reports backend {backend!r}, not 'gpu' "
+        f"(jax_platform_name={platform_name!r})"
+    )
+    assert result_platform == "gpu", (
+        f"a jitted kernel's output landed on {result_platform!r}, not a GPU, even "
+        f"though the default backend is {backend!r}"
     )

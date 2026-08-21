@@ -50,6 +50,23 @@ This node will promote one, but only when the edge explicitly declares the
 handoff plane; with no declaration it refuses. That keeps the M3.4 gate intact
 while letting the graph express the whole step as one edge, which is what it
 physically is: the change of representation *is* where those assumptions enter.
+
+What a downstream edge inherits (CHE-50)
+----------------------------------------
+The field this edge writes is valid **at** the declared handoff plane and carries
+no ``exp(i k r^2 / 2R)`` wavefront-curvature term, because the core's sum is
+linear in the transverse coordinate. A graph that reads this record and only
+measures an intensity or a PSF is unaffected. A graph that propagates it a
+further distance is outside what CHE-24/CHE-38 verified in phase, and the
+discrepancy will not show up in ``|U|^2``.
+
+CHE-50 dispositioned this as a tracked known limitation with no kernel change,
+to be re-examined when a propagation-sensitive hybrid composition requires it.
+It is not silent: the emitted ``ComplexField`` states it in
+``provenance["validity"]``, and the reasoning and measured numbers live in
+``couplers/ray_to_wave.py``'s module docstring and on the coupler card. To hand
+off on a different plane, declare that plane and let the core reconstruct there
+from advanced ray state -- do not propagate this record instead.
 """
 
 from __future__ import annotations

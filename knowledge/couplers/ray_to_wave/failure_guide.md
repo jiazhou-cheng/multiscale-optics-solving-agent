@@ -108,7 +108,7 @@ violated condition:
 | Code | Condition |
 |---|---|
 | `MISSING_DECLARATION` | Input omits units, frame, phasor, reference plane, or OPL reference |
-| `OPL_REFERENCE_UNVERIFIED` | Caller passed `opd_native`, whose sign and reference M1 recorded as unverified |
+| `OPL_REFERENCE_UNVERIFIED` | Caller passed `opd_native` instead of a declared OPL. M1 recorded its sign and reference as unverified; CHE-30/CHE-41 have since characterized them, and the refusal remains by design — a native accumulator is not a declared physical quantity. See `conventions.md` H1 |
 | `AMPLITUDE_IS_A_WEIGHT` | Caller passed a real ray weight where a complex amplitude is required |
 | `UNDERSAMPLED_WAVEFRONT` | Adjacent-ray phase difference exceeds π at the plane |
 | `RAYS_NOT_AT_PLANE` | Ray intersections are not coplanar with the declared reconstruction plane |

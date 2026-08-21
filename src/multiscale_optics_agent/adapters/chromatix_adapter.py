@@ -232,11 +232,12 @@ def _do_import_chromatix() -> tuple[Any, Any, Any, Any, Any]:
     )
 
     # jax_enable_x64 is process-global mutable state (like optiland's
-    # set_backend -- never call this concurrently across threads). Another
-    # adapter in the same process (e.g. sax, which requires x64 enabled) may
-    # have already flipped it on as an import side effect that -- because
-    # Python only executes module bodies once -- will NOT be re-triggered by
-    # importing sax again later. Asserting our own requirement explicitly,
+    # set_backend -- never call this concurrently across threads). Anything else
+    # in the same process may have already flipped it on, possibly as an import
+    # side effect that -- because Python only executes module bodies once -- will
+    # NOT be re-triggered by importing that module again later. This repository's
+    # own float64 characterization tests do exactly that. Asserting our own
+    # requirement explicitly,
     # every call, makes this adapter correct regardless of import/call order
     # instead of depending on ambient state: Chromatix's own
     # ScalarField.__init__ force-casts input to complex64 either way, but
@@ -292,9 +293,12 @@ def _jax_gpu_unavailable_reason() -> str | None:
     needs only the driver, while running a kernel needs ptxas. So this compiles
     and runs one, which is the only question that matters.
 
-    It also catches the klujax hazard: importing SAX pins
-    ``jax_platform_name='cpu'`` process-globally at import time, after which JAX
-    reports no GPU at all on a GPU host.
+    It also catches a process-global platform pin: with
+    ``jax_platform_name='cpu'`` or ``JAX_PLATFORMS`` set anywhere in the process,
+    JAX reports no GPU at all on a GPU host. CHE-72 removed the one dependency
+    known to do that at import time, so this is now a defensive check rather than
+    a characterized hazard -- but the state it detects is indistinguishable from
+    a missing CUDA plugin, and both are worth naming.
     """
     try:
         import jax
@@ -308,8 +312,8 @@ def _jax_gpu_unavailable_reason() -> str | None:
         try:
             if jax.config.read("jax_platform_name") == "cpu":
                 pinned = (
-                    " -- jax_platform_name is pinned to 'cpu' in this process, which "
-                    "importing SAX does at import time via klujax"
+                    " -- jax_platform_name is pinned to 'cpu' process-globally, so "
+                    "no GPU is reachable regardless of the hardware present"
                 )
         except Exception:  # pragma: no cover - defensive on a config API change
             pass
@@ -1330,9 +1334,8 @@ class ChromatixAdapter:
                     supported=["cpu"],
                     remedy=(
                         "Run in the CUDA container (`./run.sh --gpu ...`, see "
-                        "docs/testing/gpu_environment.md), and do not import SAX "
-                        "before Chromatix in the same process. There is "
-                        "deliberately no silent fallback to the CPU."
+                        "docs/testing/gpu_environment.md). There is deliberately "
+                        "no silent fallback to the CPU."
                     ),
                 )
 
@@ -1699,9 +1702,10 @@ class ChromatixAdapter:
             field_out = cf.asm_propagate(field_in, z=z_m, n=refractive_index, pad_width=pad_width)
 
         # Observed BEFORE anything is copied to the host: this is the one place
-        # that can still tell where the computation actually happened. PB4a's
-        # klujax hazard produces exactly the state where the request said cuda
-        # and this says cpu, and reporting the request here would hide it.
+        # that can still tell where the computation actually happened. A
+        # process-global platform pin produces exactly the state where the request
+        # said cuda and this says cpu, and reporting the request here would hide
+        # it (PB4a measured that; CHE-72 removed the dependency that caused it).
         output_state = array_state(field_out.u)
         device_mismatch = output_state.device.kind is not resolved.device.kind
 
@@ -1792,18 +1796,17 @@ class ChromatixAdapter:
         )
 
         if device_mismatch:
-            # Never silent success reported as CUDA (PB4b section 13). The
-            # canonical way this happens is klujax pinning jax_platform_name to
-            # 'cpu' at import; the run is still a valid complex64 propagation, so
-            # it is surfaced as a warning with the ACTUAL device on the artifact
-            # rather than failed outright, and the caller can gate on
+            # Never silent success reported as CUDA (PB4b section 13). The run is
+            # still a valid complex64 propagation, so it is surfaced as a warning
+            # with the ACTUAL device on the artifact rather than failed outright,
+            # and the caller can gate on
             # metadata['execution']['device_mismatch'].
             warnings.append(
                 f"requested device {resolved.device} but the output array landed on "
                 f"{output_state.device}. The artifact records the ACTUAL device. The "
-                "usual cause is a process-global JAX platform pin -- importing SAX "
-                "sets jax_platform_name='cpu' via klujax at import time, before "
-                "Chromatix gets a say. Any GPU-execution claim for this run is false."
+                "usual cause is a process-global JAX platform pin (jax_platform_name "
+                "or JAX_PLATFORMS) set before Chromatix got a say. Any GPU-execution "
+                "claim for this run is false."
             )
         # No warning for the input downcast, deliberately. CHE-35 replaced exactly
         # that warning string with a measured number, on the grounds that the

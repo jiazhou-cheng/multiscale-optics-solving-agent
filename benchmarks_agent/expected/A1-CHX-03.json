@@ -1,0 +1,20 @@
+{
+  "task_id": "A1-CHX-03",
+  "library": "chromatix",
+  "recorded_reference_output": {
+    "centroid_x_um": 17.50169100446387,
+    "library": "chromatix"
+  },
+  "checks": [
+    {
+      "key": "centroid_x_um",
+      "description": "signed x displacement of the intensity centroid",
+      "expected": 17.497732705184802,
+      "unit": "um",
+      "rtol": 0.02,
+      "tolerance_basis": "z tan(theta) is exact geometry for a collimated beam. The pinned solver gives +17.5017 um against +17.4977 analytic (2.3e-4 relative). 2e-2 rejects z sin(theta) only if the angle were large -- at 5 degrees they differ by 0.4%, so this check deliberately does NOT claim to separate them, and the report says so",
+      "kind": "analytic"
+    }
+  ],
+  "graded_against": "the closed forms in `checks`, not this recording. Re-recording cannot make a wrong answer pass."
+}

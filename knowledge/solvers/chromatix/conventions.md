@@ -183,7 +183,9 @@ this section used to make.
 
 Probe: `knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py`; recorded
 output: `knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json`;
-regression tests: `tests/test_m3_pupil_to_focus.py`.
+regression tests: `archive/tests/gen1/tests/test_m3_pupil_to_focus.py` — **archived
+by CHE-67 and not runnable**, so nothing in the default suite fails if this
+convention regresses. The probe and its recorded output above still run.
 
 Under `exp(-i omega t)` with `exp(+i k z)`, a wave converging to a focus a
 distance `R` downstream has pupil field `exp(-i k sqrt(rho^2 + R^2))`, because
@@ -274,14 +276,19 @@ supports for `ScalarField`; a `complex128` input is silently downcast to
 `chromatix.functional.asm_propagate` was observed to return a `complex128`
 output field even when its input was explicitly `complex64` -- i.e. the
 *output* dtype can still silently follow the ambient x64 setting despite the
-input-side downcast above. `sax.saxtypes.core` sets `jax_enable_x64=True` as
-an import side effect, and
-`multiscale_optics_agent.adapters.registry._discover()` eagerly imports
-every `*_adapter.py` module (including `sax_adapter.py`) to read its
-`MODEL_ID`, so this flag can already be flipped process-wide before any
-chromatix-specific test runs, purely as a consequence of test collection
-order. `tests/test_chromatix_adapter.py` pins `jax_enable_x64=False` in an
-autouse fixture to keep its assertions reproducible regardless of order.
+input-side downcast above. `jax_enable_x64` is process-global, and
+`multiscale_optics_agent.adapters.registry._discover()` eagerly imports every
+`*_adapter.py` module to read its `MODEL_ID`, so any module that sets the flag as
+an import side effect can flip it process-wide before a chromatix-specific test
+runs, purely as a consequence of collection order. This repository's own float64
+characterization tests set it deliberately, which is the same hazard from a
+different direction. `chromatix_adapter._do_import_chromatix()` therefore pins
+`jax_enable_x64=False` on every call, so its assertions are reproducible
+regardless of order.
+
+Until CHE-72 the concrete offender was `sax.saxtypes.core`, which set
+`jax_enable_x64=True` on import; SAX has since been removed. The defence stays
+because the flag is still process-global and still mutable by anything.
 
 ## Grid centering and coordinate origin (CHE-14, verified)
 

@@ -1359,8 +1359,9 @@ class OptilandAdapter:
 
         # PB4b section 13: the observed placement, read off the traced arrays, and
         # a mismatch against the request made visible rather than reported as
-        # success. Optiland has no equivalent of the klujax hazard, but the rule
-        # is the same one and it is cheap to hold here too.
+        # success. Optiland has no equivalent of the JAX platform-pin hazard that
+        # motivated the rule, but the rule is the same one and it is cheap to hold
+        # here too.
         actual_state = array_state(rays.x)
         diagnostics["execution"]["actual"] = actual_state.as_dict()
         mismatches = []

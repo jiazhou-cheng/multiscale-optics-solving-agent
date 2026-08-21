@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path("/workspace") if Path("/workspace").is_dir() else Path.cwd()
 
 IN_SCOPE_SOLVERS = ("optiland", "chromatix")
-OFF_SCOPE_SOLVERS = ("fmmax", "fdtdx", "jax_fem", "sax")
+OFF_SCOPE_SOLVERS = ("fmmax", "fdtdx", "jax_fem")
 
 # path -> (classification, rationale)
 OVERRIDES: dict[str, tuple[str, str]] = {

@@ -43,7 +43,7 @@ agent_should_not_assume:
   - the ray count returned by trace(num_rays=N) equals N (aperture/pupil sampling changes it; observed 16 -> 817)
 required_probes:
   - import and backend selection  # done, see knowledge/solvers/optiland/conventions.md
-  - GPU device placement  # not done, no GPU in this environment
+  - GPU device placement  # done (CHE-60/CHE-61): torch backend + set_device('cuda') traces on cuda:0 at float32 and float64, gradient included; numpy backend raises BackendCapabilityError. See knowledge/solvers/optiland/solver_card.yaml devices_tested and docs/precision/precision_device_policy.md. TPU: not attempted.
   - one surface-parameter gradient  # done for one path (torch backend, lens radius -> trace -> RMS-spot proxy), relative error 1.11e-03 vs finite difference -- looser than JAX solvers, not root-caused
   - wavefront/OPD export convention  # not done
   - pupil power and coordinate orientation  # not done

@@ -77,9 +77,17 @@ Grounded in the real `optiland` 0.6.0 API surface and the probes in
 
 ## Not yet exercised in this repository
 
-- GPU execution (`supports_gpu` is `False` in this CPU-only container even
-  under the torch backend; no CUDA device available to test). `be.set_device`
-  exists and accepts `'cpu'`; no other device has been exercised.
+- ~~GPU execution.~~ **Now a validated repository capability (CHE-60/CHE-61).**
+  The statement this bullet used to make — `supports_gpu` is `False` and no CUDA
+  device is available — was true of the default CPU-only `agent_solver` image and
+  is still true there. CHE-60 added the opt-in `agent_solver_gpu` image
+  (`./run.sh --gpu`), and under `set_backend('torch'); set_device('cuda')` a real
+  trace executes on `cuda:0` at both `float32` and `float64` with a gradient
+  flowing through it (`tests/test_precision_gpu_pipeline.py`, marked `gpu`).
+  `set_device` still raises `BackendCapabilityError` on the numpy backend, so
+  CUDA is a torch-backend-only path. Setup and the two traps that silently
+  disable the GPU: `docs/testing/gpu_environment.md`. Not re-run since CHE-60.
+- TPU execution. Never attempted; Optiland reports no TPU device.
 - ~~Broad hand-built prescription coverage.~~ **Substantially addressed by
   CHE-57, and now a validated repository capability (CHE-56/PB5)**: every
   adapter-owned system is built from a canonical prescription

@@ -211,21 +211,6 @@ sources:
     framework: external
     priority: V
     url: https://meep.readthedocs.io/en/latest/Python_Tutorials/Adjoint_Solver/
-  - id: sax-docs
-    name: SAX
-    role: differentiable photonic circuits
-    framework: jax
-    priority: P0
-    url: https://gdsfactory.github.io/sax/
-    repository: https://github.com/gdsfactory/sax
-    pinned_ref: "0.18.2"
-    retrieved_at: "2026-07-30"
-    notes: >
-      Real PyPI package (`pip install sax`), requires-python >=3.11.
-      Repository moved orgs (github.com/flaport/sax now redirects here).
-      Git tags on the repository lag far behind PyPI releases (tags stop at
-      0.9.2 while PyPI is at 0.18.2+) -- pin by PyPI version number, not by
-      git commit. See knowledge/solvers/sax/ for the full knowledge pack.
   - id: photontorch-docs
     name: Photontorch
     role: differentiable photonic circuits

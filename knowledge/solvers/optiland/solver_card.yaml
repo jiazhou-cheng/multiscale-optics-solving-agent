@@ -31,6 +31,9 @@ license: not yet confirmed in this pass (not read from LICENSE file or PyPI clas
 framework: numpy (M1-validated adapter path)
 supported_regimes:
   - sequential geometric ray tracing on CPU/float64 with the NumPy backend
+  - sequential geometric ray tracing on CUDA/float32 and CUDA/float64 with the
+    torch backend, including a gradient through the traced objective (CHE-60,
+    CHE-61 -- see devices_tested and precision_verdict_che61)
   - manufactured free-space and ideal paraxial cases
   - a spherical plano-convex catalog prescription with aperture classification
   - the bundled ReverseTelephoto sample at one field and wavelength
@@ -43,7 +46,14 @@ supported_regimes:
 package_reported_unverified_regimes:
   # CHE-57 (PB6) moved most of this list into "verified" -- see
   # tutorials/README.md and capability_notes.md. What remains unverified:
-  - GPU execution (no CUDA device in this container; be.set_device only exercised for 'cpu')
+  # GPU execution moved OUT of this list by CHE-60/CHE-61. See devices_tested.
+  - >-
+    the NumPy backend on any device other than 'cpu' -- set_device raises
+    BackendCapabilityError there, so CUDA is a torch-backend-only path
+  - >-
+    float16 anywhere. Refused, not promoted -- geometry, OPL and direction
+    cosines all accumulate and an OPL here spans ~1e4 waves
+    (docs/precision/precision_device_policy.md)
   - reading a genuine vendor-authored .zmx or .seq file (both catalog tutorials'
     artifacts are unreachable -- see source_manifest.yaml)
   - GRIN media, coordinate breaks, NURBS/Forbes/Chebyshev/toroidal/biconic/grid-sag/
@@ -147,12 +157,44 @@ derivative:
     bounds. res.success is not evidence: record problem.sum_squared() before and
     after. Evidence: tutorials/t35_three_mirror_anastigmat.py.
 devices_reported_by_package: [cpu, gpu]
-devices_tested: [cpu]
+devices_tested: [cpu, cuda]
 device_api_note: >
-  CHE-57: optiland.backend.set_device(str) exists and accepts 'cpu'; no other
-  device value has been exercised in this repository. be.supports_gpu remains
-  False in this container under both backends.
+  CHE-68 supersedes the CHE-57 note here, which said 'cpu' was the only device
+  value ever exercised and that be.supports_gpu was False in this container.
+  That was true of the CPU-only default image and is no longer the whole picture.
+  CHE-60 built the opt-in agent_solver_gpu image and CHE-61 made device an
+  explicit contract: with set_backend('torch'); set_device('cuda'), arrays land
+  on cuda:0 at the selected precision, and a real trace executes there at both
+  float32 and float64 with a gradient flowing through it
+  (tests/test_precision_gpu_pipeline.py, marked gpu). set_device still raises
+  BackendCapabilityError on the numpy backend, so CUDA is torch-only. The
+  default image remains CPU-only by construction, and the gpu-marked tests skip
+  unless the session is a dedicated ./run.sh --gpu pytest -q -m gpu run -- see
+  docs/testing/gpu_environment.md. Not re-run since CHE-60.
 dtypes_validated_for_m1: [float64]
+# CHE-61 (PB4b). Scoped separately from dtypes_validated_for_m1 above, which is
+# an M1-era claim and is left as the historical record. Devices, dtypes,
+# precision and array namespace are four separate concepts; the authoritative
+# machine-readable table is core/capabilities.py, which
+# tests/test_registry_matches_capabilities.py holds the registry to.
+precision_verdict_che61:
+  native_compute: [float32, float64]
+  refused: [float16]
+  measured: >-
+    Ray positions and directions validated at float32 to 1e-7 relative against
+    the float64 reference; OPL accumulation validated and it is what dominates
+    the reduced-precision end-to-end difference. Two quantities are deliberately
+    float64 regardless of trace precision and are called out at their call sites
+    rather than inherited silently: the object-space OPL reference (~1e4 waves,
+    so float32 would inject more error than the wavefront it corrects) and
+    hexapolar ring-index assignment (a tolerance test on a ratio).
+  hazard: >-
+    The torch backend DEFAULTS to precision=32 and the numpy backend to 64.
+    Before CHE-61 the adapter never called set_precision while reporting
+    dtype: 'float64', so every torch-backend run traced in float32 under a
+    float64 label. The recorded gradient probe in expected/gradient_probe.json
+    is therefore the float32 path.
+  source: docs/precision/precision_device_policy.md
 input_output_artifacts:
   - optiland.rays.real_rays.RealRays (maps to project artifact `ray_bundle`)
 known_conventions: see conventions.md
@@ -429,7 +471,12 @@ validated_probe_ids:
     term is a piston on axis and the whole convergence tilt off axis, and what a
     tilt-carrying pupil costs in sampling at seven field points)
 not_yet_probed:
-  - GPU device placement (no GPU in this environment)
+  # 'GPU device placement' was here until CHE-68; CHE-60/CHE-61 probed it. What
+  # remains untested on the device side:
+  - TPU. Never attempted, and Optiland reports no TPU device.
+  - the gpu-marked suite since CHE-60. It is expected to pass and has not been
+    re-run; a dedicated ./run.sh --gpu pytest -q -m gpu pass is outstanding.
+  - more than the two devices this project's policy allows at once (AGENTS.md)
   - pupil power and coordinate orientation
   - a system whose exit pupil is real rather than virtual (both M3 systems are
     virtual -- CHE-32)

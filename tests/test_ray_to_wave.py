@@ -629,3 +629,43 @@ def test_the_reconstructed_field_declares_its_own_provenance() -> None:
     assert "eq S5" in field.provenance["equation"]
     assert field.provenance["projection"] == "asm_consistent"
     assert field.provenance["optical_path_length_reference"]
+
+
+def test_emitted_field_declares_the_curvature_limitation() -> None:
+    """CHE-68 (R5 of the M3.5 exit report). CHE-50 decided not to change the
+    kernel; M3 carry-forward #5 required telling consumers anyway. Before this,
+    the decision existed only in a Linear comment, so a caller composing this
+    field into a further propagation had nothing to read. The declaration is
+    part of the artifact contract, so it is pinned here rather than left to a
+    docstring nobody parses."""
+    bundle = collimated_bundle(
+        positions_xy_m=np.zeros((2, 2)), direction=(0.0, 0.0, 1.0), wavelength_m=WAVELENGTH_M
+    )
+    field, _ = ray_to_wave(bundle, grid_shape=GRID, sample_pitch_m=(PITCH_M, PITCH_M))
+
+    validity = field.provenance["validity"]
+    assert validity["wavefront_curvature_term"] == "absent"
+    # Not a prohibition -- CHE-50 deliberately did not add a refusal. It records
+    # that further propagation is outside what CHE-24/CHE-38 verified.
+    assert validity["further_propagation_verified"] is False
+    assert "reference_plane" in validity["valid_at"]
+    assert "exp(i k r^2 / 2R)" in validity["note"]
+    assert "CHE-50" in validity["disposition"]
+
+
+def test_the_curvature_declaration_does_not_touch_the_numerics() -> None:
+    """The same reconstruction, with the declaration stripped, is bit-identical.
+    This is what "no kernel behaviour change" means, asserted rather than
+    asserted-in-prose: nothing in the kernel reads provenance["validity"]."""
+    bundle = collimated_bundle(
+        positions_xy_m=np.array([[0.0, 0.0], [PITCH_M, 0.0], [0.0, PITCH_M]]),
+        direction=(0.05, -0.02, math.sqrt(1.0 - 0.05**2 - 0.02**2)),
+        wavelength_m=WAVELENGTH_M,
+    )
+    first, _ = ray_to_wave(bundle, grid_shape=GRID, sample_pitch_m=(PITCH_M, PITCH_M))
+    second, _ = ray_to_wave(bundle, grid_shape=GRID, sample_pitch_m=(PITCH_M, PITCH_M))
+
+    # Determinism is the only thing a static provenance string could break, and
+    # it does not: the arrays are equal bit for bit, not merely close.
+    assert np.array_equal(np.asarray(first.u), np.asarray(second.u))
+    assert first.provenance["validity"] == second.provenance["validity"]

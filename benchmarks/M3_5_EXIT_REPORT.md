@@ -21,6 +21,27 @@ M3 already recorded against itself.
 > **`benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md`** — read that if this report and
 > another file appear to disagree. CHE-62 changed no tolerance, no gate, and no
 > physics claim.
+>
+> **CHE-68 update.** **R5 and R6 are now discharged**, which closes the last two
+> items on this list — see their entries below, and L4. CHE-68 was documentation
+> and metadata only: no kernel change, no new physics claim, no new tolerance.
+> One stale statement in the Linear project description was found and
+> deliberately *not* changed, because it was outside CHE-68's scope: the
+> "Current Highest-Priority Blocker" section still names Optiland `opd_native`
+> characterization as the blocker, which CHE-30 (M3.1) resolved. It needs its own
+> ticket.
+>
+> **CHE-69 update.** That follow-up is done. The section now names the real
+> blocker — **there is no independent PSF oracle**, so M4 cannot set a tolerance
+> without circularity (PB7 F2) — and lists the two items gated on it (the
+> unticketed benchmark #3 tolerance, R1(b) below; and CHE-48's unmet `1.0e-3`
+> gate) plus the secondary open items by ticket. CHE-69 also found the same stale
+> claim in a live knowledge asset — `knowledge/couplers/ray_to_wave/`
+> `conventions.md` hazard H1 and the matching `failure_guide.md` row read as
+> though `opd_native` were still uncharacterized — and corrected both. The
+> refusal itself is unchanged and still correct; what changed is its stated
+> reason, from "nobody has probed this" to "a native accumulator is not a
+> declared physical quantity." No gate, tolerance or physics claim moved.
 
 ---
 
@@ -257,12 +278,24 @@ interpolation) is still the concrete next step. `manifest.yaml` and
 CHE-48 is reopened, and the `1.0e-3` gate is carried into M4 as an explicit open
 limitation on benchmark #3. Item 3 of the disposition doc.
 
-### L4 — CHE-50's decision is not reflected in the repository
+### L4 — ~~CHE-50's decision is not reflected in the repository~~ DISCHARGED (CHE-68)
 CHE-50 closed with a decision ("no kernel change for now; revisit when a
 propagation-sensitive benchmark requires it") — a legitimate outcome. But M3's
 carry-forward #5 required *telling consumers*, and no coupler card, docstring,
-or artifact field currently warns a caller that the emitted sensor field carries
-no curvature term. The decision lives only in a Linear comment.
+or artifact field warned a caller that the emitted sensor field carries no
+curvature term. The decision lived only in a Linear comment.
+
+**Now stated in four places, one of which travels with the artifact:** the
+`C_RAY_TO_WAVE` module docstring, the graph-edge wrapper's docstring,
+`knowledge/couplers/ray_to_wave/` (`coupler_card.yaml`
+`known_limitations.no_wavefront_curvature_term` and `conventions.md`), and
+`provenance["validity"]` on every emitted `ComplexField` — so a downstream
+consumer reads it off the field rather than having to have read a document. Two
+tests pin it: one that the declaration is present and says what it must, one that
+the reconstruction is still bit-identical, because "no kernel change" is a claim
+that should be asserted rather than promised. The card also records why PB7's
+silence is not clearance (F3), so the next reader cannot cite three agreeing PSF
+routes as evidence the term is absent.
 
 ### L5 — PSF cross-method semantics are compared, not frozen with tolerances
 PB8's own acceptance criterion asks for "frozen, cross-comparable semantics with
@@ -368,13 +401,18 @@ validation. Separating `N_f` from NA needs several systems/wavelengths against a
 genuinely independent oracle, which is the same prerequisite M4 benchmark #3
 already carries. Items 3 and 4 of the disposition doc.
 
-### R5 — Make CHE-50's decision visible to consumers
+### R5 — ~~Make CHE-50's decision visible to consumers~~ DISCHARGED (CHE-68)
 One line in the `C_RAY_TO_WAVE` coupler card and/or the emitted artifact's
 diagnostics: the reconstructed field carries no wavefront-curvature term, valid
 at the handoff plane, not valid after further propagation. M4's hybrid
 compositions are precisely the consumer this was meant to warn.
 
-### R6 — Apply the M4 scope note to the project description
+**Done, and in more than one line** — see L4 above for where. It is a
+declaration, not a refusal: CHE-50 deliberately did not add one, so
+`provenance["validity"]["further_propagation_verified"]` records that further
+propagation is outside what CHE-24/CHE-38 verified rather than prohibiting it.
+
+### R6 — ~~Apply the M4 scope note to the project description~~ DISCHARGED (CHE-68)
 Reviewed against what M3.5 established, four things in the Linear project
 description are now stale:
 
@@ -391,9 +429,41 @@ description are now stale:
    another Optiland PSF method**. Without that, benchmark #3's tolerance would be
    fitted against a route that shares a front end with the thing under test.
 
+**All four applied (CHE-68).** Items 1–3: the scope section is retitled
+"Supported Scope Entering M4" and now carries CUDA GPU as established with its
+evidence, `float32`/`complex64` with the measured per-subsystem verdict and the
+explicit refusals, and the CHE-60 caveat that the `gpu`-marked suite has not been
+re-run; TPU is the only accelerator left under "Still unverified" and under
+"Deferred Beyond v0.1". Item 4: benchmark #3 gained two subsections — what it
+inherits from PB7, and the independent-oracle requirement stated as a hard
+prerequisite before any tolerance is *defined or finalized*, plus the `FFTPSF`
+per-axis mis-scale and the CHE-50 curvature term as things not to re-learn the
+hard way. **No tolerance was set**, per F2.
+
+The knowledge-asset summary cards were reviewed in the same pass and no longer
+claim "no GPU/accelerator in this container": both solver cards, both coupler
+cards, `knowledge/solver_cards/{optiland,chromatix}.yaml` and
+`knowledge/solvers/optiland/capability_notes.md`. Card pointers to tests CHE-67
+archived are now labelled as archived and unguarded rather than reading as live
+evidence.
+
 Optional, cosmetic: the milestone "M3.5 — Pre-Benchmark Stabilization" collides
 by name with issue CHE-34, "M3.5 — Make C_RAY_TO_WAVE executable as a graph
-edge".
+edge". Untouched by CHE-68.
+
+**~~Still stale in the project description, and deliberately left for its own
+ticket~~ DISCHARGED (CHE-69):** the "Current Highest-Priority Blocker" section
+named Optiland `opd_native` characterization as the blocker on the forward
+pipeline. CHE-30 (M3.1) established its sign, units, reference and behaviour
+under known propagation against manufactured geometries, CHE-41 closed the
+off-axis half, and M3 exited on that evidence. This was outside CHE-68's stated
+scope, so CHE-68 reported it and CHE-69 rewrote it.
+
+The replacement says the blocker changed *shape* rather than disappeared:
+nothing blocks execution, and what blocks M4's benchmark claims is the **absence
+of an independent PSF oracle** (F2 above). CHE-69 also corrected hazard H1 in
+`knowledge/couplers/ray_to_wave/conventions.md`, which still read as though
+`opd_native` were uncharacterized. Documentation only.
 
 ---
 

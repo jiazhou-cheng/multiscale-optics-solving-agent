@@ -1,5 +1,11 @@
 # Test-suite runtime audit and tier review (CHE-64)
 
+> **Superseded in part by CHE-67 (2026-08-19).** The paths and tier labels below
+> describe the tree as it was profiled. CHE-67 archived 288 of these tests to
+> `archive/tests/gen1/` and moved the 60 tutorial tests to `tests_tutorial/`, so
+> a `tests/...` path here may no longer exist. Nothing was re-measured; see
+> `docs/testing/test_archive.md` for the mapping.
+
 Per-test runtime, peak memory, purpose and tier for all 904 profiled tests, the
 manual review that followed, and the swap guardrail built to make the profiling
 safe on a shared server.

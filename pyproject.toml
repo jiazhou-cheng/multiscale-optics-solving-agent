@@ -62,14 +62,6 @@ torch = [
   "torch>=2.13.0",
   "optiland>=0.6.0",
 ]
-circuit = [
-  "jax>=0.6.2",
-  "optax>=0.2.8",
-  "equinox>=0.13.8",
-  "optimistix>=0.0.11",
-  "jaxtyping>=0.3.7",
-  "sax>=0.18.2",
-]
 
 [project.scripts]
 multiscale-optics = "multiscale_optics_agent.cli:app"
@@ -85,7 +77,34 @@ where = ["src"]
 "multiscale_optics_agent.registry" = ["*.yaml"]
 
 [tool.pytest.ini_options]
+# CHE-67: `tests` is the whole default suite. Two active test trees deliberately
+# sit outside it and are reachable only by naming them:
+#   * `tests_tutorial/` -- the on-demand tutorial suite (`make test-tutorial`);
+#     33 min of pinned-dependency regression, so opting *in* is the safe default.
+#   * `archive/tests/<generation>/` -- historical tests, also blocked by
+#     `norecursedirs` below and by a hard abort in each generation's conftest.
+#   * `benchmarks_agent/` -- the CHE-71 V1 agent benchmark (`make test-agent-benchmark`).
 testpaths = ["tests"]
+# The pytest defaults, plus the two opt-in trees. Listing the defaults is
+# required: this key replaces them rather than extending them.
+#
+# This covers `pytest .`, which `testpaths` does not: an explicit path argument
+# overrides `testpaths`, and `pytest .` would otherwise collect the 33-minute
+# tutorial suite (measured: 625 tests instead of 565). `norecursedirs` is NOT
+# applied to a path named on the command line, so `pytest tests_tutorial` still
+# works -- which is exactly the split wanted here: opt in by naming the suite,
+# never by sweeping the repository root.
+norecursedirs = [
+  "archive",
+  "tests_tutorial",
+  # CHE-71: the V1 agent benchmark. Same reasoning as `tests_tutorial` -- it runs
+  # an agent, so it is nondeterministic, slow and consumes model tokens, and the
+  # default suite is a required gate. Opt in by naming the directory. Its
+  # *harness* is unit-tested in `tests/test_agent_benchmark.py`, which does run by
+  # default and is deterministic.
+  "benchmarks_agent",
+  "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
+]
 addopts = "-ra"
 markers = [
   "jax: requires the optional JAX solver environment",
@@ -94,12 +113,19 @@ markers = [
   "optiland: exercises the real Optiland ray-tracing engine (current-milestone ray model)",
   "chromatix: exercises the real Chromatix wave-propagation engine (current-milestone wave model)",
   "coupler: exercises C_RAY_TO_WAVE / C_WAVE_TO_RAY coupler physics or protocol",
-  "fmmax: exercises the FMMAX RCWA adapter (out of current milestone scope, see AGENTS.md)",
-  "fdtdx: exercises the FDTDX EM adapter (out of current milestone scope, see AGENTS.md)",
-  "sax: exercises the SAX photonic-circuit adapter (out of current milestone scope, see AGENTS.md)",
-  "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction",
+  # These three are still registered but select nothing: every test carrying
+  # them was archived by CHE-67 (archive/tests/gen1/). They are kept so an
+  # unarchived file is valid pytest the moment it is moved back, and so the
+  # historical tier commands in docs/testing/ stay runnable instead of erroring.
+  # The `sax` marker was deleted outright by CHE-72 along with the integration
+  # itself -- there is nothing left to unarchive. A `-m` expression naming it
+  # still parses (an unknown name evaluates false), so the recorded tier
+  # commands that say `not sax` keep working.
+  "fmmax: exercises the FMMAX RCWA adapter (out of current milestone scope, see AGENTS.md); archived by CHE-67",
+  "fdtdx: exercises the FDTDX EM adapter (out of current milestone scope, see AGENTS.md); archived by CHE-67",
+  "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction; archived by CHE-67 pending a replacement baseline",
   "slow: individually expensive numerical characterization or convergence test",
-  "tutorial: reproduces an upstream third-party tutorial; a regression gate on the PINNED dependency, not a test of this repository's physics (CHE-64)",
+  "tutorial: reproduces an upstream third-party tutorial; a regression gate on the PINNED dependency, not a test of this repository's physics (CHE-64). Carried by every test in tests_tutorial/, which testpaths excludes -- selecting it does nothing unless that directory is named (CHE-67)",
   "gpu: requires a CUDA device attached to the container (`./run.sh --gpu`); auto-skips otherwise",
 ]
 

@@ -49,11 +49,12 @@ pytestmark = pytest.mark.chromatix
 def _pinned_wave_engine_precision():
     """Pin `jax_enable_x64` off before every test in this module.
 
-    `sax` turns x64 on as an import side effect that Python will not re-trigger,
-    so in a full-suite run these tests would otherwise inherit complex128 FFTs
-    from whichever module imported first and measure an engine M3 does not
-    declare. `chromatix_adapter` has carried the same defence since M1; this
-    module needs it too because it builds `Field`s directly.
+    x64 is process-global and something else in the session may turn it on --
+    possibly as an import side effect that Python will not re-trigger. Without
+    this pin, a full-suite run would let these tests inherit complex128 FFTs from
+    whichever module ran first and measure an engine M3 does not declare.
+    `chromatix_adapter` has carried the same defence since M1; this module needs
+    it too because it builds `Field`s directly.
     """
     from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
         pin_wave_engine_precision,
@@ -423,12 +424,14 @@ def test_field_derived_wavelength_is_float32_and_says_so() -> None:
 
 
 def test_propagation_pins_jax_x64_off_regardless_of_ambient_state() -> None:
-    """The measurements must not depend on whether `sax` was imported first.
+    """The measurements must not depend on ambient `jax_enable_x64` state.
 
     Found by CHE-40 the expensive way: in isolation this module's tests passed,
-    and in a full-suite run one failed, because `sax` had turned `jax_enable_x64`
-    on and Chromatix's FFTs quietly promoted to complex128. An error figure that
-    depends on unrelated import order is not evidence.
+    and in a full-suite run one failed, because another module had turned
+    `jax_enable_x64` on and Chromatix's FFTs quietly promoted to complex128. An
+    error figure that depends on unrelated import order is not evidence. This
+    test creates that state itself rather than relying on a particular import
+    doing it, so it stays meaningful whatever else is installed.
     """
     import jax
 

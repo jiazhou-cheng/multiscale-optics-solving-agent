@@ -126,10 +126,11 @@ CHROMATIX_CAPABILITIES = ComponentCapabilities(
         "jax 0.6.2 backend gpu)"
     ),
     notes=(
-        "Requested device must never be reported as actual: PB4a measured "
-        "klujax (a SAX dependency) pinning jax_platform_name='cpu' at import "
-        "time, which produces a successful complex64 run on the host while the "
-        "caller asked for CUDA."
+        "Requested device must never be reported as actual: a process-global JAX "
+        "platform pin produces a successful complex64 run on the host while the "
+        "caller asked for CUDA, with no error raised. PB4a measured this via a "
+        "third-party import-time pin (removed in CHE-72); the rule is not "
+        "specific to that cause."
     ),
 )
 

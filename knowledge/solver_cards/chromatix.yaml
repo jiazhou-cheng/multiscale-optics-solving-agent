@@ -29,7 +29,7 @@ required_probes:
   - Airy-pattern analytic comparison  # not yet done
   - Gaussian-beam propagation  # not yet done
   - sample-pitch and FFT convention  # done, see knowledge/solvers/chromatix/conventions.md
-  - CPU/GPU agreement  # not yet done, no GPU in this environment
+  - CPU/GPU agreement  # done (CHE-61): complex64 round trip 8.3e-07 (L2) on host and on cuda:0, no GPU penalty, against an enforced 2e-5 bound. Requires precision='highest' -- XLA:GPU otherwise computes complex64 matmuls in TF32 (3.5e-04). See docs/precision/precision_device_policy.md. TPU: not attempted.
   - directional derivative of propagation distance or phase mask  # one narrow path probed, see conventions.md/solver_card.yaml derivative.verified_note
   - exact engine pin and isolated CPU import  # done, see benchmarks/probes/verify_m1_engines.py
 benchmarks: [L1-WAVE-01, L2-PSF-01, L2-META-01, L3-HYBRID-01, L3-ACHROMATIC-01]

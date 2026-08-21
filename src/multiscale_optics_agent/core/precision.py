@@ -33,7 +33,7 @@ So three separate things are separated here, and a fourth is added:
 
 ``ArrayNamespace``
     Which array ecosystem owns the buffer. Orthogonal to device: NumPy is
-    CPU-only, JAX and Torch are either. PB4a's klujax hazard is exactly a case
+    CPU-only, JAX and Torch are either. PB4a's platform-pin hazard is exactly a case
     where the namespace is right and the device is silently wrong, so "GPU" is
     not sufficient information to execute anything.
 
@@ -378,7 +378,7 @@ class ArrayState:
 
     Constructed by :func:`multiscale_optics_agent.core.arrays.array_state`
     from a real buffer. Nothing in this project builds one from a config
-    value: that is the substitution PB4a's klujax hazard punishes.
+    value: that is the substitution PB4a's platform-pin hazard punishes.
     """
 
     dtype: DType

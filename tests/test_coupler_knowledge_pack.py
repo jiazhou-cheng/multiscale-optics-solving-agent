@@ -186,3 +186,91 @@ def test_papers_policy_exception_is_documented_rather_than_contradicted() -> Non
 
     for name in ("paper.pdf", "supporting_information.pdf"):
         assert (ROOT / "knowledge/papers/raywave_tracing" / name).is_file()
+
+
+def test_ray_to_wave_card_carries_che50s_decision_and_names_who_it_affects() -> None:
+    """CHE-68 (R5). A closed decision that lives only in a Linear comment is not
+    a documented limitation. The card must say what is missing, who it breaks,
+    what the correct remedy is today, and -- because PB7 looked and did not see
+    it -- why PB7's silence is not evidence of absence."""
+    limitation = _card("ray_to_wave")["known_limitations"]["no_wavefront_curvature_term"]
+
+    assert limitation["issue"] == "CHE-50"
+    # Tracked, not promoted to a defect and not quietly dropped.
+    assert "tracked known limitation" in limitation["status"]
+    assert "no kernel change" in limitation["decided"]
+
+    # The statement has to name the term and the scope of validity, or a reader
+    # cannot tell whether their own use is affected.
+    assert "exp(i k r^2 / 2R)" in limitation["statement"]
+    assert "further" in limitation["statement"]
+
+    # A limitation with no remedy and no revisit condition is a shrug.
+    assert "advance the RAY STATE" in limitation["correct_remedy_today"]
+    assert limitation["revisit_when"]
+
+    # PB7 is the trap: three PSF routes agreed and none of them could have seen
+    # this. Recording that keeps the next reader from citing PB7 as clearance.
+    assert "PB7" in limitation["who_is_not_a_witness"]
+
+    # Every surface named must exist, or the card is pointing at nothing.
+    for surface in limitation["surfaced_in"]:
+        path = surface.split(" ")[0]
+        if path != "this":
+            assert (ROOT / path).is_file(), surface
+
+
+def test_ray_to_wave_card_does_not_present_the_missing_record_as_evidence() -> None:
+    """CHE-63's record has never been generated. The card may cite it as the
+    intended evidence path, but not without saying it is absent -- otherwise a
+    reader takes a filename for a measurement."""
+    text = (COUPLERS / "ray_to_wave/coupler_card.yaml").read_text()
+    record = "benchmarks/probes/records/m3r_sensor_handoff.json"
+
+    assert not (ROOT / record).exists(), (
+        "the record now exists; drop this test and the NOT COMMITTED notes on the card"
+    )
+    assert record in text
+    assert "NOT COMMITTED" in text
+    assert "CHE-63" in text
+
+
+def test_the_near_grazing_cancellation_hazard_is_recorded_with_its_numbers() -> None:
+    """CHE-70's measured defect, on the card and in the conventions, or nowhere.
+
+    The hazard is *open*: the kernel loses the phase of near-grazing modes and does
+    not warn, and CHE-70 handled it at the caller with a declared band limit rather
+    than changing verified numerics. That disposition is only honest if a consumer
+    can read it, so the card must carry the measurement (not a summary of it), the
+    conventions must carry the hazard under a heading, and the derivation must sit
+    in the module that applies it.
+    """
+    limitation = _card("ray_to_wave")["known_limitations"][
+        "near_grazing_phase_cancellation"
+    ]
+    assert limitation["issue"] == "CHE-70"
+    assert limitation["status"].startswith("open")
+    measured = limitation["measured_impact"]
+    assert measured["offending_bins"].startswith("8")
+    assert measured["offending_optical_path_m"] == pytest.approx(4745.3, rel=1e-3)
+    assert measured["offending_power_fraction"] == pytest.approx(2.25e-7, rel=1e-2)
+    # Both sides of the measurement, so the card cannot state the good number alone.
+    assert "2.8e-09" in measured["exactness_limit_without_band_limit"]
+    assert "8.9e-14" in measured["exactness_limit_with_band_limit"]
+    assert "not a kernel change" in limitation["current_handling"].lower()
+
+    conventions = (COUPLERS / "ray_to_wave" / "conventions.md").read_text()
+    assert "### H4" in conventions
+    assert "4745 m" in conventions
+    assert "Four hazards" in conventions, (
+        "the hazard count in the heading must match the hazards below it"
+    )
+
+    streaming = (
+        Path(__file__).resolve().parents[1]
+        / "src/multiscale_optics_agent/couplers/streaming.py"
+    ).read_text()
+    assert "grazing_floor_for_phase_budget" in streaming
+    assert "eps * k * Z / d_n" in streaming, (
+        "the derivation belongs next to the code that applies it, not only in a report"
+    )

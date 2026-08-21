@@ -137,7 +137,7 @@ No reproduction reduces an iteration count or grid below what upstream specifies
 
 `jax_enable_x64` is pinned to `False` by the harness at import, and
 `tests/test_chromatix_tutorials.py::test_jax_x64_is_pinned_off` asserts the pin
-held: `sax.saxtypes.core` sets it to `True` as an import side effect and the
+held: a module can set it to `True` as an import side effect and the
 adapter registry imports every adapter eagerly, so collection order could
 otherwise flip it process-wide and change every recorded number
 (`conventions.md`, "Numerical dtype").

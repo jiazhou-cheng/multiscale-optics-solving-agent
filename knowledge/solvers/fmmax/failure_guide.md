@@ -65,6 +65,6 @@ reproduce the oracle in `probes/fresnel_oracle_probe.py`.
 ## Python version
 
 FMMAX itself only requires `>=3.10` (looser than Chromatix's `>=3.12` or
-SAX/Optiland's `>=3.11`), but the shared `agent_solver` image uses
+Optiland's `>=3.11`), but the shared `agent_solver` image uses
 `python:3.12-slim` because other pinned solvers need it. No FMMAX-specific
 incompatibility was observed at 3.12.

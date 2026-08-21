@@ -1,6 +1,6 @@
 # Image: agent_solver
 #
-# Chromatix, SAX, and Optiland all require Python >=3.11/3.12 (see
+# Chromatix and Optiland both require Python >=3.11/3.12 (see
 # docker/requirements.txt header for per-package install hazards). This
 # image exists because the host environment only had Python 3.10/3.8
 # available. python:3.12-slim satisfies every pinned solver's

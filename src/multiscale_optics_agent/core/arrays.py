@@ -11,14 +11,16 @@ authorizes -- and only those.
 
 Why introspection rather than metadata
 --------------------------------------
-PB4a measured ``klujax.py:47`` running ``jax.config.update("jax_platform_name",
-"cpu")`` at *import* time; klujax is a SAX dependency, so importing SAX
-anywhere in a process silently moves every later JAX computation onto the host
-with no warning and no ``JAX_PLATFORMS`` set. Under that failure a requested
-device of ``cuda`` and an actual device of ``cpu`` coexist happily, and any code
-that writes ``record.device = requested_device`` reports GPU execution that
-never happened. Every device fact in this project therefore comes from
-:func:`array_state`, which reads the buffer.
+A requested device is not evidence of an actual one. Any process-global JAX
+platform setting, a missing PTX compiler, or a silent host fallback can leave a
+requested device of ``cuda`` and an actual device of ``cpu`` coexisting happily,
+with no warning raised -- and any code that writes
+``record.device = requested_device`` then reports GPU execution that never
+happened. PB4a measured exactly that (a third-party package pinning
+``jax_platform_name='cpu'`` at import time; removed in CHE-72), which is the
+concrete case this policy came from rather than the only way to reach it. Every
+device fact in this project therefore comes from :func:`array_state`, which
+reads the buffer.
 
 Why NumPy and JAX are the compute namespaces
 ---------------------------------------------
@@ -208,7 +210,8 @@ def verify_dtype(array: Any, requested: DType, *, context: str) -> Any:
 
     This exists because of one specific silent failure. JAX with
     ``jax_enable_x64`` disabled -- which is the state the Chromatix adapter
-    *deliberately* enforces on every call, and the state klujax leaves behind --
+    *deliberately* enforces on every call, and which any import-time config
+    mutation elsewhere in the process can also leave behind --
     accepts ``astype(float64)`` and returns ``float32``. No warning, no error:
     the requested precision simply does not happen. Checking the dtype that came
     back rather than the one that was asked for turns a two-decimal-digit loss
@@ -226,8 +229,9 @@ def verify_dtype(array: Any, requested: DType, *, context: str) -> Any:
                 detail = (
                     " jax_enable_x64 is disabled in this process, so JAX silently "
                     "returns float32/complex64 for any 64-bit request. The "
-                    "Chromatix adapter disables it on every call by design, and "
-                    "importing SAX can leave it disabled too."
+                    "Chromatix adapter disables it on every call by design; it "
+                    "is process-global, so another import can leave it disabled "
+                    "too."
                 )
         except ImportError:  # pragma: no cover - jax is pinned in both images
             pass
@@ -377,8 +381,9 @@ def _jax_device(jax: Any, device: DevicePlacement) -> Any:
             message=f"jax reports no {platform} device (backend={jax.default_backend()!r}).",
             requested=device,
             evidence=(
-                "PB4a: importing SAX pins jax_platform_name='cpu' process-globally "
-                "via klujax, which produces exactly this state on a GPU host"
+                "on a GPU host this state means the JAX CUDA plugin is absent or a "
+                "process-global platform pin (jax_platform_name / JAX_PLATFORMS) "
+                "is in force -- see docs/testing/gpu_environment.md"
             ),
         )
     if device.index is None:

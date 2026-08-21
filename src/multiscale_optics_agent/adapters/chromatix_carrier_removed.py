@@ -91,12 +91,12 @@ GLOBAL_PHASE_POLICY = "retained_as_metadata_not_reapplied"
 def pin_wave_engine_precision() -> None:
     """Force ``jax_enable_x64`` off, the way ``chromatix_adapter`` already does.
 
-    ``jax_enable_x64`` is process-global mutable state, and ``sax`` turns it *on*
-    as an import side effect that Python will not re-trigger. Under x64 the FFTs
-    behind ``kernel_propagate`` promote to ``complex128`` and this module's error
-    figures silently improve by orders of magnitude -- which would make every
-    number in ``outputs/M3/carrier-phase/`` depend on whether some unrelated
-    adapter had been imported first.
+    ``jax_enable_x64`` is process-global mutable state, and anything in the
+    process may turn it *on* -- possibly as an import side effect that Python will
+    not re-trigger. Under x64 the FFTs behind ``kernel_propagate`` promote to
+    ``complex128`` and this module's error figures silently improve by orders of
+    magnitude -- which would make every number in
+    ``outputs/M3/carrier-phase/`` depend on what else had been imported first.
 
     Exported rather than private because a caller that builds the ``Field``
     itself must pin the flag *before* doing so: this function cannot retroactively

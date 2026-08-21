@@ -1,7 +1,7 @@
 """GPU execution of each component, and the hybrid path end to end (CHE-61).
 
 Every test here needs a dedicated session, because enabling the GPU means
-undoing klujax's process-global ``jax_platform_name='cpu'`` pin:
+JAX computing on the GPU for the whole process:
 
     ./run.sh --gpu pytest -q -m gpu
 

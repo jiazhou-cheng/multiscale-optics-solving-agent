@@ -1,9 +1,12 @@
 # GPU execution environment (CHE-60 / PB4a, Phase 0)
 
-Status: **complete and validated** on the target host, 2026-08-19.
+Status: **complete and validated** on the target host. Established 2026-08-19
+(CHE-60); revalidated 2026-08-20 from a rebuilt image by CHE-72/CHE-73, after
+the SAX removal took Trap 2 out at the source.
 
 This document records how GPU execution is provisioned, the evidence that it
-actually works, and two non-obvious traps that silently disable it. It is the
+actually works, and two non-obvious traps that silently disable it (the second
+of which is now historical). It is the
 prerequisite for every other phase of CHE-60 — Optiland GPU tracing, Chromatix
 GPU propagation, and GPU-resident ray-wave couplers all assume what is
 established here.
@@ -65,10 +68,13 @@ jax_devices:        cuda:0
 Host: 8x NVIDIA RTX A6000 (49 GB each), driver 550.163.01 (CUDA 12.4), docker
 `nvidia` runtime present. Results:
 
-- `./run.sh --gpu pytest -q -m gpu` — **8 passed**
+- `./run.sh --gpu pytest -q -m gpu` — **8 passed** (2026-08-19, the 8 tests in
+  `test_gpu_environment.py` as it then stood)
 - `./run.sh pytest -q -m "not slow and not benchmark and not fmmax and not fdtdx and not sax"`
-  (Tier A, CPU image) — **561 passed, 27 skipped**; the 6 non-`sax` GPU tests
-  auto-skip, matching the 561 passed measured before this change.
+  (Tier A, CPU image, as run on 2026-08-19) — **561 passed, 27 skipped**; the 6
+  non-`sax` GPU tests auto-skip, matching the 561 passed measured before that
+  change. The `sax` marker no longer exists (CHE-72); the command still runs
+  because an unknown name evaluates false in a `-m` expression.
 
 ### Driver/CUDA compatibility
 
@@ -78,6 +84,81 @@ build and it runs on this 12.4 driver through CUDA minor-version compatibility
 same floor). Both are satisfied at 550.163.01. If the host driver is ever
 downgraded below 525.60.13 this image stops working and the CPU image must be
 used instead.
+
+## Revalidation from a rebuilt image (CHE-72 / CHE-73, 2026-08-20)
+
+Both images were rebuilt from changed `docker/requirements.txt` (the SAX removal
+dropped `sax`, `klujax`, `jaxellip`, `lark`, `natsort`, `orjson` and `scikit-rf`),
+so this is a clean-dependency-state result rather than a re-run against the
+image CHE-60 built.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Dedicated GPU suite | `./run.sh --gpu pytest -q -m gpu` | **48 passed, 769 deselected, 69.6 s** on 1x RTX A6000 |
+| Default suite, CPU image | `./run.sh pytest -q` | **769 passed, 48 skipped, 182 s** |
+| Fast subset | `./run.sh pytest -q -m "not slow"` | 751 passed, 48 skipped, 18 deselected, 37 s |
+| Legacy Tier A expression (still names the deleted `sax` marker) | `-m "not slow and not benchmark and not fmmax and not fdtdx and not sax"` | 799/817 collected — the marker is gone but the expression still parses |
+| Agent benchmark gate | `./run.sh pytest -q benchmarks_agent` | 52 passed, 7.6 s |
+
+Against the CHE-60 baseline of 770 passed / 48 skipped, the default suite moved by
+exactly two accounted-for deltas and nothing else:
+
+- **−1 passed**: `test_adapter_registry.py::test_discovered_adapter_spec_matches_model_id[M_CIRCUIT_SAX]`.
+  That test is parametrized over discovered adapter modules, so deleting
+  `sax_adapter.py` removes one case.
+- **48 skipped, unchanged**: two SAX pin-characterization tests were deleted and
+  two new `gpu` tests added (`test_a_clean_interpreter_reaches_the_gpu_with_no_platform_repair`,
+  `test_one_coherent_cuda_dependency_family`).
+
+### Clean-interpreter evidence
+
+`benchmarks/probes/gpu/che72_gpu_revalidation.py`, run in a process pytest never
+touches, because the old harness repair meant "works under pytest" and "works in a
+clean interpreter" were different claims:
+
+```json
+{
+  "sax_family_installed": [],
+  "sax_importable": false,
+  "klujax_importable": false,
+  "jax_platform_name": "<unset>",
+  "jax_devices": ["cuda:0"],
+  "jax_default_backend": "gpu",
+  "jax_jit_result": 1000000.0,
+  "jax_jit_result_exact": true,
+  "jax_result_device": "cuda:0",
+  "torch_version": "2.13.0+cu126",
+  "torch_cuda_version": "12.6",
+  "torch_result_device": "cuda"
+}
+```
+
+`jax_platform_name` reads `<unset>`: nothing pins it and nothing repairs it.
+
+### Resolved CUDA family
+
+One coherent stack, not two. Asserted by
+`test_one_coherent_cuda_dependency_family`, which is the guard CHE-73 added
+because nothing previously checked this:
+
+| Package | Version |
+| --- | --- |
+| `nvidia-cuda-nvcc-cu12` | 12.6.85 |
+| `nvidia-cuda-nvrtc-cu12` | 12.6.85 |
+| `nvidia-nvjitlink-cu12` | 12.6.85 |
+| `nvidia-cuda-runtime-cu12` | 12.6.77 |
+| `nvidia-cuda-cupti-cu12` | 12.6.80 |
+| `nvidia-nvtx-cu12` | 12.6.77 |
+| `nvidia-cublas-cu12` | 12.6.4.1 |
+| `torch` | 2.13.0+cu126 (`torch.version.cuda == "12.6"`) |
+
+The compiler/JIT trio (`nvcc`/`nvrtc`/`nvjitlink`) are byte-identical at 12.6.85,
+which is the specific coherence that matters for the PTX stage. The math libraries
+(`cufft` 11.3.0.4, `cusolver` 11.7.1.2, `cusparse` 12.5.4.2) version on their own
+schedules and are deliberately *not* asserted against 12.6 — doing so would be a
+false claim. `nvidia-cuda-nvcc-cu12` remains the only CUDA package added for JAX;
+`jax[cuda12]` / `jax-cuda12-plugin[with-cuda]` are still not used, and the minimal
+strategy was not shown to be insufficient.
 
 ## Trap 1: a visible GPU that cannot execute anything
 
@@ -106,71 +187,68 @@ missing, so `docker/requirements-gpu.txt` pins just `nvidia-cuda-nvcc-cu12`
 `site-packages/nvidia/cuda_nvcc/bin/`, already one of the paths XLA searches, so
 no `PATH` or env var is needed.
 
-## Trap 2: importing SAX silently disables the GPU for the whole process
+## Trap 2 (resolved at the source): a process-global JAX platform pin
 
-`klujax.py:47` executes, at **import** time:
+**Status: no longer live.** CHE-72 removed the dependency that caused it, and the
+test harness no longer repairs anything. Kept here because the *state* is still
+reachable by other means and is genuinely hard to diagnose.
+
+`klujax.py:47` executed, at **import** time:
 
 ```python
 jax.config.update(name="jax_platform_name", val="cpu")
 ```
 
-klujax is a hard dependency of SAX. So importing SAX — an out-of-milestone
-solver that a graph or a pytest session may load for unrelated reasons — forces
-every subsequent JAX computation in that process onto the CPU. It emits no
-warning and never sets `JAX_PLATFORMS`; the only symptom is
+klujax was a hard dependency of SAX, so importing SAX — an out-of-milestone
+solver that a graph or a pytest session could load for unrelated reasons — forced
+every subsequent JAX computation in that process onto the CPU. It emitted no
+warning and never set `JAX_PLATFORMS`; the only symptom was
 `jax.default_backend() == 'cpu'` on a machine with a working GPU.
 
-This was found the hard way: `pytest -m gpu` skipped everything (pytest imports
+This was found the hard way: `pytest -m gpu` skipped everything (pytest imported
 `tests/test_sax_adapter.py` during collection even though `-m gpu` deselects it)
 while running `tests/test_gpu_environment.py` alone passed.
 
-The pin is reversible, **but only before JAX initializes its backend** — the
-backend is built once and cached, so a reset after the first `jax.devices()`
-call has no effect. Both directions are pinned down by
-`test_jax_platform_pin_is_reversible_only_before_backend_init`. This is why the
-repair in `tests/conftest.py::undo_third_party_jax_platform_pin` runs inside
-`pytest_collection_modifyitems` — after collection has done the offending
-import, before any test touches JAX — and cannot be a fixture, which would run
-too late. When the repair fires it prints
+CHE-72 deleted the SAX integration outright — adapter, tests, knowledge pack,
+registry entry, and the `klujax`/`sax` pins — rather than keeping the harness
+workaround that undid the pin during collection. The pin was reversible, but only
+before JAX initialized its backend (the backend is built once and cached), which
+forced the repair into `pytest_collection_modifyitems` and made it impossible to
+express as a fixture. Removing the cause removed all of that.
 
-```
-jax platform repair: undid klujax's jax_platform_name='cpu' pin (imported via SAX)
-```
+What replaced it:
 
-in the terminal summary, so mutating another package's global config is stated
-out loud in the run it affects rather than applied invisibly.
+- `tests/test_gpu_environment.py::test_a_clean_interpreter_reaches_the_gpu_with_no_platform_repair`
+  asserts the property directly, in a subprocess that imports the project
+  package: `jax_platform_name` is not pinned, the default backend is the GPU, and
+  a jitted kernel's *output array* lands on a GPU device. A future dependency
+  with the same import-time habit fails this test.
+- The Chromatix adapter still names a `jax_platform_name` pin in
+  `CHROMATIX_CUDA_UNAVAILABLE` when it finds one, because an env var or another
+  package can reach the same state. It no longer attributes it to SAX.
+- The requested-vs-actual device rule (`core/arrays.py`, PB4b) is unchanged. It
+  was motivated by this trap but never depended on it: a requested device is not
+  evidence of an actual one regardless of what caused the divergence.
 
-### Why GPU tests require a dedicated session
+### Why GPU tests still require a dedicated session
 
-Because that repair is process-global, it changes the backend *every* test in the
-session computes on. So `gpu`-marked tests run only when the selection contains
-nothing else, and skip otherwise. This is not caution in the abstract — both
-failure modes were measured on the GPU image before the guard existed:
+The reason changed with CHE-72, so read this rather than assuming the old one.
 
-| Selection | Effect of repairing the pin |
-| --- | --- |
-| `-m sax` | `test_mzi_circuit_matches_analytic_oracle_and_probe_evidence` failed — klujax needs JAX on the CPU |
-| Tier A | Chromatix moved onto the GPU; 2 tolerance-sensitive tests in `test_m3_pupil_to_focus.py` failed |
+It is no longer "the harness mutates global JAX state." Nothing is mutated now.
+On the GPU image JAX simply computes on the GPU for the whole process — there is
+no per-test backend — so a mixed selection would silently move the non-GPU tests
+onto a backend their tolerances were never derived for. Measured on the GPU image
+before the guard existed: running Tier A there moved Chromatix onto the GPU and
+broke two tolerance-sensitive tests in `test_m3_pupil_to_focus.py` (archived by
+CHE-67; the measurement stands).
 
-Skipping the GPU tests is the safe direction in both cases: the established CPU
-results stay authoritative, and the GPU tests remain fully available on their
-own. Measured consequence — Tier A is now byte-identical on both images
-(561 passed, 29 skipped), and `-m gpu` passes 8/8 in the GPU image.
-
-Note the second row is *not* itself evidence of a bug in Chromatix or in those
-two tests: they were written against CPU float32 results and their tolerances
-have never been re-derived for a GPU backend. Establishing dtype-appropriate
-GPU tolerances is exactly CHE-60 Phase 5's job, and those two tests are the first
-concrete candidates for it.
-
-**This remains an open hazard outside the test harness.** Any production process
-that imports SAX before Chromatix inherits the same silent CPU downgrade, and
-nothing in the adapter layer currently detects it. CHE-60 Phase 4 must therefore
-have the Chromatix adapter report the device its output **actually** landed on,
-never the device that was requested — a requested-vs-actual mismatch is exactly
-what this trap produces. `test_importing_sax_silently_pins_jax_to_cpu`
-characterizes the upstream behavior so that if a future klujax drops the pin,
-the test fails and the workaround can be deleted rather than lingering forever.
+That is *not* itself evidence of a bug in Chromatix or in those two tests: they
+were written against CPU float32 results and their tolerances have never been
+re-derived for a GPU backend. Establishing dtype-appropriate GPU tolerances
+remains open work. Until then the established CPU results stay authoritative, so
+`gpu`-marked tests run only when the selection contains nothing else and skip
+otherwise — which is also what keeps every documented tier command green
+unchanged on both images.
 
 ## Disk footprint
 

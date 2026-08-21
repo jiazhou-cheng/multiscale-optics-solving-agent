@@ -36,11 +36,10 @@ _COORD_FRAME = "axes=(y, x) row-major; right-handed; +z propagation"
 # NOTE: jax_enable_x64 isolation is handled inside
 # chromatix_adapter._do_import_chromatix(), which explicitly forces it off
 # on every call rather than relying on ambient process state -- see that
-# function's docstring. A test-only fixture here or in conftest.py cannot
-# fix this correctly: sax.saxtypes.core sets jax_enable_x64=True as an
-# import side effect that (because Python only runs a module body once) does
-# not re-fire on a cache-hit `import sax`, so a "reset before every test"
-# fixture would end up breaking sax's own precision requirements instead.
+# function's docstring. A test-only fixture here or in conftest.py cannot fix
+# this correctly: the flag is process-global, and a module that sets it as an
+# import side effect will not re-set it on a cache-hit import, so a "reset
+# before every test" fixture would silently break whatever needed it on.
 
 
 def _make_input_record(
@@ -355,13 +354,16 @@ def test_cuda_is_gated_on_the_process_not_on_the_request() -> None:
 
 
 def test_gpu_unavailability_names_a_process_global_platform_pin() -> None:
-    """The klujax hazard has to be diagnosable from the message alone.
+    """A platform pin has to be diagnosable from the message alone.
 
-    PB4a measured `klujax.py:47` running
-    `jax.config.update("jax_platform_name", "cpu")` at import time; klujax is a
-    SAX dependency, so importing SAX makes every later JAX call run on the host
-    with no warning. On a GPU host that is indistinguishable from "no GPU
-    installed" unless the reason says so.
+    With `jax_platform_name` pinned to 'cpu' process-globally, every later JAX
+    call runs on the host with no warning. On a GPU host that is
+    indistinguishable from "no GPU installed" unless the reason says so, so the
+    adapter names the pin instead of reporting only the absent device.
+
+    PB4a found this through a dependency that set the pin at import time
+    (SAX/klujax, removed in CHE-72). The distinction still needs naming: nothing
+    stops an env var or another package from reaching the same state.
     """
     import jax
 
@@ -370,7 +372,6 @@ def test_gpu_unavailability_names_a_process_global_platform_pin() -> None:
         pytest.skip("this process has a working GPU, so there is no reason to inspect")
     if jax.config.read("jax_platform_name") == "cpu":
         assert "jax_platform_name is pinned" in reason
-        assert "SAX" in reason
 
 
 def test_require_gradients_rejected_before_any_chromatix_call(

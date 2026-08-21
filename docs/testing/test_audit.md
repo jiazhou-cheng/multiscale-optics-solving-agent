@@ -1,5 +1,11 @@
 # PB1 — Test Suite Inventory, Classification, and Disposition
 
+> **Superseded in part by CHE-67 (2026-08-19).** The paths and tier labels below
+> describe the tree as it was profiled. CHE-67 archived 288 of these tests to
+> `archive/tests/gen1/` and moved the 60 tutorial tests to `tests_tutorial/`, so
+> a `tests/...` path here may no longer exist. Nothing was re-measured; see
+> `docs/testing/test_archive.md` for the mapping.
+
 **Issue:** CHE-52 (PB1), milestone M3.5
 **Date:** 2026-08-18
 **Rule:** read-only. No test file, fixture, or config was modified to produce this audit.

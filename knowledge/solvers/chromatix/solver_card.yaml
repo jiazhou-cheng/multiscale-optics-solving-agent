@@ -24,13 +24,23 @@ license: MIT
 framework: jax
 supported_regimes:
   - scalar angular-spectrum propagation on CPU/complex64
+  - scalar angular-spectrum propagation on CUDA/complex64, with the output read
+    off the array rather than asserted from the request (CHE-60, CHE-61 --
+    see devices_tested and precision_verdict_che61)
   - exact FFT-bin homogeneous plane-wave propagation
   - signed paraxial focusing through an ideal thin-lens phase
   - fixed Gaussian grid/padding/determinism scaling
 package_reported_unverified_regimes:
   # CHE-57 (PB6) moved most of this list into verified_by_che57_example_reproductions
   # below. What genuinely remains unverified:
-  - GPU and TPU execution (no accelerator in this container; jax.devices() reports one TFRT_CPU_0)
+  # GPU moved OUT of this list by CHE-60/CHE-61; TPU stays. See devices_tested.
+  - TPU execution. jax.devices() reports no TPU on this host and none has ever
+    been attempted; the package claims one and this project does not.
+  - complex128 at any device. There is no complex128 path -- ScalarField.__init__
+    is jnp.asarray(u, dtype=jnp.complex64) unconditionally, so a complex128 array
+    handed to Field.build comes back complex64 even under jax_enable_x64=True.
+    Ingested only through an explicitly recorded lossy bridge, never faked
+    (docs/precision/precision_device_policy.md)
   - jax_enable_x64=True end to end (pinned False everywhere; see conventions.md)
   - thick lenses, gratings and the objective/sensor chain beyond what the examples exercise
   - reading a genuine vendor image (scikit-image is NOT installed; see failure_guide.md)
@@ -79,8 +89,33 @@ derivative:
     published Chromatix optimization result, check whether its update() returns
     the new state. See failure_guide.md.
 devices_reported_by_package: [cpu, gpu, tpu]
-devices_tested: [cpu]
+devices_tested: [cpu, cuda]
 dtypes_validated_for_m1: [complex64]
+# CHE-61 (PB4b). dtypes_validated_for_m1 above is left as the M1-era historical
+# claim. The authoritative machine-readable table is core/capabilities.py, held
+# to the registry by tests/test_registry_matches_capabilities.py.
+precision_verdict_che61:
+  native_compute: [complex64]
+  refused: [complex128]
+  verdict: >-
+    complex64 is not one option among several here -- it is the ONLY option, and
+    complex128 does not exist. This is the FP32 floor of the whole stack:
+    Optiland and both couplers reach float64/complex128, and the Chromatix leg
+    does not. Asserting a float64 end-to-end pipeline would be false.
+  device_note: >-
+    asm_propagate runs on cuda:0 and returns complex64 on cuda:0. A cpu request
+    stays on the cpu even with a GPU present -- there is no silent fallback in
+    either direction (tests/test_precision_gpu_pipeline.py, marked gpu; not
+    re-run since CHE-60).
+  gpu_trap: >-
+    XLA:GPU computes complex64 matmuls in TF32 by default. Measured on a
+    256-wavelet einsum against a complex128 reference: 3.5e-04 at the JAX GPU
+    default versus 2.3e-07 with precision='highest' and 2.6e-07 for NumPy
+    complex64 on the host. So 'complex64 on the GPU' was 1500x less accurate
+    than complex64, silently, with the array still reporting dtype=complex64.
+    The fix is an explicit precision flag; see core/arrays.py
+    matmul_precision_kwargs.
+  source: docs/precision/precision_device_policy.md
 input_output_artifacts:
   - chromatix.core.field.ScalarField (maps to project artifact `complex_field`)
 known_conventions: see conventions.md
@@ -132,7 +167,12 @@ m3_pupil_to_focus:
   verified_by: CHE-35 (M3.6)
   probe: knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py
   evidence: knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json
-  tests: tests/test_m3_pupil_to_focus.py
+  tests: >-
+    archive/tests/gen1/tests/test_m3_pupil_to_focus.py -- ARCHIVED by CHE-67 and
+    not runnable, so the phasor convention established below is no longer
+    guarded by a live test. The probe and its recorded output still exist and
+    still run. Unarchiving is an explicit git mv back under tests/, per
+    archive/tests/gen1/README.md.
   phasor_convention:
     status: established        # was: consistent_with, argued from kernel source
     spatial_factor: exp(+i k_z z) for z > 0
@@ -184,7 +224,12 @@ not_yet_probed:
     a second solver with an explicit time convention (e.g. FDTDX) cross-checked
     against the phasor convention CHE-35 established here
   - Airy-pattern analytic comparison (listed as required in knowledge/solver_cards/chromatix.yaml, not yet done)
-  - CPU/GPU numerical agreement (no GPU available in this environment)
+  # 'CPU/GPU numerical agreement (no GPU available in this environment)' was here
+  # until CHE-68. CHE-61 measured it: the complex64 round trip is 8.3e-07 (L2) on
+  # both host and device, i.e. no GPU penalty, against an enforced 2e-5 bound.
+  - TPU execution, and therefore any CPU/TPU agreement
+  - the gpu-marked suite since CHE-60. Expected to pass, not re-run; a dedicated
+    ./run.sh --gpu pytest -q -m gpu pass is outstanding.
   - >
     vector field / polarization paths other than high_na_ff_lens, which was
     probed by L1-WAVE-01 Case 3 and is listed under known_defective
