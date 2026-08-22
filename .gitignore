@@ -20,6 +20,9 @@ data/
 datasets/
 artifacts/
 outputs/
+
+# Vendored reference *data* (not generated output): the paper's phase masks.
+!benchmarks/probes/data/
 checkpoints/
 
 # Large scientific arrays, model weights, and archives
