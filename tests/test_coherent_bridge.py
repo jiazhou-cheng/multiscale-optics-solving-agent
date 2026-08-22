@@ -36,20 +36,14 @@ pytest.importorskip("optiland")
 
 import optiland.backend as be
 
-from adapters.optiland_builder import build_optiland_system
-from adapters.optiland_ray_trace import (
-    configure_optiland_execution,
-    plan_trace_bridges,
-    surface_positions_m,
-    trace_ray_batch,
+from core.boundary import (
+    ContractError,
+    Frame,
+    RayBundle,
+    ReferencePlane,
 )
 from core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
-from core.precision import (
-    DeviceKind,
-    DevicePlacement,
-    Precision,
-)
-from couplers.coherent_batch import (
+from core.coherent_batch import (
     CoherentRayBatch,
     declared_launch_opl_reference,
     metres_to_micrometres,
@@ -57,11 +51,10 @@ from couplers.coherent_batch import (
     micrometres_to_metres,
     millimetres_to_metres,
 )
-from couplers.contracts import (
-    ContractError,
-    Frame,
-    RayBundle,
-    ReferencePlane,
+from core.precision import (
+    DeviceKind,
+    DevicePlacement,
+    Precision,
 )
 from couplers.ray_to_wave import ray_to_wave
 from couplers.streaming import (
@@ -80,7 +73,14 @@ from couplers.wave_to_ray import (
     sampling_density,
     spectrum_to_rays,
 )
-from evaluation.metalens import (
+from solvers.optiland.builder import build_optiland_system
+from solvers.optiland.coherent_trace import (
+    configure_optiland_execution,
+    plan_trace_bridges,
+    surface_positions_m,
+    trace_ray_batch,
+)
+from studies.metalens.oracle import (
     AIR_CONFIG,
     SLAB_CONFIG,
     metalens_field,

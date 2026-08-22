@@ -86,7 +86,7 @@ couplers:
           intensity-to-amplitude map. They are configuration, not defaults: a
           request that omits them is refused with OPL_REFERENCE_UNVERIFIED and a
           remedy naming what is missing. See
-          src/couplers/optiland_handoff.py.
+          src/couplers/handoff.py.
       warnings:
         - Caustics, multi-valued phase, hard vignetting, and sparse rays can invalidate interpolation.
         - >

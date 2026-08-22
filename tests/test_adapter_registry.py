@@ -1,10 +1,10 @@
 import pytest
 
-from adapters.registry import (
+from core.errors import AdapterNotFoundError
+from solvers.registry import (
     available_model_ids,
     get_adapter_for_model,
 )
-from core.errors import AdapterNotFoundError
 
 
 def test_unknown_model_id_raises_not_found() -> None:

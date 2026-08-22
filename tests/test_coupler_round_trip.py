@@ -14,12 +14,12 @@ import math
 import numpy as np
 import pytest
 
-from couplers.cascade import planar_doe_step
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractError,
     ReferencePlane,
 )
+from couplers.cascade import planar_doe_step
 from couplers.ray_to_wave import (
     Perturbation,
     Projection,

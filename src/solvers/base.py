@@ -1,31 +1,30 @@
-"""Stable interface implemented by external physics-solver adapters."""
+"""Stable interface implemented by external physics-solver adapters.
+
+``RunStatus`` and ``CostEstimate`` are re-exported here for callers that expect
+them at this path, but they are **owned by** ``core/execution.py``. CHE-90 moved
+them because ``couplers/base.py`` imported them from here to describe a
+*coupler* result, which made the solver package a dependency of the coupler
+package for vocabulary belonging to neither.
+"""
 
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.artifacts import ArtifactRecord
+from core.execution import CostEstimate, RunStatus
 from core.graph import ValidationReport
 from core.specs import ModelSpec
 
-
-class RunStatus(StrEnum):
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    PARTIAL = "partial"
-
-
-class CostEstimate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    wall_time_s: float | None = None
-    peak_memory_bytes: int | None = None
-    solver_calls: int = 1
-    confidence: str = "unknown"
-    notes: list[str] = Field(default_factory=list)
+__all__ = [
+    "CostEstimate",
+    "ModelAdapter",
+    "ModelRunRequest",
+    "ModelRunResult",
+    "RunStatus",
+]
 
 
 class ModelRunRequest(BaseModel):

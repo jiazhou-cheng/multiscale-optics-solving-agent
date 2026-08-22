@@ -32,7 +32,7 @@ import json
 
 import pytest
 
-from benchmarks.agent_suite import (
+from agent.benchmark_suite import (
     SUITE_V1,
     ContextPolicy,
     Outcome,

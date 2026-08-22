@@ -162,7 +162,7 @@ This repository no longer calls `surfaces.add` outside the builder. The supporte
 route is a typed prescription plus one generic construction call:
 
 ```python
-from adapters.optiland_builder import build_optiland_system
+from solvers.optiland.builder import build_optiland_system
 from core.optical_system import (
     ApertureSpec, FieldSpec, IdealMaterialSpec, OpticalSystemSpec,
     PlaneGeometrySpec, SphericalGeometrySpec, SurfaceSpec, WavelengthSpec,

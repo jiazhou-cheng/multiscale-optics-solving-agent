@@ -1,6 +1,6 @@
 """Trace a *caller-supplied* ray population through Optiland (CHE-70, Phase 1).
 
-The existing :class:`~adapters.optiland_adapter.OptilandAdapter`
+The existing :class:`~solvers.optiland.adapter.OptilandAdapter`
 traces rays Optiland itself generates from a field and a pupil sampling. That is
 the right shape for a pupil benchmark and the wrong shape here: CHE-70's rays
 come from an angular-spectrum decomposition of a wave field, so their positions
@@ -49,7 +49,21 @@ from typing import Any
 import numpy as np
 
 from core.arrays import array_state, xp_for
+from core.boundary import (
+    ContractCode,
+    ContractError,
+    ReferencePlane,
+)
+from core.bridge import bridge_arrays
 from core.capabilities import OPTILAND_CAPABILITIES
+from core.coherent_batch import (
+    AMPLITUDE_SIDECAR_RULE,
+    OPTILAND_INTENSITY_RULE,
+    CoherentRayBatch,
+    metres_to_micrometres,
+    metres_to_millimetres,
+    millimetres_to_metres,
+)
 from core.errors import (
     AdapterDependencyError,
     UnsupportedCapabilityError,
@@ -63,20 +77,6 @@ from core.precision import (
     DeviceKind,
     DevicePlacement,
     Precision,
-)
-from couplers.bridge import bridge_arrays
-from couplers.coherent_batch import (
-    AMPLITUDE_SIDECAR_RULE,
-    OPTILAND_INTENSITY_RULE,
-    CoherentRayBatch,
-    metres_to_micrometres,
-    metres_to_millimetres,
-    millimetres_to_metres,
-)
-from couplers.contracts import (
-    ContractCode,
-    ContractError,
-    ReferencePlane,
 )
 
 __all__ = [

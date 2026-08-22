@@ -30,7 +30,7 @@ from typing import Any
 
 import numpy as np
 
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractCode,
     ContractError,
@@ -40,8 +40,8 @@ from couplers.contracts import (
 from couplers.ray_to_wave import Projection, ray_to_wave
 from couplers.wave_to_ray import (
     SamplingDensity,
-    draw_indices,
     decompose,
+    draw_indices,
     enumerate_indices,
     sampling_density,
     spectrum_to_rays,

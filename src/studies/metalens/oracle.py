@@ -25,7 +25,7 @@ Three routes to the same reference, for the single-layer case
 For a pure air gap the layered form must agree with two things that already
 exist and were not written for this ticket:
 
-* ``evaluation.asm_oracle.angular_spectrum_float64`` -- the repository's
+* ``verification.asm_oracle.angular_spectrum_float64`` -- the repository's
   independent float64 angular-spectrum reference (CHE-40), written in the
   un-centred FFT convention rather than this module's centred one;
 * Chromatix's ``asm_propagate`` -- a third-party package, M1-verified, with a
@@ -52,6 +52,15 @@ from typing import Any
 
 import numpy as np
 
+from core.boundary import (
+    ComplexField,
+    Frame,
+    ReferencePlane,
+)
+from core.coherent_batch import (
+    metres_to_micrometres,
+    metres_to_millimetres,
+)
 from core.optical_system import (
     ApertureSpec,
     FieldSpec,
@@ -60,15 +69,6 @@ from core.optical_system import (
     PlaneGeometrySpec,
     SurfaceSpec,
     WavelengthSpec,
-)
-from couplers.coherent_batch import (
-    metres_to_micrometres,
-    metres_to_millimetres,
-)
-from couplers.contracts import (
-    ComplexField,
-    Frame,
-    ReferencePlane,
 )
 
 __all__ = [
@@ -321,7 +321,7 @@ def metalens_field(config: MetalensConfig) -> ComplexField:
             "calibration"
         ),
         provenance={
-            "source": "evaluation.metalens.metalens_field",
+            "source": "studies.metalens.oracle.metalens_field",
             "configuration": config.name,
             "aperture_pixel_count": int((radius <= config.aperture_radius_m).sum()),
             **config.as_dict(),

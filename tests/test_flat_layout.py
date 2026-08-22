@@ -56,29 +56,33 @@ def test_every_top_level_name_resolves_inside_this_repository(name: str) -> None
     )
 
 
-def test_benchmarks_resolves_to_the_package_not_the_repository_directory() -> None:
-    """The one collision that exists inside this repository, not outside it.
+def test_no_top_level_name_collides_with_a_repository_root_directory() -> None:
+    """The collision class that lives inside this repository rather than outside it.
 
-    `src/benchmarks/` and `<root>/benchmarks/` share a name, and the repository
-    root is on `sys.path` for a bare `pytest` or `python -m`. PEP 420 resolves
-    this correctly -- a directory without `__init__.py` is recorded as a
-    namespace *portion* and the scan continues, so the regular package at
-    `src/benchmarks/` wins -- but that outcome depends on the root directory
-    never acquiring an `__init__.py`.
+    `src/benchmarks/` and `<root>/benchmarks/` shared a name until CHE-90
+    renamed the package to `agent/` and `studies/metalens/`. That was survivable
+    only by accident of PEP 420 -- a directory without `__init__.py` is recorded
+    as a namespace *portion* and the scan continues to the regular package -- and
+    it would have stopped being survivable the moment the root directory
+    acquired an `__init__.py`.
 
-    If it ever does, `import benchmarks` starts returning a package containing
-    `probes/` and `roadmap.md` instead of the agent suite, and the error is a
-    confusing `AttributeError` a long way from the cause. Phase 5 removes the
-    collision by renaming these to `studies/metalens/` and `agent/`; until then
-    this is the guard.
+    Rather than pin that one name, this asserts the general property: no
+    top-level package name may also name a directory at the repository root.
+    The repository root is on `sys.path` for a bare `pytest` or `python -m`, so
+    any such pair is one `__init__.py` away from silently resolving to the wrong
+    thing, with an `AttributeError` a long way from the cause.
     """
-    import benchmarks
-
-    assert Path(benchmarks.__file__).resolve().parent == SRC / "benchmarks"
-    assert not (ROOT / "benchmarks" / "__init__.py").exists(), (
-        "the repository-root benchmarks/ directory has acquired an __init__.py, "
-        "which turns it into a regular package that shadows src/benchmarks/ for "
-        "anything run from the repository root. Delete it."
+    root_dirs = {
+        p.name
+        for p in ROOT.iterdir()
+        if p.is_dir() and not p.name.startswith(".")
+    }
+    collisions = sorted(set(TOP_LEVEL) & root_dirs)
+    assert not collisions, (
+        f"these top-level package names also name a repository-root directory: "
+        f"{collisions}. The root is on sys.path for a bare `pytest`, so this "
+        "resolves correctly only while the root directory has no __init__.py. "
+        "Rename one side."
     )
 
 

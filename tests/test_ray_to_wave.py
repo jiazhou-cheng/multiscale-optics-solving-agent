@@ -25,8 +25,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from core.boundary import Frame
 from couplers import ComplexField, ContractError, RayBundle, ReferencePlane
-from couplers.contracts import Frame
 from couplers.ray_to_wave import (
     Perturbation,
     Projection,
@@ -39,12 +39,12 @@ pytestmark = pytest.mark.coupler
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE_MODULES = (
-    "src/couplers/contracts.py",
+    "src/core/boundary.py",
     "src/couplers/ray_to_wave.py",
     # CHE-33. Named for Optiland and encoding Optiland's conventions, yet it must
     # still import no engine: it reads a repository artifact record. Listing it
     # here is the check that the name never becomes an import.
-    "src/couplers/optiland_handoff.py",
+    "src/couplers/handoff.py",
 )
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6

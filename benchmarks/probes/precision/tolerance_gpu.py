@@ -4,13 +4,13 @@ import json
 import jax
 import numpy as np
 
-from core.precision import ArrayNamespace, Precision
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     Frame,
     RayBundle,
     ReferencePlane,
 )
+from core.precision import ArrayNamespace, Precision
 from couplers.ray_to_wave import collimated_bundle, ray_to_wave
 from couplers.wave_to_ray import wave_to_ray
 

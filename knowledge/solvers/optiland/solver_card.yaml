@@ -80,7 +80,7 @@ verified_by_che57_tutorial_reproductions:
 canonical_system_construction:
   issue: CHE-56 (PB5)
   schema: optical-system-spec/1 (src/core/optical_system.py)
-  builder: src/adapters/optiland_builder.py
+  builder: src/solvers/optiland/builder.py
   registry: src/registry/prescriptions.py
   docs: docs/prescriptions/canonical_optical_systems.md
   probe: knowledge/solvers/optiland/probes/system_construction_probe.py
@@ -493,7 +493,7 @@ not_yet_probed:
     autograd behaviour across a hard stop is still untested.
   - the full repository gradient test at float64 (CHE-57 established the
     convergence table in a tutorial reproduction, not in a gradient test)
-adapter_location: src/adapters/optiland_adapter.py
+adapter_location: src/solvers/optiland/adapter.py
 validation_status: environment_verified
 validation_note: >
   CHE-12 verified the pinned CPU environment and native geometry/wavelength

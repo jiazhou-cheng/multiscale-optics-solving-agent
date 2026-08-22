@@ -85,9 +85,9 @@ reason is stated in `knowledge/couplers/ray_to_wave/coupler_card.yaml`:
 > import time -- importing this package (or any of its siblings)
 > must never require any heavy optional dependency to be installed.
 
-Real instances: `adapters/optiland_adapter.py:511` (`_import_optiland`, returning
+Real instances: `solvers/optiland/adapter.py:511` (`_import_optiland`, returning
 `(optiland.backend, optiland.backend.utils, torch-or-None)`) and
-`adapters/chromatix_adapter.py:220` (`_do_import_chromatix`, deliberately split
+`solvers/chromatix/adapter.py:220` (`_do_import_chromatix`, deliberately split
 from its wrapper at `:252` "so tests can force an `ImportError`").
 
 **(c) A pin is a physics claim, not hygiene.** Two measured reasons, one per
@@ -292,7 +292,7 @@ converges. That is a convention fact with a downstream numerical consequence, an
 it is why conventions get their own layer rather than living in a docstring.
 
 **Where conventions become project constants.** Some conventions are not per
-solver but frozen for the whole system, in `couplers/contracts.py:80-85`:
+solver but frozen for the whole system, in `core/boundary.py:80-85`:
 
 ```python
 PHASOR = "exp(-i omega t)"
@@ -441,7 +441,7 @@ what makes discovery possible without a hand-maintained list:
 - a module-level `get_adapter() -> ModelAdapter` factory
 - lazy solver import inside `_import_<solver>()`
 
-**The protocol** (`adapters/base.py:53`) is four methods and nothing else:
+**The protocol** (`solvers/base.py:53`) is four methods and nothing else:
 
 ```python
 class ModelAdapter(Protocol):
@@ -456,7 +456,7 @@ class ModelAdapter(Protocol):
 Note the docstring's concession: "implementations may remain solver-native
 internally." The adapter is a boundary, not a rewrite.
 
-**Discovery** is by convention at `adapters/registry.py:22` — `_discover()` walks
+**Discovery** is by convention at `solvers/registry.py:22` — `_discover()` walks
 `pkgutil.iter_modules`, keeps modules ending in `_adapter`, imports them and maps
 `MODEL_ID → module`; `get_adapter_for_model()` raises `AdapterNotFoundError`.
 
@@ -555,9 +555,9 @@ it.
 | `core/capabilities.py:70-97` | Capability declaration | the authoritative device/dtype/namespace claim + its evidence string | `device_namespaces={DeviceKind.CUDA: frozenset({ArrayNamespace.TORCH})}` |
 | `registry/models.yaml:53-54` | Registry (reflection) | the graph planner's view, held equal to the above by test | `devices: [cpu, gpu]` / `dtypes: [float32, float64]` |
 | `registry/prescriptions.py` | Project data | canonical named optical systems, so "adding a system" is data not code | `M3-SINGLET-REF` |
-| `adapters/optiland_adapter.py` | Adapter | `MODEL_ID` (`:204`), typed contracts, `run`/`run_standalone`, artifact export, structured failure | `MODEL_ID = "M_RAY_OPTILAND"` |
-| `adapters/optiland_builder.py` | Adapter (support) | one function, `build_optiland_system`, from a prescription | `import optiland.backend` (in-function, `:76`) |
-| `adapters/optiland_ray_trace.py` | Adapter (support) | traces a *caller-supplied* ray population (CHE-70) | — |
+| `solvers/optiland/adapter.py` | Adapter | `MODEL_ID` (`:204`), typed contracts, `run`/`run_standalone`, artifact export, structured failure | `MODEL_ID = "M_RAY_OPTILAND"` |
+| `solvers/optiland/builder.py` | Adapter (support) | one function, `build_optiland_system`, from a prescription | `import optiland.backend` (in-function, `:76`) |
+| `solvers/optiland/coherent_trace.py` | Adapter (support) | traces a *caller-supplied* ray population (CHE-70) | — |
 | `tests/test_optiland_adapter.py` | Guard | 23 tests over the adapter contract | `test_cuda_rejected_eagerly_on_the_numpy_backend` |
 | `tests/test_optiland_opd_convention.py` | Guard | the convention itself, with its falsifiers | — |
 | `tests/test_optiland_canonical_prescriptions.py` | Guard | builder + prescription registry | — |
@@ -581,8 +581,8 @@ we have measured to be defective.
 | `knowledge/solvers/chromatix/tutorials/` | Knowledge (dependency gate) | 16 reproductions, 205 declared checks | — |
 | `core/capabilities.py:100-135` | Capability declaration | FP32-only, `lossy_input_dtypes={COMPLEX128}` — the FP32 floor of the whole stack | `precisions=frozenset({Precision.FP32})` |
 | `registry/models.yaml:146-147` | Registry (reflection) | `tpu` deliberately absent: "nothing has executed there" | `devices: [cpu, gpu]` / `dtypes: [complex64]` |
-| `adapters/chromatix_adapter.py` | Adapter | `MODEL_ID` (`:159`), lazy import (`:220`), conventions as request fields, `WaveHandoffError` | `MODEL_ID = "M_WAVE_CHROMATIX"` |
-| `adapters/chromatix_carrier_removed.py` | Adapter (support) | carrier-removed exact ASM over Chromatix machinery (CHE-40) | — |
+| `solvers/chromatix/adapter.py` | Adapter | `MODEL_ID` (`:159`), lazy import (`:220`), conventions as request fields, `WaveHandoffError` | `MODEL_ID = "M_WAVE_CHROMATIX"` |
+| `solvers/chromatix/carrier_removed_asm.py` | Adapter (support) | carrier-removed exact ASM over Chromatix machinery (CHE-40) | — |
 | `tests/test_chromatix_adapter.py` | Guard | 20 tests over the adapter contract | — |
 | `tests/test_carrier_removed_asm.py` | Guard | the carrier-removed path | — |
 
@@ -724,7 +724,7 @@ to the closing checklist of any issue that validates a capability.
 present at the Knowledge layer, and still *reachable* at the adapter layer.
 `adapters/fmmax_adapter.py` (`MODEL_ID = "M_RCWA_FMMAX"`) and
 `adapters/fdtdx_adapter.py` (`M_EM_FDTDX`) were discovered by
-`adapters/registry.py`'s filename scan, while their tests had been archived by
+`solvers/registry.py`'s filename scan, while their tests had been archived by
 CHE-67 and `capabilities_for("M_RCWA_FMMAX")` already raised
 `CapabilityError(code="UNKNOWN_COMPONENT")`. `registry/models.yaml` declared
 `devices: [cpu, gpu, tpu]` for `M_RCWA_FMMAX`, `M_EM_FDTDX` and
@@ -743,7 +743,7 @@ while a registry claim survives reads to a planner as a supported capability.
 
 Three things now hold the resolution rather than a convention holding it:
 
-* `adapters/registry.py` is an **explicit map**, so a filename can no longer
+* `solvers/registry.py` is an **explicit map**, so a filename can no longer
   imply a registration and a duplicated `MODEL_ID` raises instead of being
   resolved by directory order.
 * `test_registry_declares_no_component_without_a_capability` drops the `_OWNED`
@@ -784,7 +784,7 @@ One tier up, the system stops being about packages and starts being about
 handoffs. Named here only so this report's boundary is explicit; each is a
 follow-up:
 
-- **Artifacts** — `couplers/contracts.py` holds `RayBundle`, `WavefrontSamples`,
+- **Artifacts** — `core/boundary.py` holds `RayBundle`, `WavefrontSamples`,
   `ComplexField` and `PSF` as frozen dataclasses with required declarations,
   replacing the per-adapter `metadata: dict[str, Any]` that preceded them. Its
   three rules ("A missing declaration is an error, never a default"; "An

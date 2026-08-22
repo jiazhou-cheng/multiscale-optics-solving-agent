@@ -90,9 +90,7 @@ from core.arrays import (
     verify_dtype,
     xp_for,
 )
-from core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
-from core.precision import ArrayState, DType, Precision
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractCode,
     ContractError,
@@ -100,6 +98,8 @@ from couplers.contracts import (
     RayBundle,
     ReferencePlane,
 )
+from core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
+from core.precision import ArrayState, DType, Precision
 
 __all__ = [
     "Perturbation",

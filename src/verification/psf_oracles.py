@@ -75,7 +75,7 @@ from typing import Any
 
 import numpy as np
 
-from couplers.contracts import ContractCode, ContractError, RayBundle
+from core.boundary import ContractCode, ContractError, RayBundle
 
 __all__ = [
     "AIRY_FIRST_NULL_COEFFICIENT_EXACT",

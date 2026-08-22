@@ -66,14 +66,14 @@ from typing import Any
 import numpy as np
 
 from core.artifacts import ArtifactRecord
-from core.specs import ArtifactKind
-from couplers.contracts import (
+from core.boundary import (
     ORIGIN_RULE,
     PSF,
     ComplexField,
     ContractCode,
     ContractError,
 )
+from core.specs import ArtifactKind
 
 __all__ = [
     "COHERENCE_MODEL",

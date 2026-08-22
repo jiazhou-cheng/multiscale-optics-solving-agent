@@ -92,7 +92,7 @@ Grounded in the real `optiland` 0.6.0 API surface and the probes in
   CHE-57, and now a validated repository capability (CHE-56/PB5)**: every
   adapter-owned system is built from a canonical prescription
   (`core/optical_system.py`, schema `optical-system-spec/1`) through one generic
-  builder (`adapters/optiland_builder.py`). Plane, spherical/conic and
+  builder (`solvers/optiland/builder.py`). Plane, spherical/conic and
   even-aspheric geometry; refractive and grating interactions; air, ideal and
   catalog materials; a surface stop; `EPD`; angular fields; and a wavelength list
   with one primary are each exercised with a closed-form or independent-oracle

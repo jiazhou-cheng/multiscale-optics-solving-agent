@@ -58,7 +58,7 @@ from typing import Any, Callable, Literal
 
 import numpy as np
 
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractCode,
     ContractError,

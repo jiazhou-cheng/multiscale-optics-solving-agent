@@ -13,7 +13,7 @@ import math
 import numpy as np
 import pytest
 
-from couplers.contracts import ContractError
+from core.boundary import ContractError
 from couplers.curvature import (
     check_patch,
     curvature_direction_error_bound,

@@ -10,7 +10,7 @@ import math
 import numpy as np
 import pytest
 
-from couplers.contracts import ContractCode, ContractError
+from core.boundary import ContractCode, ContractError
 from couplers.quadrature import (
     hexapolar_area_weight_m2,
     hexapolar_ring_index,

@@ -85,7 +85,7 @@ from typing import Any, Literal
 import numpy as np
 
 from core.artifacts import ArtifactRecord
-from couplers.contracts import (
+from core.boundary import (
     ContractCode,
     ContractError,
     RayBundle,

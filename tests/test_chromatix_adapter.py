@@ -21,11 +21,11 @@ import numpy as np
 import pytest
 from conftest import load_probe_expected
 
-from adapters import chromatix_adapter as mod
-from adapters.base import ModelRunRequest, RunStatus
 from core.artifacts import ArtifactRecord
 from core.errors import AdapterDependencyError, UnsupportedCapabilityError
 from core.specs import ArtifactKind
+from solvers.base import ModelRunRequest, RunStatus
+from solvers.chromatix import adapter as mod
 
 pytestmark = [pytest.mark.jax, pytest.mark.integration, pytest.mark.chromatix]
 

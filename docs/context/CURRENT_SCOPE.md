@@ -26,7 +26,7 @@ The distinction is the one the architecture rests on:
 - **Couplers** perform physically meaningful cross-representation or cross-model handoffs. `C_RAY_TO_WAVE` is one: `RayBundle -> ComplexField`, carrying assumptions about OPL reference, phase sign, amplitude weighting, sampling and handoff plane — which is why it can refuse a request.
 - **Measurements / observables** extract quantities such as a PSF from the terminal state. `ComplexField -> |U|^2` changes no representation and consults no convention it does not already hold.
 
-Do not add a coupler solely so a graph terminates in a particular artifact type. PSF extraction lives in `src/evaluation/psf_measurement.py` and runs after the graph.
+Do not add a coupler solely so a graph terminates in a particular artifact type. PSF extraction lives in `src/verification/psf_measurement.py` and runs after the graph.
 
 ## Required Inputs
 

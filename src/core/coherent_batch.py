@@ -59,14 +59,14 @@ from typing import Any
 import numpy as np
 
 from core.arrays import device_of, dtype_of, namespace_of
-from core.precision import ArrayNamespace
-from couplers.contracts import (
+from core.boundary import (
     ContractCode,
     ContractError,
     Frame,
     RayBundle,
     ReferencePlane,
 )
+from core.precision import ArrayNamespace
 
 __all__ = [
     "AMPLITUDE_SIDECAR_RULE",

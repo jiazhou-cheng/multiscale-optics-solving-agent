@@ -4,27 +4,27 @@ Physics and provenance for these couplers live in ``knowledge/couplers/``; the
 frozen execution contract lives in ``benchmarks/M2_COUPLER_PROTOCOL.md``.
 """
 
+from core.boundary import (
+    AXIS_ORDER,
+    ORIGIN_RULE,
+    PHASOR,
+    PSF,
+    SPATIAL_FACTOR,
+    ComplexField,
+    ContractCode,
+    ContractError,
+    Frame,
+    RayBundle,
+    ReferencePlane,
+    WavefrontSamples,
+)
 from couplers.base import (
     DEFAULT_SOURCE_PORT,
     Coupler,
     CouplerRunRequest,
     CouplerRunResult,
 )
-from couplers.contracts import (
-    AXIS_ORDER,
-    ORIGIN_RULE,
-    PHASOR,
-    SPATIAL_FACTOR,
-    ComplexField,
-    ContractCode,
-    ContractError,
-    Frame,
-    PSF,
-    RayBundle,
-    ReferencePlane,
-    WavefrontSamples,
-)
-from couplers.ray_to_wave_node import RayToWaveCoupler
+from couplers.node import RayToWaveCoupler
 
 __all__ = [
     "RayToWaveCoupler",

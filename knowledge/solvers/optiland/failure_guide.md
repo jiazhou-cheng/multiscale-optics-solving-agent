@@ -393,7 +393,7 @@ warning. The resulting geometry has no attribute to inspect afterwards
 
 **Fix:** validate the prescription before construction and assemble the keyword
 set per surface type explicitly. In this repository that is
-`core/optical_system.py` + `adapters/optiland_builder.py`; see
+`core/optical_system.py` + `solvers/optiland/builder.py`; see
 `probes/system_construction_probe.py` for the measurement.
 
 ## `Material('SK1')` silently returns SK16

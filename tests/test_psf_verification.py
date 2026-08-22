@@ -25,14 +25,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from couplers.contracts import (
+from core.boundary import (
     ContractCode,
     ContractError,
     Frame,
     RayBundle,
     ReferencePlane,
 )
-from evaluation.psf_oracles import (
+from verification.psf_oracles import (
     AIRY_FIRST_NULL_COEFFICIENT_EXACT,
     AIRY_FIRST_NULL_COEFFICIENT_ROUNDED,
     AIRY_J1_FIRST_ZERO,

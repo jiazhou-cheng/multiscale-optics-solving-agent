@@ -65,7 +65,7 @@ def pin_jax_precision() -> None:
     """Pin `jax_enable_x64=False`, the pinned environment's documented default.
 
     Another module may flip this to True as an import side effect, and
-    `adapters.registry._discover()` imports every adapter
+    `solvers.registry._discover()` imports every adapter
     module eagerly, so a chromatix reproduction can otherwise observe complex128
     output purely because of test collection order.
     """

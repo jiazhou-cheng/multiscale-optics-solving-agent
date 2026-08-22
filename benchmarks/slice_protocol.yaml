@@ -182,7 +182,7 @@ scope:
   terminal_measurement:
     kind: observable
     quantity: psf
-    implementation: src/evaluation/psf_measurement.py
+    implementation: src/verification/psf_measurement.py
     is_a_graph_edge: false
   # M2 forbade engine imports in the coupler *core* and that rule is inherited
   # unchanged. M3 is an end-to-end slice, so the benchmark driver necessarily
@@ -294,7 +294,7 @@ required_conditioning:
       k_z - k = -(k_x^2 + k_y^2)/(k_z + k)
     is_not: a paraxial approximation -- no term is dropped
     implementation: ASM-CARRIER-REMOVED-V1
-    module: src/adapters/chromatix_carrier_removed.py
+    module: src/solvers/chromatix/carrier_removed_asm.py
     global_phase_policy: retained_as_metadata_not_reapplied
     global_phase_policy_detail: >-
       the removed exp(i k z) is recorded in float64 on the result and is never
@@ -325,7 +325,7 @@ required_conditioning:
       belong to the M3.4 contract; this protocol fixes only that a reference
       subtraction must happen before phase is formed
     status: implemented
-    implementation: src/couplers/optiland_handoff.py
+    implementation: src/couplers/handoff.py
     implemented_by: CHE-33 (M3.4)
     opl_reference_chosen: >-
       the traced chief ray -- the surviving ray of smallest pupil radius -- with
@@ -1153,7 +1153,7 @@ psf_measurement:
     consults no convention it does not already hold, so it is a measurement of
     the terminal state. C_FIELD_TO_PSF was removed from the registry rather than
     implemented; see open_structural_items.terminal_coupler_has_no_target_node.
-  implementation: src/evaluation/psf_measurement.py
+  implementation: src/verification/psf_measurement.py
   runs: after the graph, in the benchmark/measurement layer
   intensity: abs(u)**2
   intensity_taken_in: contracts.PSF.from_complex_field
@@ -1191,7 +1191,7 @@ psf_measurement:
       input pitch. Taking the input pitch would rescale every distance the
       measurement reports while leaving the intensity map entirely plausible.
     enforced_by: >-
-      evaluation.psf_measurement.measure_psf_from_record refuses with
+      verification.psf_measurement.measure_psf_from_record refuses with
       SAMPLE_PITCH_MISMATCH when the record's declared pitch is not the pitch the
       propagation reported. CHE-36 added input/output pitch to the graph path's
       diagnostics so there is something independent to compare against; reading
@@ -1335,7 +1335,7 @@ open_structural_items:
       never an edge to place. C_FIELD_TO_PSF is removed from
       registry/couplers.yaml, and PSF extraction is a measurement over the
       existing contracts.PSF primitive
-      (src/evaluation/psf_measurement.py), run after the
+      (src/verification/psf_measurement.py), run after the
       graph and recorded in provenance. No sink node was added, and M_SENSOR_IDEAL
       stays out of M3.
     also_found: >-
@@ -1377,7 +1377,7 @@ open_structural_items:
     oracle_half_status: resolved
     oracle_half_resolved_by: CHE-37 (M3.8)
     oracle_half_resolution: >-
-      evaluation/psf_oracles.py computes the radius from the first zero of J1
+      verification/psf_oracles.py computes the radius from the first zero of J1
       (3.8317059702075125 / 2 pi = 0.6098349) and never reads airy_radius_um.
       Using the exact coefficient rather than the quoted 0.61 is a further 0.03%.
       The frozen fields are left as they are and the correction is recorded;
@@ -1726,7 +1726,7 @@ open_structural_items:
       couplers/base.py declares Coupler.transform and nothing defines it, so
       GraphValidator currently validates edges that cannot execute.
     resolution: >-
-      src/couplers/ray_to_wave_node.py implements the
+      src/couplers/node.py implements the
       Coupler protocol for C_RAY_TO_WAVE. It is a wrapper over the M2 core and is
       tested to be bit-identical to the direct function call, so M2's
       verification evidence still binds on what a graph runs. The core keeps its

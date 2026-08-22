@@ -173,7 +173,7 @@ models:
           A complex128 input array is silently downcast to complex64 inside
           chromatix.core.field.ScalarField.__init__; there is no verified
           complex128 path through Chromatix for this model. Confirmed
-          2026-07-30 while building src/adapters/chromatix_adapter.py.
+          2026-07-30 while building src/solvers/chromatix/adapter.py.
     cost_model:
       scaling: O(batch * pixels * log(pixels)) for FFT-based propagation
       memory_scaling: O(batch * pixels)

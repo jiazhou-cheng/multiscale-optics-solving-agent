@@ -48,7 +48,11 @@ sys.path.insert(0, str(TUTORIAL_DIR))
 
 pytest.importorskip("optiland")
 
-from _optiland_harness import expected_path, load_tutorial_module, tutorial_module_paths  # noqa: E402
+from _optiland_harness import (  # noqa: E402
+    expected_path,
+    load_tutorial_module,
+    tutorial_module_paths,
+)
 
 pytestmark = [
     pytest.mark.tutorial,

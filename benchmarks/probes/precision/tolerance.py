@@ -3,9 +3,9 @@ import json
 
 import numpy as np
 
+from core.boundary import ComplexField, Frame, ReferencePlane
 from core.precision import ArrayNamespace, Precision
 from couplers import wave_to_ray as w2r
-from couplers.contracts import ComplexField, Frame, ReferencePlane
 from couplers.ray_to_wave import collimated_bundle, ray_to_wave
 
 WL = 500e-9

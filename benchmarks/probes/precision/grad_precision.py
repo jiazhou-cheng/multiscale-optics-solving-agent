@@ -22,8 +22,8 @@ from pathlib import Path
 import optiland.backend as be
 import torch
 
-from adapters.optiland_builder import build_optiland_system
 from registry.prescriptions import resolve_prescription
+from solvers.optiland.builder import build_optiland_system
 
 ROOT = Path(__file__).resolve().parents[3]
 RECORD = ROOT / "knowledge" / "solvers" / "optiland" / "expected" / "gradient_probe.json"

@@ -29,6 +29,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from core.arrays import array_state, dtype_of, to_namespace
+from core.boundary import ComplexField, RayBundle
 from core.precision import (
     ArrayState,
     BridgePlan,
@@ -38,7 +39,6 @@ from core.precision import (
     DType,
     plan_bridge,
 )
-from couplers.contracts import ComplexField, RayBundle
 
 __all__ = [
     "bridge_arrays",

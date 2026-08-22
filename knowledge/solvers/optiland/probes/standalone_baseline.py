@@ -19,8 +19,8 @@ import json
 import sys
 from pathlib import Path
 
-from adapters.base import RunStatus
-from adapters.optiland_adapter import (
+from solvers.base import RunStatus
+from solvers.optiland.adapter import (
     OptilandAdapter,
     OptilandRayRequest,
 )

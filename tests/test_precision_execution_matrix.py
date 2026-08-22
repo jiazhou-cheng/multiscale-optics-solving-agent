@@ -50,6 +50,16 @@ import numpy as np
 import pytest
 
 from core.arrays import array_state, xp_for
+from core.boundary import (
+    PSF,
+    ComplexField,
+    ContractCode,
+    ContractError,
+    Frame,
+    RayBundle,
+    ReferencePlane,
+)
+from core.bridge import bridge_complex_field, bridge_ray_bundle
 from core.capabilities import (
     C_RAY_TO_WAVE_CAPABILITIES,
     CHROMATIX_CAPABILITIES,
@@ -65,16 +75,6 @@ from core.precision import (
     DType,
     Precision,
     plan_bridge,
-)
-from couplers.bridge import bridge_complex_field, bridge_ray_bundle
-from couplers.contracts import (
-    PSF,
-    ComplexField,
-    ContractCode,
-    ContractError,
-    Frame,
-    RayBundle,
-    ReferencePlane,
 )
 from couplers.ray_to_wave import (
     collimated_bundle,

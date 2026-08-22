@@ -27,7 +27,7 @@ from typing import Any
 
 import numpy as np
 
-from couplers.contracts import ContractCode, ContractError
+from core.boundary import ContractCode, ContractError
 
 __all__ = [
     "CurvatureBudget",

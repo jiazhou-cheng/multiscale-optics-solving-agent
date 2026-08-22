@@ -59,6 +59,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from core.paths import repository_root
+
 __all__ = [
     "SUITE_V1",
     "AgentTask",
@@ -79,13 +81,10 @@ __all__ = [
     "task_by_id",
 ]
 
-# src/benchmarks/agent_suite.py -> src/benchmarks -> src -> repo root.
-# It was 3 before CHE-89 flattened src/ by one level. A parent count is a silent
-# dependency on this file's directory depth: nothing about it fails at import,
-# and a wrong value just points REPO_ROOT somewhere plausible. The tests that
-# resolve prompt_path are what catch it, which is why they resolve it on disk
-# rather than trusting the constant.
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# Located by marker, not by counting parents. The count was 3 before CHE-89
+# flattened src/, and would have needed changing again for CHE-90's move -- and a
+# wrong count does not fail at import, it points REPO_ROOT somewhere plausible.
+REPO_ROOT = repository_root()
 SUITE_DIR = REPO_ROOT / "benchmarks_agent"
 
 

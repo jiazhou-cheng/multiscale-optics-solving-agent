@@ -27,8 +27,11 @@ import subprocess
 import sys
 import textwrap
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
 
 pytestmark = [pytest.mark.gpu, pytest.mark.integration]
 
@@ -361,12 +364,21 @@ def test_a_clean_interpreter_reaches_the_gpu_with_no_platform_repair() -> None:
         device enumeration alone does not establish (see Trap 1 in
         docs/testing/gpu_environment.md).
     """
+    # Discovered from the tree rather than typed out. The list was hard-coded
+    # when CHE-89 flattened src/, and CHE-90's renames then left it naming two
+    # packages that no longer exist -- inside a string literal, where no import
+    # rewrite and no linter could see it. The property under test is "importing
+    # *this repository* does not pin jax's platform", and with a flat layout
+    # that means all of it, whatever it currently is.
+    packages = ", ".join(
+        sorted(
+            [p.name for p in (ROOT / "src").iterdir() if (p / "__init__.py").is_file()]
+            + [p.stem for p in (ROOT / "src").glob("*.py")]
+        )
+    )
     platform_name, backend, result_platform = _run_in_subprocess(
-        """
-        # Every top-level package this project ships. The check is that
-        # *importing this repository* does not pin jax's platform, and with the
-        # flat layout there is no single package to import as a proxy for that.
-        import adapters, cli, core, couplers, evaluation, registry  # noqa: F401,E401
+        f"""
+        import {packages}  # noqa: F401,E401
         import jax
         import jax.numpy as jnp
 

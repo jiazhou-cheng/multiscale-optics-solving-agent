@@ -123,12 +123,6 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from adapters.base import (
-    CostEstimate,
-    ModelRunRequest,
-    ModelRunResult,
-    RunStatus,
-)
 from core.arrays import array_state
 from core.artifacts import ArtifactRecord
 from core.capabilities import CHROMATIX_CAPABILITIES
@@ -152,6 +146,12 @@ from core.precision import (
 )
 from core.specs import ArtifactKind, Device, Framework, ModelSpec
 from registry.loader import Registry
+from solvers.base import (
+    CostEstimate,
+    ModelRunRequest,
+    ModelRunResult,
+    RunStatus,
+)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -1685,7 +1685,7 @@ class ChromatixAdapter:
             # and evanescent policy. Required by benchmarks/slice_protocol.yaml for
             # any phase-insensitive M3 PSF path; the field's ABSOLUTE phase is not
             # physical afterwards, which the output metadata states.
-            from adapters.chromatix_carrier_removed import (
+            from solvers.chromatix.carrier_removed_asm import (
                 carrier_removed_asm_propagate,
             )
 

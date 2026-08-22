@@ -50,7 +50,11 @@ sys.path.insert(0, str(TUTORIAL_DIR))
 pytest.importorskip("chromatix")
 pytest.importorskip("jax")
 
-from _chromatix_harness import expected_path, load_tutorial_module, tutorial_module_paths  # noqa: E402
+from _chromatix_harness import (  # noqa: E402
+    expected_path,
+    load_tutorial_module,
+    tutorial_module_paths,
+)
 
 pytestmark = [
     pytest.mark.tutorial,
@@ -151,7 +155,6 @@ def test_jax_x64_is_pinned_off() -> None:
     The harness pins it at import; this asserts the pin held.
     """
     import jax
-
     from _chromatix_harness import pin_jax_precision
 
     pin_jax_precision()

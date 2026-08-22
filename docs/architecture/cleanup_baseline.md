@@ -74,9 +74,9 @@ unguarded modules; this is the map that decision is checked against.
 
 | Module | Statements | Note |
 | -- | -- | -- |
-| `evaluation/psf_oracles.py` | 227 | the independent Airy / Richards-Wolf oracles |
+| `verification/psf_oracles.py` | 227 | the independent Airy / Richards-Wolf oracles |
 | `evaluation/m1_bundle.py` | 135 | gen1 machinery **plus** the two fingerprint helpers L2-PSF-01 and L2-COUPLER-01 still import |
-| `evaluation/psf_measurement.py` | 92 | named as the terminal measurement by `registry/couplers.yaml` and `examples/graphs/ray_to_wave.yaml` |
+| `verification/psf_measurement.py` | 92 | named as the terminal measurement by `registry/couplers.yaml` and `examples/graphs/ray_to_wave.yaml` |
 | `cli.py` | 39 | the packaged console script |
 | `evaluation/checks.py` | 21 | no importer anywhere; Phase 1 deletes it |
 | `core/provenance.py` | 20 | consumed only by `scripts/export_schemas.py`, which the suite does not run |
@@ -91,12 +91,12 @@ Phases 2-3, which is most of the deficit:
 | Module | Statements | Coverage | Disposition |
 | -- | -- | -- | -- |
 | `adapters/fmmax_adapter.py` | 172 | 16% | Phase 2 deletes |
-| `benchmarks/metalens_candidate.py` | 254 | 16% | keep; `studies/metalens/` in Phase 5 |
+| `studies/metalens/candidate.py` | 254 | 16% | keep; `studies/metalens/` in Phase 5 |
 | `adapters/fdtdx_adapter.py` | 168 | 22% | Phase 2 deletes |
 | `adapters/optiland_benchmark_adapter.py` | 176 | 36% | Phase 3 archives |
 | `adapters/chromatix_benchmark_adapter.py` | 39 | 41% | Phase 3 archives |
 | `adapters/chromatix_scaling_adapter.py` | 100 | 42% | Phase 3 archives |
-| `benchmarks/metalens_controller.py` | 663 | 48% | keep; `studies/metalens/` in Phase 5 |
+| `studies/metalens/controller.py` | 663 | 48% | keep; `studies/metalens/` in Phase 5 |
 
 **Totals:** 7,337 statements, **68.8%** covered. The full per-module table is
 reproducible with the command above — note that the `--cov` target was renamed

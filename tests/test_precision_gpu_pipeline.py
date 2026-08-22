@@ -39,9 +39,8 @@ import pytest
 pytest.importorskip("optiland")
 pytest.importorskip("chromatix")
 
-from adapters.base import ModelRunRequest, RunStatus
-from adapters.chromatix_adapter import get_adapter as get_wave_adapter
-from adapters.optiland_adapter import get_adapter as get_ray_adapter
+from core.boundary import PSF, ComplexField
+from core.bridge import bridge_ray_bundle
 from core.capabilities import (
     C_RAY_TO_WAVE_CAPABILITIES,
     CHROMATIX_CAPABILITIES,
@@ -57,14 +56,15 @@ from core.precision import (
     plan_bridge,
 )
 from couplers.base import CouplerRunRequest
-from couplers.bridge import bridge_ray_bundle
-from couplers.contracts import PSF, ComplexField
-from couplers.optiland_handoff import (
+from couplers.handoff import (
     DeclaredHandoffPlane,
     declare_coherent_bundle,
 )
+from couplers.node import RayToWaveCoupler
 from couplers.ray_to_wave import ray_to_wave
-from couplers.ray_to_wave_node import RayToWaveCoupler
+from solvers.base import ModelRunRequest, RunStatus
+from solvers.chromatix.adapter import get_adapter as get_wave_adapter
+from solvers.optiland.adapter import get_adapter as get_ray_adapter
 
 pytestmark = [
     pytest.mark.gpu,

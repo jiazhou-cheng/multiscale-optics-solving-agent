@@ -25,7 +25,7 @@ test-agent-benchmark:
 PARTICIPANT ?= reference
 TRIALS ?= 3
 agent-benchmark:
-	python -m benchmarks.agent_suite \
+	python -m agent.benchmark_suite \
 	    --suite v1 --trials $(TRIALS) --participant $(PARTICIPANT) \
 	    --context-policy per-task --output outputs/che71_agent_v1
 

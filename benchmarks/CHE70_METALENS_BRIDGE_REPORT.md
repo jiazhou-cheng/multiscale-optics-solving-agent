@@ -13,7 +13,7 @@ CSV tables, seven figures, three `.npy` fields) live under
 ## 1. Reproduction
 
 ```bash
-MOA_GPUS=device=0 ./run.sh --gpu python -m benchmarks.metalens_controller \
+MOA_GPUS=device=0 ./run.sh --gpu python -m studies.metalens.controller \
     --grid-size 100 --device cuda --precision fp32 --sampling-density magnitude \
     --seed 1 --auto-converge --memory-guard --config METALENS-AIR-100 \
     --validate METALENS-SLAB-100 --output outputs/che70_metalens
@@ -23,7 +23,7 @@ MOA_GPUS=device=0 ./run.sh --gpu python -m benchmarks.metalens_controller \
 re-derivable from the persisted candidates without re-running anything:
 
 ```bash
-./run.sh python -m benchmarks.metalens_controller \
+./run.sh python -m studies.metalens.controller \
     --output outputs/che70_metalens --config METALENS-AIR-100 \
     --validate METALENS-SLAB-100 --device cuda --reanalyze
 ```
@@ -118,7 +118,7 @@ Monte Carlo variability at the pair, three independent seeds (Phase 28): NCC mea
 
 The metalens is an ideal phase-only element: unit amplitude inside the aperture,
 zero outside, carrying `-k(√(r² + f²) − f)`. Both routes start from the **same**
-`ComplexField` — `evaluation.metalens.metalens_field` is the only producer, so the
+`ComplexField` — `studies.metalens.oracle.metalens_field` is the only producer, so the
 reference and the ray route cannot be tuned independently.
 
 `METALENS-SLAB-100` exists because a pure air gap does not exercise the OPL
@@ -138,7 +138,7 @@ it, and neither sees a system built to flatter it.
 
 ## 5. The oracle, and why it can carry a gate
 
-`evaluation.metalens.reference_field` evaluates the **exact** plane-wave transfer
+`studies.metalens.oracle.reference_field` evaluates the **exact** plane-wave transfer
 function of the layer stack in float64:
 
 ```
@@ -156,7 +156,7 @@ It is cross-checked against two things written for other reasons:
 
 | route | agreement (air configuration) |
 |---|---|
-| `evaluation.asm_oracle.angular_spectrum_float64` (CHE-40), *un-centred* FFT convention | 6.1 × 10⁻¹⁴ piston-aligned relative field error |
+| `verification.asm_oracle.angular_spectrum_float64` (CHE-40), *un-centred* FFT convention | 6.1 × 10⁻¹⁴ piston-aligned relative field error |
 | Chromatix `asm_propagate`, third-party, M1-verified, complex64 | < 5 × 10⁻⁴ (its own dtype floor); PSF 1 − NCC < 10⁻⁶ |
 
 Both live in `tests/test_metalens_oracle.py`. The Chromatix leg is corroboration,

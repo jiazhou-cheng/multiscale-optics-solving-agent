@@ -2,7 +2,7 @@
 
 Run as a module, never imported by the controller's own process:
 
-    python -m benchmarks.metalens_candidate \
+    python -m studies.metalens.candidate \
         --config METALENS-AIR-100 --launch-count 16 --samples-per-launch 1024 \
         --seed 1 --chunk-size 65536 --device cuda --precision fp32 \
         --result <path>.json
@@ -211,14 +211,8 @@ def run_candidate(request: CandidateRequest) -> dict[str, Any]:
     fallback all come back as a record with the corresponding status, because the
     sweep needs to *read* them to decide what to do next.
     """
-    from adapters.optiland_builder import build_optiland_system
-    from adapters.optiland_ray_trace import (
-        configure_optiland_execution,
-        plan_trace_bridges,
-        trace_ray_batch,
-    )
-    from couplers.coherent_batch import CoherentRayBatch
-    from couplers.contracts import PSF, ReferencePlane
+    from core.boundary import PSF, ReferencePlane
+    from core.coherent_batch import CoherentRayBatch
     from couplers.ray_to_wave import Projection
     from couplers.streaming import (
         PositionalAngularSampler,
@@ -229,7 +223,13 @@ def run_candidate(request: CandidateRequest) -> dict[str, Any]:
         nested_aperture_launch_positions,
     )
     from couplers.wave_to_ray import SamplingDensity, decompose
-    from evaluation.metalens import (
+    from solvers.optiland.builder import build_optiland_system
+    from solvers.optiland.coherent_trace import (
+        configure_optiland_execution,
+        plan_trace_bridges,
+        trace_ray_batch,
+    )
+    from studies.metalens.oracle import (
         CONFIGURATIONS,
         compare_psfs,
         metalens_field,

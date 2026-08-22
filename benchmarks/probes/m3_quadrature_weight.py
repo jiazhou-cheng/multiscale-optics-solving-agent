@@ -78,7 +78,7 @@ def _load_sensor_probe():
 
 
 def _weighted_bundle(sensor: Any, rays: Any, *, apply_quadrature_weight: bool):
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,

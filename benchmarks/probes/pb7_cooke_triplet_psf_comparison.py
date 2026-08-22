@@ -152,7 +152,8 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any
 
@@ -654,7 +655,7 @@ def advance_bundle_to_z(bundle, z_m: float):
     ``_advance_bundle_to_z``; reproduced rather than imported because that probe
     is a 126 kB study module whose import runs its own declarations.
     """
-    from couplers.contracts import Frame, RayBundle, ReferencePlane
+    from core.boundary import Frame, RayBundle, ReferencePlane
 
     positions = np.asarray(bundle.positions_m, dtype=np.float64)
     directions = np.asarray(bundle.directions, dtype=np.float64)
@@ -695,7 +696,7 @@ def translate_bundle_transverse(bundle, dx_m: float, dy_m: float):
     interpolated, resampled or approximated, and no optical path is altered:
     only the transverse components of ``positions_m`` change.
     """
-    from couplers.contracts import Frame, RayBundle
+    from core.boundary import Frame, RayBundle
 
     positions = np.asarray(bundle.positions_m, dtype=np.float64).copy()
     positions[:, 0] -= float(dx_m)
@@ -730,15 +731,15 @@ def method_c_ray_to_wave(
     output is reported, so "the wave leg was exercised and is the identity here"
     is a measurement rather than an assertion.
     """
-    from adapters.base import ModelRunRequest
-    from adapters.chromatix_adapter import get_adapter as chromatix
-    from adapters.optiland_adapter import get_adapter as optiland
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
     from couplers.ray_to_wave import ray_to_wave
-    from evaluation.psf_measurement import (
+    from solvers.base import ModelRunRequest
+    from solvers.chromatix.adapter import get_adapter as chromatix
+    from solvers.optiland.adapter import get_adapter as optiland
+    from verification.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf,
         measure_psf_from_record,
@@ -1611,7 +1612,7 @@ def characterize() -> dict[str, Any]:
     from optiland.samples.objectives import CookeTriplet
     from optiland.utils import get_working_FNO
 
-    from adapters.optiland_builder import build_optiland_system
+    from solvers.optiland.builder import build_optiland_system
 
     spec = cooke_triplet_spec()
     built = build_optiland_system(spec)

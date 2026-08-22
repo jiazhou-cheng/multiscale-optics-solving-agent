@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from couplers.contracts import ComplexField, ReferencePlane
+from core.boundary import ComplexField, ReferencePlane
 from couplers.gradient import (
     GradientProblem,
     characterize,
@@ -195,9 +195,9 @@ def test_nothing_here_promotes_a_gradient_claim() -> None:
     unbiased measurement in one narrow regime is not the evidence
     coupler_protocol.yaml requires for promotion, and the registry must still
     say so."""
-    import yaml
-
     from pathlib import Path
+
+    import yaml
 
     root = Path(__file__).resolve().parents[1]
     couplers = yaml.safe_load(

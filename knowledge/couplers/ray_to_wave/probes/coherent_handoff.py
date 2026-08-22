@@ -6,7 +6,7 @@ Run inside the container:
         --write knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
 
 The declaration made by
-``couplers.optiland_handoff.declare_coherent_bundle`` is
+``couplers.handoff.declare_coherent_bundle`` is
 only worth the name if it can be checked against something that does not come
 from this repository. It can:
 
@@ -47,12 +47,12 @@ from typing import Any
 import numpy as np
 import yaml
 
-from adapters.base import ModelRunRequest
-from adapters.optiland_adapter import (
+from solvers.base import ModelRunRequest
+from solvers.optiland.adapter import (
     _scientific_array_hash,
     get_adapter,
 )
-from couplers.optiland_handoff import (
+from couplers.handoff import (
     DeclaredHandoffPlane,
     HandoffPerturbation,
     declare_coherent_bundle,
@@ -95,10 +95,22 @@ def _optiland_wavefront_pv_waves(sample: str) -> dict[str, Any]:
     import optiland.backend as be
     from optiland.wavefront import Wavefront
 
-    from adapters.optiland_adapter import _resolve_lens
+    from registry.prescriptions import resolve_prescription
+    from solvers.optiland.adapter import _resolve_lens
 
     be.set_backend("numpy")
-    lens = _resolve_lens(sample, __import__("optiland.samples.objectives", fromlist=["x"]), be)
+    # `_resolve_lens` took (name, optiland.samples module, backend) until CHE-56
+    # routed every system through the canonical prescription registry and the
+    # generic builder; this call was never updated and had been raising a
+    # TypeError ever since -- silently, because nothing runs the probes. Repaired
+    # by CHE-90 while executing them.
+    #
+    # Building the lens through our own builder does not weaken the independence
+    # claim below. What is independent here is Optiland's *wavefront* machinery
+    # -- `wavefront/strategy.py`, its chief-ray reference and its opposite sign
+    # convention -- not the prescription, which is the shared input both sides
+    # must agree about for the comparison to mean anything.
+    lens = _resolve_lens(resolve_prescription(sample))
     wavefront = Wavefront(
         lens,
         fields=[(0.0, 0.0)],

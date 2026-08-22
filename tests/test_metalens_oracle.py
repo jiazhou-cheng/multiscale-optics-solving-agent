@@ -1,12 +1,12 @@
 """The CHE-70 oracle, held to two independent references (CHE-70, Phase 22/23).
 
 The gate's oracle is analytic: a plane-parallel homogeneous stack is diagonal in
-the plane-wave basis, so ``evaluation.metalens.reference_field`` evaluates a
+the plane-wave basis, so ``studies.metalens.oracle.reference_field`` evaluates a
 closed form over the grid's own modes rather than discretizing a propagation.
 That claim is worth exactly as much as its cross-checks, so the single-layer case
 is held against two things written for other reasons:
 
-* ``evaluation.asm_oracle.angular_spectrum_float64`` (CHE-40), the repository's
+* ``verification.asm_oracle.angular_spectrum_float64`` (CHE-40), the repository's
   independent float64 angular-spectrum reference -- in the *un-centred* FFT
   convention, so agreement is not a shared-convention artifact;
 * Chromatix's ``asm_propagate``, a third-party M1-verified package with a
@@ -28,11 +28,7 @@ import math
 import numpy as np
 import pytest
 
-from evaluation.asm_oracle import (
-    angular_spectrum_float64,
-    compare_fields,
-)
-from evaluation.metalens import (
+from studies.metalens.oracle import (
     AIR_CONFIG,
     CONFIGURATIONS,
     SLAB_CONFIG,
@@ -45,6 +41,10 @@ from evaluation.metalens import (
     optical_system_spec,
     reference_field,
     retained_mode_mask,
+)
+from verification.asm_oracle import (
+    angular_spectrum_float64,
+    compare_fields,
 )
 
 pytestmark = [pytest.mark.coupler]
@@ -211,7 +211,7 @@ class TestOracleCrossChecks:
     def test_zero_distance_is_the_identity_on_the_retained_band(self):
         import dataclasses
 
-        from evaluation.metalens import Layer
+        from studies.metalens.oracle import Layer
 
         config = dataclasses.replace(
             AIR_CONFIG, layers=(Layer(thickness_m=1e-18, refractive_index=1.0, name="air"),),
@@ -295,16 +295,16 @@ class TestSlabAssumption:
         import numpy as np
         from optiland.rays import RealRays
 
-        from adapters.optiland_builder import (
-            build_optiland_system,
-        )
-        from adapters.optiland_ray_trace import (
-            configure_optiland_execution,
-        )
         from core.precision import (
             DeviceKind,
             DevicePlacement,
             Precision,
+        )
+        from solvers.optiland.builder import (
+            build_optiland_system,
+        )
+        from solvers.optiland.coherent_trace import (
+            configure_optiland_execution,
         )
 
         configure_optiland_execution(
@@ -336,16 +336,16 @@ class TestSlabAssumption:
         pytest.importorskip("optiland")
         from optiland.rays import RealRays
 
-        from adapters.optiland_builder import (
-            build_optiland_system,
-        )
-        from adapters.optiland_ray_trace import (
-            configure_optiland_execution,
-        )
         from core.precision import (
             DeviceKind,
             DevicePlacement,
             Precision,
+        )
+        from solvers.optiland.builder import (
+            build_optiland_system,
+        )
+        from solvers.optiland.coherent_trace import (
+            configure_optiland_execution,
         )
 
         configure_optiland_execution(

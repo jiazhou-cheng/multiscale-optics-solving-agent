@@ -113,7 +113,7 @@ known_limitations:
     surfaced_in:
       - src/couplers/ray_to_wave.py (module docstring; and
         provenance["validity"] on every emitted ComplexField)
-      - src/couplers/ray_to_wave_node.py (module docstring)
+      - src/couplers/node.py (module docstring)
       - knowledge/couplers/ray_to_wave/conventions.md
       - this card
     test: tests/test_ray_to_wave.py::test_emitted_field_declares_the_curvature_limitation
@@ -483,7 +483,7 @@ validated_probe_ids:
 # CHE-33 (M3.4). The coupler needs a complex amplitude and an OPL with a declared
 # reference; a real Optiland trace supplies neither. This is what has to be
 # declared before the coupler will accept one, and how each declaration was
-# checked. Implementation: src/couplers/optiland_handoff.py
+# checked. Implementation: src/couplers/handoff.py
 coherent_handoff_from_a_ray_trace:
   status: verified
   verified_by: CHE-33 (M3.4)
@@ -814,7 +814,7 @@ measured_behaviour:
 runnable_graph_edge:
   status: implemented
   implemented_by: CHE-34 (M3.5)
-  module: src/couplers/ray_to_wave_node.py
+  module: src/couplers/node.py
   tests: tests/test_ray_to_wave_node.py
   is_a_wrapper: >-
     proven, not asserted: the field it writes is bit-identical (np.array_equal,
@@ -858,7 +858,7 @@ runnable_graph_edge:
     forward-only by protocol.
 
 implementation_location: src/couplers/ray_to_wave.py
-runnable_node_location: src/couplers/ray_to_wave_node.py
+runnable_node_location: src/couplers/node.py
 test_location: tests/test_ray_to_wave.py
 validation_status: analytically_validated_scalar_planar_cpu
 validation_note: >

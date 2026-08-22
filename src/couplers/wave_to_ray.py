@@ -41,9 +41,7 @@ from core.arrays import (
     numpy_dtype,
     xp_for,
 )
-from core.capabilities import C_WAVE_TO_RAY_CAPABILITIES
-from core.precision import ArrayNamespace, DType, Precision
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractCode,
     ContractError,
@@ -51,6 +49,8 @@ from couplers.contracts import (
     RayBundle,
     ReferencePlane,
 )
+from core.capabilities import C_WAVE_TO_RAY_CAPABILITIES
+from core.precision import ArrayNamespace, DType, Precision
 
 __all__ = [
     "AngularSpectrum",

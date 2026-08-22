@@ -6,8 +6,8 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from adapters.base import CostEstimate, RunStatus
 from core.artifacts import ArtifactRecord
+from core.execution import CostEstimate, RunStatus
 from core.graph import ValidationReport
 from core.specs import CouplerSpec
 

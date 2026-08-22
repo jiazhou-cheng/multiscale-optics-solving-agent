@@ -25,8 +25,7 @@ import numpy as np
 import pytest
 
 from core.artifacts import ArtifactRecord
-from core.specs import ArtifactKind, Device, Framework
-from couplers.contracts import (
+from core.boundary import (
     PSF,
     ComplexField,
     ContractCode,
@@ -34,7 +33,8 @@ from couplers.contracts import (
     Frame,
     ReferencePlane,
 )
-from evaluation.psf_measurement import (
+from core.specs import ArtifactKind, Device, Framework
+from verification.psf_measurement import (
     COHERENCE_MODEL,
     M3_ORACLE_NORMALIZATION,
     NORMALIZATION_RATIONALE,
@@ -495,15 +495,15 @@ def test_the_protocol_records_the_normalization_blind_spot() -> None:
 pytest.importorskip("optiland")
 pytest.importorskip("chromatix")
 
-from adapters.base import ModelRunRequest, RunStatus  # noqa: E402
-from adapters.chromatix_adapter import (  # noqa: E402
+from couplers.base import CouplerRunRequest  # noqa: E402
+from couplers.node import RayToWaveCoupler  # noqa: E402
+from solvers.base import ModelRunRequest, RunStatus  # noqa: E402
+from solvers.chromatix.adapter import (  # noqa: E402
     get_adapter as get_wave_adapter,
 )
-from adapters.optiland_adapter import (  # noqa: E402
+from solvers.optiland.adapter import (  # noqa: E402
     get_adapter as get_ray_adapter,
 )
-from couplers.base import CouplerRunRequest  # noqa: E402
-from couplers.ray_to_wave_node import RayToWaveCoupler  # noqa: E402
 
 # The frozen M3-SLICE-CPU-V1 geometry, as M3.6 used it.
 PUPIL_Z_M = 0.06814345991561233e-3

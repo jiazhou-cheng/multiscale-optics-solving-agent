@@ -66,8 +66,8 @@ ARCHIVED_GEN1 = {
     # the restore map and there is nothing left to restore.
     #
     # Why they came back: CHE-67 archived them as milestone evidence, but they
-    # were the *only* guard on `evaluation/psf_oracles.py` (807 lines, the
-    # independent Airy and Fraunhofer oracles) and `evaluation/psf_measurement.py`
+    # were the *only* guard on `verification/psf_oracles.py` (807 lines, the
+    # independent Airy and Fraunhofer oracles) and `verification/psf_measurement.py`
     # (448 lines, named as the terminal measurement by the registry and the
     # shipped example graph). An unguarded verification oracle is worse than
     # either keeping or deleting it: it silently becomes the thing it was meant

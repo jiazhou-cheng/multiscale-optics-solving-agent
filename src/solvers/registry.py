@@ -21,15 +21,17 @@ import importlib
 from functools import lru_cache
 from typing import cast
 
-from adapters.base import ModelAdapter
 from core.errors import AdapterNotFoundError
+from solvers.base import ModelAdapter
 
-#: ``(model_id, module_name)``, one entry per executable adapter. A sequence
-#: rather than a dict literal so a duplicated id is a startup error instead of
-#: a silent last-one-wins.
+#: ``(model_id, module)``, one entry per executable adapter. A sequence rather
+#: than a dict literal so a duplicated id is a startup error instead of a silent
+#: last-one-wins. The module is a full dotted path, not a name relative to this
+#: package: CHE-90 moved the adapters into per-solver subpackages, and a
+#: relative name would have to encode that layout here as well as in the tree.
 _REGISTRATIONS: tuple[tuple[str, str], ...] = (
-    ("M_RAY_OPTILAND", "optiland_adapter"),
-    ("M_WAVE_CHROMATIX", "chromatix_adapter"),
+    ("M_RAY_OPTILAND", "solvers.optiland.adapter"),
+    ("M_WAVE_CHROMATIX", "solvers.chromatix.adapter"),
 )
 
 
@@ -42,7 +44,7 @@ def _registry() -> dict[str, str]:
                 f"Duplicate adapter registration for {model_id!r}: "
                 f"{mapping[model_id]!r} and {module_name!r} both claim it. "
                 "One model id maps to exactly one adapter module; remove or "
-                "rename one of them in adapters/registry.py."
+                "rename one of them in solvers/registry.py."
             )
         mapping[model_id] = module_name
     return mapping
@@ -64,11 +66,11 @@ def get_adapter_for_model(model_id: str) -> ModelAdapter:
             f"No adapter implementation registered for {model_id!r}. "
             f"Registered: {sorted(_registry())}."
         )
-    module = importlib.import_module(f"adapters.{module_name}")
+    module = importlib.import_module(module_name)
     declared = getattr(module, "MODEL_ID", None)
     if declared != model_id:
         raise RuntimeError(
-            f"adapters/registry.py maps {model_id!r} to {module_name!r}, but that "
+            f"solvers/registry.py maps {model_id!r} to {module_name!r}, but that "
             f"module declares MODEL_ID={declared!r}. The map and the module must "
             "agree; fix whichever is wrong."
         )

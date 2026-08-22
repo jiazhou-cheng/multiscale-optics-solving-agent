@@ -2,7 +2,7 @@
 
 Protocol `M3-SLICE-CPU-V1`. Graph `[M_RAY_OPTILAND, C_RAY_TO_WAVE,
 M_WAVE_CHROMATIX]`, terminating at the propagated `ComplexField`. PSF
-extraction (`evaluation.psf_measurement.measure_psf`) is a benchmark-layer
+extraction (`verification.psf_measurement.measure_psf`) is a benchmark-layer
 measurement on that terminal state, not a graph node: `C_FIELD_TO_PSF` was
 retired by CHE-36 (M3.7).
 

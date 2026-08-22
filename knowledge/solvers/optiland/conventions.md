@@ -279,7 +279,7 @@ to notice it by (`probes/system_construction_probe.py`,
 `surface_kwargs_are_silently_filtered`). Validate a prescription before it
 reaches `surfaces.add`; this repository does that in
 `core/optical_system.py` (`extra="forbid"`) and
-`adapters/optiland_builder.py` (explicit per-type keyword sets).
+`solvers/optiland/builder.py` (explicit per-type keyword sets).
 
 ## A bare glass name is a fuzzy query (CHE-56)
 

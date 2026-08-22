@@ -71,7 +71,7 @@ edges:
 # representation; it is a MEASUREMENT of the terminal simulated field.
 #
 # So C_FIELD_TO_PSF was removed from the registry, and PSF extraction lives in
-# src/evaluation/psf_measurement.py, run by the benchmark
+# src/verification/psf_measurement.py, run by the benchmark
 # driver on this node's output_field and recorded in provenance. No sink node was
 # added and M_SENSOR_IDEAL is still out of scope.
 design_variables: []

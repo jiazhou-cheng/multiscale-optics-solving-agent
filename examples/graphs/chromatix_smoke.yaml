@@ -12,6 +12,6 @@ metadata:
     Single-node smoke graph for the M_WAVE_CHROMATIX adapter. Exercises only
     the one implemented path (chromatix.functional.asm_propagate, scalar
     angular-spectrum propagation); see
-    src/adapters/chromatix_adapter.py for the scope
+    src/solvers/chromatix/adapter.py for the scope
     and conventions. No edges, design variables, or objectives are needed to
     validate a single node against the registry contract.

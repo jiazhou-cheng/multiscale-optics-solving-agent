@@ -1436,7 +1436,7 @@ class PSF:
 
         The pitch is taken from the field, so a PSF's axes are only as correct as
         the pitch the producing adapter declared. For a propagated field that must
-        be the OUTPUT pitch; see ``evaluation.psf_measurement``, which checks it.
+        be the OUTPUT pitch; see ``verification.psf_measurement``, which checks it.
         """
         return cls(
             # |u|^2 in the field's own namespace and precision: a complex64 GPU

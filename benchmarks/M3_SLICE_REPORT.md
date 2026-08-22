@@ -168,7 +168,7 @@ intensity error from wraparound.
 
 `ComplexField → |U|^2` changes no representation, so it was removed as a
 registry primitive rather than implemented. PSF extraction now runs through
-`evaluation.psf_measurement.measure_psf` on the graph's terminal `ComplexField`,
+`verification.psf_measurement.measure_psf` on the graph's terminal `ComplexField`,
 recorded in provenance, never as a graph edge. Re-verified on the M3 tree this
 session: no `- id: C_FIELD_TO_PSF` line exists in `registry/couplers.yaml`
 (`tests/test_l2_psf_bundle.py::test_the_registry_still_has_no_c_field_to_psf_entry`,

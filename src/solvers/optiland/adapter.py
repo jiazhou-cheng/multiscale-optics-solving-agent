@@ -11,7 +11,7 @@ while a P0 model/coupler lacks tests")
 ------------------------------------------------------------------------
 - Optical systems are built from canonical prescriptions
   (``core/optical_system.py``, schema ``optical-system-spec/1``) through the one
-  generic builder in ``adapters/optiland_builder.py`` -- CHE-56 (PB5). A request
+  generic builder in ``solvers/optiland/builder.py`` -- CHE-56 (PB5). A request
   either names a registered prescription via ``config["sample"]`` (default
   ``"ReverseTelephoto"``; the registry is ``registry/prescriptions.py``) or
   supplies one inline via ``config["prescription"]``, as an
@@ -165,13 +165,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from adapters.base import (
-    CostEstimate,
-    ModelRunRequest,
-    ModelRunResult,
-    RunStatus,
-)
-from adapters.optiland_builder import build_optiland_system
 from core.arrays import array_state, dtype_of, numpy_dtype
 from core.artifacts import ArtifactRecord
 from core.capabilities import OPTILAND_CAPABILITIES
@@ -199,6 +192,13 @@ from registry.prescriptions import (
     prescription_names,
     resolve_prescription,
 )
+from solvers.base import (
+    CostEstimate,
+    ModelRunRequest,
+    ModelRunResult,
+    RunStatus,
+)
+from solvers.optiland.builder import build_optiland_system
 
 MODEL_ID = "M_RAY_OPTILAND"
 

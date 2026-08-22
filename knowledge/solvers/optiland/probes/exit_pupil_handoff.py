@@ -48,8 +48,8 @@ from typing import Any
 import numpy as np
 import yaml
 
-from adapters.base import ModelRunRequest, RunStatus
-from adapters.optiland_adapter import OptilandAdapter
+from solvers.base import ModelRunRequest, RunStatus
+from solvers.optiland.adapter import OptilandAdapter
 
 ROOT = Path(__file__).resolve().parents[4]
 SLICE_PROTOCOL = ROOT / "benchmarks" / "slice_protocol.yaml"

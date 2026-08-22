@@ -29,8 +29,8 @@ from typing import Any
 
 import numpy as np
 
-from adapters.base import RunStatus
-from adapters.chromatix_adapter import (
+from solvers.base import RunStatus
+from solvers.chromatix.adapter import (
     ChromatixAdapter,
     ChromatixWaveRequest,
     ChromatixWaveResult,

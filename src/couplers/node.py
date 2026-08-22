@@ -77,8 +77,13 @@ from typing import Any
 
 import numpy as np
 
-from adapters.base import CostEstimate, RunStatus
 from core.artifacts import ArtifactRecord
+from core.boundary import (
+    ContractCode,
+    ContractError,
+    RayBundle,
+)
+from core.execution import CostEstimate, RunStatus
 from core.graph import Severity, ValidationIssue, ValidationReport
 from core.specs import ArtifactKind, CouplerSpec
 from couplers.base import (
@@ -86,12 +91,7 @@ from couplers.base import (
     CouplerRunRequest,
     CouplerRunResult,
 )
-from couplers.contracts import (
-    ContractCode,
-    ContractError,
-    RayBundle,
-)
-from couplers.optiland_handoff import (
+from couplers.handoff import (
     DeclaredHandoffPlane,
     declare_coherent_bundle,
 )

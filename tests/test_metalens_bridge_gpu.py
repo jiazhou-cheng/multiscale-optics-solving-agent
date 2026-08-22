@@ -54,7 +54,7 @@ def cuda_available() -> None:
 @pytest.fixture(scope="module")
 def small_run(cuda_available):
     """One real CUDA candidate, shared by the residency assertions."""
-    from benchmarks.metalens_candidate import (
+    from studies.metalens.candidate import (
         CandidateRequest,
         run_candidate,
     )
@@ -165,7 +165,7 @@ class TestPhysicsOnTheDevice:
         set by its arithmetic rather than by its sampling -- which is exactly the
         TF32 hazard ``matmul_precision_kwargs`` exists to prevent.
         """
-        from benchmarks.metalens_candidate import (
+        from studies.metalens.candidate import (
             CandidateRequest,
             run_candidate,
         )
@@ -193,7 +193,7 @@ class TestPhysicsOnTheDevice:
 
     def test_the_slab_configuration_also_meets_the_gate_on_the_device(self, cuda_available):
         """Real refraction at two interfaces, and an index-weighted OPL."""
-        from benchmarks.metalens_candidate import (
+        from studies.metalens.candidate import (
             CandidateRequest,
             run_candidate,
         )
@@ -223,7 +223,7 @@ class TestNoHostRayTransfer:
         self, cuda_available, monkeypatch
     ):
         import core.arrays as arrays_module
-        from benchmarks.metalens_candidate import (
+        from studies.metalens.candidate import (
             CandidateRequest,
             run_candidate,
         )
@@ -267,7 +267,7 @@ class TestNoHostRayTransfer:
         Holding the population would therefore be plainly visible against a chunk
         of 8192.
         """
-        from benchmarks.metalens_candidate import (
+        from studies.metalens.candidate import (
             CandidateRequest,
             run_candidate,
         )
@@ -315,7 +315,7 @@ class TestNoHostRayTransfer:
 
     def test_the_gpu_peak_is_set_by_the_chunk_and_not_by_the_total(self, cuda_available):
         """Phase 32's claim, as a test rather than only as a plot."""
-        from benchmarks.metalens_candidate import (
+        from studies.metalens.candidate import (
             CandidateRequest,
             run_candidate,
         )

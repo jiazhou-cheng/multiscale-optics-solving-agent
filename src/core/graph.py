@@ -2,19 +2,43 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import StrEnum
+from typing import Protocol
 
 import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.specs import (
+    CouplerSpec,
     DerivativeMode,
     EdgeSpec,
     GraphSpec,
     ModelSpec,
     PortSpec,
 )
-from registry.loader import Registry
+
+
+class ComponentIndex(Protocol):
+    """What the validator needs from a registry, and nothing more.
+
+    It used to take `registry.loader.Registry` by name, which made `core/` and
+    `registry/` import each other -- `Registry` is built out of `core.specs`
+    types. That is a real cycle, and it existed because the validator was
+    annotated against the *class that happened to hold the two dicts* rather
+    than against the two dicts.
+
+    Stating the requirement structurally removes the cycle and is also more
+    honest: validation reads two mappings and never loads anything, so a caller
+    with a fixture index is as valid an argument as the packaged registry.
+    `Registry` satisfies this without declaring that it does.
+    """
+
+    @property
+    def models(self) -> Mapping[str, ModelSpec]: ...
+
+    @property
+    def couplers(self) -> Mapping[str, CouplerSpec]: ...
 
 
 class Severity(StrEnum):
@@ -53,7 +77,7 @@ class ValidationReport(BaseModel):
 class GraphValidator:
     """Compile-time validator for graph structure and scientific contracts."""
 
-    def __init__(self, registry: Registry):
+    def __init__(self, registry: ComponentIndex):
         self.registry = registry
 
     def validate(self, spec: GraphSpec) -> ValidationReport:

@@ -5,7 +5,7 @@ Three things are under test, and they are deliberately separated:
 1. **The schema** (``core/optical_system.py``) -- units, versioning,
    validation, and a canonical normalization strong enough to fingerprint.
    No solver is involved.
-2. **The builder** (``adapters/optiland_builder.py``) -- one construction path
+2. **The builder** (``solvers/optiland/builder.py``) -- one construction path
    for every Phase 3 feature, checked against closed-form geometry and the
    grating equation rather than against itself.
 3. **The migration** -- ``M3SingletRef`` and ``ReverseTelephoto`` now come from
@@ -38,8 +38,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from conftest import load_probe_expected
 
-from adapters.base import ModelRunRequest, RunStatus
-from adapters.optiland_adapter import OptilandAdapter
 from core.errors import UnsupportedCapabilityError
 from core.optical_system import (
     OPTICAL_SYSTEM_SPEC_VERSION,
@@ -66,13 +64,15 @@ from registry.prescriptions import (
     prescription_names,
     resolve_prescription,
 )
+from solvers.base import ModelRunRequest, RunStatus
+from solvers.optiland.adapter import OptilandAdapter
 
 optiland_backend = pytest.importorskip("optiland.backend")
 build_optiland_system = pytest.importorskip(
-    "adapters.optiland_builder"
+    "solvers.optiland.builder"
 ).build_optiland_system
 resolve_catalog_material = pytest.importorskip(
-    "adapters.optiland_builder"
+    "solvers.optiland.builder"
 ).resolve_catalog_material
 OptilandMaterial = pytest.importorskip("optiland.materials").Material
 
@@ -895,7 +895,7 @@ def test_adapter_regression_fingerprints_are_unmoved_by_the_migration(tmp_path) 
 
 
 def test_registry_names_are_the_adapter_supported_set() -> None:
-    from adapters import optiland_adapter
+    from solvers.optiland import adapter as optiland_adapter
 
     assert prescription_names() == PRESCRIPTION_NAMES
     assert optiland_adapter._SUPPORTED_SAMPLES == PRESCRIPTION_NAMES

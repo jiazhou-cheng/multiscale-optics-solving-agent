@@ -1,7 +1,7 @@
 """Tests for the M_RAY_OPTILAND adapter (Optiland 0.6.0).
 
 Scope reminder (see module docstring of
-``adapters.optiland_adapter``): this adapter only
+``solvers.optiland.adapter``): this adapter only
 supports the bundled ``ReverseTelephoto`` sample lens, the ``numpy``
 (default) and ``torch`` (opt-in) backends, and exactly one design-parameter
 path for gradients. Every numeric expectation below is read from
@@ -27,12 +27,6 @@ optiland = pytest.importorskip("optiland")
 
 from conftest import load_probe_expected  # noqa: E402
 
-from adapters import optiland_adapter  # noqa: E402
-from adapters.base import ModelRunRequest, RunStatus  # noqa: E402
-from adapters.optiland_adapter import (  # noqa: E402
-    OptilandAdapter,
-    OptilandRayRequest,
-)
 from core.errors import (  # noqa: E402
     AdapterDependencyError,
     UnsupportedCapabilityError,
@@ -43,6 +37,12 @@ from core.precision import (  # noqa: E402
     Precision,
 )
 from core.specs import ArtifactKind  # noqa: E402
+from solvers.base import ModelRunRequest, RunStatus  # noqa: E402
+from solvers.optiland import adapter as optiland_adapter  # noqa: E402
+from solvers.optiland.adapter import (  # noqa: E402
+    OptilandAdapter,
+    OptilandRayRequest,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.optiland]
 
@@ -284,7 +284,7 @@ def test_require_gradients_without_explicit_torch_backend_raises() -> None:
         require_gradients=True,
     )
 
-    with patch("adapters.optiland_adapter._import_optiland") as mock_import:
+    with patch("solvers.optiland.adapter._import_optiland") as mock_import:
         mock_import.side_effect = AssertionError(
             "solver import must not be attempted when gradients are requested "
             "without an explicit torch backend"
@@ -361,7 +361,7 @@ def test_cuda_rejected_eagerly_on_the_numpy_backend() -> None:
         design_parameters={},
         require_gradients=False,
     )
-    with patch("adapters.optiland_adapter._import_optiland") as mock_import:
+    with patch("solvers.optiland.adapter._import_optiland") as mock_import:
         mock_import.side_effect = AssertionError(
             "solver import must not be attempted for an unsupported device"
         )
@@ -419,7 +419,7 @@ def test_float16_is_rejected_because_optiland_has_no_float16_path() -> None:
         design_parameters={},
         require_gradients=False,
     )
-    with patch("adapters.optiland_adapter._import_optiland") as mock_import:
+    with patch("solvers.optiland.adapter._import_optiland") as mock_import:
         mock_import.side_effect = AssertionError(
             "solver import must not be attempted for an unsupported precision"
         )
@@ -551,7 +551,7 @@ def test_standalone_invalid_or_unsupported_request_is_structured(
 def test_standalone_missing_dependency_is_structured(tmp_path) -> None:
     adapter = OptilandAdapter()
     with patch(
-        "adapters.optiland_adapter._import_optiland",
+        "solvers.optiland.adapter._import_optiland",
         side_effect=AdapterDependencyError("missing pinned package"),
     ):
         result = adapter.run_standalone({"output_directory": tmp_path / "failed"})
@@ -629,11 +629,11 @@ def _patched_optiland(values, *, paraxial=None):
     modules, lens = _fake_optiland_import(values, paraxial=paraxial)
     with (
         patch(
-            "adapters.optiland_adapter._import_optiland",
+            "solvers.optiland.adapter._import_optiland",
             return_value=modules,
         ),
         patch(
-            "adapters.optiland_adapter._resolve_lens",
+            "solvers.optiland.adapter._resolve_lens",
             return_value=lens,
         ),
     ):
@@ -988,7 +988,7 @@ def test_unsupported_handoff_plane_is_rejected_eagerly(plane) -> None:
     adapter = OptilandAdapter()
     request = _smoke_request(handoff_plane=plane)
 
-    with patch("adapters.optiland_adapter._import_optiland") as mock_import:
+    with patch("solvers.optiland.adapter._import_optiland") as mock_import:
         mock_import.side_effect = AssertionError("optiland must not be imported for a bad plane")
         with pytest.raises(UnsupportedCapabilityError, match="handoff_plane"):
             adapter.run(request)

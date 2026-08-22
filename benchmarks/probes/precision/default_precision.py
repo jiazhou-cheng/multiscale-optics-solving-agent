@@ -17,8 +17,8 @@ import json
 import optiland.backend as be
 import torch
 
-from adapters.optiland_builder import build_optiland_system
 from registry.prescriptions import resolve_prescription
+from solvers.optiland.builder import build_optiland_system
 
 WAVELENGTH_UM = 0.55
 NUM_RAYS = 64

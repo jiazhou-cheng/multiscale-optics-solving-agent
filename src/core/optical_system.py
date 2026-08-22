@@ -4,7 +4,7 @@ This module is the authoritative representation of an optical system in this
 repository. It is deliberately **solver-agnostic**: it imports no ray tracer,
 declares its own units, and knows nothing about how Optiland spells a surface.
 The Optiland-specific translation lives in
-:mod:`adapters.optiland_builder`, which is the only
+:mod:`solvers.optiland.builder`, which is the only
 place allowed to import Optiland (repository rule: keep external solver
 imports inside adapter modules).
 

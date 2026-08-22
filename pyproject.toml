@@ -42,7 +42,7 @@ wave = [
   "optimistix>=0.0.11",
   "jaxtyping>=0.3.7",
   "chromatix @ git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
-  # Declared by CHE-37 (M3.8). evaluation/psf_oracles.py needs scipy.special.j1
+  # Declared by CHE-37 (M3.8). verification/psf_oracles.py needs scipy.special.j1
   # for the analytic Airy pattern. It was already present transitively -- jax,
   # chromatix and optiland each require it, and docker/requirements.txt pins
   # 1.15.3 -- but a verification oracle should not rest on a dependency this
@@ -70,7 +70,7 @@ where = ["src"]
 # `multiscale_optics_agent/` level, so `where = ["src"]` now discovers whatever
 # directory happens to sit there; an enumeration means a stray scratch directory
 # cannot silently become a shipped package.
-include = ["adapters*", "benchmarks*", "core*", "couplers*", "evaluation*", "registry*"]
+include = ["agent*", "core*", "couplers*", "registry*", "solvers*", "studies*", "verification*"]
 
 [tool.setuptools.package-data]
 "registry" = ["*.yaml"]
@@ -150,5 +150,5 @@ explicit_package_bases = true
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
 # package to name any more.
-source = ["adapters", "benchmarks", "core", "couplers", "evaluation", "registry", "cli"]
+source = ["agent", "cli", "core", "couplers", "registry", "solvers", "studies", "verification"]
 branch = true

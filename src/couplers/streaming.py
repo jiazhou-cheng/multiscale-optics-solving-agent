@@ -79,8 +79,7 @@ from core.arrays import (
     numpy_dtype,
     xp_for,
 )
-from core.precision import Precision
-from couplers.contracts import (
+from core.boundary import (
     ComplexField,
     ContractCode,
     ContractError,
@@ -88,6 +87,7 @@ from couplers.contracts import (
     RayBundle,
     ReferencePlane,
 )
+from core.precision import Precision
 from couplers.ray_to_wave import Projection, ray_to_wave
 from couplers.wave_to_ray import (
     AngularSpectrum,

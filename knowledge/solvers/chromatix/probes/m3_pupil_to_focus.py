@@ -10,7 +10,7 @@ string or not at all:
 
 1. **What does Chromatix's ``complex64`` cast actually cost on the real pupil
    field?** Measured twice: the input truncation on its own, and end to end
-   against the float64 reference (``evaluation/asm_oracle.py``), on both the
+   against the float64 reference (``verification/asm_oracle.py``), on both the
    absolute-carrier path and the carrier-conditioned path the protocol requires.
 
 2. **Which phasor convention does Chromatix's ASM implement?** Settled by
@@ -44,11 +44,11 @@ from typing import Any
 import numpy as np
 import yaml
 
-from adapters.base import ModelRunRequest
-from adapters.optiland_adapter import get_adapter as get_ray_adapter
+from solvers.base import ModelRunRequest
+from solvers.optiland.adapter import get_adapter as get_ray_adapter
 from couplers.base import CouplerRunRequest
-from couplers.ray_to_wave_node import RayToWaveCoupler
-from evaluation.asm_oracle import (
+from couplers.node import RayToWaveCoupler
+from verification.asm_oracle import (
     ASM_ORACLE_ID,
     CarrierConvention,
     angular_spectrum_float64,
@@ -127,7 +127,7 @@ def _chromatix_propagate(
     import jax
     import jax.numpy as jnp
 
-    from adapters.chromatix_carrier_removed import (
+    from solvers.chromatix.carrier_removed_asm import (
         carrier_removed_asm_propagate,
         pin_wave_engine_precision,
     )
@@ -279,7 +279,7 @@ def measure_padding_cost_in_float64(pupil: dict[str, Any], pad_width: int) -> di
 
 
 def measure_padding_and_energy(pupil: dict[str, Any]) -> dict[str, Any]:
-    from adapters.chromatix_carrier_removed import (
+    from solvers.chromatix.carrier_removed_asm import (
         pin_wave_engine_precision,
     )
 

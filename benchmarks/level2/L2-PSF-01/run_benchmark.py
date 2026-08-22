@@ -3,7 +3,7 @@
 
 The graph is ``[M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]``, terminating
 at the propagated ``ComplexField``. PSF extraction is a benchmark-layer
-measurement (``evaluation.psf_measurement.measure_psf``), not a fourth graph
+measurement (``verification.psf_measurement.measure_psf``), not a fourth graph
 node: ``C_FIELD_TO_PSF`` was retired by CHE-36 (M3.7) on the grounds that
 ``|U|^2`` is a trivial observable, not a cross-representation handoff.
 
@@ -128,7 +128,7 @@ def _opl_sign_negative_control(sensor: Any, workdir: Path) -> dict[str, Any]:
     pupil) is reported alongside for characterization only, per the rule that
     a custom oracle we wrote must never be the thing that decides pass/fail.
     """
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,
@@ -216,7 +216,7 @@ def _full_graph_demonstration(sensor: Any, workdir: Path) -> dict[str, Any]:
     adapter, and reports whether the result agrees with the zero-propagation
     configuration to within CHE-38's own padding-sweep evidence.
     """
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )

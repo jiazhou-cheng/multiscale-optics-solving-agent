@@ -20,19 +20,19 @@ import dataclasses
 import numpy as np
 import pytest
 
-from couplers.coherent_batch import (
+from core.boundary import (
+    ContractError,
+    Frame,
+    RayBundle,
+    ReferencePlane,
+)
+from core.coherent_batch import (
     AMPLITUDE_SIDECAR_RULE,
     MICROMETRES_PER_METRE,
     MILLIMETRES_PER_METRE,
     OPTILAND_INTENSITY_RULE,
     CoherentRayBatch,
     declared_launch_opl_reference,
-)
-from couplers.contracts import (
-    ContractError,
-    Frame,
-    RayBundle,
-    ReferencePlane,
 )
 
 pytestmark = [pytest.mark.coupler]

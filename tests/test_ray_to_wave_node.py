@@ -27,22 +27,22 @@ import numpy as np
 import pytest
 
 from core.artifacts import ArtifactRecord
+from core.boundary import ContractCode
 from core.graph import GraphValidator
 from core.specs import ArtifactKind
 from couplers.base import CouplerRunRequest
-from couplers.contracts import ContractCode
-from couplers.optiland_handoff import (
+from couplers.handoff import (
     DeclaredHandoffPlane,
     declare_coherent_bundle,
 )
+from couplers.node import COUPLER_ID, RayToWaveCoupler
 from couplers.ray_to_wave import Projection, ray_to_wave
-from couplers.ray_to_wave_node import COUPLER_ID, RayToWaveCoupler
 from registry.loader import Registry
 
 pytest.importorskip("optiland")
 
-from adapters.base import ModelRunRequest, RunStatus
-from adapters.optiland_adapter import get_adapter
+from solvers.base import ModelRunRequest, RunStatus
+from solvers.optiland.adapter import get_adapter
 
 pytestmark = [pytest.mark.coupler, pytest.mark.optiland]
 
@@ -421,7 +421,7 @@ def test_the_registry_port_matches_what_the_implementation_consumes(coupler):
 
 def test_the_runnable_node_imports_no_solver_engine():
     tree = ast.parse(
-        (ROOT / "src/couplers/ray_to_wave_node.py").read_text()
+        (ROOT / "src/couplers/node.py").read_text()
     )
     imported: set[str] = set()
     for node in ast.walk(tree):
@@ -436,12 +436,12 @@ def test_the_runnable_node_loads_no_engine_at_runtime():
     """Dynamic half: constructing and validating through the node pulls in neither.
 
     The static scan alone is not enough -- an engine can arrive through a
-    transitive import, which is exactly what `adapters.base` would have done had
+    transitive import, which is exactly what `solvers.base` would have done had
     it not been protocol-only.
     """
     script = (
         "import sys\n"
-        "from couplers.ray_to_wave_node import RayToWaveCoupler\n"
+        "from couplers.node import RayToWaveCoupler\n"
         "from couplers.base import CouplerRunRequest\n"
         "from core.artifacts import ArtifactRecord\n"
         "from core.specs import ArtifactKind\n"

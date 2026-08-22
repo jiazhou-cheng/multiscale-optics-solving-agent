@@ -23,9 +23,9 @@ import itertools
 import numpy as np
 import pytest
 
+from core.boundary import ContractError, ReferencePlane
+from core.coherent_batch import CoherentRayBatch
 from core.precision import Precision
-from couplers.coherent_batch import CoherentRayBatch
-from couplers.contracts import ContractError, ReferencePlane
 from couplers.streaming import (
     PositionalAngularSampler,
     StreamingReconstruction,
@@ -40,7 +40,7 @@ from couplers.wave_to_ray import (
     draw_indices,
     sampling_density,
 )
-from evaluation.metalens import AIR_CONFIG, metalens_field
+from studies.metalens.oracle import AIR_CONFIG, metalens_field
 
 pytestmark = [pytest.mark.coupler]
 
@@ -360,7 +360,7 @@ class TestChunkEquivalence:
             assert other.total_rays == whole.total_rays
 
     def test_the_psf_is_unchanged_by_the_chunk_size(self, spectrum):
-        from evaluation.metalens import (
+        from studies.metalens.oracle import (
             normalized_cross_correlation,
         )
 

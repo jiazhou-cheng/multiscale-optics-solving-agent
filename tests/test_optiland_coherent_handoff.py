@@ -28,9 +28,8 @@ import numpy as np
 import pytest
 from conftest import load_coupler_probe_expected
 
-from adapters.base import ModelRunRequest
 from couplers import ContractCode, ContractError, RayBundle
-from couplers.optiland_handoff import (
+from couplers.handoff import (
     AMPLITUDE_MAPPING,
     AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT,
     DeclaredHandoffPlane,
@@ -39,10 +38,11 @@ from couplers.optiland_handoff import (
     reconstruct_hashed_arrays,
 )
 from couplers.ray_to_wave import Projection, ray_to_wave
+from solvers.base import ModelRunRequest
 
 pytest.importorskip("optiland")
 
-from adapters.optiland_adapter import (
+from solvers.optiland.adapter import (
     _scientific_array_hash,
     get_adapter,
 )

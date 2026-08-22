@@ -41,7 +41,7 @@ import math
 
 import numpy as np
 
-from couplers.contracts import ContractCode, ContractError
+from core.boundary import ContractCode, ContractError
 
 __all__ = [
     "hexapolar_area_weight_m2",

@@ -141,8 +141,8 @@ def _protocol() -> dict[str, Any]:
 
 
 def _trace(rings: int, directory: Path):
-    from adapters.base import ModelRunRequest
-    from adapters.optiland_adapter import get_adapter
+    from solvers.base import ModelRunRequest
+    from solvers.optiland.adapter import get_adapter
 
     return (
         get_adapter()
@@ -168,7 +168,7 @@ def _trace(rings: int, directory: Path):
 def _reconstruct(rays, directory: Path, *, grid_n: int, pitch_m: float):
     """Through the graph node, which CHE-34 pinned bit-identical to the core."""
     from couplers.base import CouplerRunRequest
-    from couplers.ray_to_wave_node import RayToWaveCoupler
+    from couplers.node import RayToWaveCoupler
 
     return RayToWaveCoupler().transform(
         CouplerRunRequest(
@@ -187,8 +187,8 @@ def _reconstruct(rays, directory: Path, *, grid_n: int, pitch_m: float):
 
 
 def _propagate(field_record, directory: Path, *, pad_width: int, target_z_m: float):
-    from adapters.base import ModelRunRequest
-    from adapters.chromatix_adapter import get_adapter
+    from solvers.base import ModelRunRequest
+    from solvers.chromatix.adapter import get_adapter
 
     return get_adapter().run(
         ModelRunRequest(
@@ -207,7 +207,7 @@ def _propagate(field_record, directory: Path, *, pad_width: int, target_z_m: flo
 
 
 def _measure(result):
-    from evaluation.psf_measurement import (
+    from verification.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -292,11 +292,11 @@ def _contract_code_of(result) -> str | None:
 # absolute amplitude grows as the ray count and no absolute metric converges.
 # ---------------------------------------------------------------------------
 def _bundle_and_aberration(rays, *, observation_z_m: float | None = None):
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
-    from evaluation.psf_oracles import pupil_aberration
+    from verification.psf_oracles import pupil_aberration
 
     observation_z_m = SINGLET["image_z_m"] if observation_z_m is None else observation_z_m
     bundle = declare_coherent_bundle(
@@ -312,7 +312,7 @@ def _bundle_and_aberration(rays, *, observation_z_m: float | None = None):
 
 
 def _fft_oracle(aberration, *, pitch_m: float, grid_n: int, distance_m: float, factor: int = 8):
-    from evaluation.psf_oracles import fraunhofer_psf
+    from verification.psf_oracles import fraunhofer_psf
 
     return fraunhofer_psf(
         aberration,
@@ -376,7 +376,7 @@ def _psf_vs_oracle(measurement, oracle, *, max_radius_m: float) -> float:
     this reads 1.5e-2), so the fine array is evaluated at the coarse grid's pixel
     centres instead.
     """
-    from evaluation.psf_oracles import resample_to_grid
+    from verification.psf_oracles import resample_to_grid
 
     psf = measurement.intensity
     resampled = resample_to_grid(
@@ -390,7 +390,7 @@ def _psf_vs_oracle(measurement, oracle, *, max_radius_m: float) -> float:
 
 
 def _airy_metrics(measurement, *, numerical_aperture: float, max_radius_m: float) -> dict[str, Any]:
-    from evaluation.psf_oracles import (
+    from verification.psf_oracles import (
         airy_first_null_radius_m,
         airy_psf_on_grid,
     )
@@ -476,7 +476,7 @@ def _scale_invariance(workdir: Path, rows: list[dict[str, Any]]) -> dict[str, An
     the power exponent is fitted, and the peak-normalized PSF is shown to be
     BIT-identical under an exact rescale of the amplitude.
     """
-    from couplers.contracts import RayBundle
+    from core.boundary import RayBundle
     from couplers.ray_to_wave import ray_to_wave
 
     counts = [row["traced_rays"] for row in rows if row.get("pupil_discrete_power")]
@@ -559,8 +559,8 @@ def _scale_invariance(workdir: Path, rows: list[dict[str, Any]]) -> dict[str, An
 # 2. Ray count
 # ---------------------------------------------------------------------------
 def _ray_count_sweep(workdir: Path, protocol: dict[str, Any]) -> dict[str, Any]:
-    from couplers.contracts import ComplexField
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from core.boundary import ComplexField
+    from verification.psf_oracles import airy_first_null_radius_m
 
     airy_radius = airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
     compare_radius = 5.0 * airy_radius
@@ -780,7 +780,7 @@ def _continuous_pupil_record(
     the wavelet sum was measured to produce, which turns the aperture hypothesis
     into a prediction rather than a description.
     """
-    from couplers.contracts import ComplexField, Frame, ReferencePlane
+    from core.boundary import ComplexField, Frame, ReferencePlane
 
     axis = (np.arange(grid_n, dtype=np.float64) - grid_n // 2) * pitch_m
     gy, gx = np.meshgrid(axis, axis, indexing="ij")
@@ -958,7 +958,7 @@ def _knife_edge_rim_slope() -> dict[str, Any]:
 
 def _aperture_edge_study(workdir: Path) -> dict[str, Any]:
     from couplers.ray_to_wave import ray_to_wave
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from verification.psf_oracles import airy_first_null_radius_m
 
     airy_radius = airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
     compare_radius = 5.0 * airy_radius
@@ -1180,7 +1180,7 @@ def _synthetic_converging_bundle(rings: int, *, radius_m: float, distance_m: flo
     The Fresnel-scale prediction is about the operator, so it must be tested
     without the engine in the way.
     """
-    from couplers.contracts import Frame, RayBundle, ReferencePlane
+    from core.boundary import Frame, RayBundle, ReferencePlane
 
     xy = _hexapolar(rings, radius_m)
     x, y = xy[:, 0], xy[:, 1]
@@ -1214,7 +1214,7 @@ def _fresnel_number_consequence(workdir: Path) -> dict[str, Any]:
     propagated over the same distance with the same padding -- so the aperture
     function is the only thing that differs between the two sides.
     """
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from verification.psf_oracles import airy_first_null_radius_m
 
     rows = []
     for factor in FRESNEL_DISTANCE_FACTORS:
@@ -1340,7 +1340,7 @@ def _decomposition(workdir: Path, ray_sweep: dict[str, Any]) -> dict[str, Any]:
     oracle is implicated -- which is the claim, and it is checked rather than
     asserted.
     """
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from verification.psf_oracles import airy_first_null_radius_m
 
     airy_radius = airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
     compare_radius = 5.0 * airy_radius
@@ -1495,7 +1495,7 @@ def _decomposition(workdir: Path, ray_sweep: dict[str, Any]) -> dict[str, Any]:
 # 5. Grid
 # ---------------------------------------------------------------------------
 def _grid_sweep(workdir: Path, protocol: dict[str, Any]) -> dict[str, Any]:
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from verification.psf_oracles import airy_first_null_radius_m
 
     rays = _trace(SWEEP_RINGS, workdir / "rays")
     bundle, aberration = _bundle_and_aberration(rays)
@@ -1643,7 +1643,7 @@ def _nyquist_bypass(
     ray set reconstructed at an inadmissible pitch aliases, and the PSF it produces
     is wrong by far more than the gate rather than merely coarse.
     """
-    from couplers.optiland_handoff import (
+    from couplers.handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
@@ -1757,8 +1757,8 @@ def _nyquist_bypass(
 # 6. Padding
 # ---------------------------------------------------------------------------
 def _padding_sweep(workdir: Path) -> dict[str, Any]:
-    from couplers.contracts import ComplexField
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from core.boundary import ComplexField
+    from verification.psf_oracles import airy_first_null_radius_m
 
     airy_radius = airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
     compare_radius = 5.0 * airy_radius
@@ -2069,7 +2069,7 @@ def _determinism_and_cost(rings: int) -> dict[str, Any]:
 # 8. Oversampling factor review -- the sampling half of CHE-33's defect
 # ---------------------------------------------------------------------------
 def _oversampling_review(grid: dict[str, Any], protocol: dict[str, Any]) -> dict[str, Any]:
-    from evaluation.psf_oracles import airy_first_null_radius_m
+    from verification.psf_oracles import airy_first_null_radius_m
 
     airy_radius = airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
     critical_pitch = grid["measured_nyquist_pitch_max_m"]

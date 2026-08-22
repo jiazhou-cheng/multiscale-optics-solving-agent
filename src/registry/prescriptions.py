@@ -4,7 +4,7 @@ This module is the authoritative representation of every optical system the
 Optiland adapter supports by name. Each entry is a plain
 :class:`~core.optical_system.OpticalSystemSpec` value,
 built by the one generic builder in
-:mod:`adapters.optiland_builder`; none of them carries
+:mod:`solvers.optiland.builder`; none of them carries
 its own construction code, and this module imports no solver.
 
 Adding a system means adding a prescription here (or handing one to the adapter
