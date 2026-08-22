@@ -55,6 +55,7 @@ from core.precision import (
 __all__ = [
     "CHROMATIX_CAPABILITIES",
     "COMPONENT_CAPABILITIES",
+    "C_PATCH_WFT_CAPABILITIES",
     "C_PLANAR_DOE_STEP_CAPABILITIES",
     "C_RAY_TO_WAVE_CAPABILITIES",
     "C_WAVE_TO_RAY_CAPABILITIES",
@@ -222,6 +223,42 @@ C_PLANAR_DOE_STEP_CAPABILITIES = ComponentCapabilities(
 )
 
 
+C_PATCH_WFT_CAPABILITIES = ComponentCapabilities(
+    component="C_PATCH_WFT",
+    devices=frozenset({DeviceKind.CPU}),
+    precisions=frozenset({Precision.FP64}),
+    # Accepts all four: the paper's own phase masks are float32, and refusing
+    # them would refuse the data this operator exists to reproduce. The upcast
+    # to complex128 is lossless, and declared rather than silent.
+    accepted_input_dtypes=_FIELD_DTYPES,
+    # The patch transform is complex128 throughout and says so. Not caution: the
+    # exactness relation it exists to satisfy is measured at 1.4e-12 relative
+    # field error, which is below float32 epsilon, so a float32 path could not
+    # be gated by the one test that makes this operator trustworthy. Emitting a
+    # float32 spectrum would be a different operator with a different claim.
+    native_compute_dtypes=frozenset({DType.COMPLEX128}),
+    output_dtypes=frozenset({DType.FLOAT64, DType.COMPLEX128}),
+    namespaces=frozenset({ArrayNamespace.NUMPY}),
+    device_namespaces={DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY})},
+    minimum_compute_precision=Precision.FP64,
+    evidence=(
+        "couplers/patch.py builds every patch spectrum with numpy's float64 "
+        "FFT; the full-aperture enumeration reproduces the independent float64 "
+        "discrete ASM at 1.4e-12 relative field error and complete enumeration "
+        "is unbiased at 5.9e-15 (tests/test_patch_wft.py). No CUDA or JAX path "
+        "has been executed, so none is declared -- see the note."
+    ),
+    notes=(
+        "CPU-only is a statement about THIS step, not about the route. The "
+        "expensive half of a patch run is the O(rays x pixels) reconstruction "
+        "in C_RAY_TO_WAVE, which is xp-parameterized and does execute on CUDA "
+        "under JAX; the patch transform is O(patches x pad^2 log pad) and is "
+        "not where the time goes. Declaring CUDA here would claim a device this "
+        "operator has never run on."
+    ),
+)
+
+
 COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
     capability.component: capability
     for capability in (
@@ -230,6 +267,7 @@ COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
         C_RAY_TO_WAVE_CAPABILITIES,
         C_WAVE_TO_RAY_CAPABILITIES,
         C_PLANAR_DOE_STEP_CAPABILITIES,
+        C_PATCH_WFT_CAPABILITIES,
     )
 }
 
@@ -267,5 +305,6 @@ def capability_matrix() -> list[dict[str, Any]]:
             "M_WAVE_CHROMATIX",
             "C_WAVE_TO_RAY",
             "C_PLANAR_DOE_STEP",
+            "C_PATCH_WFT",
         )
     ]

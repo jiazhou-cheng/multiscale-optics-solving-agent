@@ -36,7 +36,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from core.boundary import ContractError, ReferencePlane
+from core.artifacts import ArtifactRecord
+from core.boundary import ContractError, Frame, RayBundle, ReferencePlane
+from core.execution import RunStatus
+from core.graph import Severity
+from core.specs import ArtifactKind
+from couplers.base import CouplerRunRequest
 from couplers.patch import (
     PatchPlan,
     Substrate,
@@ -46,6 +51,7 @@ from couplers.patch import (
     plan_patches,
     resolve_pad_px,
 )
+from couplers.patch_node import DOE_PORT, PatchWftCoupler
 from couplers.ray_to_wave import Projection, ray_to_wave
 from verification.asm_oracle import angular_spectrum_float64, compare_fields
 
@@ -440,3 +446,192 @@ def test_a_ray_that_cannot_reach_the_target_plane_is_refused_not_dropped() -> No
     behind = ReferencePlane(name="behind", z_m=-Z_M)
     with pytest.raises(ContractError, match="travels away"):
         advance_bundle_to_plane(rays, target=behind)
+
+
+# ---------------------------------------------------------------------------
+# The graph node (CHE-96)
+# ---------------------------------------------------------------------------
+#
+# The library is gated by the exactness anchor above. These check the *edge*:
+# that a graph reaching for this operator gets the same refusals the library
+# gives, and that the three derived quantities a caller cannot see -- the pad,
+# the coverage basis, the evanescent loss -- come back in the record.
+
+NODE_N = 15
+NODE_GRID = (NODE_N, NODE_N)
+NODE_PITCH = (6.3e-6, 6.3e-6)
+NODE_PLANE = ReferencePlane(name="doe", z_m=0.0)
+
+
+def _node_records(tmp_path, *, ray_count: int = 4):
+    """An incident bundle with a declared OPL, plus a random phase DOE."""
+    rng = np.random.default_rng(20260822)
+    half = NODE_N // 2
+    offsets = rng.integers(-half, half + 1, size=(ray_count, 2)) * NODE_PITCH[0]
+    positions = np.column_stack([offsets[:, 0], offsets[:, 1], np.zeros(ray_count)])
+    directions = np.tile(np.array([0.0, 0.0, 1.0]), (ray_count, 1))
+    incident = RayBundle(
+        positions_m=positions,
+        directions=directions,
+        wavelength_m=0.7e-6,
+        reference_plane=NODE_PLANE,
+        frame=Frame(),
+        amplitude=np.ones(ray_count, dtype=np.complex128),
+        optical_path_length_m=np.zeros(ray_count),
+        optical_path_length_reference="zero at the DOE plane",
+    )
+    rays_uri = tmp_path / "rays.npz"
+    source = incident.to_artifact_record(artifact_id="incident", uri=rays_uri)
+    doe_uri = tmp_path / "doe.npy"
+    np.save(doe_uri, np.exp(1j * rng.uniform(-np.pi, np.pi, size=NODE_GRID)))
+    doe = ArtifactRecord(
+        id="doe",
+        kind=ArtifactKind.COMPLEX_FIELD,
+        uri=str(doe_uri),
+        shape=list(NODE_GRID),
+        dtype="complex128",
+    )
+    return source, doe
+
+
+def _node_config(**overrides):
+    config = {
+        "grid_shape": list(NODE_GRID),
+        "sample_pitch_m": list(NODE_PITCH),
+        "plane_z_m": 0.0,
+        "patch_px": 5,
+        "pad_factor": 2,
+        "patch_placement": "incident_positions",
+        "coverage_basis": "uniform_over_dilated_aperture",
+    }
+    config.update(overrides)
+    return config
+
+
+def _run(tmp_path, **overrides):
+    source, doe = _node_records(tmp_path)
+    return PatchWftCoupler().transform(
+        CouplerRunRequest(
+            run_id="che96",
+            edge_id="patch_step",
+            sources={"source": source, DOE_PORT: doe},
+            config=_node_config(**overrides),
+        )
+    )
+
+
+def test_the_node_runs_and_reports_what_the_caller_could_not_see(tmp_path) -> None:
+    """Three derived quantities come back, because a consumer reads the record.
+
+    The pad the edge actually used, the coverage basis it applied, and the
+    evanescent modes it dropped are all decisions made inside the step that
+    change the answer and are invisible in the output array. A diagnostics block
+    that omitted them would leave a consumer unable to tell a converged run from
+    a mis-padded one.
+    """
+    result = _run(tmp_path)
+    assert result.status is RunStatus.SUCCEEDED, result.error_message
+    payload = result.diagnostics["patch"]
+    assert payload["substrate"] == "planar"
+    assert payload["curvature_bound_rad"] == 0.0, "planar: established, not assumed"
+    assert payload["apodization"].startswith("none")
+    assert payload["reconstruction_normalization"] == "one_over_n"
+    assert result.diagnostics["pad_used"] == payload["pad_px"]
+    assert result.diagnostics["coverage_basis"] == "uniform_over_dilated_aperture"
+    assert "double-count" not in result.diagnostics["opl_convention"]
+    assert "reset to zero" in result.diagnostics["opl_convention"]
+
+
+def test_the_node_raises_a_pad_that_would_alias_and_says_it_did(tmp_path) -> None:
+    """`pad_factor` is a preference. Silently honouring it is the 100% error.
+
+    The edge derives the pad from clearance, centring and oddness, and warns
+    when the derived value differs from the requested one. Warning rather than
+    refusing is deliberate: the caller asked for something unsafe and got
+    something safe, which is the right outcome, but a caller who then reports
+    "pad factor 2" would be reporting a run that did not happen.
+    """
+    result = _run(tmp_path, pad_factor=2)
+    assert result.status is RunStatus.SUCCEEDED
+    assert result.diagnostics["pad_used"] > result.diagnostics["pad_requested"]
+    assert any("pad_factor" in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [
+        ({"patch_px": 50}, "even"),
+        ({"substrate": "conformal"}, "substrate"),
+        ({"coverage_basis": None}, "coverage_basis"),
+        ({"patch_placement": "drawn", "patch_count": 4}, "seed"),
+        ({"patch_px": None}, "patch_px"),
+    ],
+)
+def test_the_node_refuses_what_the_library_refuses(tmp_path, overrides, expected) -> None:
+    """The edge and the library must not disagree about what is acceptable.
+
+    Each of these is a refusal the library makes for a stated physical reason,
+    re-asserted at the graph boundary. The even-patch case is the one a caller
+    is most likely to hit -- the paper's own sizes are 40, 50 and 100 -- and it
+    is refused rather than rounded so that a transcribed number cannot silently
+    become a different one.
+    """
+    result = _run(tmp_path, **overrides)
+    assert result.status is RunStatus.FAILED
+    assert expected in (result.error_message or "") + str(result.error_type)
+
+
+def test_validate_request_predicts_every_refusal_transform_makes(tmp_path) -> None:
+    """Two checklists is how a validator comes to bless a request that then fails.
+
+    Both call the same `diagnose`, so this asserts that arrangement holds rather
+    than that the two happen to agree today.
+    """
+    source, doe = _node_records(tmp_path)
+    request = CouplerRunRequest(
+        run_id="che96",
+        edge_id="e",
+        sources={"source": source, DOE_PORT: doe},
+        config=_node_config(patch_px=50),
+    )
+    node = PatchWftCoupler()
+    report = node.validate_request(request)
+    assert any(issue.severity is Severity.ERROR for issue in report.issues)
+    assert node.transform(request).status is RunStatus.FAILED
+
+
+def test_the_node_refuses_a_gradient_request(tmp_path) -> None:
+    """`derivative.verified` is false and promotion did not change that."""
+    source, doe = _node_records(tmp_path)
+    report = PatchWftCoupler().validate_request(
+        CouplerRunRequest(
+            run_id="che96",
+            edge_id="e",
+            sources={"source": source, DOE_PORT: doe},
+            config=_node_config(),
+            require_gradients=True,
+        )
+    )
+    assert any("GRADIENT_NOT_VERIFIED" in issue.code for issue in report.issues)
+
+
+def test_the_cost_estimate_names_the_downstream_term_not_its_own(tmp_path) -> None:
+    """This edge is cheap and the route it enables is not.
+
+    The transform is `patches x pad^2 log pad`; the reconstruction that consumes
+    the emitted bundle is `rays x pixels`, which at the paper's parameters is
+    1.6e8 against 1e4. An estimate reporting only this edge's own work would
+    understate the run by orders of magnitude, so the emitted ray count is
+    surfaced as the quantity to budget against.
+    """
+    source, doe = _node_records(tmp_path)
+    estimate = PatchWftCoupler().estimate(
+        CouplerRunRequest(
+            run_id="che96",
+            edge_id="e",
+            sources={"source": source, DOE_PORT: doe},
+            config=_node_config(secondary_count=100, seed=0),
+        )
+    )
+    joined = " ".join(estimate.notes)
+    assert "DOWNSTREAM" in joined and "ray-pixel" in joined

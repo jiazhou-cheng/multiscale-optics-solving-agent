@@ -73,6 +73,23 @@ Generated from `core/capabilities.py` by `benchmarks/probes/precision/capability
 | M_WAVE_CHROMATIX | cpu, cuda | fp32       | complex64                               | complex64                               | complex64                               | complex128           | jax          | fp32          |
 | C_WAVE_TO_RAY    | cpu, cuda | fp32, fp64 | complex128, complex64                   | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
 | C_PLANAR_DOE_STEP | cpu, cuda | fp32, fp64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
+| C_PATCH_WFT       | cpu       | fp64       | complex128, complex64, float32, float64 | complex128                              | complex128, float64                     | --                   | numpy        | fp64          |
+
+`C_PATCH_WFT` (CHE-96) is the narrowest row and the one where the four columns
+pay for themselves. It **accepts** all four dtypes -- the paper's own phase masks
+are float32, and refusing them would refuse the data the operator exists to
+reproduce -- while **computing** in complex128 only. The upcast is lossless, so
+the narrow compute column is not a restriction on the caller; it is the honest
+answer to "does this support float32", which is *no*. The reason is specific: the
+exactness relation that makes this operator trustworthy is measured at 1.4e-12
+relative field error, below float32 epsilon, so a float32 compute path could not
+be gated by its own anchor.
+
+Its `cpu`-only device column is likewise a statement about this step and not
+about the route. A patch run's cost is the O(rays x pixels) reconstruction in
+`C_RAY_TO_WAVE`, which is xp-parameterized and does execute on CUDA under JAX;
+the patch transform is O(patches x pad^2 log pad). Declaring `cuda` here would
+claim a device this operator has never run on.
 
 `C_PLANAR_DOE_STEP` is the one composed row, and it is worth reading as such:
 its capability is `C_RAY_TO_WAVE`'s and `C_WAVE_TO_RAY`'s **intersected**, not an

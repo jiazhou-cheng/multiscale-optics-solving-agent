@@ -27,8 +27,10 @@ from couplers.base import (
 from couplers.cascade import CascadeDiagnostics, PrimarySampling, planar_doe_step
 from couplers.doe_node import PlanarDoeStepCoupler
 from couplers.node import RayToWaveCoupler
+from couplers.patch_node import PatchWftCoupler
 
-# `PlanarDoeStepCoupler` and `RayToWaveCoupler` are the two runnable graph nodes;
+# `PatchWftCoupler`, `PlanarDoeStepCoupler` and `RayToWaveCoupler` are the three
+# runnable graph nodes;
 # `planar_doe_step` and its two companions are the batched step as a library
 # call, for a caller outside a graph. Sorted rather than grouped by role, because
 # a hand-grouped list drifts and ruff will not let it.
@@ -47,6 +49,7 @@ __all__ = [
     "CouplerRunRequest",
     "CouplerRunResult",
     "Frame",
+    "PatchWftCoupler",
     "PlanarDoeStepCoupler",
     "PrimarySampling",
     "RayBundle",

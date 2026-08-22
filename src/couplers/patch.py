@@ -70,15 +70,31 @@ patch-count sweep looks like when it plateaus instead of falling.
 Two conditions, both derivable and both measured:
 
 * **Clearance.** A patch centred at `c` has replicas spanning
-  `c ± patch/2 + m * pad`. For none to enter a window of half-width `N/2` at the
-  worst-case centre `c = -(N/2 + patch/2)`, the requirement is
-  `pad_px >= N + patch_px`. Measured on a 3x3 tiling of an 11-px patch over a
-  33-px grid, where the extreme centre is `-11p` and the requirement is
-  therefore `pad >= 33`: pad 32 gives 1.44, pad 33 gives **5.6e-15**, pad 23
-  gives 1.29.
+  `c ± patch/2 + m * pad`. For none to enter a window of half-width `N/2`, the
+  requirement is `pad > max|c| + (N + patch)/2`, strictly -- at equality the
+  replica's edge sample lands on the window's edge sample, and a patch is rarely
+  zero at its own edge. With centres drawn over the aperture dilated by half a
+  patch, `max|c| = (N + patch)/2` and this becomes the memorable
+  `pad >= N + patch`. Measured on a 3x3 tiling of an 11-px patch over a 33-px
+  grid: pad 32 gives 1.44, pad 33 gives **5.6e-15**, pad 23 gives 1.29.
+
+  **The full-aperture single patch is exempt, and it is the only exemption.**
+  Clearance is a statement about a *sub*-aperture -- it protects the part of the
+  window the patch does not itself cover. When the patch is the window there is
+  no such part, and the periodicity a pad would suppress is the same periodicity
+  the unpadded reference ASM has. Padding it is not the safe choice: it moves
+  the mode grid off the oracle's and the exactness anchor reads 0.57 instead of
+  1.4e-12.
 * **Centring.** `pad_px - patch_px` must be **even**, so the patch sits on the
   padded array's centre sample. Odd puts it half a sample off, which injects a
   linear phase: pad 34 and pad 44 both satisfy clearance and both give ~1.4.
+
+  Together with the odd-`pad_px` rule below this forces `patch_px` **odd**: an
+  odd pad and an even `pad - patch` cannot both hold otherwise. That is not an
+  arithmetic accident. A patch with an even side has no centre sample, so
+  "centred on a ray" is undefined for it. An even `patch_px` is refused rather
+  than rounded, because the paper's sizes (40, 50, 100) are all even and a
+  caller transcribing one should be told which value actually ran.
 
 `pad_px` is therefore **derived**, not taken. A caller states `pad_factor` as a
 preference and `plan_patches` raises it to whatever satisfies both conditions,
@@ -125,6 +141,7 @@ from core.boundary import (
 from couplers.curvature import check_patch
 
 __all__ = [
+    "CoverageBasis",
     "PatchDiagnostics",
     "PatchPlan",
     "Substrate",
@@ -151,6 +168,32 @@ class Substrate(StrEnum):
     #: position-dependent normals -- a substantial new geometry surface, and the
     #: exactness ladder does not extend to it.
     CONFORMAL = "conformal"
+
+
+class CoverageBasis(StrEnum):
+    """How caller-supplied patch centres were drawn — a required declaration.
+
+    The coverage correction ``A_draw / A_patch`` is only unbiased for centres
+    drawn uniformly over the dilated aperture. When :func:`plan_patches` draws
+    them itself it knows this; when a caller supplies them -- the paper's actual
+    configuration, where each *incident ray* defines a patch -- it does not, and
+    the density is not recoverable from the positions alone.
+
+    So it is declared. Guessing would produce a field that is wrong by a
+    constant factor and looks entirely plausible, which is the failure mode this
+    whole module keeps running into.
+    """
+
+    #: Centres are an i.i.d. uniform sample of the dilated aperture's sample
+    #: grid. The correction applies as usual.
+    UNIFORM_OVER_DILATED_APERTURE = "uniform_over_dilated_aperture"
+    #: Centres are the complete set of sample positions of the dilated
+    #: aperture, each used once. Deterministic, and the correction is the same
+    #: ratio -- it is a count of positions either way.
+    ENUMERATED_OVER_DILATED_APERTURE = "enumerated_over_dilated_aperture"
+    #: The caller does not know. Refused: an unbiased estimator needs a known
+    #: sampling density, and there is no safe default.
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True)
@@ -304,6 +347,8 @@ def plan_patches(
     patch_px: int,
     pad_factor: int = 2,
     patch_count: int | None = None,
+    centers_xy_m: np.ndarray[Any, Any] | None = None,
+    coverage_basis: CoverageBasis = CoverageBasis.UNKNOWN,
     substrate: Substrate = Substrate.PLANAR,
     radius_m: float = math.inf,
     error_threshold_rad: float = 1e-3,
@@ -311,8 +356,19 @@ def plan_patches(
 ) -> PatchPlan:
     """Choose patch centres and sizes, with the curvature bound enforced first.
 
-    ``patch_count=None`` gives the single full-aperture patch: the exactness
-    anchor, and the configuration relation (1) of SI S2 is about.
+    Three placements, and which one is in use is decided by what the caller
+    passes rather than by a mode flag:
+
+    * neither ``patch_count`` nor ``centers_xy_m`` -- the single full-aperture
+      patch: the exactness anchor, and the configuration relation (1) of SI S2
+      is about;
+    * ``patch_count`` with an ``rng`` -- centres drawn here, uniformly over the
+      dilated aperture's sample grid;
+    * ``centers_xy_m`` with a ``coverage_basis`` -- centres supplied by the
+      caller, which is the paper's actual configuration: each *incident ray*
+      defines a patch. The basis must be declared because the Monte Carlo
+      correction is only unbiased for a known density, and the density cannot be
+      read back off the positions.
 
     The curvature check is a **precondition**, not a footnote. On a planar
     substrate it records ``R = inf => bound 0`` explicitly rather than leaving it
@@ -363,7 +419,35 @@ def plan_patches(
     # half-width for drawn centres. Using the drawn-case floor for the single
     # patch would over-pad it and, against the unpadded oracle, look like a
     # 0.57 error rather than the 1.4e-12 it actually is.
-    max_center_px = 0.0 if patch_count is None else float(max(ny, nx) // 2 + patch_px // 2)
+    supplied = centers_xy_m is not None
+    if supplied and patch_count is not None:
+        raise ContractError(
+            ContractCode.MISSING_DECLARATION,
+            "centers_xy_m and patch_count both decide where the patches are",
+            declaration="centers_xy_m",
+            remedy="Supply exactly one.",
+        )
+    if supplied and coverage_basis is CoverageBasis.UNKNOWN:
+        raise ContractError(
+            ContractCode.MISSING_DECLARATION,
+            "centers_xy_m needs coverage_basis: the Monte Carlo correction "
+            "A_draw / A_patch is only unbiased for a known sampling density, and "
+            "the density is not recoverable from the positions",
+            declaration="coverage_basis",
+            remedy=(
+                "Declare CoverageBasis.UNIFORM_OVER_DILATED_APERTURE if the "
+                "centres are an i.i.d. uniform draw over the dilated aperture's "
+                "sample grid, or place them with patch_count instead. A guessed "
+                "density gives a field wrong by a constant factor that looks "
+                "entirely plausible."
+            ),
+        )
+
+    max_center_px = (
+        0.0
+        if patch_count is None and not supplied
+        else float(max(ny, nx) // 2 + patch_px // 2)
+    )
     pad_px = resolve_pad_px(
         grid_n=max(ny, nx),
         patch_px=patch_px,
@@ -371,10 +455,32 @@ def plan_patches(
         max_center_px=max_center_px,
     )
 
-    if patch_count is None:
+    if patch_count is None and not supplied:
         centers = np.zeros((1, 2), dtype=np.float64)
         coverage = 1.0
         dilation = 0
+    elif supplied:
+        # The paper's actual configuration: each incident ray defines a patch,
+        # so the centres come from the ray bundle rather than from a draw here.
+        # They are snapped to the sample grid for the same reason drawn centres
+        # are -- `extract_patch` indexes by nearest sample, so an unsnapped
+        # centre extracts one patch while the ray launches from another.
+        dilation = patch_px // 2
+        raw = np.asarray(centers_xy_m, dtype=np.float64)
+        if raw.ndim != 2 or raw.shape[1] != 2:
+            raise ContractError(
+                ContractCode.SHAPE_MISMATCH,
+                f"centers_xy_m must be (P, 2), got {raw.shape}",
+                declaration="centers_xy_m",
+            )
+        centers = np.column_stack(
+            [
+                np.round(raw[:, 0] / float(sample_pitch_m[1])) * float(sample_pitch_m[1]),
+                np.round(raw[:, 1] / float(sample_pitch_m[0])) * float(sample_pitch_m[0]),
+            ]
+        )
+        draw_positions = (2 * (ny // 2 + dilation) + 1) * (2 * (nx // 2 + dilation) + 1)
+        coverage = float(draw_positions / (patch_px * patch_px))
     else:
         if rng is None:
             raise ContractError(
@@ -476,7 +582,6 @@ def patch_secondary_rays(
 
     pitch_y, pitch_x = float(sample_pitch_m[0]), float(sample_pitch_m[1])
     pad = plan.pad_px
-    wavenumber = 2.0 * math.pi / wavelength_m
 
     # Spatial frequencies of the PADDED transform, centered to match
     # `ComplexField.coordinates` and `wave_to_ray.decompose`.

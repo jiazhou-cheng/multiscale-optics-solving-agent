@@ -105,6 +105,50 @@ def test_reference_implementation_is_recorded_as_read_but_never_executed(directi
 
 
 @pytest.mark.parametrize("direction", DIRECTIONS)
+def test_vendored_reference_data_is_a_separate_entry_that_names_real_files(
+    direction: str,
+) -> None:
+    """Vendored data and read-but-not-vendored code are different claims (CHE-96).
+
+    CHE-96 committed two SLM phase masks from the paper's reference
+    implementation. They are inputs to the Fig 5b/5c reproductions and cannot be
+    regenerated here, so vendoring them is right -- but recording them under the
+    existing `reference_implementation` entry would flip its `vendored` flag to
+    true and destroy the claim that entry exists to make. Hence a second entry
+    with its own `source_type`, and hence this test, which asserts the two stay
+    distinct rather than merely that both exist.
+
+    The files are checked to be present because a manifest entry naming a path
+    that is not there records nothing. Pinning is checked because a vendored
+    input that changes silently makes every number measured from it
+    unreproducible.
+    """
+    entries = [
+        entry
+        for entry in _manifest(direction)["sources"]
+        if entry.get("source_type") == "reference_data"
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["vendored"] is True, "these arrays ARE copied in; the entry must say so"
+    assert entry["executed_by_this_repository"] is False, "data is not executed"
+    assert entry["pinned"] is True and entry.get("pinned_revision")
+    files = entry["files"]
+    assert files, "an entry that names no file records nothing"
+    for relative in files:
+        assert (ROOT / relative).is_file(), f"{relative} is recorded but absent"
+
+    implementation = [
+        entry
+        for entry in _manifest(direction)["sources"]
+        if entry.get("source_type") == "reference_implementation"
+    ]
+    assert implementation[0]["vendored"] is False, (
+        "vendoring the data must not have been recorded as vendoring the code"
+    )
+
+
+@pytest.mark.parametrize("direction", DIRECTIONS)
 def test_validation_status_matches_the_probes_the_card_actually_lists(direction: str) -> None:
     """The validation-status ladder only means anything if a card cannot claim a
     rung it has no evidence for, and cannot sit on a lower rung than its own

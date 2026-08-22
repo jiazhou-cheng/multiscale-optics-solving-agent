@@ -101,3 +101,38 @@ sources:
       registry actually claims: experimental maturity, unverified gradient,
       `surrogate` derivative mode, and declared lossiness. Recorded here so the
       change reads as deliberate rather than as a check that quietly disappeared.
+
+  - url: https://github.com/jiazhou-cheng/raywave-tracing
+    source_type: reference_data
+    vendored: true
+    pinned: true
+    pinned_revision: "16ed3d7"
+    executed_by_this_repository: false
+    retrieved_at: "2026-08-22"
+    local_copy: benchmarks/probes/data/
+    files:
+      - benchmarks/probes/data/demo2_smile_phase_profile.npy
+      - benchmarks/probes/data/demo3_smile_phase_profile.npy
+    usage_note: >
+      Two SLM phase masks, (100, 100) and (200, 200) float32 in [-pi, pi], taken
+      from the paper's reference implementation and committed here as DATA. They
+      are the inputs to the Fig 5b and Fig 5c reproductions (CHE-96) and cannot
+      be regenerated from anything in this repository.
+
+      This is a separate entry from the `reference_implementation` one on
+      purpose, and the distinction is the whole point. Code from that repository
+      is read, never vendored, never executed; these arrays are vendored
+      deliberately and are not code. Folding them into the implementation entry
+      would make it say the source was vendored, which would be false about the
+      code and would erase the reason the other entry exists.
+
+      Vendored, therefore pinned: an input that changes silently makes every
+      recorded number unreproducible. `16ed3d7` is the upstream revision the
+      arrays were copied at.
+
+      Nothing about the surrounding notebooks was copied. The three places where
+      copying them would have been wrong -- intensity accumulated instead of
+      field, a phase flip that compensates a DeepLens `Ray.flip_xy` this
+      repository does not have, and an `(n-1)/2` origin rule against this
+      repository's `n // 2` -- are recorded in the reproduction probes rather
+      than reproduced.
