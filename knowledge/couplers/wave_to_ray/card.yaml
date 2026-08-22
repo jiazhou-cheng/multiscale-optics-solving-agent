@@ -479,5 +479,122 @@ batched_planar_step:
     # than off the request. Evidence:
     # benchmarks/probes/records/planar_doe_step_device.json, produced by
     # benchmarks/probes/gpu/planar_doe_step_device.py.
-    - a stacked configuration at the paper's scale. The count-bounding property
-      is asserted on a 16x16 grid; the fig7-scale behaviour is CHE-96's.
+    # 'a stacked configuration at the paper's scale' was here and is partly
+    # cleared by CHE-96: this operator ran as demo3's RW-F route at SI Table S2
+    # System 3's configuration -- 200x200 DOE, 3000 launch positions, 20000
+    # secondary each, 60 M rays on cuda:0 -- in
+    # benchmarks/probes/records/ray_wave/demo3_characterization_rw_f.json.
+    # What is NOT cleared: it was not run at the paper's 5.3e9-ray budget, and
+    # the count-bounding property is still asserted only on a 16x16 stack.
+    - >-
+      the paper's full ray budget on a stack. See `patch_step.cost_ceiling`
+      below -- 1.2 h per run at 1.78e9 rays with an O(rays x pixels)
+      reconstruction, which is the CHE-95 k-space fast path's case.
+
+# --- The patch-based local WFT step (CHE-96) ----------------------------------
+#
+# `C_PATCH_WFT` is the general ray-DOE method, and the point most likely to be
+# missed is the relation between it and the step above: **`C_PLANAR_DOE_STEP` is
+# a special case of this, not a peer of it.** SI S10 says so about the global
+# aggregation Algorithm S1 performs -- "For conformal DOEs, this global
+# aggregation before ray-DOE interaction is not applicable ... We therefore
+# retain the direct implementation." The direct implementation is this one.
+patch_step:
+  coupler_id: C_PATCH_WFT
+  implementation: src/couplers/patch.py
+  graph_node: src/couplers/patch_node.py
+  relation_to_the_batched_step: >-
+    They coincide when there is exactly ONE launch position -- demo2's RW-F
+    row, where a single full-aperture patch and a single global spectrum are
+    the same object. They diverge as soon as there are many: the batched step
+    resamples one global spectrum at many positions, the patch step transforms
+    a different local patch per position. Both were run on demo3, which needs
+    many launch positions because the refractive lens downstream introduces
+    field-dependent aberrations a single primary ray cannot represent.
+  exactness_gate: >-
+    A single full-aperture patch with every propagating mode enumerated
+    reproduces the independent float64 discrete ASM
+    (verification/asm_oracle.angular_spectrum_float64) at **7.1e-13** relative
+    field error on the paper's own demo2 system -- 100x100 SLM, 6.3 um pitch,
+    lambda 0.7 um, z = 1.26 mm -- and at 1.4e-12 on a 33x33 synthetic case.
+    Complete enumeration is unbiased at 5.9e-15. tests/test_patch_wft.py, and
+    benchmarks/probes/records/ray_wave/demo2_paper_jax.json.
+
+    The comparison is only an exactness measurement when the two PERIODICITIES
+    match. A discrete ASM is periodic with its padded period, so the same route
+    scored against an oracle padded 2x reads 8.8e-3 at pad 199 and 0.33 at pad
+    101 -- neither is an error in either implementation, both are the wraparound
+    between two periods. Every recorded score names its oracle's pad.
+  convergence_relation: >-
+    SI S2 relation (2), measured rather than cited: sub-aperture patches
+    uniformly covering the aperture converge to the full-aperture response.
+    On demo2 at SI Table S2's parameters (patch 51^2, pad factor 4, 16000
+    incident, 1e4 secondary, 1.6e8 rays) RW-P reaches NCC 0.999418 against both
+    the ASM oracle and the RW-F route, and the 5x3 budget sweep is monotone in
+    both incident and secondary count
+    (benchmarks/probes/records/ray_wave/demo2_cost_sweep.json).
+  conventions_that_change_across_the_step:
+    optical_path_length: >-
+      RESET TO ZERO at the patch plane, for the same reason the batched step
+      resets it: each patch's phase is already in its spectral amplitude. The
+      graph node is STRICTER than C_RAY_TO_WAVE about an undeclared incident
+      OPL for that reason -- a guessed reference would be absorbed and could
+      not be audited afterwards.
+    amplitude: >-
+      `coverage * A[m] / p[m]`, where `coverage = A_draw / A_patch`. The
+      direction of that ratio is easy to invert and the inversion is invisible
+      on the full-aperture anchor, where it is exactly 1.
+    launch_position_phase: >-
+      NONE, and this is the one most likely to be got wrong. `spectrum_to_rays`
+      applies `exp(i k (d_u x_p + d_v y_p))` because there the spectrum's origin
+      is the plane's and the ray launches elsewhere. Here the padded patch is
+      centred on the patch centre, so the spectrum's origin IS the launch point
+      and `ray_to_wave` already references its ramp to each ray's position.
+      Adding it again double-counts it -- and, again, is invisible on the
+      full-aperture anchor.
+  three_refusals:
+    even_patch_px: >-
+      An even patch has no centre sample, so "centred on a ray" is undefined,
+      and the odd-pad and even-(pad - patch) rules are jointly unsatisfiable.
+      The paper's own sizes are 40, 50 and 100, so this REFUSES rather than
+      rounds: a caller transcribing one should be told which value ran.
+    derived_pad: >-
+      `pad_factor` is a preference and `pad_px` is derived from clearance,
+      centring and oddness. Clearance is `pad > max|c| + (grid + patch)/2`,
+      strictly, with exactly one exemption -- the full-aperture single patch,
+      which IS the window and has nothing outside it to contaminate. Padding
+      that case is not the safe choice: it moves the mode grid off the oracle's
+      and the anchor reads 0.57 instead of 1.4e-12.
+    coverage_basis: >-
+      Caller-supplied patch centres need a declared `CoverageBasis`. The Monte
+      Carlo correction is unbiased only for a known sampling density and the
+      density cannot be read back off the positions; a guess scales the whole
+      field by a constant and looks entirely plausible.
+  apodization: >-
+    NONE offered. Any taper below 1 removes field no other patch replaces, so
+    the partition-of-unity argument behind the convergence relation breaks and
+    the coherent sum stops converging to the full-DOE response.
+  cost_ceiling: >-
+    Reconstruction is O(N_rays x N_pixels) -- `ray_to_wave` contracts a
+    separable einsum -- against upstream's O(N_rays) + one FFT. Measured
+    consequences: demo2's RW-P needed 40 batches where the paper used 2, and
+    94.9 s where the paper reports 2.275 s; demo3 does not converge at any
+    budget that fits, and the seed-to-seed NCC trend (log-log slope 0.956,
+    i.e. noise-limited) extrapolates to 1.78e9 rays and 1.2 h per run for
+    NCC 0.9. The paper's own RW-P budget for that system is 2.6e9 rays. This
+    is the evidence for the k-space fast path tracked on CHE-95.
+  gradient: >-
+    None certified. Inherits the fixed-direction estimator; the registry records
+    derivative.mode=surrogate with verified=false and the node refuses
+    require_gradients=True.
+  not_yet_probed:
+    - >-
+      a conformal substrate. REFUSED by `Substrate`, not approximated -- the
+      SI S2 exactness relation does not hold there and the planar case's
+      confidence must not be inherited.
+    - >-
+      this step on a device. It is numpy/complex128 only and
+      core/capabilities.py says so. The expensive half of a patch run, the
+      reconstruction, does execute on cuda:0 under JAX and did throughout
+      demo2 and demo3.
+    - the paper's full ray budget, on either demo. See `cost_ceiling`.

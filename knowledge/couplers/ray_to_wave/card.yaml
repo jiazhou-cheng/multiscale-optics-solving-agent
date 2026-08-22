@@ -910,3 +910,28 @@ validation_note: >
 #   * the step's outgoing rays are valid AT the declared plane, and the OPL
 #     reset means a consumer cannot recover the incident path from them.
 batched_planar_step_reference: knowledge/couplers/wave_to_ray/card.yaml::batched_planar_step
+
+# --- The patch-based local WFT step (CHE-96) ----------------------------------
+#
+# `C_PATCH_WFT` is the general ray-DOE method, of which the batched step above
+# is a special case (SI S10). The full description is on the wave_to_ray card
+# under `patch_step`, because the decomposition-and-resample half is where the
+# choices are. What matters on THIS card:
+#
+#   * the RECONSTRUCTION of a patch bundle is this operator, unchanged, at
+#     ASM_CONSISTENT projection, and it is where a patch run spends its time:
+#     O(N_rays x N_pixels) against upstream's O(N_rays) + one FFT. Every cost
+#     number CHE-96 recorded is a number about this operator;
+#   * this operator is what makes the patch step's launch-position phase rule
+#     correct. `ray_to_wave` already references each wavelet's ramp to the ray's
+#     own position, so a patch bundle must NOT carry a launch-position phase --
+#     `spectrum_to_rays` applies one and the patch step deliberately does not;
+#   * the patch step's OPL reset means a consumer of its bundle cannot recover
+#     the incident path, exactly as for the batched step.
+#
+# Evidence that the pair reproduces an independent implementation: a single
+# full-aperture patch enumerated through this operator matches
+# verification/asm_oracle.angular_spectrum_float64 at 7.1e-13 relative field
+# error on the paper's demo2 system, at MATCHED padding
+# (benchmarks/probes/records/ray_wave/demo2_paper_jax.json).
+patch_step_reference: knowledge/couplers/wave_to_ray/card.yaml::patch_step

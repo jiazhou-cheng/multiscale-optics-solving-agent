@@ -104,6 +104,43 @@ def test_reference_implementation_is_recorded_as_read_but_never_executed(directi
     )
 
 
+def test_the_patch_step_card_section_names_things_that_exist() -> None:
+    """A card section describing an operator has to be bound to that operator.
+
+    CHE-96 added `patch_step` to the wave_to_ray card and a pointer to it from
+    the ray_to_wave card. The failure mode this guards is the ordinary one for
+    prose evidence: the section keeps reading correctly after the module it
+    describes has been renamed, the node it names has been deleted, or the
+    coupler id has drifted from the registry's.
+
+    What is checked is the load-bearing part -- the paths resolve, the coupler
+    id is registered, and the three refusals the section claims are actually
+    the three the implementation makes. The measured numbers are not re-derived
+    here; they belong to `tests/test_patch_wft.py` and to the probe records,
+    and duplicating them would create a second place to update.
+    """
+    card = _card("wave_to_ray")
+    section = card["patch_step"]
+    assert section["coupler_id"] == "C_PATCH_WFT"
+    assert section["coupler_id"] in Registry.from_package().couplers
+
+    for key in ("implementation", "graph_node"):
+        path = section[key].split("::")[0]
+        assert (ROOT / path).is_file(), f"{key} names {path}, which does not exist"
+
+    assert set(section["three_refusals"]) == {
+        "even_patch_px",
+        "derived_pad",
+        "coverage_basis",
+    }
+
+    pointer = _card("ray_to_wave")["patch_step_reference"]
+    assert pointer == "knowledge/couplers/wave_to_ray/card.yaml::patch_step"
+    referenced_file, _, key = pointer.partition("::")
+    assert (ROOT / referenced_file).is_file()
+    assert key in card, "the pointer names a section the target card does not have"
+
+
 @pytest.mark.parametrize("direction", DIRECTIONS)
 def test_vendored_reference_data_is_a_separate_entry_that_names_real_files(
     direction: str,
