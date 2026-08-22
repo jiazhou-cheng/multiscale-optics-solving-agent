@@ -42,3 +42,10 @@ checkpoints/
 
 # Local Claude Code agent settings (not part of the project contract)
 .claude/
+
+# CHE-96: intermediate field dumps from the demo3 probes. They exist only so a
+# route-agreement comparison can be computed across two separately-run routes
+# (each route at a converged budget is ~150 s and six runs do not fit in one
+# command). Several MB each, regenerable by re-running the probe, and not
+# evidence -- the JSON records beside them are.
+benchmarks/probes/records/**/*_fields.npz

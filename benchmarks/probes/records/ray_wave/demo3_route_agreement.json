@@ -1,0 +1,80 @@
+{
+  "compared": [
+    "rw_f_seed131",
+    "rw_p_seed131"
+  ],
+  "cross_seed_matrix": [
+    {
+      "left": "rw_f_seed131",
+      "ncc_intensity": 0.010381715316168008,
+      "right": "rw_p_seed131"
+    },
+    {
+      "left": "rw_f_seed131",
+      "ncc_intensity": 0.017566453117613918,
+      "right": "rw_p_seed20260822"
+    },
+    {
+      "left": "rw_f_seed131",
+      "ncc_intensity": 0.014447988916621022,
+      "right": "rw_p_seed7"
+    },
+    {
+      "left": "rw_f_seed20260822",
+      "ncc_intensity": 0.01298222479675345,
+      "right": "rw_p_seed131"
+    },
+    {
+      "left": "rw_f_seed20260822",
+      "ncc_intensity": 0.012925570869494125,
+      "right": "rw_p_seed20260822"
+    },
+    {
+      "left": "rw_f_seed20260822",
+      "ncc_intensity": 0.013636003646038487,
+      "right": "rw_p_seed7"
+    },
+    {
+      "left": "rw_f_seed7",
+      "ncc_intensity": 0.02125057132136205,
+      "right": "rw_p_seed131"
+    },
+    {
+      "left": "rw_f_seed7",
+      "ncc_intensity": 0.017273271859160496,
+      "right": "rw_p_seed20260822"
+    },
+    {
+      "left": "rw_f_seed7",
+      "ncc_intensity": 0.011951814895819906,
+      "right": "rw_p_seed7"
+    }
+  ],
+  "environment": {
+    "commit": "5f480394c8c2795b47065f3c5ba1b99683fffb6d",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "TFRT_CPU_0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-96",
+  "mse_intensity_unit_sum": 6.498726707749667e-11,
+  "ncc_intensity": 0.010381715316168008,
+  "noise_limited_agreement": {
+    "mean_cross_route_ncc": 0.014712846082114607,
+    "mean_self_ncc": {
+      "demo3_characterization_rw_f": 0.0039629304442472466,
+      "demo3_characterization_rw_p": 0.04227366940084598
+    },
+    "predicted_if_same_field": 0.012943245785298825,
+    "ratio_measured_over_predicted": 1.1367199793753222,
+    "reading": "a ratio near 1 means the two routes agree to within the Monte Carlo noise each carries at this budget -- which is the strongest statement available without converging either. A ratio well below 1 would be a systematic difference between the routes and would invalidate the SI S2 relation for this system."
+  },
+  "note": "SI S2 relation (2) with a refractive element downstream. The only cross-check this system has -- the paper states no conventional reference exists -- so this is agreement between two of our own routes, not a validation of either.",
+  "probe": "demo3_route_agreement",
+  "sources": [
+    "demo3_characterization_rw_f",
+    "demo3_characterization_rw_p"
+  ]
+}

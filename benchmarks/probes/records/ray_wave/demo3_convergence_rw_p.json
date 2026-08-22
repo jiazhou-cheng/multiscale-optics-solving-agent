@@ -1,0 +1,90 @@
+{
+  "configuration": {
+    "backend": "jax",
+    "precision": "fp32",
+    "secondary_per_emitter": 20000,
+    "seeds": [
+      20260822,
+      7
+    ],
+    "sensor_grid": [
+      420,
+      420
+    ],
+    "sensor_pitch_m": 4.2e-06
+  },
+  "cost_ceiling": {
+    "extrapolated_hours_per_run": 1.1916748050002133,
+    "extrapolated_rays_required": 1780291452.4832127,
+    "extrapolated_rays_required_from_fit": 2159580622.6234202,
+    "extrapolated_seconds_per_run": 4290.029298000768,
+    "extrapolation_basis": "slope-1 theory anchored at the highest rung above the noise floor. The two-point log-log fit is reported next to it; the spread between them is the uncertainty on this number.",
+    "measured_seconds_per_ray": 2.409734255600051e-06,
+    "note": "Our reconstruction is O(N_rays x N_pixels); upstream's is O(N_rays) + one FFT. This is the number the k-space fast path tracked on CHE-95 would change, stated rather than asserted. The issue asks for a budget shortfall to be reported as evidence, and this is that report.",
+    "paper_table_s2_rays": {
+      "rw_f": 5280000000.0,
+      "rw_p": 2600000000.0
+    },
+    "target_seed_to_seed_ncc": 0.9
+  },
+  "device_memory": {
+    "available": true,
+    "bytes_limit": 38275448832,
+    "device": "cuda:0",
+    "peak_bytes_in_use": 11877416192,
+    "peak_gb": 11.877
+  },
+  "environment": {
+    "commit": "5f480394c8c2795b47065f3c5ba1b99683fffb6d",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "cuda:0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-96",
+  "probe": "demo3_convergence",
+  "route": "rw_p",
+  "rungs": [
+    {
+      "mean_seed_to_seed_ncc": 0.010373645820936089,
+      "pairs": [
+        0.010373645820936089
+      ],
+      "patches": 1000,
+      "rays_per_pixel": 113.37868480725623,
+      "secondary_per_patch": 20000,
+      "total_rays": 20000000,
+      "wall_clock_s": 99.39168976095971
+    },
+    {
+      "mean_seed_to_seed_ncc": 0.014668856139632348,
+      "pairs": [
+        0.014668856139632348
+      ],
+      "patches": 1500,
+      "rays_per_pixel": 170.06802721088437,
+      "secondary_per_patch": 20000,
+      "total_rays": 30000000,
+      "wall_clock_s": 143.7097307840013
+    },
+    {
+      "mean_seed_to_seed_ncc": 0.020221408101345397,
+      "pairs": [
+        0.020221408101345397
+      ],
+      "patches": 2000,
+      "rays_per_pixel": 226.75736961451247,
+      "secondary_per_patch": 20000,
+      "total_rays": 40000000,
+      "wall_clock_s": 192.7787404480041
+    }
+  ],
+  "trend": {
+    "log_log_slope": 0.9558397469348232,
+    "noise_floor_ncc": 0.007142857142857143,
+    "note": "seed-to-seed NCC is the estimator's own signal fraction. While it is small it grows linearly in the ray count for an unbiased estimator with independent noise, so a log-log slope near 1 says the disagreement is Monte Carlo noise and not a systematic one.",
+    "rungs_above_noise_floor": 3,
+    "slope_reading": "near 1: noise-limited, more rays fix it. Near 0: a systematic difference that no budget removes."
+  }
+}
