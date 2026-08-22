@@ -34,7 +34,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 TUTORIAL_SUITE = ROOT / "tests_tutorial"
-ARCHIVE_GENERATIONS = ROOT / "archive" / "tests"
+ARCHIVE_ROOT = ROOT / "archive"
+ARCHIVE_GENERATIONS = ARCHIVE_ROOT / "tests"
 
 #: What CHE-67 archived, as (generation-relative path) -> why. The paths are the
 #: original ones, so this doubles as the restore map: unarchiving is
@@ -59,8 +60,19 @@ ARCHIVED_GEN1 = {
     "tests/test_m2_coupler_protocol.py": "outdated milestone suite",
     "tests/test_m3_slice_protocol.py": "outdated milestone suite",
     "tests/test_m3_pupil_to_focus.py": "outdated milestone suite",
-    "tests/test_m3_psf_measurement.py": "outdated milestone suite",
-    "tests/test_m3_psf_verification.py": "outdated milestone suite",
+    # `test_m3_psf_measurement.py` and `test_m3_psf_verification.py` were
+    # unarchived by CHE-88 and are now `tests/test_psf_measurement.py` and
+    # `tests/test_psf_verification.py`. They are not listed because this dict is
+    # the restore map and there is nothing left to restore.
+    #
+    # Why they came back: CHE-67 archived them as milestone evidence, but they
+    # were the *only* guard on `evaluation/psf_oracles.py` (807 lines, the
+    # independent Airy and Fraunhofer oracles) and `evaluation/psf_measurement.py`
+    # (448 lines, named as the terminal measurement by the registry and the
+    # shipped example graph). An unguarded verification oracle is worse than
+    # either keeping or deleting it: it silently becomes the thing it was meant
+    # to check. Both files run unmodified against the committed probe record --
+    # 46 tests, 6.6 s -- so restoring beat rewriting them.
     "tests/test_m3_convergence.py": "outdated milestone suite",
     "tests/test_m3_off_axis_handoff.py": "outdated milestone suite",
     "tests/test_m3_quadrature_weight.py": "outdated milestone suite",
@@ -153,12 +165,21 @@ def test_every_archive_generation_carries_the_collection_abort() -> None:
     """The guard that survives a mistyped path must exist in every generation.
 
     `testpaths` and `norecursedirs` both stop at *directory* level; naming an
-    archived file directly walks past both (measured in CHE-67). The per-generation
-    conftest is what turns that into a usage error, so it is the one part of the
-    archive that a future generation must not forget to copy.
+    archived file directly walks past both (measured in CHE-67). The
+    per-generation conftest is what turns that into a usage error, so it is the
+    one part of the archive that a future generation must not forget to copy.
+
+    Scoped to every generation under `archive/`, not just `archive/tests/`.
+    CHE-88 added `archive/benchmarks/gen1/`, and an archive tree that happens to
+    contain no test file today is exactly the one that will acquire one later
+    without anyone remembering the guard.
     """
-    generations = sorted(p for p in ARCHIVE_GENERATIONS.glob("*") if p.is_dir())
-    assert generations, "archive/tests/ has no generation directories"
+    generations = sorted(
+        path
+        for family in sorted(p for p in ARCHIVE_ROOT.glob("*") if p.is_dir())
+        for path in sorted(p for p in family.glob("*") if p.is_dir())
+    )
+    assert generations, "archive/ has no generation directories"
     for generation in generations:
         conftest = generation / "conftest.py"
         assert conftest.is_file(), f"{generation.relative_to(ROOT)} has no conftest.py guard"

@@ -103,7 +103,7 @@ carried forward from CHE-38/CHE-47:
 `convergence.json` (the full sensor ray ladder), `plot.png`, `README.md`.
 Every file is SHA-256 hashed into `provenance.json`.
 
-The scientific fingerprint covers physics only (`evaluation.m1_bundle.
-VOLATILE_KEYS` stripped): wall-clock and run-identity keys are excluded, so
+The scientific fingerprint covers physics only (`core.provenance.VOLATILE_KEYS`
+stripped): wall-clock and run-identity keys are excluded, so
 the fingerprint is bit-identical across two runs on an unchanged tree — the
 same guarantee L2-COUPLER-01 (CHE-29) established for M2.

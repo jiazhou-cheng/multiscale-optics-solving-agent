@@ -7,7 +7,11 @@ Implemented here:
   `1.0e-3 fft_oracle_intensity_relative_l2` gate is **unmet** and carried into
   M4 as an explicit open limitation; see `benchmarks/manifest.yaml`'s
   `gate_disposition` and `L2-PSF-01/README.md`.
-* `L2-COUPLER-01` — bidirectional ray-wave coupler characterization.
+
+`L2-COUPLER-01` (bidirectional ray-wave coupler characterization, M2) was
+archived to `archive/benchmarks/gen1/` by CHE-88: its physics is covered by the
+active `test_coupler_round_trip.py`, `test_coupler_gradient.py` and
+`test_curvature_bound.py`.
 
 A Level 2 task passes only when the coupling boundary is independently tested.
 Passing each model separately is not sufficient.

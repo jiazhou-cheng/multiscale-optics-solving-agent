@@ -13,6 +13,9 @@ from pathlib import Path
 import pytest
 import yaml
 
+from multiscale_optics_agent.core.specs import DerivativeMode, Maturity
+from multiscale_optics_agent.registry.loader import Registry
+
 pytestmark = pytest.mark.coupler
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -144,19 +147,52 @@ def test_wave_to_ray_records_the_estimator_as_knowingly_biased() -> None:
     assert "biased surrogate" in rejected["backward"]
 
 
-def test_wave_to_ray_records_the_independence_check_it_replaced() -> None:
-    """verify_m1_independence.py used to assert C_WAVE_TO_RAY did NOT exist.
-    Registering it retired that check, so the replacements must actually be
-    present -- otherwise a claim audit silently got weaker."""
+def test_wave_to_ray_registration_is_not_a_capability_claim() -> None:
+    """The M1 independence check asserted C_WAVE_TO_RAY did *not* exist.
+
+    CHE-23 registered the coupler, so that check could no longer hold. It was
+    replaced rather than deleted, because the property it protected still
+    matters: the registry must not claim a wave->ray capability that has not
+    been established.
+
+    CHE-88 archived `verify_m1_independence.py` with the rest of the gen1
+    suite. This test used to assert that the four replacement checks appeared
+    *as strings* in that script, which was already the weaker form of the
+    question -- and archiving the script would have silently retired the audit a
+    second time, in exactly the way the card warns about.
+
+    So the four claims are asserted here, against the packaged registry, where
+    they are properties rather than source text. That survives the archival and
+    is what the card's `registry_claims_now_audited` list now points at.
+    """
     card = _card("wave_to_ray")
     note = card["registry_note"]
     assert "wave_to_ray_not_claimed" in note
     assert "REPLACED" in note
 
-    verifier = (ROOT / "benchmarks/verify_m1_independence.py").read_text()
-    assert '"wave_to_ray_not_claimed": "C_WAVE_TO_RAY" not in by_id' not in verifier
-    for claim in card["registry_claims_now_audited"]:
-        assert f'"{claim}"' in verifier, claim
+    spec = Registry.from_package().couplers["C_WAVE_TO_RAY"]
+
+    # `maturity` was `experimental` when the replacement checks were written and
+    # is `characterized` since CHE-87, which set the field from what is actually
+    # measured. The claim the check protects is the ceiling, not the exact
+    # rung: a Monte Carlo estimator with no certified gradient is not validated.
+    assert spec.maturity != Maturity.VALIDATED
+
+    assert spec.derivative.verified is False
+    assert spec.derivative.mode == DerivativeMode.SURROGATE
+    assert spec.lossy is True
+
+    audited = set(card["registry_claims_now_audited"])
+    assert audited == {
+        "wave_to_ray_not_validated",
+        "wave_to_ray_gradient_unverified",
+        "wave_to_ray_gradient_mode_is_surrogate",
+        "wave_to_ray_declared_lossy",
+    }, (
+        "the card lists claims this test does not audit, or vice versa. Both "
+        "must move together -- a claim listed as audited and checked by nothing "
+        "is worse than an unlisted one."
+    )
 
 
 def test_curvature_bound_is_recorded_with_its_assumptions() -> None:

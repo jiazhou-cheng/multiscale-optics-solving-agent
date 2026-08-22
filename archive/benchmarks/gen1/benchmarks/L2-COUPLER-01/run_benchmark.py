@@ -67,7 +67,7 @@ from multiscale_optics_agent.couplers.wave_to_ray import (  # noqa: E402
     sampling_density,
     spectrum_to_rays,
 )
-from multiscale_optics_agent.evaluation.m1_bundle import VOLATILE_KEYS, _strip_volatile  # noqa: E402
+from multiscale_optics_agent.core.provenance import VOLATILE_KEYS, strip_volatile  # noqa: E402
 
 BENCHMARK_ID = "L2-COUPLER-01"
 PROTOCOL_ID = "M2-COUPLER-CPU-V1"
@@ -708,8 +708,8 @@ def main() -> int:
     # so the M1.8 defect -- wall-clock leaking into a hash and making it track
     # machine load -- cannot recur here.
     projection = {
-        "accuracy": _strip_volatile(accuracy),
-        "stochastic": _strip_volatile(stochastic),
+        "accuracy": strip_volatile(accuracy),
+        "stochastic": strip_volatile(stochastic),
         "array_sha256": hashlib.sha256(
             b"".join(np.ascontiguousarray(arrays[k]).tobytes() for k in sorted(arrays))
         ).hexdigest(),

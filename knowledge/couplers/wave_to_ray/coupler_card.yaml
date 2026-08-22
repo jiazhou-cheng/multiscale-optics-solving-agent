@@ -296,16 +296,33 @@ not_yet_probed:
   - vector fields, chromatic ensembles, GPU
 
 registry_note: >
-  benchmarks/verify_m1_independence.py previously asserted this coupler's
-  ABSENCE via the check wave_to_ray_not_claimed. CHE-23 registered the coupler,
-  so that check could no longer hold. It was REPLACED rather than deleted,
-  because the property it protected still matters: the registry must not claim a
-  wave->ray capability M2 has not established. The replacements assert that the
-  entry is experimental, that its gradient is unverified, that its derivative
-  mode is `surrogate` rather than native_autodiff, and that it is declared
-  lossy. Registration is not a capability claim.
+  The M1 independence check asserted this coupler's ABSENCE, via a check named
+  wave_to_ray_not_claimed. CHE-23 registered the coupler, so that check could no
+  longer hold. It was REPLACED rather than deleted, because the property it
+  protected still matters: the registry must not claim a wave->ray capability
+  that has not been established. Registration is not a capability claim.
+
+  The replacements assert that the entry is not `validated`, that its gradient
+  is unverified, that its derivative mode is `surrogate` rather than
+  native_autodiff, and that it is declared lossy.
+
+  Where they are checked has moved twice, and the second move is the one worth
+  knowing about. They were originally string-matched inside
+  benchmarks/verify_m1_independence.py; CHE-88 archived that script with the
+  gen1 suite, which would have retired the audit a second time in exactly the
+  way this note warns against. They are now asserted against the packaged
+  registry by
+  tests/test_coupler_knowledge_pack.py::test_wave_to_ray_registration_is_not_a_capability_claim,
+  which checks them as properties rather than as source text and does not depend
+  on any benchmark surviving.
+
+  One claim was renamed in the move. `wave_to_ray_registered_experimental`
+  became `wave_to_ray_not_validated`: CHE-87 set every registry entry's
+  `maturity` from what is actually measured, and this coupler is now
+  `characterized`. The property the check protects is the ceiling, not the exact
+  rung -- a Monte Carlo estimator with no certified gradient is not validated.
 registry_claims_now_audited:
-  - wave_to_ray_registered_experimental
+  - wave_to_ray_not_validated
   - wave_to_ray_gradient_unverified
   - wave_to_ray_gradient_mode_is_surrogate
   - wave_to_ray_declared_lossy

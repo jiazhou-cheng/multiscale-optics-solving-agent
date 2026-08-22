@@ -22,32 +22,35 @@ benchmarks/levelN/<task_id>/
 
 Every run must emit `graph.yaml`, `result.json`, scientific artifacts, and `provenance.json`. Freeze task specifications and evaluator versions before comparing agents.
 
-The M1 ray and wave baselines additionally follow the frozen
-[`M1-BASELINE-CPU-V1`](M1_BASELINE_PROTOCOL.md) contract. Each baseline runs
-in a fresh process without importing the other engine or a coupler, and must
-emit `result.json`, `provenance.json`, `arrays.npz`, `plot.png`,
-`tolerances.yaml`, and `README.md`. Accuracy and performance results remain
-separate. Missing solver results are reported as structured blockers, never
-replaced with fabricated values.
+## What is here
 
-Reproduce and independently review the complete M1 branches with:
+| | |
+| -- | -- |
+| **Live suite** | `level2/L2-PSF-01/` -- the one maintained benchmark. Its `1.0e-3 fft_oracle_intensity_relative_l2` gate is **unmet** and carried into M4 as an explicit open limitation; see `manifest.yaml`'s `gate_disposition`. |
+| **Protocols** | `protocol.yaml`, `coupler_protocol.yaml`, `slice_protocol.yaml`, and the three `*_PROTOCOL.md` contracts. Frozen. |
+| **Reports** | the milestone record. Historical, and their numbers stand. |
+| **Probes** | `probes/` -- one-off executable evidence behind card claims. |
+| **Roadmap** | `roadmap.md` -- planned tasks and retired components, explicitly non-executable. |
 
-```bash
-./run.sh python benchmarks/level1/L1-RAY-01/run_all.py
-./run.sh python benchmarks/level1/L1-WAVE-01/run_all.py
-./run.sh python benchmarks/verify_m1_independence.py
-```
+## Archived (CHE-88)
 
-The reviewed outcome of those runs is the M1 exit report,
-[`M1_BASELINE_REPORT.md`](M1_BASELINE_REPORT.md): exact commands, commit,
-environment, per-branch accuracy and performance evidence, independence and
-claim-audit results, and the recorded limitations that M2 must carry forward.
-Note that the ray branch runs the amended `M1-BASELINE-CPU-V2` contract while
-the wave branch runs `M1-BASELINE-CPU-V1`; the report records that gap as
-limitation L2.
+`L1-RAY-01`, `L1-WAVE-01`, `L2-COUPLER-01` and `verify_m1_independence.py` moved
+to `archive/benchmarks/gen1/`, with the three benchmark-only adapters and
+`m1_bundle.py` that only they consumed. They are preserved and **not runnable**;
+`archive/benchmarks/gen1/README.md` records what each one guarded and what is
+therefore unguarded now.
 
-Each `run_all.py` command launches its standalone, analytic, and scaling work
-in separate child processes. The root bundle records a scientific fingerprint
-that excludes timestamps, run identifiers, paths, process IDs, timings, peak
-RSS, and the Git dirty flag; performance is comparable only when the separate
-environment fingerprint matches.
+The M1 exit report ([`M1_BASELINE_REPORT.md`](M1_BASELINE_REPORT.md)) and the
+`M1-BASELINE-CPU-V1`/`V2` contracts still describe those runs accurately. They
+are the milestone record; the code that produced them is one directory away.
+
+## Reproducibility
+
+A run's *scientific fingerprint* is the hash of what it computed with everything
+about the particular execution projected out -- timestamps, run identifiers,
+paths, process IDs, timings, peak RSS. The projection is
+`core.provenance.VOLATILE_KEYS` and `strip_volatile`, which CHE-88 moved out of
+the archived `m1_bundle.py` because reproducibility is not an M1 concern. The
+git dirty flag, package versions, device and dtype are deliberately **not**
+projected out: they change what was computed. Performance is comparable only
+when the separate environment fingerprint also matches.

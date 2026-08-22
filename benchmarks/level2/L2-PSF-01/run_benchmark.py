@@ -83,7 +83,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from multiscale_optics_agent.evaluation.m1_bundle import VOLATILE_KEYS, _strip_volatile  # noqa: E402
+from multiscale_optics_agent.core.provenance import VOLATILE_KEYS, strip_volatile  # noqa: E402
 
 BENCHMARK_ID = "L2-PSF-01"
 PROTOCOL_ID = "M3-SLICE-CPU-V1"
@@ -509,13 +509,13 @@ def main() -> int:
     _write_plot(output_dir / "plot.png", production)
     (output_dir / "tolerances.yaml").write_text((here / "tolerances.yaml").read_text())
     (output_dir / "convergence.json").write_text(
-        json.dumps(_strip_volatile(production["sensor_ladder"]), indent=2, sort_keys=True, default=float)
+        json.dumps(strip_volatile(production["sensor_ladder"]), indent=2, sort_keys=True, default=float)
     )
     (output_dir / "README.md").write_text((here / "README.md").read_text())
 
     projection = {
-        "accuracy": _strip_volatile(accuracy),
-        "differentiability": _strip_volatile(differentiability),
+        "accuracy": strip_volatile(accuracy),
+        "differentiability": strip_volatile(differentiability),
         "array_sha256": hashlib.sha256(
             b"".join(np.ascontiguousarray(arrays[k]).tobytes() for k in sorted(arrays))
         ).hexdigest(),
