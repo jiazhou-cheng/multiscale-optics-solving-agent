@@ -1,0 +1,331 @@
+{
+  "cells": [
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 29197056,
+        "peak_gb": 0.029
+      },
+      "incident_rays": 100,
+      "mse_intensity_unit_sum": 5.719272040935991e-08,
+      "ncc_intensity": 0.29103509553024726,
+      "pad_px": 205,
+      "rays_per_second": 3561.6452623244627,
+      "relative_l2_field": 2.762835537271181,
+      "secondary_per_incident": 100,
+      "status": "measured",
+      "total_rays": 10000,
+      "wall_clock_s": 2.807691182999406
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 288482048,
+        "peak_gb": 0.288
+      },
+      "incident_rays": 100,
+      "mse_intensity_unit_sum": 2.1948905170279238e-08,
+      "ncc_intensity": 0.8087333027990173,
+      "pad_px": 205,
+      "rays_per_second": 45002.81584291327,
+      "relative_l2_field": 0.9118094964112379,
+      "secondary_per_incident": 1000,
+      "status": "measured",
+      "total_rays": 100000,
+      "wall_clock_s": 2.2220831769518554
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 2876082432,
+        "peak_gb": 2.876
+      },
+      "incident_rays": 100,
+      "mse_intensity_unit_sum": 1.1235094588854864e-08,
+      "ncc_intensity": 0.9083632569541135,
+      "pad_px": 205,
+      "rays_per_second": 373324.86793902033,
+      "relative_l2_field": 0.36614669678245615,
+      "secondary_per_incident": 10000,
+      "status": "measured",
+      "total_rays": 1000000,
+      "wall_clock_s": 2.6786321669933386
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 2876082432,
+        "peak_gb": 2.876
+      },
+      "incident_rays": 400,
+      "mse_intensity_unit_sum": 3.380756611028738e-08,
+      "ncc_intensity": 0.6920941110510942,
+      "pad_px": 205,
+      "rays_per_second": 14362.313844959397,
+      "relative_l2_field": 1.3805821515584686,
+      "secondary_per_incident": 100,
+      "status": "measured",
+      "total_rays": 40000,
+      "wall_clock_s": 2.7850665590376593
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 2876082432,
+        "peak_gb": 2.876
+      },
+      "incident_rays": 400,
+      "mse_intensity_unit_sum": 5.6786200289664774e-09,
+      "ncc_intensity": 0.9546951736307858,
+      "pad_px": 205,
+      "rays_per_second": 132899.80398427905,
+      "relative_l2_field": 0.45172555554913857,
+      "secondary_per_incident": 1000,
+      "status": "measured",
+      "total_rays": 400000,
+      "wall_clock_s": 3.0097862299880944
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11504082432,
+        "peak_gb": 11.504
+      },
+      "incident_rays": 400,
+      "mse_intensity_unit_sum": 2.450217016779873e-09,
+      "ncc_intensity": 0.9801631453844906,
+      "pad_px": 205,
+      "rays_per_second": 927696.1912215224,
+      "relative_l2_field": 0.18514583899808654,
+      "secondary_per_incident": 10000,
+      "status": "measured",
+      "total_rays": 4000000,
+      "wall_clock_s": 4.311756411043461
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11504082432,
+        "peak_gb": 11.504
+      },
+      "incident_rays": 1600,
+      "mse_intensity_unit_sum": 1.1314738715131245e-08,
+      "ncc_intensity": 0.9171708306191673,
+      "pad_px": 205,
+      "rays_per_second": 28945.00686334654,
+      "relative_l2_field": 0.6820971981188073,
+      "secondary_per_incident": 100,
+      "status": "measured",
+      "total_rays": 160000,
+      "wall_clock_s": 5.527723684965167
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11504082432,
+        "peak_gb": 11.504
+      },
+      "incident_rays": 1600,
+      "mse_intensity_unit_sum": 1.5073433809419224e-09,
+      "ncc_intensity": 0.987765879002922,
+      "pad_px": 205,
+      "rays_per_second": 263734.92506593926,
+      "relative_l2_field": 0.2219379459314395,
+      "secondary_per_incident": 1000,
+      "status": "measured",
+      "total_rays": 1600000,
+      "wall_clock_s": 6.066697459958959
+    },
+    {
+      "batches": 4,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520245504,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 1600,
+      "mse_intensity_unit_sum": 7.097464725390712e-10,
+      "ncc_intensity": 0.9942564725084003,
+      "pad_px": 205,
+      "rays_per_second": 1767577.0427480836,
+      "relative_l2_field": 0.08902779819752017,
+      "secondary_per_incident": 10000,
+      "status": "measured",
+      "total_rays": 16000000,
+      "wall_clock_s": 9.05193924397463
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520245504,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 6400,
+      "mse_intensity_unit_sum": 2.7869364304042964e-09,
+      "ncc_intensity": 0.9789777603814301,
+      "pad_px": 205,
+      "rays_per_second": 40697.56498076412,
+      "relative_l2_field": 0.3421062970815503,
+      "secondary_per_incident": 100,
+      "status": "measured",
+      "total_rays": 640000,
+      "wall_clock_s": 15.72575657296693
+    },
+    {
+      "batches": 2,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520245504,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 6400,
+      "mse_intensity_unit_sum": 5.381240754911037e-10,
+      "ncc_intensity": 0.9956139591716622,
+      "pad_px": 205,
+      "rays_per_second": 358508.10401695926,
+      "relative_l2_field": 0.1142383457743313,
+      "secondary_per_incident": 1000,
+      "status": "measured",
+      "total_rays": 6400000,
+      "wall_clock_s": 17.851758240023628
+    },
+    {
+      "batches": 16,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520246016,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 6400,
+      "mse_intensity_unit_sum": 3.348313805608595e-10,
+      "ncc_intensity": 0.9972717681394874,
+      "pad_px": 205,
+      "rays_per_second": 1754011.236661168,
+      "relative_l2_field": 0.05172152287485266,
+      "secondary_per_incident": 10000,
+      "status": "measured",
+      "total_rays": 64000000,
+      "wall_clock_s": 36.48779361404013
+    },
+    {
+      "batches": 1,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520246016,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 16000,
+      "mse_intensity_unit_sum": 1.0674349298746676e-09,
+      "ncc_intensity": 0.9917003686772978,
+      "pad_px": 205,
+      "rays_per_second": 45849.677151604315,
+      "relative_l2_field": 0.2130108017061874,
+      "secondary_per_incident": 100,
+      "status": "measured",
+      "total_rays": 1600000,
+      "wall_clock_s": 34.896647030021995
+    },
+    {
+      "batches": 4,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520246016,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 16000,
+      "mse_intensity_unit_sum": 1.6000349803624168e-10,
+      "ncc_intensity": 0.9986958196683725,
+      "pad_px": 205,
+      "rays_per_second": 397018.7231525004,
+      "relative_l2_field": 0.0697827318494856,
+      "secondary_per_incident": 1000,
+      "status": "measured",
+      "total_rays": 16000000,
+      "wall_clock_s": 40.300366373034194
+    },
+    {
+      "batches": 40,
+      "device_memory": {
+        "available": true,
+        "bytes_limit": 38275448832,
+        "device": "cuda:0",
+        "peak_bytes_in_use": 11520246016,
+        "peak_gb": 11.52
+      },
+      "incident_rays": 16000,
+      "mse_intensity_unit_sum": 7.142731010506863e-11,
+      "ncc_intensity": 0.9994182326189224,
+      "pad_px": 205,
+      "rays_per_second": 1749939.5322911206,
+      "relative_l2_field": 0.02856208422471665,
+      "secondary_per_incident": 10000,
+      "status": "measured",
+      "total_rays": 160000000,
+      "wall_clock_s": 91.43173066701274
+    }
+  ],
+  "configuration": {
+    "backend": "jax",
+    "max_rays": 200000000.0,
+    "oracle": "matched-periodicity ASM at the route's own pad",
+    "pad_factor_requested": 4,
+    "patch_px": 51,
+    "precision": "fp32",
+    "rays_per_chunk": 4000000.0,
+    "seed": 20260822
+  },
+  "cost_model": "our reconstruction is O(N_rays x N_pixels) -- ray_to_wave contracts a separable einsum('n,ny,nx->yx'). Upstream's is O(N_rays) + one FFT. The same ray budget is therefore not the same cost, and the wall-clock column is the evidence for the k-space fast path tracked on CHE-95.",
+  "environment": {
+    "commit": "da2e757bfba3aff7d5d8c2f3e57ba2878513f073",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "cuda:0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-96",
+  "probe": "demo2_cost_sweep",
+  "summary": {
+    "best_ncc": 0.9994182326189224,
+    "cells_measured": 15,
+    "cells_skipped": 0
+  },
+  "total_wall_clock_s": 276.58491401199717
+}
