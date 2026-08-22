@@ -95,6 +95,80 @@ if [[ "$USE_GPU" -eq 1 ]]; then
     # Count and DeviceIDs on device request". The embedded quotes suppress that
     # split. Harmless for a single device, so it is applied unconditionally.
     gpu_args=(--gpus "\"$gpus\"")
+
+    # Fallback for a host whose NVML enumeration is broken.
+    #
+    # `--gpus` goes through nvidia-container-cli, whose prestart hook calls
+    # nvmlInit and enumerates *every* GPU on the box before it decides which
+    # ones to expose. One GPU in a fault state therefore fails the hook for all
+    # of them -- "nvidia-container-cli: detection error: nvml error: unknown
+    # error" -- and no GPU container starts at all, however healthy the device
+    # actually requested is. Recovering the faulted device needs a GPU reset or
+    # a reboot, i.e. root on a shared host, so it is not something this script
+    # can or should do.
+    #
+    # What the hook does is mechanical: bind the requested /dev/nvidia* nodes
+    # and the host's userspace driver libraries into the container. Doing it
+    # explicitly skips the enumeration entirely. It is strictly narrower than
+    # `--gpus` -- only the devices named by MOA_GPUS are visible -- and it
+    # touches no host state.
+    #
+    # MOA_GPU_PASSTHROUGH=1 forces this path, =0 forbids it; unset auto-detects.
+    passthrough="${MOA_GPU_PASSTHROUGH:-auto}"
+    if [[ "$passthrough" == auto ]]; then
+        if nvidia-container-cli info >/dev/null 2>&1; then
+            passthrough=0
+        else
+            passthrough=1
+            echo "run.sh: nvidia-container-cli cannot enumerate this host's GPUs;" >&2
+            echo "run.sh: falling back to explicit device passthrough for '$gpus'." >&2
+        fi
+    fi
+
+    if [[ "$passthrough" == 1 ]]; then
+        if [[ "$gpus" != device=* ]]; then
+            echo "run.sh: device passthrough needs explicit ids, e.g. MOA_GPUS=device=0 (got '$gpus')." >&2
+            exit 2
+        fi
+
+        gpu_args=()
+        IFS=, read -r -a _moa_devs <<<"${gpus#device=}"
+        for dev in "${_moa_devs[@]}"; do
+            if [[ ! -e "/dev/nvidia${dev}" ]]; then
+                echo "run.sh: /dev/nvidia${dev} does not exist." >&2
+                exit 2
+            fi
+            gpu_args+=(--device "/dev/nvidia${dev}")
+        done
+        for dev in /dev/nvidiactl /dev/nvidia-uvm /dev/nvidia-uvm-tools; do
+            [[ -e "$dev" ]] && gpu_args+=(--device "$dev")
+        done
+
+        # Mount each driver library straight onto its SONAME. The container runs
+        # as the invoking user, so it cannot create the symlinks or run ldconfig
+        # that the real hook would; binding onto the linker-visible name is the
+        # equivalent that works unprivileged.
+        libdir=/usr/lib/x86_64-linux-gnu
+        driver_version=$(cat /sys/module/nvidia/version 2>/dev/null || true)
+        if [[ -z "$driver_version" ]]; then
+            echo "run.sh: cannot read the NVIDIA driver version from /sys/module/nvidia/version." >&2
+            exit 2
+        fi
+        for pair in \
+            "libcuda.so:libcuda.so.1" \
+            "libnvidia-ml.so:libnvidia-ml.so.1" \
+            "libnvidia-ptxjitcompiler.so:libnvidia-ptxjitcompiler.so.1" \
+            "libnvidia-nvvm.so:libnvidia-nvvm.so.4" \
+            "libnvidia-gpucomp.so:libnvidia-gpucomp.so.1" \
+            "libnvidia-allocator.so:libnvidia-allocator.so.1"
+        do
+            src="${libdir}/${pair%%:*}.${driver_version}"
+            dst="${libdir}/${pair##*:}"
+            [[ -e "$src" ]] && gpu_args+=(-v "${src}:${dst}:ro")
+        done
+        [[ -x /usr/bin/nvidia-smi ]] && gpu_args+=(-v /usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro)
+        gpu_args+=(-e "LD_LIBRARY_PATH=${libdir}")
+    fi
 fi
 
 if [[ "$DO_BUILD" -eq 1 ]]; then

@@ -49,6 +49,57 @@ than 2 devices (exit code 2) rather than silently clamping, and
 `test_gpu_visibility_honors_the_two_device_project_cap` asserts the cap from
 inside the container so a raw `docker run --gpus all` is caught too.
 
+### Trap 3: one faulted GPU blocks every GPU container on the host
+
+Observed 2026-08-22, and the reason `--gpu` grew a second code path.
+
+```
+docker: Error response from daemon: ... error running prestart hook #0:
+nvidia-container-cli: detection error: nvml error: unknown error
+```
+
+Nothing about the container is wrong. GPU 5 (`0000:B2:00.0`) on this host is in
+a fault state at the NVML level — `nvidia-smi -L` lists the other seven and
+fails on that one, and `nvidia-container-cli info` fails outright.
+`nvidia-container-cli`'s prestart hook calls `nvmlInit` and enumerates **every**
+GPU before deciding which to expose, so a single bad device fails the hook for
+all of them, however healthy the one you asked for is. `MOA_GPUS=device=0`,
+selecting by UUID, and `--gpus '"device=<uuid>"'` all fail identically, because
+the failure precedes device selection.
+
+Repairing it needs `nvidia-smi -r` or a reboot — root on a shared host, and
+outside what this project may do.
+
+So `run.sh --gpu` falls back. When `nvidia-container-cli info` fails, it binds
+the requested `/dev/nvidia<N>` nodes plus `/dev/nvidiactl`, `/dev/nvidia-uvm`
+and `/dev/nvidia-uvm-tools`, and bind-mounts the host's userspace driver
+libraries, skipping enumeration entirely. Three properties make this safe rather
+than a workaround that hides a problem:
+
+* It is **narrower** than `--gpus`, not wider — only the devices `MOA_GPUS`
+  names are visible, and the two-device cap is applied before it.
+* It changes no host state, no driver, and no daemon configuration.
+* It works unprivileged. The container runs as the invoking user, so it cannot
+  create symlinks or run `ldconfig` the way the real hook does; each library is
+  therefore bind-mounted **directly onto its SONAME**
+  (`libcuda.so.$VERSION` → `libcuda.so.1`, `libnvidia-nvvm.so.$VERSION` →
+  `libnvidia-nvvm.so.4`, and so on), with the version read from
+  `/sys/module/nvidia/version` rather than hard-coded.
+
+Control it with `MOA_GPU_PASSTHROUGH`: `auto` (default) detects,
+`1` forces the fallback, `0` forbids it and keeps the stock `--gpus` path. Once
+the host is repaired, nothing has to be un-done — auto-detection simply stops
+choosing the fallback.
+
+Evidence on device 0 through the fallback, 2026-08-22, driver 550.163.01:
+`nvidia-smi -L` names the A6000; `jax.devices()` returns `[CudaDevice(id=0)]`;
+a 2048² matmul returns the exact expected `8589934592.0`;
+`torch.cuda.is_available()` is `True` with `device_count() == 1`; and
+`./run.sh --gpu pytest -q -m gpu` is **48 passed, 769 deselected in 69.68 s**,
+matching the CHE-72/CHE-73 figure of 48 passed in 70 s measured through the
+stock path. The suite asserts real kernel execution, not device enumeration, so
+that equality is a statement about compute, not about visibility.
+
 ## Verified evidence
 
 Recorded by `tests/test_gpu_environment.py::test_record_actual_devices_used` via
