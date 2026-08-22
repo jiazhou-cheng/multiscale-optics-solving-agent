@@ -28,20 +28,18 @@ from couplers.cascade import CascadeDiagnostics, PrimarySampling, planar_doe_ste
 from couplers.doe_node import PlanarDoeStepCoupler
 from couplers.node import RayToWaveCoupler
 
+# `PlanarDoeStepCoupler` and `RayToWaveCoupler` are the two runnable graph nodes;
+# `planar_doe_step` and its two companions are the batched step as a library
+# call, for a caller outside a graph. Sorted rather than grouped by role, because
+# a hand-grouped list drifts and ruff will not let it.
 __all__ = [
-    # The two runnable graph nodes.
-    "PlanarDoeStepCoupler",
-    "RayToWaveCoupler",
-    # The batched planar step as a library call, for callers outside a graph.
-    "CascadeDiagnostics",
-    "PrimarySampling",
-    "planar_doe_step",
     "AXIS_ORDER",
     "DEFAULT_SOURCE_PORT",
     "ORIGIN_RULE",
     "PHASOR",
     "PSF",
     "SPATIAL_FACTOR",
+    "CascadeDiagnostics",
     "ComplexField",
     "ContractCode",
     "ContractError",
@@ -49,7 +47,11 @@ __all__ = [
     "CouplerRunRequest",
     "CouplerRunResult",
     "Frame",
+    "PlanarDoeStepCoupler",
+    "PrimarySampling",
     "RayBundle",
+    "RayToWaveCoupler",
     "ReferencePlane",
     "WavefrontSamples",
+    "planar_doe_step",
 ]
