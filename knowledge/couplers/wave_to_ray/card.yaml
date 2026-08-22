@@ -397,3 +397,87 @@ validation_note: >
   patch at float64 on CPU. Curved surfaces, the round trip and cascade, every
   gradient claim, vector fields, chromatic ensembles, and accelerators remain
   unestablished.
+
+# --- The batched planar DOE step (CHE-95) -------------------------------------
+#
+# `C_PLANAR_DOE_STEP` is a registered coupler with a graph node, and it composes
+# this direction with the other one: accumulate every incident ray onto a common
+# plane through C_RAY_TO_WAVE, apply the DOE transmission once, transform, and
+# resample a fixed budget through C_WAVE_TO_RAY. SI Algorithm S1.
+#
+# It had existed as `couplers/cascade.py::planar_doe_step` since M2 and was
+# library-only -- no registry entry, no capability declaration, no graph node --
+# so the one operator that bounds ray count across stacked DOEs could not appear
+# in a graph. CHE-95 promoted it rather than writing a new coupler, because the
+# mathematics was already verified; what was missing was reachability.
+batched_planar_step:
+  coupler_id: C_PLANAR_DOE_STEP
+  implementation: src/couplers/cascade.py::planar_doe_step
+  graph_node: src/couplers/doe_node.py
+  what_it_bounds: >-
+    The outgoing ray count is the caller's P x S budget and does NOT depend on
+    the incident count. Asserted directly on a three-surface stack in
+    tests/test_planar_doe_step.py: same budget at surfaces two and three, and
+    the same outgoing count for three different incident populations. Per-ray
+    branching would instead multiply by the secondary count at every surface,
+    which is the failure this operator exists to prevent.
+  exactness_gate: >-
+    With secondary_count=None every propagating bin is enumerated, so there is
+    no sampling error and re-accumulating the outgoing rays must reproduce the
+    transmitted field to dtype round-off. Measured at < 1e-12 relative L2 on a
+    16x16 complex128 random field with a random-phase DOE
+    (tests/test_planar_doe_step.py::test_full_enumeration_still_reproduces_the_transmitted_field,
+    CPU, numpy). This is the only oracle the composed step has -- it has no
+    analytic case of its own -- so promotion to a graph node is conditional on
+    it, not merely accompanied by it.
+  conventions_that_change_across_the_step:
+    optical_path_length: >-
+      RESET TO ZERO on the outgoing rays. The incident path is already folded
+      into the accumulated field's phase, so carrying it forward would
+      double-count it. The consequence for a caller is that the phase reference
+      is rebased to this plane: an OPL measured downstream is measured from
+      here, not from wherever the incident bundle launched.
+    amplitude: >-
+      Becomes the importance-weighted spectral amplitude U~[m]/p[m]. No per-ray
+      correspondence to the incident amplitudes survives the accumulation.
+    power: >-
+      NOT conserved by default, deliberately. A lossy DOE legitimately loses
+      power, and `preserve_energy` -- which renormalizes to the incident power
+      -- is off by default because switching it on hides exactly the case a
+      conservation check exists to catch. When on, the applied factor is
+      reported in the diagnostics and in the field's provenance.
+  primary_position_sampling: >-
+    Offered as an option, not adopted as the estimator. Secondary directions are
+    drawn by spectrum magnitude while `uniform_on_grid` draws positions
+    UNIFORMLY, and the paper does not justify that asymmetry. The alternative,
+    `incident_positions`, keeps each incident ray's own transverse position and
+    refuses rather than replaces when asked for more positions than the bundle
+    has -- an invented position is a fabricated ray.
+  sampler_cost_measured: >-
+    The flat multinomial draw over propagating bins is 8.8% of the step at the
+    paper's largest sampling load (SI Table S2 Hologram RW-P: 501^2 grid, 4000
+    secondary rays, complex128, CPU). The reference implementation uses a
+    two-stage marginal/conditional sampler for speed and for CUDA's category
+    limit; neither reason transfers at that fraction on the host, so the flat
+    sampler is kept. Evidence and the pre-stated decision rule:
+    benchmarks/probes/records/doe_step_sampler_cost.json. Revisit if the draw
+    moves to a device.
+  gradient: >-
+    None certified. Inherits this direction's fixed-direction estimator, so the
+    registry records derivative.mode=surrogate with verified=false. Registering
+    the step as a graph node did not change that, and the node refuses
+    require_gradients=True.
+  not_yet_probed:
+    - a conformal substrate. The step REFUSES nothing structurally here because
+      it takes a plane as an argument, but the accumulation is only valid on a
+      planar surface -- rays on a curved one strike different tangent frames.
+      Use couplers/curvature.py to size a patch instead.
+    # 'the step on a device' was here and is cleared: the full-enumeration
+    # exactness limit holds on cuda:0 at complex64 round-off, 2.475e-06
+    # relative L2 on a 64x64 grid, with the outgoing directions and the
+    # transmitted field both read off the arrays as living on cuda:0 rather
+    # than off the request. Evidence:
+    # benchmarks/probes/records/planar_doe_step_device.json, produced by
+    # benchmarks/probes/gpu/planar_doe_step_device.py.
+    - a stacked configuration at the paper's scale. The count-bounding property
+      is asserted on a 16x16 grid; the fig7-scale behaviour is CHE-96's.

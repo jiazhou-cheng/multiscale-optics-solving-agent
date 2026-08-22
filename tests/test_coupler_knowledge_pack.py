@@ -57,9 +57,25 @@ def test_card_pins_the_doi_and_names_the_paper_equations(direction: str) -> None
 
 
 @pytest.mark.parametrize("direction", DIRECTIONS)
-def test_reference_implementation_is_recorded_as_unused(direction: str) -> None:
-    """The paper's code exists and is public. Nothing here may cite it as
-    evidence, because this repository neither pins nor executes it."""
+def test_reference_implementation_is_recorded_as_read_but_never_executed(direction: str) -> None:
+    """The paper's code is public, and what this repository did with it must be exact.
+
+    Three states are distinct and the manifest must keep them distinct:
+    **vendored** (copied in), **executed** (run, so its output could become a
+    number here), and **read**. It was never the first two and, since CHE-95,
+    it has been the third.
+
+    This test used to assert the entry said "NOT used", full stop. That is no
+    longer true and asserting it would make the manifest lie. CHE-95 read the
+    upstream implementation for its *option inventory* -- that four knobs exist
+    and are worth having -- and implemented each from its physical description.
+    The equations still come from the paper, which is what makes the two
+    implementations agreeing on a convention corroboration rather than copying.
+
+    So what is asserted is the pair that actually matters: not vendored, not
+    executed, and the reading recorded with a date and a stated scope. A read
+    with no scope is indistinguishable from a copy.
+    """
     card = _card(direction)
     status = card["scientific_source"]["reference_implementation_status"]
     assert "NOT vendored" in status
@@ -75,6 +91,17 @@ def test_reference_implementation_is_recorded_as_unused(direction: str) -> None:
     assert entry["vendored"] is False
     assert entry["pinned"] is False
     assert entry["executed_by_this_repository"] is False
+    assert entry.get("read_at"), (
+        "the upstream implementation was read by CHE-95; the manifest must say "
+        "when, or a future reader cannot tell a read from a copy."
+    )
+    assert entry.get("read_scope"), "a read with no recorded scope is not a record of anything"
+    note = entry["usage_note"]
+    assert "never executed" in note and "never vendored" in note
+    assert "come from the paper" in note, (
+        "the manifest must still say that the equations came from the published "
+        "text, which is the claim the whole entry exists to protect."
+    )
 
 
 @pytest.mark.parametrize("direction", DIRECTIONS)

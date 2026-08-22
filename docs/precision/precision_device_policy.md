@@ -72,6 +72,14 @@ Generated from `core/capabilities.py` by `benchmarks/probes/precision/capability
 | C_RAY_TO_WAVE    | cpu, cuda | fp32, fp64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | complex128, complex64                   | --                   | jax, numpy   | fp32          |
 | M_WAVE_CHROMATIX | cpu, cuda | fp32       | complex64                               | complex64                               | complex64                               | complex128           | jax          | fp32          |
 | C_WAVE_TO_RAY    | cpu, cuda | fp32, fp64 | complex128, complex64                   | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
+| C_PLANAR_DOE_STEP | cpu, cuda | fp32, fp64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
+
+`C_PLANAR_DOE_STEP` is the one composed row, and it is worth reading as such:
+its capability is `C_RAY_TO_WAVE`'s and `C_WAVE_TO_RAY`'s **intersected**, not an
+independent measurement. The step accumulates through the first and resamples
+through the second, so anything either refuses is refused here, and the
+intermediate DOE multiply introduces no cast of its own. A composed component
+whose row was *wider* than its parts' would be the thing to distrust.
 
 Four dtype columns rather than one, because they are different questions and
 collapsing them is how "supports float16" comes to mean "will not crash if

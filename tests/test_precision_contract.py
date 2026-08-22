@@ -202,14 +202,32 @@ class TestDeclaredCapabilities:
         for capability in COMPONENT_CAPABILITIES.values():
             assert capability.evidence, f"{capability.component} declares no evidence"
 
-    def test_capability_matrix_covers_all_four_components(self):
+    def test_the_capability_matrix_covers_every_declared_component(self):
+        """Order is the pipeline's, and completeness is derived rather than typed.
+
+        The rows read in execution order -- ray model, ray-to-wave, wave model,
+        wave-to-ray -- because that is how a reader traces a field through the
+        stack, and the composed batched DOE step comes last because its
+        capability is the intersection of two rows above it.
+
+        The completeness half is asserted against `COMPONENT_CAPABILITIES`
+        rather than against a second hand-written list. A declared component
+        missing from the documented matrix is a component whose support nobody
+        can look up, and a hard-coded list would have to be edited to notice.
+        """
         rows = capability_matrix()
         assert [row["component"] for row in rows] == [
             "M_RAY_OPTILAND",
             "C_RAY_TO_WAVE",
             "M_WAVE_CHROMATIX",
             "C_WAVE_TO_RAY",
+            "C_PLANAR_DOE_STEP",
         ]
+        assert {row["component"] for row in rows} == set(COMPONENT_CAPABILITIES), (
+            "the documented capability matrix and the declarations have diverged; "
+            "a declared component absent from the matrix is one whose support "
+            "nobody can look up."
+        )
 
     def test_unknown_component_fails_structurally(self):
         with pytest.raises(CapabilityError) as excinfo:

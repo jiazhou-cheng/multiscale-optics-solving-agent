@@ -1,0 +1,40 @@
+{
+  "configuration": {
+    "device": "cpu",
+    "dtype": "complex128",
+    "grid": [
+      501,
+      501
+    ],
+    "grid_points": 251001,
+    "propagating_bins": 251001,
+    "propagating_fraction_of_grid": 1.0,
+    "repeats": 5,
+    "sample_pitch_m": 6.3e-06,
+    "secondary_count": 4000,
+    "source": "SI Table S2, Hologram (RW-P)",
+    "wavelength_m": 7e-07
+  },
+  "draw_fraction_of_total": 0.08700685348347978,
+  "environment": {
+    "machine": "x86_64",
+    "numpy": "2.2.6",
+    "python": "3.12.14"
+  },
+  "probe": "doe_step_sampler_cost",
+  "question": "is the flat multinomial draw a material fraction of the batched DOE step at the paper's largest sampling load?",
+  "seconds_best_of": {
+    "decompose": 0.0217386269941926,
+    "draw_indices": 0.0028423310141079128,
+    "sampling_density": 0.0018322329851798713,
+    "spectrum_to_rays": 0.006254706997424364,
+    "total": 0.03266789799090475
+  },
+  "seconds_median": {
+    "decompose": 0.0220399450045079,
+    "draw_indices": 0.0029865939868614078,
+    "sampling_density": 0.0018591920379549265,
+    "spectrum_to_rays": 0.00636598898563534
+  },
+  "verdict": "KEEP the flat sampler. The draw is 8.7% of the step at the paper's largest sampling load, so the two-stage sampler would optimize something that is not the bottleneck while adding a second place for a sampling bug to live. The upstream reasons do not transfer: this draw is over PROPAGATING BINS only (100.0% of the grid here), not over a flat H x W, and it runs on the host, where CUDA's category limit does not apply. Revisit if either changes -- a device-side draw is the case that would."
+}

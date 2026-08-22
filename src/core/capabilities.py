@@ -55,6 +55,7 @@ from core.precision import (
 __all__ = [
     "CHROMATIX_CAPABILITIES",
     "COMPONENT_CAPABILITIES",
+    "C_PLANAR_DOE_STEP_CAPABILITIES",
     "C_RAY_TO_WAVE_CAPABILITIES",
     "C_WAVE_TO_RAY_CAPABILITIES",
     "OPTILAND_CAPABILITIES",
@@ -188,6 +189,39 @@ C_WAVE_TO_RAY_CAPABILITIES = ComponentCapabilities(
 )
 
 
+C_PLANAR_DOE_STEP_CAPABILITIES = ComponentCapabilities(
+    component="C_PLANAR_DOE_STEP",
+    devices=frozenset({DeviceKind.CPU, DeviceKind.CUDA}),
+    precisions=frozenset({Precision.FP32, Precision.FP64}),
+    # A ray bundle in, a ray bundle out -- but the step passes through a complex
+    # field in the middle, so it accepts what either side of that can carry.
+    accepted_input_dtypes=_FIELD_DTYPES,
+    native_compute_dtypes=_FIELD_DTYPES,
+    output_dtypes=_FIELD_DTYPES,
+    namespaces=frozenset({ArrayNamespace.NUMPY, ArrayNamespace.JAX}),
+    device_namespaces={
+        DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY, ArrayNamespace.JAX}),
+        DeviceKind.CUDA: frozenset({ArrayNamespace.JAX}),
+    },
+    minimum_compute_precision=Precision.FP32,
+    evidence=(
+        "composed from C_RAY_TO_WAVE and C_WAVE_TO_RAY, which is why its "
+        "capability is theirs intersected rather than an independent claim: the "
+        "step accumulates through couplers/ray_to_wave.py and resamples through "
+        "couplers/wave_to_ray.py, so any device or dtype either of them refuses "
+        "is refused here too. The exactness gate -- full enumeration reproducing "
+        "the transmitted field to dtype round-off -- is asserted in "
+        "tests/test_coupler_round_trip.py"
+    ),
+    notes=(
+        "The intermediate DOE multiply happens in the accumulated field's own "
+        "dtype: this step introduces no cast of its own, which is what makes "
+        "the composition's precision the min of its two halves rather than "
+        "something new."
+    ),
+)
+
+
 COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
     capability.component: capability
     for capability in (
@@ -195,6 +229,7 @@ COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
         CHROMATIX_CAPABILITIES,
         C_RAY_TO_WAVE_CAPABILITIES,
         C_WAVE_TO_RAY_CAPABILITIES,
+        C_PLANAR_DOE_STEP_CAPABILITIES,
     )
 }
 
@@ -231,5 +266,6 @@ def capability_matrix() -> list[dict[str, Any]]:
             "C_RAY_TO_WAVE",
             "M_WAVE_CHROMATIX",
             "C_WAVE_TO_RAY",
+            "C_PLANAR_DOE_STEP",
         )
     ]

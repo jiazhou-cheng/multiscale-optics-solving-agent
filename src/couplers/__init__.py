@@ -24,10 +24,18 @@ from couplers.base import (
     CouplerRunRequest,
     CouplerRunResult,
 )
+from couplers.cascade import CascadeDiagnostics, PrimarySampling, planar_doe_step
+from couplers.doe_node import PlanarDoeStepCoupler
 from couplers.node import RayToWaveCoupler
 
 __all__ = [
+    # The two runnable graph nodes.
+    "PlanarDoeStepCoupler",
     "RayToWaveCoupler",
+    # The batched planar step as a library call, for callers outside a graph.
+    "CascadeDiagnostics",
+    "PrimarySampling",
+    "planar_doe_step",
     "AXIS_ORDER",
     "DEFAULT_SOURCE_PORT",
     "ORIGIN_RULE",

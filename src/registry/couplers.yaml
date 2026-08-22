@@ -187,7 +187,86 @@ couplers:
     # Scope note: this coupler is a **library API, not a graph node.** It is
     # registered because it is a real cross-representation handoff with declared
     # conventions, and callers use it directly; no graph edge executes it, and
-    # nothing here implies one does. C_RAY_TO_WAVE is currently the only coupler
-    # with a graph node.
+    # nothing here implies one does. C_RAY_TO_WAVE and C_PLANAR_DOE_STEP are the
+    # couplers with graph nodes.
     maturity: characterized
     tags: [ray_wave, angular_spectrum, monte_carlo, stochastic]
+
+  - id: C_PLANAR_DOE_STEP
+    version: 0.1.0
+    description: >
+      One batched planar DOE interaction: accumulate every incident ray
+      coherently onto the common plane, apply the complex transmission once,
+      transform, and resample a fixed P x S budget of outgoing rays. SI
+      Algorithm S1. Ray bundle in, ray bundle out; the wave representation is
+      internal to the step.
+    framework: internal
+    source:
+      name: incident_rays
+      artifact: ray_bundle
+      requires_metadata:
+        [wavelength, coordinates, directions, amplitude, optical_path_length, reference_plane]
+    target:
+      name: outgoing_rays
+      artifact: ray_bundle
+      provides_metadata:
+        [wavelength, coordinates, directions, amplitude, optical_path_length, reference_plane]
+    # Composed from C_RAY_TO_WAVE and C_WAVE_TO_RAY, so its capability is theirs
+    # intersected rather than an independent claim, and the authoritative form is
+    # core/capabilities.py::C_PLANAR_DOE_STEP_CAPABILITIES.
+    devices: [cpu, gpu]
+    dtypes: [float32, float64, complex64, complex128]
+    derivative:
+      mode: surrogate
+      verified: false
+      parameters: []
+      notes: >-
+        Inherits C_WAVE_TO_RAY's fixed-direction estimator: secondary directions
+        are held fixed and only the amplitudes carry a derivative, so the
+        gradient is a deliberately biased surrogate. No gradient across this
+        step is certified, and registering the step does not change that.
+    validity:
+      assumptions:
+        - >-
+          The surface is PLANAR. Every incident ray must cross one common
+          Cartesian plane, which is what makes a single accumulation valid.
+          A conformal substrate has position-dependent tangent frames and
+          normals and there is no common plane to accumulate onto; use the
+          curvature bound in couplers/curvature.py to size a patch instead.
+        - >-
+          The declared plane is where the transmission lives. The step does not
+          propagate the incident bundle to it.
+      warnings:
+        - >-
+          The step RESETS optical path length to zero on the outgoing rays. The
+          incident path is already in the accumulated field's phase, so carrying
+          it forward would double-count it -- but the consequence is that the
+          phase reference is rebased to this plane, and an OPL measured
+          downstream is measured from here.
+        - >-
+          Power is not conserved by default and should not be. `preserve_energy`
+          renormalizes to the incident power and is off by default: a lossy DOE
+          legitimately loses power, and renormalizing hides the case a
+          conservation check exists to catch. When on, the factor is reported.
+        - >-
+          The outgoing amplitude is a spectral amplitude U~[m]/p[m], not a
+          transformed incident weight. No per-ray correspondence survives the
+          accumulation.
+        - >-
+          Primary launch positions are sampled UNIFORMLY while secondary
+          directions are sampled by spectrum magnitude. That asymmetry comes
+          from the reference implementation and the paper does not justify it;
+          it is offered as an option rather than adopted as the estimator.
+    cost_model:
+      scaling: O(incident_rays * pixels + pixels * log(pixels) + P * S)
+      memory_scaling: O(pixels + P * S)
+    lossy: true
+    invariants:
+      [evanescent_power_accounted, importance_weight_applied, unit_direction_norm, outgoing_count_is_the_budget]
+    # `characterized`: the full-enumeration limit reproduces the transmitted
+    # field to dtype round-off, and the budget-independence property the step
+    # exists for is asserted directly. Not `validated`: no certified gradient,
+    # and the composition has no analytic oracle of its own beyond the
+    # enumeration limit.
+    maturity: characterized
+    tags: [ray_wave, doe, cascade, batched]

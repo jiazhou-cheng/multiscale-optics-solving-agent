@@ -47,9 +47,29 @@ sources:
     pinned: false
     executed_by_this_repository: false
     retrieved_at: null
+    read_at: "2026-08-22"
+    read_scope: configuration_and_option_inventory
     usage_note: >
-      NOT used. Recorded so no future agent assumes the mathematics here was read
-      off working code, or cites it as evidence.
+      Read, never executed, and never vendored -- and the distinction between
+      those three is the point of this entry.
+
+      Every equation behind this coupler come from the paper and its SI, not
+      from this code. The estimator, the 1/p weighting and the evanescent cut
+      were worked from the published derivation, which is why upstream and this
+      repository independently reaching the same fixed-direction gradient
+      treatment is corroboration rather than copying -- upstream expresses it as
+      a `.detach()` call, this repository as a structural choice to take drawn
+      indices as an argument.
+
+      What was taken from reading it, in CHE-95: the knowledge that a
+      primary-position sampler, an energy-preserving renormalization, a padding
+      policy and a collapsed single-ray mode exist and are worth having. Each
+      was specified and implemented here from its physical description, and two
+      were deliberately changed rather than copied. See
+      knowledge/couplers/ray_to_wave/source_manifest.yaml for the detail; the
+      options live on the batched planar step, which composes both directions.
+
+      No number in this card comes from this source.
 
   - url: https://doi.org/10.1002/wics.56
     source_type: cited_method

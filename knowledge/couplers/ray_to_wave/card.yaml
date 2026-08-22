@@ -888,3 +888,25 @@ validation_note: >
   PLANAR surface at float64 on CPU. Vector fields, chromatic ensembles, partial
   coherence, curved reconstruction surfaces, accelerators, caustics, and every
   gradient claim remain unvalidated.
+
+# --- The batched planar DOE step (CHE-95) -------------------------------------
+#
+# `C_PLANAR_DOE_STEP` composes this direction with C_WAVE_TO_RAY into one
+# registered coupler with a graph node: accumulate every incident ray onto a
+# common plane through the operator on this card, apply the DOE transmission
+# once, transform, and resample a fixed budget back to rays. SI Algorithm S1.
+#
+# The full description -- what it bounds, the exactness gate, and the three
+# conventions that change across it (OPL resets to zero, the amplitude becomes
+# a spectral amplitude, power is not conserved by default) -- is on the
+# wave_to_ray card under `batched_planar_step`, because the resampling half is
+# where the interesting choices are. What matters on THIS card:
+#
+#   * the accumulation is this operator, unchanged, at ASM_CONSISTENT
+#     projection. The step adds no physics to it;
+#   * the no-wavefront-curvature limitation recorded above therefore applies to
+#     the accumulated field inside the step exactly as it does when this
+#     operator is called directly;
+#   * the step's outgoing rays are valid AT the declared plane, and the OPL
+#     reset means a consumer cannot recover the incident path from them.
+batched_planar_step_reference: knowledge/couplers/wave_to_ray/card.yaml::batched_planar_step

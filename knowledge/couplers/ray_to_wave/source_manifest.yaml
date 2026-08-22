@@ -42,12 +42,31 @@ sources:
     pinned: false
     executed_by_this_repository: false
     retrieved_at: null
+    read_at: "2026-08-22"
+    read_scope: configuration_and_option_inventory
     usage_note: >
-      NOT used. Recorded so that a future agent does not assume the mathematics
-      here was read off working code, and does not cite this repository as
-      evidence for a claim. Every equation in theory.md comes from the paper;
-      every number that will appear in a coupler card must come from a probe run
-      in the agent_solver container.
+      Read, never executed, and never vendored -- and the distinction between
+      those three is the point of this entry.
+
+      Every equation in theory.md come from the paper and its SI, not from this
+      code. That was true before it was read and is still true: the derivations,
+      the estimator, the curvature bound and Algorithm S1 were all worked from
+      the published text, which is why the two implementations converging on the
+      same projection-convention split is corroboration rather than copying.
+
+      What WAS taken from reading it, in CHE-95: the knowledge that four options
+      exist and are worth having. Primary-position sampling, an energy-preserving
+      renormalization, a flat zero-padding policy, and a collapsed single-ray
+      preview. Each was then specified and implemented here from its physical
+      description -- and two were deliberately changed rather than copied:
+      `preserve_energy` is OFF by default because renormalizing to the incident
+      power hides a DOE that is losing power for a real reason, and the uniform
+      primary-position sampler is offered as an option rather than adopted,
+      because the paper does not justify sampling positions uniformly while
+      sampling directions by spectrum magnitude.
+
+      No number in any coupler card comes from this source. Every one comes from
+      a probe run in the agent_solver container, and the entries below say which.
 
   - source_type: inherited_repository_evidence
     retrieved_at: "2026-08-12"
