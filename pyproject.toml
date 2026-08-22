@@ -42,21 +42,12 @@ wave = [
   "optimistix>=0.0.11",
   "jaxtyping>=0.3.7",
   "chromatix @ git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
-  "fmmax>=1.7.1",
   # Declared by CHE-37 (M3.8). evaluation/psf_oracles.py needs scipy.special.j1
   # for the analytic Airy pattern. It was already present transitively -- jax,
   # chromatix and optiland each require it, and docker/requirements.txt pins
   # 1.15.3 -- but a verification oracle should not rest on a dependency this
   # project never declared.
   "scipy>=1.10",
-]
-em = [
-  "jax>=0.6.2",
-  "optax>=0.2.8",
-  "equinox>=0.13.8",
-  "optimistix>=0.0.11",
-  "jaxtyping>=0.3.7",
-  "fdtdx>=0.6.2",
 ]
 torch = [
   "torch>=2.13.0",
@@ -113,16 +104,15 @@ markers = [
   "optiland: exercises the real Optiland ray-tracing engine (current-milestone ray model)",
   "chromatix: exercises the real Chromatix wave-propagation engine (current-milestone wave model)",
   "coupler: exercises C_RAY_TO_WAVE / C_WAVE_TO_RAY coupler physics or protocol",
-  # These three are still registered but select nothing: every test carrying
-  # them was archived by CHE-67 (archive/tests/gen1/). They are kept so an
-  # unarchived file is valid pytest the moment it is moved back, and so the
-  # historical tier commands in docs/testing/ stay runnable instead of erroring.
-  # The `sax` marker was deleted outright by CHE-72 along with the integration
-  # itself -- there is nothing left to unarchive. A `-m` expression naming it
-  # still parses (an unknown name evaluates false), so the recorded tier
-  # commands that say `not sax` keep working.
-  "fmmax: exercises the FMMAX RCWA adapter (out of current milestone scope, see AGENTS.md); archived by CHE-67",
-  "fdtdx: exercises the FDTDX EM adapter (out of current milestone scope, see AGENTS.md); archived by CHE-67",
+  # Registered but selects nothing: every test carrying it was archived by
+  # CHE-67 (archive/tests/gen1/), and it is kept so an unarchived file is valid
+  # pytest the moment it is moved back.
+  #
+  # `fmmax` and `fdtdx` were deleted by CHE-87 together with their adapters,
+  # registry entries, example graphs and knowledge packs -- following the CHE-72
+  # precedent for SAX. A recorded `-m` expression naming a deleted marker still
+  # parses, because an unknown name evaluates false, so the historical tier
+  # commands keep working and simply match less.
   "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction; archived by CHE-67 pending a replacement baseline",
   "slow: individually expensive numerical characterization or convergence test",
   "tutorial: reproduces an upstream third-party tutorial; a regression gate on the PINNED dependency, not a test of this repository's physics (CHE-64). Carried by every test in tests_tutorial/, which testpaths excludes -- selecting it does nothing unless that directory is named (CHE-67)",

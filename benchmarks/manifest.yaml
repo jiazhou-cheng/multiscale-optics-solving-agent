@@ -1,4 +1,12 @@
-version: 0.1.0
+version: 0.2.0
+# CHE-87: this file lists **implemented** benchmarks only.
+#
+# It previously also carried nine planned tasks -- four at level 1, three at
+# level 2, three at level 3 -- naming components with no adapter, and in three
+# cases (M_TMM_JAXLAYERLUMOS, M_PC_LEGUME, C_FIELD_TO_PSF) no registry entry
+# either. A manifest that mixes "this runs" with "we would like this to run"
+# cannot be used to answer either question. The intent is preserved, marked
+# non-executable, in benchmarks/roadmap.md.
 m1_exit_report: benchmarks/M1_BASELINE_REPORT.md
 m1_independence_check: benchmarks/verify_m1_independence.py
 levels:
@@ -84,18 +92,6 @@ levels:
           ABCD matrix and ray_transfer rather than a surface-resolved
           wave-optical prescription. Chromatix-generated snapshots remain
           regression evidence only, never oracles.
-      - id: L1-TMM-01
-        title: Multilayer Bragg mirror
-        primary_model: M_TMM_JAXLAYERLUMOS
-      - id: L1-RCWA-01
-        title: Binary grating diffraction
-        primary_model: M_RCWA_FMMAX
-      - id: L1-EM-01
-        title: Full-wave waveguide component
-        primary_model: M_EM_FDTDX
-      - id: L1-PC-01
-        title: Photonic-crystal band structure
-        primary_model: M_PC_LEGUME
   2:
     name: two-to-three-model orchestration
     tasks:
@@ -147,21 +143,3 @@ levels:
           FFTPSF and HuygensPSF share one Wavefront/OPD front end and are not two
           oracles. Full disposition:
           benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md item 3.
-      - id: L2-META-01
-        title: Unit-cell-to-system meta-optic imaging
-        graph: [M_RCWA_FMMAX, C_CELL_TO_SURFACE, M_WAVE_CHROMATIX]
-      - id: L2-GRATING-01
-        title: Full-wave near-field to far-field/fiber overlap
-        graph: [M_EM_FDTDX, C_NEAR_TO_FAR]
-      - id: L2-THERMO-01
-        title: Optical absorption to thermo-optic response
-        graph: [M_EM_FDTDX, C_ABSORPTION_TO_HEAT, M_THERMAL_JAX_FEM, C_TEMPERATURE_TO_MATERIAL]
-  3:
-    name: hard inverse design
-    tasks:
-      - id: L3-HYBRID-01
-        title: Wide-field refractive-diffractive microscope
-      - id: L3-ACHROMATIC-01
-        title: Achromatic meta-optic computational imager
-      - id: L3-ROBUST-01
-        title: Robust adaptive-fidelity grating coupler

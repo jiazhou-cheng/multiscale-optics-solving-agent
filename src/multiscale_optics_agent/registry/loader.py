@@ -26,6 +26,19 @@ class Registry:
         return cls._from_data(model_data, coupler_data)
 
     @classmethod
+    def from_mapping(cls, model_data: Any, coupler_data: Any) -> Registry:
+        """Build a registry from already-parsed data.
+
+        Exists so a test can declare the component shapes it needs instead of
+        borrowing the shipped registry as a bag of examples. That borrowing is
+        what kept eight unimplemented couplers alive: deleting an entry nothing
+        implements would have broken a test that only wanted its port types.
+        The packaged registry states what this repository can execute; a fixture
+        states what a test needs, and they are not the same claim.
+        """
+        return cls._from_data(model_data, coupler_data)
+
+    @classmethod
     def from_files(cls, models_path: Path, couplers_path: Path) -> Registry:
         return cls._from_data(
             cls._read_yaml_path(models_path),

@@ -212,7 +212,7 @@ field the two conventions differ by focusing versus defocusing, and no
 downstream metric distinguishes them.
 
 Still not established: agreement with a second solver that declares an explicit
-time convention (e.g. FDTDX). Any coupler joining those two must verify sign
+time convention (an FDTD code, say). Any coupler joining those two must verify sign
 agreement with its own manufactured traveling-wave test.
 
 `chromatix.functional.fft`/`ifft` wrap plain `jnp.fft.fft2`/`ifft2` (NumPy's

@@ -645,7 +645,15 @@ inside `solver_card.yaml`.
 project vocabulary and add one pointer line to each file — cheap, no code change.
 (b) Rename `capability_notes.md` to `usage_notes.md`. (a) is enough.
 
-### Gap 2 — device/dtype claims live in three places; only two are enforced
+### Gap 2 — device/dtype claims live in three places; only two are enforced — **PARTIALLY RESOLVED (CHE-87)**
+
+CHE-87 closed the half of this that was a *scope* problem: there is no longer a
+registry entry without a capability declaration, and the equality check now
+covers every entry rather than an `_OWNED` subset. What remains is the third
+place — `knowledge/solvers/*/solver_card.yaml`'s restated `devices_tested` /
+`dtypes_validated_for_m1` / `precision_verdict_che61` tables, still unchecked.
+CHE-92 demotes them to pointers, which removes the drift surface instead of
+policing it.
 
 **What.** The same claim is written in `core/capabilities.py`, in
 `registry/*.yaml`, and in `knowledge/solvers/*/solver_card.yaml`. Only the first
@@ -710,28 +718,48 @@ that is in fact validated, or trains readers to discount the list.
 **Options.** Update the entry and add "check the affected cards' `not_yet_probed`"
 to the closing checklist of any issue that validates a capability.
 
-### Gap 5 — the three tiers disagree on what is in scope
+### Gap 5 — the three tiers disagree on what is in scope — **RESOLVED (CHE-87)**
 
-**What.** Out-of-scope solvers are absent from the capability layer, present at
-the Knowledge layer, and still *reachable* at the adapter layer.
-
-**Evidence.** `knowledge/solvers/{fmmax,fdtdx,jax_fem}/` and their flat cards
-exist. `adapters/fmmax_adapter.py` (`MODEL_ID = "M_RCWA_FMMAX"`) and
-`adapters/fdtdx_adapter.py` (`M_EM_FDTDX`) are still discovered by
-`adapters/registry.py`, while their tests were archived by CHE-67 and
-`capabilities_for("M_RCWA_FMMAX")` raises `CapabilityError(code="UNKNOWN_COMPONENT")`.
-Meanwhile `registry/models.yaml` still declares `devices: [cpu, gpu, tpu]` for
-`M_RCWA_FMMAX` (`:199`), `M_EM_FDTDX` (`:262`) and `M_SENSOR_IDEAL` (`:366`) —
-precisely the "claim nothing has executed" that
-`tests/test_registry_matches_capabilities.py` was written to stop, exempted only
-because `_OWNED = sorted(COMPONENT_CAPABILITIES)` (`:42`) scopes the test to the
+**What it was.** Out-of-scope solvers were absent from the capability layer,
+present at the Knowledge layer, and still *reachable* at the adapter layer.
+`adapters/fmmax_adapter.py` (`MODEL_ID = "M_RCWA_FMMAX"`) and
+`adapters/fdtdx_adapter.py` (`M_EM_FDTDX`) were discovered by
+`adapters/registry.py`'s filename scan, while their tests had been archived by
+CHE-67 and `capabilities_for("M_RCWA_FMMAX")` already raised
+`CapabilityError(code="UNKNOWN_COMPONENT")`. `registry/models.yaml` declared
+`devices: [cpu, gpu, tpu]` for `M_RCWA_FMMAX`, `M_EM_FDTDX` and
+`M_SENSOR_IDEAL` — precisely the "claim nothing has executed" that
+`tests/test_registry_matches_capabilities.py` exists to stop, and which escaped
+it only because `_OWNED = sorted(COMPONENT_CAPABILITIES)` scoped the test to the
 four declared components.
 
-**Options.** (a) State and enforce the rule this report proposes: *a solver with
-Knowledge but no capability declaration is planning-only, and its adapter must
-either be undiscoverable or refuse at the capability gate.* (b) Narrow the three
-`tpu` claims to what has executed (nothing), which is a one-line edit per entry
-and is inside the spirit of PB4b. Both are small; (b) removes a false claim today.
+**How it was resolved.** Neither of the recorded options. Option (a) would have
+built a mechanism to describe components that do not exist, and option (b) would
+have corrected a false device claim while leaving the entry that made the claim.
+CHE-87 deleted instead, atomically across all six surfaces in one commit —
+adapter, registry entry, example graph, knowledge pack, pytest marker,
+dependency pin — because a partial retirement is worse than none: code removed
+while a registry claim survives reads to a planner as a supported capability.
+
+Three things now hold the resolution rather than a convention holding it:
+
+* `adapters/registry.py` is an **explicit map**, so a filename can no longer
+  imply a registration and a duplicated `MODEL_ID` raises instead of being
+  resolved by directory order.
+* `test_registry_declares_no_component_without_a_capability` drops the `_OWNED`
+  exemption and asserts the registry contains **no** entry outside
+  `COMPONENT_CAPABILITIES`. The remedy it names is asymmetric on purpose: add a
+  declaration backed by an executable probe, or delete the entry — never a
+  placeholder.
+* `test_no_registry_entry_is_still_experimental` makes `maturity` carry
+  information. All 17 entries were `experimental`, which is a constant, not a
+  classification. The four survivors are `characterized`.
+
+The intent behind the deleted components is preserved, marked non-executable, in
+`benchmarks/roadmap.md`, together with the two findings worth keeping: FMMAX's
+unresolved phase/sign convention (energy closed to ~1e-7, the complex
+amplitude's sign did not match the Fresnel convention), and JAX-FEM's GPLv3
+licence against this project's MIT.
 
 ### Gap 6 — `validation_status` has no executable meaning for solvers
 

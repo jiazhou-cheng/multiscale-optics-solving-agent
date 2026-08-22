@@ -1,6 +1,10 @@
-# Pinned dependency lock for the agent_solver dev container, covering the
-# solver packages characterized by the existing adapters:
-# Chromatix, FMMAX, FDTDX, JAX-FEM, Optiland.
+# Pinned dependency lock for the agent_solver dev container, covering the two
+# solver packages this repository can execute: Chromatix and Optiland.
+#
+# CHE-87 removed FMMAX, FDTDX and JAX-FEM together with their adapters,
+# registry entries, example graphs and knowledge packs. They are out of scope
+# per AGENTS.md, nothing imported them, and an installed package with no caller
+# is a capability claim the image cannot back.
 #
 # Regenerate this file (do not hand-edit versions without re-verifying on
 # PyPI/the package's own metadata) whenever a knowledge/solver_cards/*.yaml
@@ -13,10 +17,6 @@
 # Known install hazards (see each solver's failure_guide.md for detail):
 #   - chromatix: PyPI has an unrelated namesquat under the same name; must
 #     install from GitHub, pinned to a commit.
-#   - jax-fem: its packaged metadata declares NO dependencies at all (not
-#     even jax/numpy); this file pins the real dependency set taken from
-#     the project's own environment.yml. petsc4py is intentionally omitted
-#     (no prebuilt wheel; would require compiling PETSc from source).
 #   - optiland: its canonical repo moved GitHub orgs
 #     (HarrisonKramer/optiland -> optiland/optiland). The old path still
 #     redirects, but registry/knowledge entries should cite the new org.
@@ -38,7 +38,7 @@ pytest-cov==7.1.0
 ruff==0.16.0
 types-PyYAML==6.0.12.20260724
 
-# --- shared JAX-ecosystem stack (satisfies chromatix/fmmax/fdtdx/jax-fem constraints) ---
+# --- shared JAX-ecosystem stack (satisfies chromatix's constraints) ---
 jax==0.6.2
 numpy==2.2.6
 scipy==1.15.3
@@ -56,41 +56,27 @@ optimistix==0.0.11
 # tag: 0.6.0 -> commit d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee (verified via `git ls-remote --tags`)
 chromatix @ git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee
 
-# --- FMMAX (M_RCWA_FMMAX): real PyPI package, repository https://github.com/mfschubert/fmmax ---
-fmmax==1.7.1
-
-# --- FDTDX (M_EM_FDTDX): real PyPI package, repository https://github.com/ymahlau/fdtdx ---
-equinox==0.13.8
-gdstk==1.0.1
-loguru==0.7.3
-moviepy==2.2.1
-pytreeclass==0.11.0
-tidy3d==2.12.0
-trimesh==4.12.2
-fdtdx==0.6.2
-
-# --- JAX-FEM (M_THERMAL_JAX_FEM): real PyPI package, but ships with NO
-# declared dependencies -- pinned set below taken from the project's own
-# environment.yml (https://github.com/deepmodeling/jax-fem), minus
-# petsc4py (no prebuilt wheel available). ---
-meshio==5.3.5
-gmsh==4.15.2
-fenics-basix==0.11.0
-pyfiglet==1.0.4
-jax-fem==0.0.12
-
 # --- shared transitive pins that no single solver block owns ---
 # CHE-72 removed the SAX block that used to declare these. Each is still
 # required by a non-optional dependency of a solver that remains, verified by
 # reverse-dependency query in the built image rather than assumed:
 #   sympy  <- torch
-#   xarray <- tidy3d
-#   pandas <- optiland, tidy3d, seaborn, xarray
-# The SAX-only pins removed with it were jaxellip, lark, natsort, orjson,
+#   pandas <- optiland, seaborn
+#
+# CHE-87 dropped `xarray==2026.4.0` with the FDTDX block: tidy3d was its only
+# consumer, and the pin existed solely to hold it below 2026.5.0 for tidy3d's
+# sake. pandas survives on its remaining consumers.
+#
+# The SAX-only pins removed by CHE-72 were jaxellip, lark, natsort, orjson,
 # scikit-rf, klujax and sax.
 sympy==1.14.0
-xarray==2026.4.0  # capped below 2026.5.0: tidy3d==2.12.0 (pulled in by fdtdx) requires xarray<2026.5.0
 pandas==3.0.5
+# jsonschema is imported directly by evaluation/m1_bundle.py, which validates
+# benchmark result bundles against benchmarks/schemas/result.schema.json. It had
+# never been pinned -- it arrived transitively through tidy3d, so removing FDTDX
+# in CHE-87 broke a first-party import. A dependency a module imports by name is
+# a direct dependency whatever installed it.
+jsonschema==4.26.0
 
 # --- Optiland (M_RAY_OPTILAND): real PyPI package, repository moved to
 # https://github.com/optiland/optiland (HarrisonKramer/optiland now

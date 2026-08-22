@@ -221,7 +221,7 @@ m3_pupil_to_focus:
 
 not_yet_probed:
   - >
-    a second solver with an explicit time convention (e.g. FDTDX) cross-checked
+    a second solver with an explicit time convention (an FDTD code, say) cross-checked
     against the phasor convention CHE-35 established here
   - Airy-pattern analytic comparison (listed as required in knowledge/solver_cards/chromatix.yaml, not yet done)
   # 'CPU/GPU numerical agreement (no GPU available in this environment)' was here

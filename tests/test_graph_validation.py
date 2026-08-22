@@ -4,8 +4,84 @@ from multiscale_optics_agent.core.graph import GraphValidator, Severity
 from multiscale_optics_agent.core.specs import GraphSpec
 from multiscale_optics_agent.registry.loader import Registry
 
-
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _fixture_registry() -> Registry:
+    """A registry built here, for tests that need components the project does not ship.
+
+    CHE-87 deleted the speculative registry entries -- five models and eight
+    couplers with no implementation and no scope. Two tests below had borrowed
+    them as fixtures, which is the coupling that let those entries survive: a
+    production registry is a statement about what this repository can execute,
+    and using it as a source of convenient shapes gave "delete the unimplemented
+    thing" a test failure as its price.
+
+    So the shapes live here. Both models expose the port artifacts the mismatch
+    tests need and nothing else, and neither claims a device or a dtype -- they
+    are graph-validation fixtures, not capability declarations.
+    """
+    models = {
+        "models": [
+            {
+                "id": "M_FIXTURE_SOURCE",
+                "version": "0.0.0",
+                "description": "Fixture-only source model; not a shipped capability.",
+                "framework": "internal",
+                "approximation": "transformation",
+                "inputs": [],
+                "outputs": [
+                    {"name": "near_field", "artifact": "near_field_surface"},
+                    {"name": "absorbed_power", "artifact": "absorbed_power_density"},
+                    {"name": "output_field", "artifact": "complex_field"},
+                ],
+                "derivative": {"mode": "none", "verified": False, "parameters": []},
+                "validity": {"assumptions": ["Fixture only."]},
+                "cost_model": {"scaling": "O(1)", "memory_scaling": "O(1)"},
+                "maturity": "experimental",
+            },
+            {
+                "id": "M_FIXTURE_SINK",
+                "version": "0.0.0",
+                "description": "Fixture-only sink model; not a shipped capability.",
+                "framework": "internal",
+                "approximation": "transformation",
+                "inputs": [
+                    {"name": "input_field", "artifact": "complex_field"},
+                    {"name": "psf", "artifact": "psf"},
+                    {"name": "heat_source", "artifact": "heat_source"},
+                ],
+                "outputs": [],
+                "derivative": {"mode": "none", "verified": False, "parameters": []},
+                "validity": {"assumptions": ["Fixture only."]},
+                "cost_model": {"scaling": "O(1)", "memory_scaling": "O(1)"},
+                "maturity": "experimental",
+            },
+        ]
+    }
+    couplers = {
+        "couplers": [
+            {
+                "id": "C_FIXTURE_MISMATCH",
+                "version": "0.0.0",
+                "description": (
+                    "Fixture coupler whose declared source and target artifacts both "
+                    "differ from the ports the mismatch test wires, so one report "
+                    "must carry both codes."
+                ),
+                "framework": "internal",
+                "source": {"name": "absorbed_power", "artifact": "absorbed_power_density"},
+                "target": {"name": "heat_source", "artifact": "heat_source"},
+                "derivative": {"mode": "none", "verified": False, "parameters": []},
+                "validity": {"assumptions": ["Fixture only."]},
+                "cost_model": {"scaling": "O(1)", "memory_scaling": "O(1)"},
+                "lossy": True,
+                "maturity": "experimental",
+            }
+        ]
+    }
+    return Registry.from_mapping(models, couplers)
+
 
 
 def _gradient_requiring_graph() -> GraphSpec:
@@ -99,28 +175,29 @@ def test_unknown_model_fails() -> None:
 def test_artifact_type_mismatch_fails() -> None:
     """Both ends wrong at once, so neither check can hide behind the other.
 
-    CHE-36 (M3.7) repointed this fixture. It used to name C_FIELD_TO_PSF, which is
-    no longer a registered coupler -- PSF extraction is a measurement on the
-    terminal field, not an edge. C_ABSORPTION_TO_HEAT replaces it because it has
-    the same property this test needs and nothing else: its declared source
+    CHE-36 (M3.7) repointed this fixture off C_FIELD_TO_PSF, which is not a
+    registered coupler -- PSF extraction is a measurement on the terminal field,
+    not an edge. It then borrowed C_ABSORPTION_TO_HEAT and M_EM_FDTDX, which
+    CHE-87 deleted as unimplemented. The shapes now come from `_fixture_registry`,
+    which is where a test's requirements belong.
+
+    What the test needs and nothing else: a coupler whose declared source
     (`absorbed_power_density`) and target (`heat_source`) both differ from the
-    ports wired below, so one report must carry both mismatch codes.
+    ports wired below, so one report must carry both mismatch codes. The source
+    model does expose an `absorbed_power` port, so wiring `near_field` here is
+    the deliberate half of the error rather than an accident of the fixture.
     """
-    registry = Registry.from_package()
+    registry = _fixture_registry()
     graph = GraphSpec.model_validate(
         {
             "nodes": [
-                {"id": "em", "model": "M_EM_FDTDX"},
-                {"id": "wave", "model": "M_WAVE_CHROMATIX"},
+                {"id": "em", "model": "M_FIXTURE_SOURCE"},
+                {"id": "wave", "model": "M_FIXTURE_SINK"},
             ],
             "edges": [
                 {
                     "id": "wrong",
-                    "coupler": "C_ABSORPTION_TO_HEAT",
-                    # near_field is `near_field_surface`, not absorbed_power_density;
-                    # input_field is `complex_field`, not heat_source. M_EM_FDTDX does
-                    # expose an `absorbed_power` port, so wiring `near_field` here is
-                    # the deliberate half of the error, not an accident of the model.
+                    "coupler": "C_FIXTURE_MISMATCH",
                     "source": {"node": "em", "port": "near_field"},
                     "target": {"node": "wave", "port": "input_field"},
                 }
@@ -143,14 +220,18 @@ def test_field_to_psf_is_not_a_registered_coupler() -> None:
     architectural statement of what a coupler is, and a graph that names the
     retired id must fail rather than validate.
     """
-    registry = Registry.from_package()
-    assert "C_FIELD_TO_PSF" not in registry.couplers
+    assert "C_FIELD_TO_PSF" not in Registry.from_package().couplers
 
+    # The graph itself is built against a fixture registry: the *packaged* claim
+    # under test is the absence of C_FIELD_TO_PSF, asserted directly above, and
+    # the sink model here only has to own a `psf` port for the edge to be
+    # well-formed apart from its coupler id.
+    registry = _fixture_registry()
     graph = GraphSpec.model_validate(
         {
             "nodes": [
-                {"id": "wave", "model": "M_WAVE_CHROMATIX"},
-                {"id": "sensor", "model": "M_SENSOR_IDEAL"},
+                {"id": "wave", "model": "M_FIXTURE_SOURCE"},
+                {"id": "sensor", "model": "M_FIXTURE_SINK"},
             ],
             "edges": [
                 {

@@ -108,14 +108,20 @@ only cross-file import under `tests/` is
   `benchmarks/` still *claim* those results; nothing now re-verifies them. Treat a
   dependence on one of those behaviors as a reason to unarchive, not as an
   assumption.
-- **The out-of-scope adapters are unguarded too**, so FMMAX/FDTDX may rot
-  silently against dependency updates. That is the intended trade — they are out
-  of milestone scope per `AGENTS.md` — but reviving one should budget for repair.
-  SAX is no longer in this category at all: CHE-72 (2026-08-20) deleted the
+- **The out-of-scope adapters are no longer unguarded — they are gone.** This
+  entry recorded FMMAX and FDTDX as at risk of rotting silently against
+  dependency updates. CHE-87 (2026-08-22) resolved that the other way: both
+  adapters were deleted together with their registry entries, example graphs,
+  knowledge packs, pytest markers and dependency pins, as was JAX-FEM, which
+  never had an adapter. Their archived tests remain in `archive/tests/gen1/` and
+  are now archived tests of deleted code, so unarchiving one is not a route back
+  — a restoration is a fresh scoped integration. Intent and the findings worth
+  keeping: `benchmarks/roadmap.md`.
+  SAX was already in that state: CHE-72 (2026-08-20) deleted the
   integration, its tests, its knowledge pack and its `sax`/`klujax` pins, because
   klujax pinned `jax_platform_name='cpu'` at import and silently disabled the GPU
-  process-wide. It is not unguarded — it is gone, and a future SAX integration
-  should be built fresh rather than unarchived. The measurement rows above are
+  process-wide. A future SAX integration should be built fresh rather than
+  unarchived. The measurement rows above are
   left as recorded on 2026-08-19.
 - **The tutorial gate now depends on a human cadence.** Nothing fails if nobody
   runs `make test-tutorial` for a month; a pin change can therefore land

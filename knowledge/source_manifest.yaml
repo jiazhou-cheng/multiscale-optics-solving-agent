@@ -133,15 +133,21 @@ sources:
     name: FMMAX
     role: differentiable RCWA / Fourier modal method
     framework: jax
-    priority: P0
+    priority: removed
     url: https://invrs-io.github.io/fmmax/
     repository: https://github.com/invrs-io/fmmax
     pinned_ref: "1.7.1"
     retrieved_at: "2026-07-30"
     notes: >
+      REMOVED from this project by CHE-87 (2026-08-22) together with its
+      adapter, registry entry, example graph, knowledge pack and dependency
+      pin. There is no knowledge/solvers/fmmax/ any more; the intent and the
+      one finding worth keeping -- energy conservation closed to ~1e-7 through
+      `directional_poynting_flux`, but the complex amplitude's SIGN never
+      matched the textbook Fresnel convention -- are recorded in
+      benchmarks/roadmap.md. Retained here as a catalog entry only.
       Real PyPI package (`pip install fmmax`); repository moved orgs
-      (github.com/mfschubert/fmmax now redirects here). See
-      knowledge/solvers/fmmax/ for the full knowledge pack.
+      (github.com/mfschubert/fmmax now redirects here).
   - id: meent-docs
     name: Meent
     role: differentiable RCWA across several backends
@@ -176,17 +182,21 @@ sources:
     name: FDTDX
     role: differentiable FDTD
     framework: jax
-    priority: P0
+    priority: removed
     url: https://fdtdx.readthedocs.io/
     repository: https://github.com/ymahlau/fdtdx
     pinned_ref: "0.6.2"
     retrieved_at: "2026-07-30"
     notes: >
+      REMOVED from this project by CHE-87 (2026-08-22) together with its
+      adapter, registry entry, example graph, knowledge pack and dependency
+      pin. There is no knowledge/solvers/fdtdx/ any more; the two failed
+      gradient paths worth knowing about are recorded in
+      benchmarks/roadmap.md. Retained here as a catalog entry only.
       Real PyPI package (`pip install fdtdx`), requires-python >=3.11,<3.14.
       The GitHub main-branch README example is API-drifted relative to the
       pinned 0.6.2 release (uses a `UniformGrid`/`grid=` config field that
-      does not exist in this version; use `resolution=` instead). See
-      knowledge/solvers/fdtdx/ for the full knowledge pack.
+      does not exist in this version; use `resolution=` instead).
   - id: jaxwell-docs
     name: Jaxwell
     role: differentiable FDFD
@@ -221,21 +231,26 @@ sources:
     name: JAX-FEM
     role: differentiable thermal and mechanical FEM
     framework: jax
-    priority: P0
+    priority: removed
     url: https://deepmodeling.github.io/jax-fem/
     repository: https://github.com/deepmodeling/jax-fem
     pinned_ref: "0.0.12"
     retrieved_at: "2026-07-30"
     notes: >
+      REMOVED from this project by CHE-87 (2026-08-22). It never had an
+      adapter; its registry entry, knowledge pack and dependency pins are gone
+      and there is no knowledge/solvers/jax_fem/ any more. Two blockers are
+      recorded in benchmarks/roadmap.md, and the second is not about optics: a
+      LICENCE MISMATCH -- PyPI metadata claims BSD, the repository's actual
+      LICENSE is GPLv3 against this project's MIT. Retained here as a catalog
+      entry only.
       Real PyPI package (`pip install jax-fem`), but the published wheel
       declares NO dependencies at all (not even jax/numpy) -- the real
       dependency set had to be reconstructed from the project's own
       environment.yml. The actual FEM solve entry point
       (`jax_fem.solver`) hard-imports petsc4py, which has no prebuilt wheel;
       NOT executable end-to-end in this project's lightweight pip-based
-      container without a much heavier PETSc build. See
-      knowledge/solvers/jax_fem/ for the full knowledge pack and blocker
-      detail.
+      container without a much heavier PETSc build.
   - id: feax-repo
     name: FEAX
     role: differentiable FEM reference

@@ -27,10 +27,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxft2 \
         libgomp1 \
     && rm -rf /var/lib/apt/lists/*
-# libglu1-mesa etc.: jax-fem's `generate_mesh` module imports `gmsh` even for
-# headless meshing, and gmsh's Python bindings dlopen a real OpenGL/X11
-# stack at import time (`OSError: libGLU.so.1: cannot open shared object
-# file`) -- see knowledge/solvers/jax_fem/failure_guide.md.
+# libglu1-mesa and the libx*/libgomp set: an OpenGL/X11 stack that several
+# scientific wheels dlopen at import time even when used headlessly. It was
+# originally added for gmsh, which CHE-87 removed with JAX-FEM; the packages are
+# kept because Optiland's visualization path (vtk 9.6.2) needs the same
+# libraries, and removing them to save image layers would trade a measured
+# working image for an untested one. Verify against vtk before trimming.
 
 WORKDIR /workspace
 

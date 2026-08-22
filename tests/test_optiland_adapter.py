@@ -134,7 +134,7 @@ def test_smoke_run_succeeds_with_ray_and_wavefront_outputs() -> None:
     # Declared-but-unavailable metadata (amplitude/polarization/pupil_mask)
     # must be recorded as missing, never fabricated.
     assert "missing_declared_metadata" in wavefront_artifact.metadata
-    assert any("not power-normalized" not in w for w in result.warnings)  # sanity: no fdtdx leakage
+    assert any("not power-normalized" not in w for w in result.warnings)  # sanity: no foreign adapter warning leaked in
     assert any("intensity" in w or "length_unit" in w or "backend" in w for w in result.warnings)
 
     # The persisted artifact on disk must be loadable and non-empty,

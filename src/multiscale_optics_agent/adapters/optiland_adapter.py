@@ -115,9 +115,8 @@ m/mm`` and ``1e-6 m/um``. ``RealRays.opd`` is deliberately preserved as
 ``opd_native``: its reference and sign semantics remain unverified and it is
 not presented as an absolute OPL/OPD oracle.
 
-Exception-handling convention (per ``core/errors.py`` docstring, mirroring
-``fdtdx_adapter.py``)
-------------------------------------------------------------------------
+Exception-handling convention (per the ``core/errors.py`` docstring)
+--------------------------------------------------------------------
 - ``AdapterDependencyError`` is raised (propagates) when ``optiland`` cannot
   be imported at all, or when ``torch`` cannot be imported for a request that
   needs the torch backend.

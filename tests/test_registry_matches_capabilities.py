@@ -31,14 +31,16 @@ from multiscale_optics_agent.core.capabilities import (
     capability_matrix,
 )
 from multiscale_optics_agent.core.precision import DeviceKind, DType
-from multiscale_optics_agent.core.specs import Device
+from multiscale_optics_agent.core.specs import Device, Maturity
 
 pytestmark = pytest.mark.coupler
 
-#: The components PB4b owns. Other registry entries (FMMAX, FDTDX) are out
-#: of the current milestone's scope and have no capability declaration yet, so
-#: they are not asserted against one -- rather than being given a placeholder
-#: declaration that would be exactly the unvalidated claim this test forbids.
+#: Every declared component. The list used to be scoped to "the components PB4b
+#: owns", which quietly exempted the FMMAX/FDTDX/JAX-FEM entries -- and those
+#: were exactly the ones claiming `devices: [cpu, gpu, tpu]` with nothing
+#: executed. CHE-87 deleted them, so the exemption has nothing left to protect
+#: and the registry is now asserted to contain no entry outside this mapping
+#: (see `test_registry_declares_no_component_without_a_capability` below).
 _OWNED = sorted(COMPONENT_CAPABILITIES)
 
 
@@ -143,6 +145,55 @@ def test_the_documented_capability_table_matches_the_generated_one():
             f"  doc:       {cells}\n"
             f"  generated: {expected}\n"
             "Regenerate with benchmarks/probes/precision/capability_table.py."
+        )
+
+
+def test_registry_declares_no_component_without_a_capability(registry):
+    """Every shipped registry entry has an executable capability declaration.
+
+    This is the check the old ``_OWNED`` scoping made impossible. Declaring a
+    component in the registry is what makes it addressable by a graph, so an
+    entry with no capability declaration is a component the planner can select
+    and the precision bridge cannot reason about -- which is strictly worse than
+    the component not existing.
+
+    The remedy is deliberately asymmetric. If the component is real, add its
+    declaration to ``core/capabilities.py`` **with the probe evidence behind
+    it**. If it is not, delete the registry entry. Adding a placeholder
+    declaration to silence this test would manufacture the unvalidated claim the
+    whole file exists to prevent.
+    """
+    declared = set(registry.models) | set(registry.couplers)
+    undeclared = declared - set(COMPONENT_CAPABILITIES)
+    assert not undeclared, (
+        f"registry entries with no capability declaration: {sorted(undeclared)}. "
+        "Either add one to core/capabilities.py backed by an executable probe, "
+        "or delete the registry entry. Do not add a placeholder: a declaration "
+        "with no probe behind it is the unvalidated claim this file forbids."
+    )
+
+
+def test_no_registry_entry_is_still_experimental(registry):
+    """`maturity` has to carry information, and for 17 entries it carried none.
+
+    All 17 entries were ``experimental`` before CHE-87, which makes the field a
+    constant rather than a classification. The four that survived were set from
+    what is actually measured: ``characterized`` for all of them, because each
+    has an analytic or independent-implementation check and none has a certified
+    gradient.
+
+    A new entry arriving as ``experimental`` is not forbidden in principle -- it
+    is forbidden here because the field only stays meaningful if setting it is a
+    decision. If something genuinely is experimental, say so in this test with
+    the reason.
+    """
+    for name, spec in {**registry.models, **registry.couplers}.items():
+        assert spec.maturity != Maturity.EXPERIMENTAL, (
+            f"{name} is still `maturity: experimental`. Set it from what has "
+            "actually been measured -- characterized (checked against an "
+            "analytic case, conservation law, convergence study or independent "
+            "implementation), validated (that, plus a certified gradient), or "
+            "deprecated."
         )
 
 

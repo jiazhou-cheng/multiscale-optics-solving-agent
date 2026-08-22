@@ -51,7 +51,7 @@ Do not add a coupler solely so a graph terminates in a particular artifact type.
 - Full benchmark suite.
 - Broad wrappers for every Optiland or Chromatix API.
 - End-to-end cross-framework autodiff.
-- FMMAX, FDTDX, JAX-FEM, thermal, circuit, or metasurface integration. (SAX was removed outright by CHE-72; see AGENTS.md.)
+- Thermal, circuit, or metasurface integration. FMMAX, FDTDX and JAX-FEM were not merely out of scope but **removed outright** by CHE-87 -- adapter, registry entry, example graph, knowledge pack, pytest marker and dependency pin -- as SAX was by CHE-72. Restoring one is a fresh scoped integration behind its own issue, not a revert; the intent and the two findings worth keeping are in `benchmarks/roadmap.md`.
 - Renaming or deleting legacy ray-wave code before characterization.
 
 ## Forward Success Criteria
