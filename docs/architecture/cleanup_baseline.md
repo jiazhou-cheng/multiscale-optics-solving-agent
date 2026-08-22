@@ -189,3 +189,75 @@ did not block a clean `git status`; they are Phase 1's to remove.
 * **52 passed** on `./run.sh pytest -q benchmarks/agents`.
 * Zero swap growth. If a phase's run pushes the host into swap, stop it and
   reduce the work — do not record the number and move on.
+
+---
+
+# Reconciliation — the epic's final numbers against this baseline
+
+Added when CHE-94 closed the epic. The baseline above is unchanged; this section
+accounts for every delta.
+
+| Gate | Baseline (`b5fbe42`) | Final | Delta |
+| -- | -- | -- | -- |
+| `./run.sh --rebuild pytest -q` | 769 passed, 48 skipped, 183.0 s | **899 passed, 48 skipped, 187.9 s** | **+130 tests**, +5 s |
+| `./run.sh pytest -q -m "not slow"` | 751 passed, 36.6 s | **880 passed, 42.8 s** | +129, +6 s |
+| `./run.sh --gpu pytest -q -m gpu` | 48 passed, 69.7 s | **48 passed, 69.2 s** | none |
+| `./run.sh pytest -q benchmarks/agents` | 52 passed, 7.5 s | **52 passed, 7.7 s** | none |
+| `make test-tutorial` | not run | **60 passed, 1,974 s** | now runs from `tests_tutorial/cases/` |
+| `scripts/export_schemas.py` | **produced a diff** (Finding 1) | no diff | fixed in Phase 1 |
+| `make test-agent-benchmark` | **failed on the host** (Finding 2) | passes | fixed in Phase 8 |
+| `mypy src` | 157 errors, 25 files | 120 errors, 21 files | −37, all from deleted code; filed as CHE-98 |
+| Host swap | 266 MiB, never moved | 266 MiB, never moved | none |
+
+## Every delta, attributed
+
+**+130 tests**, and not one of them is an existing test changing outcome:
+
+| Phase | Added | What |
+| -- | -- | -- |
+| CHE-87 | ±0 | −2 adapter-discovery cases, +2 registry-honesty tests. Arithmetic, not luck. |
+| CHE-88 | +58 | 46 restored PSF-oracle tests (unarchived, unmodified), 5 CLI, 7 fingerprint |
+| CHE-89 | +14 | flat-layout integrity, including a real wheel install |
+| CHE-90 | +9 | dependency direction and the cycle check |
+| CHE-91 | +22 | adapter characterization, landed before the split |
+| CHE-93 | +7 | schema drift |
+| CHE-92 | +13 | solver knowledge pack |
+| CHE-94 | +6 | the architecture sweep |
+| CHE-93/92 | +1 | net, from repointed and generalized guards |
+
+**+6 s on the fast subset.** 129 new tests, all static except the
+characterization suite; CHE-94's own budget was "under 2 s" and its six checks
+cost under 0.5 s.
+
+**Coverage 68.8% → 79.6%** (measured at CHE-88; the four zero-coverage modules
+went to 91–100%).
+
+## What the baseline's four findings became
+
+1. **Stale `schemas/`** — fixed in Phase 1, and Phase 8 added the test that
+   would have caught it. Both directions: a stale schema and an orphaned one.
+2. **`make` targets non-functional on the host** — every target now runs through
+   `./run.sh`.
+3. **GPU containers blocked by a faulted GPU 5** — unresolved at the host level
+   and not resolvable without root. `run.sh` falls back to explicit device
+   passthrough; the GPU suite ran in every phase that needed it. Recorded as
+   Trap 3 in `docs/testing/gpu_environment.md`.
+4. **Dirty tree** — resolved before the baseline was taken.
+
+## What the epic found that it was not looking for
+
+Four issues, all pre-existing, all filed rather than fixed in a cleanup phase:
+
+* **CHE-100 (Urgent)** — three committed probe records no longer reproduce; one
+  differs in 214 of 674 values, with absolute power and intensity scales off by
+  ~20 orders of magnitude, and a negative control that recorded an exact `0.0`
+  now records `0.009283`. Demonstrated to predate the epic by reproducing the
+  same numbers at `b5fbe42`. Nineteen active tests read that record and pass.
+* **CHE-99 (High)** — the coherent-bridge exactness limit fails ~32% of the time
+  under `-m optiland`, and attaching a probe that merely *reads* Optiland's
+  global backend state suppresses it entirely (0/16 versus 6/19).
+* **CHE-98** — 120 mypy errors under `strict`, enforced by nothing.
+* **CHE-97** — a tutorial-harness tolerance that is stricter for smaller metrics.
+
+Three of the four were found by *running* something the epic required to be run
+rather than read: the probes, the per-subsystem suites, and the tutorial sweep.

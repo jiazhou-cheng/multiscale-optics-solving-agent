@@ -822,6 +822,43 @@ separate `validation_scope` field — the qualifiers are genuinely informative
 (b) Declare the field advisory. (a) preserves the information and restores the
 ladder's meaning.
 
+## 8.1 Which test now holds each invariant
+
+The gap list above is closed. What replaced it is a set of checks, so the next
+drift fails a run rather than requiring another manual audit. Every one is
+static -- AST and the file tree, no solver import -- and the whole set adds well
+under a second to a ~43 s fast subset.
+
+| Invariant | Held by |
+| -- | -- |
+| `solvers/` and `couplers/` do not import each other | `tests/test_package_dependencies.py` |
+| `core/` imports none of its siblings | same |
+| no import cycle between top-level packages | same, derived from the graph rather than from the rule table |
+| the four boundary artifacts live in `core/boundary.py` | same |
+| nothing locates the repository root by counting parents | same |
+| every registry entry has a capability declaration | `tests/test_registry_matches_capabilities.py` |
+| registry `devices`/`dtypes` equal the declaration | same |
+| no entry sits at `maturity: experimental` | same |
+| the registration map equals the modules declaring a `MODEL_ID` | `tests/test_architecture_invariants.py` |
+| a duplicate `MODEL_ID` raises | same |
+| no module outside `solvers/` is named like an adapter | same |
+| every example graph validates | same |
+| the checkers skip the frozen archives | same |
+| no active file cites a ticket instead of stating its finding | same |
+| every top-level name resolves inside this repository | `tests/test_flat_layout.py` |
+| no top-level name collides with a repository-root directory | same |
+| `Registry.from_package()` works from a real wheel | same |
+| `knowledge/` holds no code, arrays or PDFs | `tests/test_solver_knowledge_pack.py`, `tests/test_coupler_knowledge_pack.py` |
+| exactly one card per component | `tests/test_solver_knowledge_pack.py` |
+| no card restates a capability table | same |
+| `validation_status` is on the ladder, with a separate scope | same |
+| `not_yet_probed` carries no cleared entry | same |
+| `schemas/*.json` reproduce from their models | `tests/test_generated_artifacts.py` |
+| the suite groups stay separate | `tests/test_suite_layout.py` |
+
+Each was demonstrated to fail against a deliberate violation rather than
+asserted to work.
+
 ## 9. What sits above this tier
 
 One tier up, the system stops being about packages and starts being about

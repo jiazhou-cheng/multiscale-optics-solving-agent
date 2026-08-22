@@ -237,8 +237,10 @@ def characterize() -> dict[str, Any]:
                 "no optimization loop",
                 "no re-run of CHE-38's handoff-plane / grid / padding sweeps "
                 "(unaffected by a producer-side amplitude change)",
-                "no aperture-aware exit-pupil hard-support reconstruction "
-                "(out of contract, per CHE-38)",
+                "no aperture-aware exit-pupil hard-support reconstruction -- the "
+                "coupler reconstructs on the declared grid without an aperture "
+                "mask, which is the contract it states, so masking here would "
+                "measure a different operator than the one that ships",
             ],
             "sensor_ladder": rows,
             "absolute_power": absolute_power,
