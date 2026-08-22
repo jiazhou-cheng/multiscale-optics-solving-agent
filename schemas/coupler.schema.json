@@ -130,6 +130,16 @@
       "title": "DerivativeSpec",
       "type": "object"
     },
+    "Device": {
+      "enum": [
+        "cpu",
+        "gpu",
+        "tpu",
+        "external"
+      ],
+      "title": "Device",
+      "type": "string"
+    },
     "Framework": {
       "enum": [
         "jax",
@@ -217,6 +227,18 @@
         "package": {
           "title": "Package",
           "type": "string"
+        },
+        "pinned_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinned Commit"
         },
         "pinned_version": {
           "anyOf": [
@@ -306,6 +328,20 @@
     "description": {
       "title": "Description",
       "type": "string"
+    },
+    "devices": {
+      "items": {
+        "$ref": "#/$defs/Device"
+      },
+      "title": "Devices",
+      "type": "array"
+    },
+    "dtypes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Dtypes",
+      "type": "array"
     },
     "framework": {
       "$ref": "#/$defs/Framework"

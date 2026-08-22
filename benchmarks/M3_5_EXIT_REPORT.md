@@ -63,10 +63,10 @@ All numbers below were measured inside the `agent_solver` container via
 ## PB1–PB3 — the suite is tiered, and the dev gate is met with room to spare
 
 CHE-52 inventoried and classified every test and produced a disposition table
-(`docs/testing/test_audit.md`). CHE-53 restructured into Tier A/B/C behind
-pytest markers (`docs/testing/tier_restructure.md`). CHE-54 reviewed Tier A's
+(`docs/archive/2026-08-testing/test_audit.md`). CHE-53 restructured into Tier A/B/C behind
+pytest markers (`docs/archive/2026-08-testing/tier_restructure.md`). CHE-54 reviewed Tier A's
 numerical cost and found **no shrink was needed**
-(`docs/testing/pb3_shrink_review.md`).
+(`docs/archive/2026-08-testing/pb3_shrink_review.md`).
 
 | Tier | Command | Measured |
 | --- | --- | --- |

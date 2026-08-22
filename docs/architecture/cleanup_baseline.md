@@ -61,7 +61,7 @@ polls `/proc/meminfo` and kills the process group if swap-used grows more than
 256 MiB above its value at launch. It never fired.
 
 Because host swap is non-zero at rest, *growth* is the signal, not level — the
-same distinction `docs/testing/test_runtime_audit.md` records for the container
+same distinction `docs/archive/2026-08-testing/test_runtime_audit.md` records for the container
 cgroup guardrail.
 
 ## Per-module coverage map

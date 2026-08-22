@@ -228,6 +228,18 @@
           "title": "Package",
           "type": "string"
         },
+        "pinned_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pinned Commit"
+        },
         "pinned_version": {
           "anyOf": [
             {

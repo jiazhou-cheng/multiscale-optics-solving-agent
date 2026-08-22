@@ -2,7 +2,7 @@
 
 **Issue:** CHE-67
 **Date:** 2026-08-19
-**Consumes:** `docs/testing/test_inventory.md` / `.json` (CHE-64) for every count
+**Consumes:** `docs/archive/2026-08-testing/test_inventory.md` / `.json` (CHE-64) for every count
 and runtime quoted here. **This issue ran no tests**, so nothing below is a new
 measurement of test *behavior*; the numbers are collection counts (measured) and
 CHE-64 runtimes (reused).
@@ -61,7 +61,7 @@ Measured during this issue, in order:
    the half that still exists.
 
 Layer 3 is the one that matters in practice, because the paths in
-`docs/testing/test_inventory.md` all still read `tests/...` — that document was
+`docs/archive/2026-08-testing/test_inventory.md` all still read `tests/...` — that document was
 generated before this archival, and copy-pasting a node id out of it is exactly
 the accident layers 1 and 2 do not cover.
 
@@ -121,7 +121,7 @@ only cross-file import under `tests/` is
   runs `make test-tutorial` for a month; a pin change can therefore land
   unverified. If that turns out to matter, the fix is a scheduled run, not
   re-adding 33 minutes to every PR.
-- **`docs/testing/test_inventory.{md,json}`, `test_audit.md`, `test_runtime_audit.md`
+- **`test_inventory.{md,json}`, `test_audit.md`, `test_runtime_audit.md`
   and `tier_restructure.md` were not regenerated.** They are CHE-52/53/64 evidence
   and describe the tree as it was; every `tests/...` path in them that this issue
   moved is now stale. Regenerating would require re-running the profiler

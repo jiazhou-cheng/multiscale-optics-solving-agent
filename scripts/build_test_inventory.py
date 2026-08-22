@@ -8,6 +8,12 @@ declared purpose, and emits:
 * ``docs/testing/test_inventory.json`` -- the machine-readable inventory
 * ``docs/testing/test_inventory.md``   -- the human review table
 
+The copies CHE-64 published at those paths were archived to
+``docs/archive/2026-08-testing/`` once CHE-67 moved the tests they index, so a
+run of this script now writes a *current* inventory rather than overwriting a
+historical record. Re-running it needs the profiler's JSON first, which is
+2642 s of test execution.
+
 Run:
     ./run.sh python scripts/build_test_inventory.py
 
@@ -38,12 +44,14 @@ OUT_MD = ROOT / "docs" / "testing" / "test_inventory.md"
 #: under `tests/` -- every test carrying them was archived to
 #: `archive/tests/gen1/`, which is outside pytest collection. They are kept in this
 #: set so re-running this script over a *pre-CHE-67* profile still reproduces the
-#: tier labels that `docs/testing/test_inventory.md` was published with. `tutorial`
+#: tier labels that `docs/archive/2026-08-testing/test_inventory.md` was published
+#: with. `tutorial`
 #: is deliberately absent: the tutorials are now separated by directory
 #: (`tests_tutorial/`), not by marker, so a profile of that suite should show its
 #: real cost rather than a tier label.
 # `sax` is deliberately absent: CHE-72 deleted the marker with the integration.
-# The historical Tier A expression in docs/testing/ still says `not sax`, which
+# The historical Tier A expression in docs/archive/2026-08-testing/ still says
+# `not sax`, which
 # keeps working because an unknown name evaluates false in a `-m` expression.
 TIER_A_EXCLUDING_MARKERS = {"slow", "benchmark", "fmmax", "fdtdx"}
 #: Quarantined to its own session (CHE-60): needs `./run.sh --gpu ... -m gpu`.
@@ -65,7 +73,7 @@ KNOWN_FLAKY: dict[str, dict[str, str]] = {
         "Cannot be seeded: optiland.scatter is numba-compiled and its RNG is "
         "unreachable from numpy.",
         "disposition": "not fixed in CHE-64 -- widening the bound is a tolerance "
-        "decision on a physical claim. See docs/testing/test_runtime_audit.md F1.",
+        "decision on a physical claim. See docs/archive/2026-08-testing/test_runtime_audit.md F1.",
     },
 }
 

@@ -21,7 +21,7 @@ alone is 1020 s; `test_optiland_tutorials.py` is 983 s.
 
 They are 76% of the old suite's runtime while answering a different question from
 the rest of the suite: *has the pinned third-party solver changed?*, not *is this
-repository's physics right?* (CHE-64, `docs/testing/test_runtime_audit.md`). That
+repository's physics right?* (CHE-64, `docs/archive/2026-08-testing/test_runtime_audit.md`). That
 makes them a dependency-pin gate, so the useful cadence is a pin change — not
 every commit.
 
@@ -58,5 +58,5 @@ Refresh the recorded evidence these tests compare against with:
 
 Known flake: `test_optiland_tutorials.py::test_tutorial_reproduction[t21_surface_roughness_scattering]`
 fails roughly 1 run in 11 on an unseedable numba RNG (CHE-64 F1,
-`docs/testing/test_runtime_audit.md`). It is a known-flaky reproduction, not a
+`docs/archive/2026-08-testing/test_runtime_audit.md`). It is a known-flaky reproduction, not a
 regression signal on its own.
