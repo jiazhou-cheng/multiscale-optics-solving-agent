@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 
-from multiscale_optics_agent.core.provenance import VOLATILE_KEYS, strip_volatile
+from core.provenance import VOLATILE_KEYS, strip_volatile
 
 
 def _fingerprint(payload: object) -> str:

@@ -246,7 +246,7 @@ checks:
 
 | Check | Result |
 |---|---|
-| `ray_source` | no `chromatix`, no `multiscale_optics_agent.couplers`, no `C_RAY_TO_WAVE`/`C_WAVE_TO_RAY` identifier in any ray entry-point source |
+| `ray_source` | no `chromatix`, no `couplers`, no `C_RAY_TO_WAVE`/`C_WAVE_TO_RAY` identifier in any ray entry-point source |
 | `wave_source` | no `optiland`, no coupler import, no coupler identifier |
 | `ray_bundle` | `forbidden_modules_loaded == []` at exit, in the bundle and both nested provenance files |
 | `wave_bundle` | `forbidden_modules_loaded == []` at exit |

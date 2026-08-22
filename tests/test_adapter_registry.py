@@ -1,10 +1,10 @@
 import pytest
 
-from multiscale_optics_agent.adapters.registry import (
+from adapters.registry import (
     available_model_ids,
     get_adapter_for_model,
 )
-from multiscale_optics_agent.core.errors import AdapterNotFoundError
+from core.errors import AdapterNotFoundError
 
 
 def test_unknown_model_id_raises_not_found() -> None:

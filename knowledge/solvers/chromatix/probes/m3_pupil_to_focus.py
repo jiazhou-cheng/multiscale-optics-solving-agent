@@ -44,11 +44,11 @@ from typing import Any
 import numpy as np
 import yaml
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest
-from multiscale_optics_agent.adapters.optiland_adapter import get_adapter as get_ray_adapter
-from multiscale_optics_agent.couplers.base import CouplerRunRequest
-from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler
-from multiscale_optics_agent.evaluation.asm_oracle import (
+from adapters.base import ModelRunRequest
+from adapters.optiland_adapter import get_adapter as get_ray_adapter
+from couplers.base import CouplerRunRequest
+from couplers.ray_to_wave_node import RayToWaveCoupler
+from evaluation.asm_oracle import (
     ASM_ORACLE_ID,
     CarrierConvention,
     angular_spectrum_float64,
@@ -127,7 +127,7 @@ def _chromatix_propagate(
     import jax
     import jax.numpy as jnp
 
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagate,
         pin_wave_engine_precision,
     )
@@ -279,7 +279,7 @@ def measure_padding_cost_in_float64(pupil: dict[str, Any], pad_width: int) -> di
 
 
 def measure_padding_and_energy(pupil: dict[str, Any]) -> dict[str, Any]:
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         pin_wave_engine_precision,
     )
 

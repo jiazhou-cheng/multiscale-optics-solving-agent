@@ -26,12 +26,12 @@ import pathlib
 
 import pytest
 
-from multiscale_optics_agent.core.capabilities import (
+from core.capabilities import (
     COMPONENT_CAPABILITIES,
     capability_matrix,
 )
-from multiscale_optics_agent.core.precision import DeviceKind, DType
-from multiscale_optics_agent.core.specs import Device, Maturity
+from core.precision import DeviceKind, DType
+from core.specs import Device, Maturity
 
 pytestmark = pytest.mark.coupler
 

@@ -1,5 +1,5 @@
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.specs import ArtifactKind
+from core.artifacts import ArtifactRecord
+from core.specs import ArtifactKind
 
 
 def test_artifact_record_preserves_semantic_metadata() -> None:

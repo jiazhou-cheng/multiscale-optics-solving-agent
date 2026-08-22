@@ -13,10 +13,10 @@ import math
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.precision import ArrayNamespace, DType
-from multiscale_optics_agent.core.specs import ArtifactKind
-from multiscale_optics_agent.couplers import (
+from core.artifacts import ArtifactRecord
+from core.precision import ArrayNamespace, DType
+from core.specs import ArtifactKind
+from couplers import (
     AXIS_ORDER,
     ORIGIN_RULE,
     PHASOR,

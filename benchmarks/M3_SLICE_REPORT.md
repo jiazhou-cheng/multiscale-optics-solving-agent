@@ -252,7 +252,7 @@ ray density.
 
 ## Per-ray quadrature weight in production, and absolute power resolved (CHE-47)
 
-`multiscale_optics_agent.couplers.quadrature` implements CHE-38's measured
+`couplers.quadrature` implements CHE-38's measured
 radial-trapezoid weight as an absolute area (`π a² / (3·rings²)`, `3/4` at
 centre, `1/2` at the outer ring), folded into `declare_coherent_bundle`'s
 amplitude by default. On the **real traced** (residually aberrated)

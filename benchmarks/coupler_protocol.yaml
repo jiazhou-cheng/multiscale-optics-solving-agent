@@ -152,7 +152,7 @@ reproducibility:
       - timestamps, run identifiers, output paths, process identifiers
       - git dirty flag
     rule: >-
-      Reuses multiscale_optics_agent.core.provenance volatile-key
+      Reuses core.provenance volatile-key
       stripping. Ensemble means over a fixed seed sequence are physics and are
       included; per-realization wall-clock is not.
 

@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
-from multiscale_optics_agent.core.graph import GraphValidator
-from multiscale_optics_agent.registry.loader import Registry
+from core.graph import GraphValidator
+from registry.loader import Registry
 
 ROOT = Path(__file__).resolve().parents[1]
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\((https?://[^)]+)\)")

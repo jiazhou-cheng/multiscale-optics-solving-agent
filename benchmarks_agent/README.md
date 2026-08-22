@@ -20,7 +20,7 @@ make agent-benchmark
 make agent-benchmark PARTICIPANT=broken:trap
 
 # Against a real agent (see "Running an agent" below).
-./run.sh python -m multiscale_optics_agent.benchmarks.agent_suite \
+./run.sh python -m benchmarks.agent_suite \
     --suite v1 --trials 3 --participant "command:my-agent --prompt {prompt}" \
     --context-policy per-task --output outputs/che71_agent_v1
 ```
@@ -71,7 +71,7 @@ The split within that, and why:
 
 | what | where | in the default suite? |
 |---|---|---|
-| harness, task registry, reference implementations | `src/multiscale_optics_agent/benchmarks/agent_suite.py` | — |
+| harness, task registry, reference implementations | `src/benchmarks/agent_suite.py` | — |
 | grader / taxonomy / trial arithmetic tests | `tests/test_agent_benchmark.py` | **yes**, deterministic, 53 tests, 0.1 s |
 | prompts, recorded expectations, the graded run | `benchmarks_agent/` | no, opt-in |
 
@@ -199,7 +199,7 @@ A taxonomy that collapsed "it ran" into "it worked" could express neither.
 6. **If it is a trap**, fill in `trap` with the *measured* wrong number the
    plausible mistake produces, and add the mistake to `_trap_submission` so a
    negative participant exercises it.
-7. `./run.sh python -m multiscale_optics_agent.benchmarks.agent_suite --write-expected`
+7. `./run.sh python -m benchmarks.agent_suite --write-expected`
 8. `make test-agent-benchmark` and `./run.sh pytest -q tests/test_agent_benchmark.py`.
 
 ### Candidates excluded, with the reason measured rather than guessed
@@ -238,7 +238,7 @@ minimal so any agent can satisfy it:
 - it must leave a `submission.json` in the workspace.
 
 ```bash
-./run.sh python -m multiscale_optics_agent.benchmarks.agent_suite \
+./run.sh python -m benchmarks.agent_suite \
     --suite v1 --trials 3 \
     --participant "command:my-agent --prompt {prompt} --cwd {workspace}" \
     --context-policy per-task --output outputs/che71_agent_v1

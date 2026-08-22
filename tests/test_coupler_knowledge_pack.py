@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from multiscale_optics_agent.core.specs import DerivativeMode, Maturity
-from multiscale_optics_agent.registry.loader import Registry
+from core.specs import DerivativeMode, Maturity
+from registry.loader import Registry
 
 pytestmark = pytest.mark.coupler
 
@@ -304,7 +304,7 @@ def test_the_near_grazing_cancellation_hazard_is_recorded_with_its_numbers() -> 
 
     streaming = (
         Path(__file__).resolve().parents[1]
-        / "src/multiscale_optics_agent/couplers/streaming.py"
+        / "src/couplers/streaming.py"
     ).read_text()
     assert "grazing_floor_for_phase_budget" in streaming
     assert "eps * k * Z / d_n" in streaming, (

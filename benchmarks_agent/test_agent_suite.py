@@ -32,7 +32,7 @@ import json
 
 import pytest
 
-from multiscale_optics_agent.benchmarks.agent_suite import (
+from benchmarks.agent_suite import (
     SUITE_V1,
     ContextPolicy,
     Outcome,

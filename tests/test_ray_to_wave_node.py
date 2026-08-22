@@ -26,23 +26,23 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.graph import GraphValidator
-from multiscale_optics_agent.core.specs import ArtifactKind
-from multiscale_optics_agent.couplers.base import CouplerRunRequest
-from multiscale_optics_agent.couplers.contracts import ContractCode
-from multiscale_optics_agent.couplers.optiland_handoff import (
+from core.artifacts import ArtifactRecord
+from core.graph import GraphValidator
+from core.specs import ArtifactKind
+from couplers.base import CouplerRunRequest
+from couplers.contracts import ContractCode
+from couplers.optiland_handoff import (
     DeclaredHandoffPlane,
     declare_coherent_bundle,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import Projection, ray_to_wave
-from multiscale_optics_agent.couplers.ray_to_wave_node import COUPLER_ID, RayToWaveCoupler
-from multiscale_optics_agent.registry.loader import Registry
+from couplers.ray_to_wave import Projection, ray_to_wave
+from couplers.ray_to_wave_node import COUPLER_ID, RayToWaveCoupler
+from registry.loader import Registry
 
 pytest.importorskip("optiland")
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus
-from multiscale_optics_agent.adapters.optiland_adapter import get_adapter
+from adapters.base import ModelRunRequest, RunStatus
+from adapters.optiland_adapter import get_adapter
 
 pytestmark = [pytest.mark.coupler, pytest.mark.optiland]
 
@@ -421,7 +421,7 @@ def test_the_registry_port_matches_what_the_implementation_consumes(coupler):
 
 def test_the_runnable_node_imports_no_solver_engine():
     tree = ast.parse(
-        (ROOT / "src/multiscale_optics_agent/couplers/ray_to_wave_node.py").read_text()
+        (ROOT / "src/couplers/ray_to_wave_node.py").read_text()
     )
     imported: set[str] = set()
     for node in ast.walk(tree):
@@ -441,10 +441,10 @@ def test_the_runnable_node_loads_no_engine_at_runtime():
     """
     script = (
         "import sys\n"
-        "from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler\n"
-        "from multiscale_optics_agent.couplers.base import CouplerRunRequest\n"
-        "from multiscale_optics_agent.core.artifacts import ArtifactRecord\n"
-        "from multiscale_optics_agent.core.specs import ArtifactKind\n"
+        "from couplers.ray_to_wave_node import RayToWaveCoupler\n"
+        "from couplers.base import CouplerRunRequest\n"
+        "from core.artifacts import ArtifactRecord\n"
+        "from core.specs import ArtifactKind\n"
         "c = RayToWaveCoupler()\n"
         "c.spec\n"
         "r = CouplerRunRequest(run_id='r', edge_id='e', source=ArtifactRecord("

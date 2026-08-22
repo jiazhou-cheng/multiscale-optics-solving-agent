@@ -38,10 +38,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from conftest import load_probe_expected
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus
-from multiscale_optics_agent.adapters.optiland_adapter import OptilandAdapter
-from multiscale_optics_agent.core.errors import UnsupportedCapabilityError
-from multiscale_optics_agent.core.optical_system import (
+from adapters.base import ModelRunRequest, RunStatus
+from adapters.optiland_adapter import OptilandAdapter
+from core.errors import UnsupportedCapabilityError
+from core.optical_system import (
     OPTICAL_SYSTEM_SPEC_VERSION,
     UNITS,
     AirMaterialSpec,
@@ -58,7 +58,7 @@ from multiscale_optics_agent.core.optical_system import (
     SurfaceSpec,
     WavelengthSpec,
 )
-from multiscale_optics_agent.registry.prescriptions import (
+from registry.prescriptions import (
     M3_SINGLET_REF,
     PHASE3_FEATURE_DEMO,
     PRESCRIPTION_NAMES,
@@ -69,10 +69,10 @@ from multiscale_optics_agent.registry.prescriptions import (
 
 optiland_backend = pytest.importorskip("optiland.backend")
 build_optiland_system = pytest.importorskip(
-    "multiscale_optics_agent.adapters.optiland_builder"
+    "adapters.optiland_builder"
 ).build_optiland_system
 resolve_catalog_material = pytest.importorskip(
-    "multiscale_optics_agent.adapters.optiland_builder"
+    "adapters.optiland_builder"
 ).resolve_catalog_material
 OptilandMaterial = pytest.importorskip("optiland.materials").Material
 
@@ -895,7 +895,7 @@ def test_adapter_regression_fingerprints_are_unmoved_by_the_migration(tmp_path) 
 
 
 def test_registry_names_are_the_adapter_supported_set() -> None:
-    from multiscale_optics_agent.adapters import optiland_adapter
+    from adapters import optiland_adapter
 
     assert prescription_names() == PRESCRIPTION_NAMES
     assert optiland_adapter._SUPPORTED_SAMPLES == PRESCRIPTION_NAMES

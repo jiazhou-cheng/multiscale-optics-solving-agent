@@ -79,9 +79,9 @@ verified_by_che57_tutorial_reproductions:
   - "fileio: save/load_optiland_file (exact round trip), save/load_zemax_file (LOSSY)"
 canonical_system_construction:
   issue: CHE-56 (PB5)
-  schema: optical-system-spec/1 (src/multiscale_optics_agent/core/optical_system.py)
-  builder: src/multiscale_optics_agent/adapters/optiland_builder.py
-  registry: src/multiscale_optics_agent/registry/prescriptions.py
+  schema: optical-system-spec/1 (src/core/optical_system.py)
+  builder: src/adapters/optiland_builder.py
+  registry: src/registry/prescriptions.py
   docs: docs/prescriptions/canonical_optical_systems.md
   probe: knowledge/solvers/optiland/probes/system_construction_probe.py
   evidence: knowledge/solvers/optiland/expected/system_construction_probe.json
@@ -493,7 +493,7 @@ not_yet_probed:
     autograd behaviour across a hard stop is still untested.
   - the full repository gradient test at float64 (CHE-57 established the
     convergence table in a tutorial reproduction, not in a gradient test)
-adapter_location: src/multiscale_optics_agent/adapters/optiland_adapter.py
+adapter_location: src/adapters/optiland_adapter.py
 validation_status: environment_verified
 validation_note: >
   CHE-12 verified the pinned CPU environment and native geometry/wavelength

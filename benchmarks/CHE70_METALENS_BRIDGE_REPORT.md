@@ -13,7 +13,7 @@ CSV tables, seven figures, three `.npy` fields) live under
 ## 1. Reproduction
 
 ```bash
-MOA_GPUS=device=0 ./run.sh --gpu python -m multiscale_optics_agent.benchmarks.metalens_controller \
+MOA_GPUS=device=0 ./run.sh --gpu python -m benchmarks.metalens_controller \
     --grid-size 100 --device cuda --precision fp32 --sampling-density magnitude \
     --seed 1 --auto-converge --memory-guard --config METALENS-AIR-100 \
     --validate METALENS-SLAB-100 --output outputs/che70_metalens
@@ -23,7 +23,7 @@ MOA_GPUS=device=0 ./run.sh --gpu python -m multiscale_optics_agent.benchmarks.me
 re-derivable from the persisted candidates without re-running anything:
 
 ```bash
-./run.sh python -m multiscale_optics_agent.benchmarks.metalens_controller \
+./run.sh python -m benchmarks.metalens_controller \
     --output outputs/che70_metalens --config METALENS-AIR-100 \
     --validate METALENS-SLAB-100 --device cuda --reanalyze
 ```

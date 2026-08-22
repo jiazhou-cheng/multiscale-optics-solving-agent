@@ -175,7 +175,7 @@ def _probe_ray() -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "numpy": versions["numpy"] == EXPECTED["numpy"],
         }
         known_distance = _known_distance_report()
-        forbidden = _loaded_forbidden_modules(("chromatix", "multiscale_optics_agent.couplers"))
+        forbidden = _loaded_forbidden_modules(("chromatix", "couplers"))
         if not all(pin_checks.values()):
             errors.append(
                 {
@@ -256,7 +256,7 @@ def _probe_wave() -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "jax": versions["jax"] == EXPECTED["jax"],
             "numpy": versions["numpy"] == EXPECTED["numpy"],
         }
-        forbidden = _loaded_forbidden_modules(("optiland", "multiscale_optics_agent.couplers"))
+        forbidden = _loaded_forbidden_modules(("optiland", "couplers"))
         if not all(pin_checks.values()):
             errors.append(
                 {

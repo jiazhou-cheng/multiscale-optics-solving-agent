@@ -65,7 +65,7 @@ lands it (disposition: `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1).
 
 **CHE-47 implemented the reweighting this section describes**, as a producer-side
 default: `optiland_handoff.declare_coherent_bundle` folds
-`multiscale_optics_agent.couplers.quadrature.hexapolar_area_weight_m2` into the
+`couplers.quadrature.hexapolar_area_weight_m2` into the
 amplitude whenever the Optiland adapter can confirm an un-vignetted hexapolar
 fan. If you are seeing this failure mode on a *current* Optiland-traced bundle,
 check `handoff.declarations["quadrature_weight"]["status"]` first: `"applied"`
@@ -120,7 +120,7 @@ return an invented field.
 
 One code above the table does not surface as a `declare_coherent_bundle`
 refusal: `NON_HEXAPOLAR_SAMPLING` (CHE-47, raised by
-`multiscale_optics_agent.couplers.quadrature.hexapolar_ring_index`/
+`couplers.quadrature.hexapolar_ring_index`/
 `hexapolar_area_weight_m2`) is caught internally by the Optiland adapter's
 `_resolve_ray_quadrature_weight` and recorded as
 `quadrature_weight.unavailable_reason` rather than propagated. A missing

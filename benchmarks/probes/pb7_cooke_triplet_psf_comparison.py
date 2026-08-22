@@ -250,7 +250,7 @@ def cooke_triplet_spec():
     bundled sample gets, and recorded here so a future catalog change is an
     error instead of a quietly different lens.
     """
-    from multiscale_optics_agent.core.optical_system import (
+    from core.optical_system import (
         ApertureSpec,
         CatalogMaterialSpec,
         FieldSpec,
@@ -654,7 +654,7 @@ def advance_bundle_to_z(bundle, z_m: float):
     ``_advance_bundle_to_z``; reproduced rather than imported because that probe
     is a 126 kB study module whose import runs its own declarations.
     """
-    from multiscale_optics_agent.couplers.contracts import Frame, RayBundle, ReferencePlane
+    from couplers.contracts import Frame, RayBundle, ReferencePlane
 
     positions = np.asarray(bundle.positions_m, dtype=np.float64)
     directions = np.asarray(bundle.directions, dtype=np.float64)
@@ -695,7 +695,7 @@ def translate_bundle_transverse(bundle, dx_m: float, dy_m: float):
     interpolated, resampled or approximated, and no optical path is altered:
     only the transverse components of ``positions_m`` change.
     """
-    from multiscale_optics_agent.couplers.contracts import Frame, RayBundle
+    from couplers.contracts import Frame, RayBundle
 
     positions = np.asarray(bundle.positions_m, dtype=np.float64).copy()
     positions[:, 0] -= float(dx_m)
@@ -730,15 +730,15 @@ def method_c_ray_to_wave(
     output is reported, so "the wave leg was exercised and is the identity here"
     is a measurement rather than an assertion.
     """
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.chromatix_adapter import get_adapter as chromatix
-    from multiscale_optics_agent.adapters.optiland_adapter import get_adapter as optiland
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from adapters.base import ModelRunRequest
+    from adapters.chromatix_adapter import get_adapter as chromatix
+    from adapters.optiland_adapter import get_adapter as optiland
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
-    from multiscale_optics_agent.couplers.ray_to_wave import ray_to_wave
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from couplers.ray_to_wave import ray_to_wave
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf,
         measure_psf_from_record,
@@ -1611,7 +1611,7 @@ def characterize() -> dict[str, Any]:
     from optiland.samples.objectives import CookeTriplet
     from optiland.utils import get_working_FNO
 
-    from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
+    from adapters.optiland_builder import build_optiland_system
 
     spec = cooke_triplet_spec()
     built = build_optiland_system(spec)

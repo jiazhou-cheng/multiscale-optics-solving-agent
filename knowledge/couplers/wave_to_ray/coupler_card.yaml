@@ -370,7 +370,7 @@ measured_behaviour:
     the modal amplitudes and the exactness limit pins the scale. Parseval then
     reads sum|U~|^2 = (1/(ny*nx)) sum|u|^2.
 
-implementation_location: src/multiscale_optics_agent/couplers/wave_to_ray.py
+implementation_location: src/couplers/wave_to_ray.py
 test_location: tests/test_wave_to_ray.py
 validation_status: characterized_stochastic_scalar_planar_cpu
 validation_note: >

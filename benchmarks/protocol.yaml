@@ -4,8 +4,8 @@ scope:
   benchmark_ids: [L1-RAY-01, L1-WAVE-01]
   execution: independent_process_per_baseline
   forbidden_import_prefixes:
-    L1-RAY-01: [chromatix, multiscale_optics_agent.couplers]
-    L1-WAVE-01: [optiland, multiscale_optics_agent.couplers]
+    L1-RAY-01: [chromatix, couplers]
+    L1-WAVE-01: [optiland, couplers]
 
 # Amendments to the frozen V1 contract. A benchmark declares the amended
 # protocol_id in result.json and provenance.json; the base execution,

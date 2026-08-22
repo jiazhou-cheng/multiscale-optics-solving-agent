@@ -3,10 +3,10 @@ import json
 
 import numpy as np
 
-from multiscale_optics_agent.core.precision import ArrayNamespace, Precision
-from multiscale_optics_agent.couplers import wave_to_ray as w2r
-from multiscale_optics_agent.couplers.contracts import ComplexField, Frame, ReferencePlane
-from multiscale_optics_agent.couplers.ray_to_wave import collimated_bundle, ray_to_wave
+from core.precision import ArrayNamespace, Precision
+from couplers import wave_to_ray as w2r
+from couplers.contracts import ComplexField, Frame, ReferencePlane
+from couplers.ray_to_wave import collimated_bundle, ray_to_wave
 
 WL = 500e-9
 N = 16

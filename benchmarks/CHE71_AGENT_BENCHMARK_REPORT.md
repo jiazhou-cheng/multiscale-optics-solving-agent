@@ -4,7 +4,7 @@
 library, every one graded against an analytic oracle.
 
 Suite: `benchmarks_agent/` (task prompts, recorded expectations, the graded run).
-Harness: `src/multiscale_optics_agent/benchmarks/agent_suite.py`. Full
+Harness: `src/benchmarks/agent_suite.py`. Full
 documentation, including the five recorded design decisions and how to add a task:
 `benchmarks_agent/README.md`.
 
@@ -14,7 +14,7 @@ documentation, including the five recorded design decisions and how to add a tas
 
 ```bash
 # The delivered end-to-end run: 6 tasks x 3 trials.
-./run.sh python -m multiscale_optics_agent.benchmarks.agent_suite \
+./run.sh python -m benchmarks.agent_suite \
     --suite v1 --trials 3 --participant reference --context-policy per-task \
     --output outputs/che71_agent_v1
 

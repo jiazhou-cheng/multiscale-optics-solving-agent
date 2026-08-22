@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from multiscale_optics_agent.core.resources import (  # noqa: E402
+from core.resources import (  # noqa: E402
     CGROUP_MEMORY_CURRENT,
     CGROUP_SWAP_CURRENT,
     HOST_RESERVE_FLOOR_BYTES,

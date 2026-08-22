@@ -14,18 +14,18 @@ import math
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.cascade import planar_doe_step
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.cascade import planar_doe_step
+from couplers.contracts import (
     ComplexField,
     ContractError,
     ReferencePlane,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import (
+from couplers.ray_to_wave import (
     Perturbation,
     Projection,
     ray_to_wave,
 )
-from multiscale_optics_agent.couplers.wave_to_ray import (
+from couplers.wave_to_ray import (
     SamplingDensity,
     decompose,
     draw_indices,
@@ -218,7 +218,7 @@ def test_the_bundle_declares_which_normalization_a_reconstruction_owes_it() -> N
     knows which it is, so it says so in structured form and the reconstruction
     follows it by default instead of every caller restating it.
     """
-    from multiscale_optics_agent.couplers.ray_to_wave import collimated_bundle
+    from couplers.ray_to_wave import collimated_bundle
 
     field = _random_field()
     spectrum = decompose(field)
@@ -245,7 +245,7 @@ def test_the_bundle_declares_which_normalization_a_reconstruction_owes_it() -> N
 
 
 def test_an_unknown_reconstruction_normalization_is_refused() -> None:
-    from multiscale_optics_agent.couplers.ray_to_wave import collimated_bundle
+    from couplers.ray_to_wave import collimated_bundle
 
     bundle = collimated_bundle(
         positions_xy_m=np.zeros((2, 2)),

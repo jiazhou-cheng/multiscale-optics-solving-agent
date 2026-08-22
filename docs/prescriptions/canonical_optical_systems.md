@@ -16,9 +16,9 @@ OpticalSystemSpec  ->  build_optiland_system(spec)  ->  optiland.optic.Optic
 
 | Concern | Module |
 | -- | -- |
-| The schema, its validation, and canonical normalization | `src/multiscale_optics_agent/core/optical_system.py` (imports no solver) |
-| Translation to the pinned Optiland API | `src/multiscale_optics_agent/adapters/optiland_builder.py` |
-| The named prescriptions the adapter supports | `src/multiscale_optics_agent/registry/prescriptions.py` |
+| The schema, its validation, and canonical normalization | `src/core/optical_system.py` (imports no solver) |
+| Translation to the pinned Optiland API | `src/adapters/optiland_builder.py` |
+| The named prescriptions the adapter supports | `src/registry/prescriptions.py` |
 | Executable evidence for the admitted construction paths | `knowledge/solvers/optiland/probes/system_construction_probe.py` (+ `expected/system_construction_probe.json`) |
 | Tests | `tests/test_optiland_canonical_prescriptions.py` |
 
@@ -40,7 +40,7 @@ to drift, and two of them are counter-intuitive.
 ## Defining a new prescription
 
 ```python
-from multiscale_optics_agent.core.optical_system import (
+from core.optical_system import (
     ApertureSpec, CatalogMaterialSpec, EvenAsphereGeometrySpec, FieldSpec,
     GratingInteractionSpec, IdealMaterialSpec, OpticalSystemSpec,
     PlaneGeometrySpec, SphericalGeometrySpec, SurfaceSpec, WavelengthSpec,

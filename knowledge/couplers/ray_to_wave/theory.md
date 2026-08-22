@@ -165,7 +165,7 @@ because it does not know where the aperture is. CHE-38 deliberately did not
 implement it (§14) and assigned it to a follow-up ticket that must also settle
 absolute normalization (§15).
 
-**CHE-47 (M3.9R extension) implements it.** `multiscale_optics_agent.couplers.
+**CHE-47 (M3.9R extension) implements it.** `couplers.
 quadrature.hexapolar_area_weight_m2` computes the same radial-trapezoid weight
 CHE-38 measured, scaled to an absolute area in m² (`π a² / (3 n²)` per interior
 ray, `¾`/`½` of that at the center/outer-ring boundaries). The Optiland adapter

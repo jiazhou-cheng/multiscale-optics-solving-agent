@@ -138,7 +138,7 @@ are run as part of the full repository test suite, not in isolation.
 wins for every later test in the same pytest process. Two routes reach it:
 a module that sets it as an import side effect (Python runs a module body once,
 so a later `import` will not re-set it), combined with
-`multiscale_optics_agent.adapters.registry._discover()` importing every
+`adapters.registry._discover()` importing every
 `*_adapter.py` module just to read `MODEL_ID`; and this repository's own float64
 characterization tests, which set it deliberately.
 

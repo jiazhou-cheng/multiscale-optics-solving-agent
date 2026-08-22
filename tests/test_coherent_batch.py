@@ -20,7 +20,7 @@ import dataclasses
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.coherent_batch import (
+from couplers.coherent_batch import (
     AMPLITUDE_SIDECAR_RULE,
     MICROMETRES_PER_METRE,
     MILLIMETRES_PER_METRE,
@@ -28,7 +28,7 @@ from multiscale_optics_agent.couplers.coherent_batch import (
     CoherentRayBatch,
     declared_launch_opl_reference,
 )
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.contracts import (
     ContractError,
     Frame,
     RayBundle,
@@ -262,7 +262,7 @@ class TestTracedStateHandoff:
 
 class TestUnitConstants:
     def test_the_constants_are_the_solver_units_the_schema_declares(self):
-        from multiscale_optics_agent.core.optical_system import UNITS
+        from core.optical_system import UNITS
 
         assert UNITS["thickness"] == "mm"
         assert UNITS["wavelength"] == "um"

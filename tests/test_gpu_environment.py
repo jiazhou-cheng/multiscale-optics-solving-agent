@@ -363,7 +363,10 @@ def test_a_clean_interpreter_reaches_the_gpu_with_no_platform_repair() -> None:
     """
     platform_name, backend, result_platform = _run_in_subprocess(
         """
-        import multiscale_optics_agent  # noqa: F401  -- must not touch jax config
+        # Every top-level package this project ships. The check is that
+        # *importing this repository* does not pin jax's platform, and with the
+        # flat layout there is no single package to import as a proxy for that.
+        import adapters, cli, core, couplers, evaluation, registry  # noqa: F401,E401
         import jax
         import jax.numpy as jnp
 

@@ -19,8 +19,8 @@ import json
 import sys
 from pathlib import Path
 
-from multiscale_optics_agent.adapters.base import RunStatus
-from multiscale_optics_agent.adapters.optiland_adapter import (
+from adapters.base import RunStatus
+from adapters.optiland_adapter import (
     OptilandAdapter,
     OptilandRayRequest,
 )
@@ -45,7 +45,7 @@ def _forbidden_modules_loaded() -> list[str]:
         for name in sys.modules
         if name == "chromatix"
         or name.startswith("chromatix.")
-        or name.startswith("multiscale_optics_agent.couplers")
+        or name.startswith("couplers")
     )
 
 

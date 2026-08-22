@@ -10,8 +10,8 @@ import math
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.contracts import ContractCode, ContractError
-from multiscale_optics_agent.couplers.quadrature import (
+from couplers.contracts import ContractCode, ContractError
+from couplers.quadrature import (
     hexapolar_area_weight_m2,
     hexapolar_ring_index,
 )

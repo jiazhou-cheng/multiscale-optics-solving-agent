@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from multiscale_optics_agent.cli import app
+from cli import app
 
 ROOT = Path(__file__).resolve().parents[1]
 GRAPHS = ROOT / "examples" / "graphs"

@@ -10,7 +10,7 @@ documented matrix cannot go stale while the capabilities move.
 
 from typing import Any
 
-from multiscale_optics_agent.core.capabilities import capability_matrix
+from core.capabilities import capability_matrix
 
 COLUMNS = (
     ("Component", "component"),

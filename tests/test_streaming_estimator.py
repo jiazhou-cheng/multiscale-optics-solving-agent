@@ -23,10 +23,10 @@ import itertools
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.precision import Precision
-from multiscale_optics_agent.couplers.coherent_batch import CoherentRayBatch
-from multiscale_optics_agent.couplers.contracts import ContractError, ReferencePlane
-from multiscale_optics_agent.couplers.streaming import (
+from core.precision import Precision
+from couplers.coherent_batch import CoherentRayBatch
+from couplers.contracts import ContractError, ReferencePlane
+from couplers.streaming import (
     PositionalAngularSampler,
     StreamingReconstruction,
     band_limit_spectrum,
@@ -34,13 +34,13 @@ from multiscale_optics_agent.couplers.streaming import (
     chunk_plan,
     nested_aperture_launch_positions,
 )
-from multiscale_optics_agent.couplers.wave_to_ray import (
+from couplers.wave_to_ray import (
     SamplingDensity,
     decompose,
     draw_indices,
     sampling_density,
 )
-from multiscale_optics_agent.evaluation.metalens import AIR_CONFIG, metalens_field
+from evaluation.metalens import AIR_CONFIG, metalens_field
 
 pytestmark = [pytest.mark.coupler]
 
@@ -232,7 +232,7 @@ class TestPositionalSampler:
         ``(n, W)`` conditional table would be ``n * 7825 * 8`` bytes -- 62 GB at
         this n -- so the bound is not a close call.
         """
-        from multiscale_optics_agent.core.resources import process_rss_bytes
+        from core.resources import process_rss_bytes
 
         count = 1_000_000
         sampler, _ = PositionalAngularSampler.build(
@@ -360,7 +360,7 @@ class TestChunkEquivalence:
             assert other.total_rays == whole.total_rays
 
     def test_the_psf_is_unchanged_by_the_chunk_size(self, spectrum):
-        from multiscale_optics_agent.evaluation.metalens import (
+        from evaluation.metalens import (
             normalized_cross_correlation,
         )
 

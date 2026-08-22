@@ -215,8 +215,8 @@ def _trace(rings: int, directory: Path):
     is the operation the ray model is entitled to perform. No production adapter
     or coupler behaviour is changed by this study.
     """
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.optiland_adapter import get_adapter
+    from adapters.base import ModelRunRequest
+    from adapters.optiland_adapter import get_adapter
 
     return (
         get_adapter()
@@ -240,7 +240,7 @@ def _trace(rings: int, directory: Path):
 
 
 def _pupil_bundle(rays):
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
@@ -265,7 +265,7 @@ def _advance_bundle_to_z(bundle, z_m: float):
     over the plane offset ``s d_z``. So this does not approximate the field at the
     new plane; it evaluates the same 3-D superposition there.
     """
-    from multiscale_optics_agent.couplers.contracts import Frame, RayBundle, ReferencePlane
+    from couplers.contracts import Frame, RayBundle, ReferencePlane
 
     positions = np.asarray(bundle.positions_m, dtype=np.float64)
     directions = np.asarray(bundle.directions, dtype=np.float64)
@@ -299,7 +299,7 @@ def _reconstruct_core(bundle, *, grid_n: int, pitch_m: float, enforce_nyquist: b
     node bit-identical to the core; :func:`_node_equals_core` re-checks that on
     this study's own grid rather than inheriting the claim.
     """
-    from multiscale_optics_agent.couplers.ray_to_wave import ray_to_wave
+    from couplers.ray_to_wave import ray_to_wave
 
     return ray_to_wave(
         bundle,
@@ -311,9 +311,9 @@ def _reconstruct_core(bundle, *, grid_n: int, pitch_m: float, enforce_nyquist: b
 
 def _node_equals_core(rays, directory: Path) -> dict[str, Any]:
     """Re-pin the graph node against the core on this study's grid."""
-    from multiscale_optics_agent.couplers.base import CouplerRunRequest
-    from multiscale_optics_agent.couplers.contracts import ComplexField
-    from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler
+    from couplers.base import CouplerRunRequest
+    from couplers.contracts import ComplexField
+    from couplers.ray_to_wave_node import RayToWaveCoupler
 
     result = RayToWaveCoupler().transform(
         CouplerRunRequest(
@@ -376,7 +376,7 @@ def _asm_float64(u: np.ndarray, *, z_m: float, pitch_m: float, pad: int) -> np.n
     that a plane is not blamed for a ``complex64`` cast. The shipping Chromatix
     propagation is measured separately, in Experiments D and E.
     """
-    from multiscale_optics_agent.evaluation.asm_oracle import (
+    from evaluation.asm_oracle import (
         CarrierConvention,
         angular_spectrum_float64,
     )
@@ -401,7 +401,7 @@ def _asm_float64(u: np.ndarray, *, z_m: float, pitch_m: float, pad: int) -> np.n
 #    keeps that a separate ticket; here it only forces the normalization.
 # ---------------------------------------------------------------------------
 def _airy_radius_m() -> float:
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_first_null_radius_m
+    from evaluation.psf_oracles import airy_first_null_radius_m
 
     return airy_first_null_radius_m(WAVELENGTH_M, SINGLET["na_frozen"])
 
@@ -460,7 +460,7 @@ def _complex_relative_l2(test: np.ndarray, reference: np.ndarray, mask: np.ndarr
 
 
 def _first_null_m(intensity: np.ndarray, *, pitch: float, max_radius_m: float) -> float | None:
-    from multiscale_optics_agent.evaluation.psf_oracles import (
+    from evaluation.psf_oracles import (
         azimuthal_profile,
         measure_first_null_radius_m,
     )
@@ -539,7 +539,7 @@ def _psf_metrics(
 # ---------------------------------------------------------------------------
 def _o1_analytic_airy(*, grid_n: int, pitch: float) -> np.ndarray:
     """O1. ``[2 J1(v) / v]^2``. Paraxial, aberration-free, shares no traced data."""
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_psf_on_grid
+    from evaluation.psf_oracles import airy_psf_on_grid
 
     return airy_psf_on_grid(
         shape=(grid_n, grid_n),
@@ -1311,7 +1311,7 @@ def _synthetic_focal_bundle(rings: int, *, radius_m: float, distance_m: float, w
     advanced bundle has ``OPL = 0`` and position ``0``, which is the cleanest
     possible statement of the sensor-side handoff.
     """
-    from multiscale_optics_agent.couplers.contracts import Frame, RayBundle, ReferencePlane
+    from couplers.contracts import Frame, RayBundle, ReferencePlane
 
     xy, ring_index = _hexapolar(rings, radius_m)
     x, y = xy[:, 0], xy[:, 1]
@@ -1380,7 +1380,7 @@ def _quadrature_attribution(workdir: Path) -> dict[str, Any]:
     remedy without implementing it, which is what CHE-38 sections 14 and 15 ask
     for: the fix belongs to a quadrature-weight ticket, not to this one.
     """
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_psf_on_grid
+    from evaluation.psf_oracles import airy_psf_on_grid
 
     distance = DISTANCE_M
     numerical_aperture = PUPIL_RADIUS_M / math.hypot(PUPIL_RADIUS_M, distance)
@@ -1572,8 +1572,8 @@ def _field_record(field, directory: Path, *, z_m: float, name: str):
 
 
 def _propagate_chromatix(record, directory: Path, *, pad_width: int, target_z_m: float):
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.chromatix_adapter import get_adapter
+    from adapters.base import ModelRunRequest
+    from adapters.chromatix_adapter import get_adapter
 
     return get_adapter().run(
         ModelRunRequest(
@@ -1592,7 +1592,7 @@ def _propagate_chromatix(record, directory: Path, *, pad_width: int, target_z_m:
 
 
 def _measure_shipping(result):
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -1731,7 +1731,7 @@ def _shipping_sensor_path(workdir: Path, references: dict[str, Any]) -> dict[str
     sum is a fully constructive one and better conditioned than anywhere upstream.
     The operator reads directions, not densities.
     """
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf,
     )
@@ -2425,7 +2425,7 @@ def _figures(record: dict[str, Any], artifacts: dict[str, Any]) -> list[str]:
         axis.set_ylabel(r"y [$\mu$m]", fontsize=8)
 
     axis = figure.add_subplot(2, 1, 2)
-    from multiscale_optics_agent.evaluation.psf_oracles import azimuthal_profile
+    from evaluation.psf_oracles import azimuthal_profile
 
     limit = (SENSOR_GRID_N / 2) * SENSOR_PITCH_M
     for data, label, style in (

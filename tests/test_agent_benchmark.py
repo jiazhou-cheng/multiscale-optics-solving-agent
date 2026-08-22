@@ -18,7 +18,7 @@ import math
 
 import pytest
 
-from multiscale_optics_agent.benchmarks.agent_suite import (
+from benchmarks.agent_suite import (
     OUTCOME_REMEDY,
     SUITE_V1,
     AgentTask,
@@ -70,7 +70,7 @@ class TestRegistry:
         """
         import yaml
 
-        from multiscale_optics_agent.benchmarks.agent_suite import REPO_ROOT
+        from benchmarks.agent_suite import REPO_ROOT
 
         manifest = yaml.safe_load((REPO_ROOT / "benchmarks" / "manifest.yaml").read_text())
         existing = set()

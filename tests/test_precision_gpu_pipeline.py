@@ -39,14 +39,14 @@ import pytest
 pytest.importorskip("optiland")
 pytest.importorskip("chromatix")
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus
-from multiscale_optics_agent.adapters.chromatix_adapter import get_adapter as get_wave_adapter
-from multiscale_optics_agent.adapters.optiland_adapter import get_adapter as get_ray_adapter
-from multiscale_optics_agent.core.capabilities import (
+from adapters.base import ModelRunRequest, RunStatus
+from adapters.chromatix_adapter import get_adapter as get_wave_adapter
+from adapters.optiland_adapter import get_adapter as get_ray_adapter
+from core.capabilities import (
     C_RAY_TO_WAVE_CAPABILITIES,
     CHROMATIX_CAPABILITIES,
 )
-from multiscale_optics_agent.core.precision import (
+from core.precision import (
     ArrayNamespace,
     BridgeError,
     BridgePolicy,
@@ -56,15 +56,15 @@ from multiscale_optics_agent.core.precision import (
     Precision,
     plan_bridge,
 )
-from multiscale_optics_agent.couplers.base import CouplerRunRequest
-from multiscale_optics_agent.couplers.bridge import bridge_ray_bundle
-from multiscale_optics_agent.couplers.contracts import PSF, ComplexField
-from multiscale_optics_agent.couplers.optiland_handoff import (
+from couplers.base import CouplerRunRequest
+from couplers.bridge import bridge_ray_bundle
+from couplers.contracts import PSF, ComplexField
+from couplers.optiland_handoff import (
     DeclaredHandoffPlane,
     declare_coherent_bundle,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import ray_to_wave
-from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler
+from couplers.ray_to_wave import ray_to_wave
+from couplers.ray_to_wave_node import RayToWaveCoupler
 
 pytestmark = [
     pytest.mark.gpu,

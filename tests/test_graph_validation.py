@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from multiscale_optics_agent.core.graph import GraphValidator, Severity
-from multiscale_optics_agent.core.specs import GraphSpec
-from multiscale_optics_agent.registry.loader import Registry
+from core.graph import GraphValidator, Severity
+from core.specs import GraphSpec
+from registry.loader import Registry
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.provenance import RunProvenance
-from multiscale_optics_agent.core.specs import CouplerSpec, GraphSpec, ModelSpec
+from core.artifacts import ArtifactRecord
+from core.provenance import RunProvenance
+from core.specs import CouplerSpec, GraphSpec, ModelSpec
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "schemas"

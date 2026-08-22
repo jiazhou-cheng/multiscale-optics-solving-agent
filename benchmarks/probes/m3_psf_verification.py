@@ -101,8 +101,8 @@ def _protocol() -> dict[str, Any]:
 
 
 def _trace(geometry: dict[str, Any], directory: Path, *, hy: float | None = None):
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.optiland_adapter import get_adapter
+    from adapters.base import ModelRunRequest
+    from adapters.optiland_adapter import get_adapter
 
     return (
         get_adapter()
@@ -126,8 +126,8 @@ def _trace(geometry: dict[str, Any], directory: Path, *, hy: float | None = None
 
 
 def _reconstruct(rays, geometry: dict[str, Any], directory: Path, **overrides: Any):
-    from multiscale_optics_agent.couplers.base import CouplerRunRequest
-    from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler
+    from couplers.base import CouplerRunRequest
+    from couplers.ray_to_wave_node import RayToWaveCoupler
 
     config = {
         "handoff_plane": "exit_pupil",
@@ -143,8 +143,8 @@ def _reconstruct(rays, geometry: dict[str, Any], directory: Path, **overrides: A
 
 
 def _propagate(field_record, geometry: dict[str, Any], directory: Path, **overrides: Any):
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.chromatix_adapter import get_adapter
+    from adapters.base import ModelRunRequest
+    from adapters.chromatix_adapter import get_adapter
 
     config = {
         "propagation": "angular_spectrum",
@@ -174,7 +174,7 @@ def _shipping_psf(
     rays=None,
 ) -> dict[str, Any]:
     """One full pass of the shipping path, ending in a measured PSF."""
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -224,11 +224,11 @@ def _aberration(rays, geometry: dict[str, Any], *, observation_z_m: float):
     having the same 0.0013 waves RMS as the in-focus one -- the fit is free to move
     the centre to exactly where the defocus put the focus.
     """
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
-    from multiscale_optics_agent.evaluation.psf_oracles import pupil_aberration
+    from evaluation.psf_oracles import pupil_aberration
 
     bundle = declare_coherent_bundle(
         rays, declared_plane=DeclaredHandoffPlane("exit_pupil", geometry["pupil_z_m"])
@@ -249,7 +249,7 @@ def _aberration(rays, geometry: dict[str, Any], *, observation_z_m: float):
 
 
 def _oracle_psf(aberration, geometry: dict[str, Any], *, distance_m: float, factor: int = 16):
-    from multiscale_optics_agent.evaluation.psf_oracles import fraunhofer_psf
+    from evaluation.psf_oracles import fraunhofer_psf
 
     return fraunhofer_psf(
         aberration,
@@ -282,7 +282,7 @@ def _profile_residual(
     centre left at the origin, all six off-axis controls score a margin within 2.6x
     of 1.0, including an x/y transpose that visibly moves the peak.
     """
-    from multiscale_optics_agent.evaluation.psf_oracles import azimuthal_profile
+    from evaluation.psf_oracles import azimuthal_profile
 
     radii_m, profile_m = azimuthal_profile(
         measured / float(np.max(measured)),
@@ -328,7 +328,7 @@ def _oracle_vs_shipping(
     first null was correct to 0.14%. The oracle is finely sampled, so it is
     point-sampled at the shipping grid's pixel centres instead.
     """
-    from multiscale_optics_agent.evaluation.psf_oracles import resample_to_grid
+    from evaluation.psf_oracles import resample_to_grid
 
     psf = measurement.intensity
     resampled = resample_to_grid(
@@ -361,7 +361,7 @@ def _oracle_vs_shipping(
 
 def _energy_ledger(passed: dict[str, Any], geometry: dict[str, Any]) -> dict[str, Any]:
     """traced ray power -> pupil power -> propagated power -> PSF integral."""
-    from multiscale_optics_agent.couplers.contracts import ComplexField
+    from couplers.contracts import ComplexField
 
     rays = passed["rays"]
     arrays = dict(np.load(rays.uri))
@@ -494,14 +494,14 @@ def _perturbed_psf(
     unperturbed run below re-establishes that bit-identity at the PSF level rather
     than relying on the earlier claim.
     """
-    from multiscale_optics_agent.couplers.contracts import RayBundle
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.contracts import RayBundle
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,
     )
-    from multiscale_optics_agent.couplers.ray_to_wave import Perturbation, ray_to_wave
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from couplers.ray_to_wave import Perturbation, ray_to_wave
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -590,9 +590,9 @@ def _negative_controls(
     average at the traced image point restores the meaning of the margin. The
     default keeps the on-axis block bit-identical.
     """
-    from multiscale_optics_agent.couplers.optiland_handoff import HandoffPerturbation
-    from multiscale_optics_agent.couplers.ray_to_wave import Perturbation
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_psf_on_grid
+    from couplers.optiland_handoff import HandoffPerturbation
+    from couplers.ray_to_wave import Perturbation
+    from evaluation.psf_oracles import airy_psf_on_grid
 
     def _score(passed: dict[str, Any]) -> dict[str, Any] | None:
         if passed.get("status") != "succeeded":
@@ -747,8 +747,8 @@ def _negative_controls(
 
 def _bundle_with(rays, geometry, *, opl_tilt_x: float = 0.0, unit_amplitude: bool = False):
     """The declared bundle, optionally with a known linear tilt added to its OPL."""
-    from multiscale_optics_agent.couplers.contracts import RayBundle
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.contracts import RayBundle
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )
@@ -780,8 +780,8 @@ def _bundle_with(rays, geometry, *, opl_tilt_x: float = 0.0, unit_amplitude: boo
 
 
 def _psf_from_bundle(bundle, geometry, directory: Path, *, core_perturbation=None):
-    from multiscale_optics_agent.couplers.ray_to_wave import Perturbation, ray_to_wave
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from couplers.ray_to_wave import Perturbation, ray_to_wave
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -827,7 +827,7 @@ def _orientation_control(rays, geometry: dict[str, Any], directory: Path) -> dic
     displacement must appear along y instead. That tests the x/y wiring of the
     reconstruction with a case whose answer is known in advance.
     """
-    from multiscale_optics_agent.couplers.ray_to_wave import Perturbation
+    from couplers.ray_to_wave import Perturbation
 
     tilt = 0.02
     distance = geometry["image_z_m"] - geometry["pupil_z_m"]
@@ -961,7 +961,7 @@ def _strehl_against_airy(
     about. It cannot be read off a peak-normalized PSF, where both peaks are 1 by
     construction, so it uses the raw scale the measurement retained.
     """
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_psf_on_grid
+    from evaluation.psf_oracles import airy_psf_on_grid
 
     psf = measurement.intensity
     analytic = airy_psf_on_grid(
@@ -972,7 +972,7 @@ def _strehl_against_airy(
     )
     mask = np.ones_like(psf, dtype=bool)
     if within_airy_radii is not None:
-        from multiscale_optics_agent.evaluation.psf_oracles import airy_first_null_radius_m
+        from evaluation.psf_oracles import airy_first_null_radius_m
 
         limit = within_airy_radii * airy_first_null_radius_m(WAVELENGTH_M, numerical_aperture)
         ny, nx = psf.shape
@@ -1000,7 +1000,7 @@ def _strehl_against_airy(
 
 
 def characterize() -> dict[str, Any]:
-    from multiscale_optics_agent.evaluation.psf_oracles import (
+    from evaluation.psf_oracles import (
         AIRY_FIRST_NULL_COEFFICIENT_EXACT,
         AIRY_FIRST_NULL_COEFFICIENT_ROUNDED,
         airy_first_null_radius_m,

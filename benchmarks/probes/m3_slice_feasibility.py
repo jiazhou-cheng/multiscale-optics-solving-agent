@@ -266,8 +266,8 @@ def case_reverse_telephoto_envelope() -> dict[str, Any]:
 
 def case_coupler_throughput() -> dict[str, Any]:
     """Measure rays x pixels throughput of C_RAY_TO_WAVE, then price the envelope."""
-    from multiscale_optics_agent.couplers.contracts import RayBundle, ReferencePlane
-    from multiscale_optics_agent.couplers.ray_to_wave import ray_to_wave
+    from couplers.contracts import RayBundle, ReferencePlane
+    from couplers.ray_to_wave import ray_to_wave
 
     wavelength_m = WAVELENGTH_UM * 1e-6
     measurements = []
@@ -354,7 +354,7 @@ def case_chromatix_float32_vs_distance() -> dict[str, Any]:
     import jax.numpy as jnp
     from chromatix import functional as cf
 
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         pin_wave_engine_precision,
     )
 
@@ -488,7 +488,7 @@ def _measure_float32_intensity_error(*, z_mm: float, numerical_aperture: float) 
     import jax.numpy as jnp
     from chromatix import functional as cf
 
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         pin_wave_engine_precision,
     )
 

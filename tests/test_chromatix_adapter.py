@@ -21,11 +21,11 @@ import numpy as np
 import pytest
 from conftest import load_probe_expected
 
-from multiscale_optics_agent.adapters import chromatix_adapter as mod
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.errors import AdapterDependencyError, UnsupportedCapabilityError
-from multiscale_optics_agent.core.specs import ArtifactKind
+from adapters import chromatix_adapter as mod
+from adapters.base import ModelRunRequest, RunStatus
+from core.artifacts import ArtifactRecord
+from core.errors import AdapterDependencyError, UnsupportedCapabilityError
+from core.specs import ArtifactKind
 
 pytestmark = [pytest.mark.jax, pytest.mark.integration, pytest.mark.chromatix]
 

@@ -12,15 +12,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.contracts import ComplexField, ReferencePlane
-from multiscale_optics_agent.couplers.gradient import (
+from couplers.contracts import ComplexField, ReferencePlane
+from couplers.gradient import (
     GradientProblem,
     characterize,
     finite_difference_table,
     surrogate_derivative,
     true_derivative,
 )
-from multiscale_optics_agent.couplers.wave_to_ray import SamplingDensity
+from couplers.wave_to_ray import SamplingDensity
 
 pytestmark = [pytest.mark.coupler, pytest.mark.slow]
 
@@ -201,7 +201,7 @@ def test_nothing_here_promotes_a_gradient_claim() -> None:
 
     root = Path(__file__).resolve().parents[1]
     couplers = yaml.safe_load(
-        (root / "src/multiscale_optics_agent/registry/couplers.yaml").read_text()
+        (root / "src/registry/couplers.yaml").read_text()
     )["couplers"]
     by_id = {entry["id"]: entry for entry in couplers}
 

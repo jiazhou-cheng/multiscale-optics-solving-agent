@@ -83,7 +83,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from multiscale_optics_agent.core.provenance import VOLATILE_KEYS, strip_volatile  # noqa: E402
+from core.provenance import VOLATILE_KEYS, strip_volatile  # noqa: E402
 
 BENCHMARK_ID = "L2-PSF-01"
 PROTOCOL_ID = "M3-SLICE-CPU-V1"
@@ -128,7 +128,7 @@ def _opl_sign_negative_control(sensor: Any, workdir: Path) -> dict[str, Any]:
     pupil) is reported alongside for characterization only, per the rule that
     a custom oracle we wrote must never be the thing that decides pass/fail.
     """
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,
@@ -216,7 +216,7 @@ def _full_graph_demonstration(sensor: Any, workdir: Path) -> dict[str, Any]:
     adapter, and reports whether the result agrees with the zero-propagation
     configuration to within CHE-38's own padding-sweep evidence.
     """
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         declare_coherent_bundle,
     )

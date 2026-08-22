@@ -82,7 +82,7 @@ reason is stated in `knowledge/couplers/ray_to_wave/coupler_card.yaml`:
 
 > the external solver package must be imported lazily, inside a private
 > `_import_<solver>()` helper called from `run()`/`estimate()`, never at module
-> import time -- importing this package (or `multiscale_optics_agent` itself)
+> import time -- importing this package (or any of its siblings)
 > must never require any heavy optional dependency to be installed.
 
 Real instances: `adapters/optiland_adapter.py:511` (`_import_optiland`, returning
@@ -124,7 +124,7 @@ it?**
 devices, precisions, dtypes, array namespaces. Every entry is measured, not read
 off documentation.
 
-**File.** `src/multiscale_optics_agent/core/capabilities.py` — exactly four
+**File.** `src/core/capabilities.py` — exactly four
 instances of `ComponentCapabilities` (`M_RAY_OPTILAND`, `M_WAVE_CHROMATIX`,
 `C_RAY_TO_WAVE`, `C_WAVE_TO_RAY`), keyed in `COMPONENT_CAPABILITIES` at `:191`.
 The dataclass is `core/precision.py:399-451`:

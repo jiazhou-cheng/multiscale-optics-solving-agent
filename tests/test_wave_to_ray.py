@@ -27,13 +27,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.contracts import (
     ComplexField,
     ContractError,
     ReferencePlane,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import Projection, ray_to_wave
-from multiscale_optics_agent.couplers.wave_to_ray import (
+from couplers.ray_to_wave import Projection, ray_to_wave
+from couplers.wave_to_ray import (
     SamplingDensity,
     SamplingPerturbation,
     decompose,
@@ -103,7 +103,7 @@ def _reconstruct(bundle, n: int = N_GRID, pitch: float = PITCH_M) -> np.ndarray:
 
 
 def test_wave_to_ray_core_imports_no_solver_engine() -> None:
-    tree = ast.parse((ROOT / "src/multiscale_optics_agent/couplers/wave_to_ray.py").read_text())
+    tree = ast.parse((ROOT / "src/couplers/wave_to_ray.py").read_text())
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

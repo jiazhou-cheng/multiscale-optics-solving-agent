@@ -1,4 +1,4 @@
-from multiscale_optics_agent.registry.loader import Registry
+from registry.loader import Registry
 
 
 def test_packaged_registry_loads() -> None:

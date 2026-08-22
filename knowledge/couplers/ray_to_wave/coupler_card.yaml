@@ -111,9 +111,9 @@ known_limitations:
       request -- is new, separately-verified physics and needs its own ticket and
       its own oracle. Neither is claimed here.
     surfaced_in:
-      - src/multiscale_optics_agent/couplers/ray_to_wave.py (module docstring; and
+      - src/couplers/ray_to_wave.py (module docstring; and
         provenance["validity"] on every emitted ComplexField)
-      - src/multiscale_optics_agent/couplers/ray_to_wave_node.py (module docstring)
+      - src/couplers/ray_to_wave_node.py (module docstring)
       - knowledge/couplers/ray_to_wave/conventions.md
       - this card
     test: tests/test_ray_to_wave.py::test_emitted_field_declares_the_curvature_limitation
@@ -162,7 +162,7 @@ known_limitations:
       Each is a kernel change with its own oracle. Same disposition as CHE-50.
     surfaced_in:
       - knowledge/couplers/ray_to_wave/conventions.md (hazard H4)
-      - src/multiscale_optics_agent/couplers/streaming.py (module docstring)
+      - src/couplers/streaming.py (module docstring)
       - benchmarks/CHE70_METALENS_BRIDGE_REPORT.md
       - this card
     test: tests/test_coherent_bridge.py::TestExactnessLimit::test_the_grazing_band_limit_is_what_makes_the_exactness_limit_exact
@@ -313,7 +313,7 @@ validity_conditions:
       not enforced by the coupler and cannot be: it does not know where the
       aperture is (see the aperture_edge condition). CHE-47 makes the producer
       supply an absolute-area quadrature weight
-      (multiscale_optics_agent.couplers.quadrature.hexapolar_area_weight_m2) by
+      (couplers.quadrature.hexapolar_area_weight_m2) by
       default whenever the Optiland adapter can confirm an un-vignetted hexapolar
       fan (optiland_adapter.py's _resolve_ray_quadrature_weight regenerates the
       pupil sampling and matches it row for row against the trace, exactly as
@@ -483,7 +483,7 @@ validated_probe_ids:
 # CHE-33 (M3.4). The coupler needs a complex amplitude and an OPL with a declared
 # reference; a real Optiland trace supplies neither. This is what has to be
 # declared before the coupler will accept one, and how each declaration was
-# checked. Implementation: src/multiscale_optics_agent/couplers/optiland_handoff.py
+# checked. Implementation: src/couplers/optiland_handoff.py
 coherent_handoff_from_a_ray_trace:
   status: verified
   verified_by: CHE-33 (M3.4)
@@ -552,7 +552,7 @@ coherent_handoff_from_a_ray_trace:
       default_mapping_status: implemented_by CHE-47, verified_by CHE-47
       default_mapping_source: >-
         quadrature_weight_m2_i is an ABSOLUTE per-ray pupil/phase-space area
-        element in square metres (multiscale_optics_agent.couplers.quadrature.
+        element in square metres (couplers.quadrature.
         hexapolar_area_weight_m2), producer-supplied by the Optiland adapter
         whenever it can regenerate the hexapolar pupil sampling Optic.trace used
         and match it row for row against the traced ray count (the same
@@ -618,7 +618,7 @@ coherent_handoff_from_a_ray_trace:
       sqrt(intensity_i) amplitude mapping rather than raising, because (unlike
       the object-space term) an unweighted bundle is still coherent and
       correct, just not scale-invariant under ray refinement. The adapter's own
-      NON_HEXAPOLAR_SAMPLING code (multiscale_optics_agent.couplers.quadrature)
+      NON_HEXAPOLAR_SAMPLING code (couplers.quadrature)
       is caught internally at that boundary and recorded as
       quadrature_weight.unavailable_reason, never propagated to the caller.
 
@@ -814,7 +814,7 @@ measured_behaviour:
 runnable_graph_edge:
   status: implemented
   implemented_by: CHE-34 (M3.5)
-  module: src/multiscale_optics_agent/couplers/ray_to_wave_node.py
+  module: src/couplers/ray_to_wave_node.py
   tests: tests/test_ray_to_wave_node.py
   is_a_wrapper: >-
     proven, not asserted: the field it writes is bit-identical (np.array_equal,
@@ -857,8 +857,8 @@ runnable_graph_edge:
     require_gradients=True is refused. derivative.verified is false and M3 is
     forward-only by protocol.
 
-implementation_location: src/multiscale_optics_agent/couplers/ray_to_wave.py
-runnable_node_location: src/multiscale_optics_agent/couplers/ray_to_wave_node.py
+implementation_location: src/couplers/ray_to_wave.py
+runnable_node_location: src/couplers/ray_to_wave_node.py
 test_location: tests/test_ray_to_wave.py
 validation_status: analytically_validated_scalar_planar_cpu
 validation_note: >

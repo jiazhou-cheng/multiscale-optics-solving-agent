@@ -13,8 +13,8 @@ import math
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.contracts import ContractError
-from multiscale_optics_agent.couplers.curvature import (
+from couplers.contracts import ContractError
+from couplers.curvature import (
     check_patch,
     curvature_direction_error_bound,
     curvature_observability_width,
@@ -302,7 +302,7 @@ def test_curvature_module_imports_no_solver_engine() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    tree = ast.parse((root / "src/multiscale_optics_agent/couplers/curvature.py").read_text())
+    tree = ast.parse((root / "src/couplers/curvature.py").read_text())
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

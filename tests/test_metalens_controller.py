@@ -26,11 +26,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.benchmarks.metalens_candidate import (
+from benchmarks.metalens_candidate import (
     STATUSES,
     CandidateRequest,
 )
-from multiscale_optics_agent.benchmarks.metalens_controller import (
+from benchmarks.metalens_controller import (
     CHUNK_SAFETY_FACTOR,
     NCC_GATE,
     POWER_ERROR_TARGET,
@@ -177,8 +177,8 @@ class TestHostGuard:
     def test_the_host_reserve_blocks_a_launch_when_headroom_is_gone(
         self, tmp_path, monkeypatch
     ):
-        import multiscale_optics_agent.benchmarks.metalens_controller as module
-        from multiscale_optics_agent.core.resources import host_memory_snapshot
+        import benchmarks.metalens_controller as module
+        from core.resources import host_memory_snapshot
 
         real = host_memory_snapshot()
         monkeypatch.setattr(
@@ -207,7 +207,7 @@ class TestChildFailures:
     def test_a_child_that_exits_nonzero_without_a_result_is_a_failure_row(
         self, tmp_path, monkeypatch
     ):
-        import multiscale_optics_agent.benchmarks.metalens_controller as module
+        import benchmarks.metalens_controller as module
 
         class _Process:
             returncode = 3
@@ -232,8 +232,8 @@ class TestChildFailures:
 
     def test_a_child_killed_for_memory_pressure_overrides_a_pass(self, tmp_path, monkeypatch):
         """Requirement 16: the watchdog's verdict wins over the child's own status."""
-        import multiscale_optics_agent.benchmarks.metalens_controller as module
-        from multiscale_optics_agent.core.resources import MemoryWatchdogVerdict
+        import benchmarks.metalens_controller as module
+        from core.resources import MemoryWatchdogVerdict
 
         controller = _controller(tmp_path, memory_guard=False)
         request = controller._request()

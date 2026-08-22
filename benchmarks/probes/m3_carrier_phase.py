@@ -67,13 +67,13 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+from adapters.chromatix_carrier_removed import (
     CARRIER_REMOVED_ASM_ID,
     GLOBAL_PHASE_POLICY,
     carrier_removed_asm_propagate,
     pin_wave_engine_precision,
 )
-from multiscale_optics_agent.evaluation.asm_oracle import (
+from evaluation.asm_oracle import (
     ASM_ORACLE_ID,
     CarrierConvention,
     absolute_phase_representation_floor,
@@ -518,7 +518,7 @@ def evaluate_acceptance(
                 "needing only intensity or single-path relative phase needs nothing"
             ),
             "documented_in": [
-                "src/multiscale_optics_agent/adapters/chromatix_carrier_removed.py",
+                "src/adapters/chromatix_carrier_removed.py",
                 "benchmarks/M3_SLICE_PROTOCOL.md",
             ],
         },

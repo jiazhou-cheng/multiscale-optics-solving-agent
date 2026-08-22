@@ -28,11 +28,11 @@ import math
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.evaluation.asm_oracle import (
+from evaluation.asm_oracle import (
     angular_spectrum_float64,
     compare_fields,
 )
-from multiscale_optics_agent.evaluation.metalens import (
+from evaluation.metalens import (
     AIR_CONFIG,
     CONFIGURATIONS,
     SLAB_CONFIG,
@@ -174,9 +174,9 @@ class TestOracleCrossChecks:
 
     def test_the_retained_mask_is_the_one_the_coupler_uses(self):
         """Two implementations of the same two conditions must not drift apart."""
-        from multiscale_optics_agent.core.precision import Precision
-        from multiscale_optics_agent.couplers.streaming import band_limit_spectrum
-        from multiscale_optics_agent.couplers.wave_to_ray import decompose
+        from core.precision import Precision
+        from couplers.streaming import band_limit_spectrum
+        from couplers.wave_to_ray import decompose
 
         limited, _ = band_limit_spectrum(
             decompose(metalens_field(AIR_CONFIG)),
@@ -190,7 +190,7 @@ class TestOracleCrossChecks:
         )
 
     def test_the_centred_spectrum_agrees_with_the_couplers_own(self):
-        from multiscale_optics_agent.couplers.wave_to_ray import decompose
+        from couplers.wave_to_ray import decompose
 
         field = metalens_field(AIR_CONFIG)
         assert np.allclose(
@@ -211,7 +211,7 @@ class TestOracleCrossChecks:
     def test_zero_distance_is_the_identity_on_the_retained_band(self):
         import dataclasses
 
-        from multiscale_optics_agent.evaluation.metalens import Layer
+        from evaluation.metalens import Layer
 
         config = dataclasses.replace(
             AIR_CONFIG, layers=(Layer(thickness_m=1e-18, refractive_index=1.0, name="air"),),
@@ -295,13 +295,13 @@ class TestSlabAssumption:
         import numpy as np
         from optiland.rays import RealRays
 
-        from multiscale_optics_agent.adapters.optiland_builder import (
+        from adapters.optiland_builder import (
             build_optiland_system,
         )
-        from multiscale_optics_agent.adapters.optiland_ray_trace import (
+        from adapters.optiland_ray_trace import (
             configure_optiland_execution,
         )
-        from multiscale_optics_agent.core.precision import (
+        from core.precision import (
             DeviceKind,
             DevicePlacement,
             Precision,
@@ -336,13 +336,13 @@ class TestSlabAssumption:
         pytest.importorskip("optiland")
         from optiland.rays import RealRays
 
-        from multiscale_optics_agent.adapters.optiland_builder import (
+        from adapters.optiland_builder import (
             build_optiland_system,
         )
-        from multiscale_optics_agent.adapters.optiland_ray_trace import (
+        from adapters.optiland_ray_trace import (
             configure_optiland_execution,
         )
-        from multiscale_optics_agent.core.precision import (
+        from core.precision import (
             DeviceKind,
             DevicePlacement,
             Precision,

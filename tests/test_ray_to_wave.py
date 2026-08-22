@@ -25,9 +25,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers import ComplexField, ContractError, RayBundle, ReferencePlane
-from multiscale_optics_agent.couplers.contracts import Frame
-from multiscale_optics_agent.couplers.ray_to_wave import (
+from couplers import ComplexField, ContractError, RayBundle, ReferencePlane
+from couplers.contracts import Frame
+from couplers.ray_to_wave import (
     Perturbation,
     Projection,
     collimated_bundle,
@@ -39,12 +39,12 @@ pytestmark = pytest.mark.coupler
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE_MODULES = (
-    "src/multiscale_optics_agent/couplers/contracts.py",
-    "src/multiscale_optics_agent/couplers/ray_to_wave.py",
+    "src/couplers/contracts.py",
+    "src/couplers/ray_to_wave.py",
     # CHE-33. Named for Optiland and encoding Optiland's conventions, yet it must
     # still import no engine: it reads a repository artifact record. Listing it
     # here is the check that the name never becomes an import.
-    "src/multiscale_optics_agent/couplers/optiland_handoff.py",
+    "src/couplers/optiland_handoff.py",
 )
 WAVELENGTH_M = 500e-9
 PITCH_M = 1e-6
@@ -122,7 +122,7 @@ def test_coupler_core_loads_no_engine_at_runtime() -> None:
 
     script = (
         "import sys, numpy as np\n"
-        "from multiscale_optics_agent.couplers.ray_to_wave import "
+        "from couplers.ray_to_wave import "
         "collimated_bundle, ray_to_wave\n"
         "b = collimated_bundle(positions_xy_m=np.zeros((4, 2)), direction=(0.0, 0.0, 1.0),"
         " wavelength_m=5e-7)\n"
@@ -589,7 +589,7 @@ def test_ray_density_diagnostic_separates_the_two_sampling_conditions() -> None:
 def test_ray_density_diagnostic_reports_not_computed_rather_than_guessing() -> None:
     """Above the O(N^2) scan limit the diagnostic declines to answer. A
     fabricated estimate of a sampling condition is worse than an absent one."""
-    from multiscale_optics_agent.couplers import ray_to_wave as module
+    from couplers import ray_to_wave as module
 
     positions = _grid_positions(72, PITCH_M)  # 5184 rays > the 4096 scan limit
     assert positions.shape[0] > module._NEAREST_NEIGHBOUR_SCAN_LIMIT

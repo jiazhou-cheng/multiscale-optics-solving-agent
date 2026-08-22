@@ -25,19 +25,19 @@ test-agent-benchmark:
 PARTICIPANT ?= reference
 TRIALS ?= 3
 agent-benchmark:
-	python -m multiscale_optics_agent.benchmarks.agent_suite \
+	python -m benchmarks.agent_suite \
 	    --suite v1 --trials $(TRIALS) --participant $(PARTICIPANT) \
 	    --context-policy per-task --output outputs/che71_agent_v1
 
 validate:
 	python scripts/validate_package.py
-	python -m multiscale_optics_agent.cli validate examples/graphs/ray_to_wave.yaml
+	python -m cli validate examples/graphs/ray_to_wave.yaml
 
 list-models:
-	python -m multiscale_optics_agent.cli list-models
+	python -m cli list-models
 
 list-couplers:
-	python -m multiscale_optics_agent.cli list-couplers
+	python -m cli list-couplers
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

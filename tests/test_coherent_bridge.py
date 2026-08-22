@@ -36,20 +36,20 @@ pytest.importorskip("optiland")
 
 import optiland.backend as be
 
-from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
-from multiscale_optics_agent.adapters.optiland_ray_trace import (
+from adapters.optiland_builder import build_optiland_system
+from adapters.optiland_ray_trace import (
     configure_optiland_execution,
     plan_trace_bridges,
     surface_positions_m,
     trace_ray_batch,
 )
-from multiscale_optics_agent.core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
-from multiscale_optics_agent.core.precision import (
+from core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
+from core.precision import (
     DeviceKind,
     DevicePlacement,
     Precision,
 )
-from multiscale_optics_agent.couplers.coherent_batch import (
+from couplers.coherent_batch import (
     CoherentRayBatch,
     declared_launch_opl_reference,
     metres_to_micrometres,
@@ -57,14 +57,14 @@ from multiscale_optics_agent.couplers.coherent_batch import (
     micrometres_to_metres,
     millimetres_to_metres,
 )
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.contracts import (
     ContractError,
     Frame,
     RayBundle,
     ReferencePlane,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import ray_to_wave
-from multiscale_optics_agent.couplers.streaming import (
+from couplers.ray_to_wave import ray_to_wave
+from couplers.streaming import (
     PositionalAngularSampler,
     StreamingReconstruction,
     band_limit_spectrum,
@@ -73,14 +73,14 @@ from multiscale_optics_agent.couplers.streaming import (
     grazing_floor_for_phase_budget,
     nested_aperture_launch_positions,
 )
-from multiscale_optics_agent.couplers.wave_to_ray import (
+from couplers.wave_to_ray import (
     SamplingDensity,
     decompose,
     enumerate_indices,
     sampling_density,
     spectrum_to_rays,
 )
-from multiscale_optics_agent.evaluation.metalens import (
+from evaluation.metalens import (
     AIR_CONFIG,
     SLAB_CONFIG,
     metalens_field,
@@ -582,7 +582,7 @@ class TestSamplingDensity:
         only a global scale -- which is exactly why the control is run on
         ``p_mag``.
         """
-        from multiscale_optics_agent.couplers.wave_to_ray import SamplingPerturbation
+        from couplers.wave_to_ray import SamplingPerturbation
 
         reference = np.abs(
             np.asarray(reference_field(AIR_CONFIG, direction_cosine_floor=FLOOR).u)
@@ -603,7 +603,7 @@ class TestSamplingDensity:
 
 def _monte_carlo_psf(config, launches, samples, density_kind, *, seed, perturbation=None):
     """A Monte Carlo PSF through the streaming estimator, advanced analytically."""
-    from multiscale_optics_agent.couplers.wave_to_ray import SamplingPerturbation
+    from couplers.wave_to_ray import SamplingPerturbation
 
     perturbation = perturbation or SamplingPerturbation()
     spectrum, _ = band_limit_spectrum(

@@ -241,7 +241,7 @@ not_yet_probed:
     multiple-step-size convergence table the repository gradient contract requires.
   - jax_enable_x64=True end to end
   - "reading a genuine vendor image: scikit-image is not installed, so the two examples that need skimage.data use substituted targets (see tutorials/README.md)"
-adapter_location: src/multiscale_optics_agent/adapters/chromatix_adapter.py
+adapter_location: src/adapters/chromatix_adapter.py
 standalone_baseline:
   entry_point: ChromatixAdapter.run_standalone (ChromatixWaveRequest -> ChromatixWaveResult)
   command: >

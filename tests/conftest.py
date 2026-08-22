@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from multiscale_optics_agent.registry.loader import Registry
+from registry.loader import Registry
 
 ROOT = Path(__file__).resolve().parents[1]
 KNOWLEDGE_ROOT = ROOT / "knowledge" / "solvers"

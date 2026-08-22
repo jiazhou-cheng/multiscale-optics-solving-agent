@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.arrays import (
+from core.arrays import (
     array_state,
     device_of,
     dtype_of,
@@ -23,7 +23,7 @@ from multiscale_optics_agent.core.arrays import (
     to_host_numpy,
     xp_for,
 )
-from multiscale_optics_agent.core.capabilities import (
+from core.capabilities import (
     C_RAY_TO_WAVE_CAPABILITIES,
     CHROMATIX_CAPABILITIES,
     COMPONENT_CAPABILITIES,
@@ -31,8 +31,8 @@ from multiscale_optics_agent.core.capabilities import (
     capabilities_for,
     capability_matrix,
 )
-from multiscale_optics_agent.core.errors import UnsupportedCapabilityError
-from multiscale_optics_agent.core.precision import (
+from core.errors import UnsupportedCapabilityError
+from core.precision import (
     ArrayNamespace,
     ArrayState,
     BridgeError,
@@ -46,7 +46,7 @@ from multiscale_optics_agent.core.precision import (
     Precision,
     plan_bridge,
 )
-from multiscale_optics_agent.core.specs import Device
+from core.specs import Device
 
 CPU = DevicePlacement(DeviceKind.CPU)
 CUDA0 = DevicePlacement(DeviceKind.CUDA, 0)

@@ -24,7 +24,7 @@
 #     GPU backend is opt-in and requires installing torch separately (done
 #     below) and selecting it at runtime.
 
-# --- multiscale_optics_agent base runtime deps (kept in sync with pyproject.toml) ---
+# --- project base runtime deps (kept in sync with pyproject.toml) ---
 networkx==3.4.2
 pydantic==2.13.4
 PyYAML==6.0.3

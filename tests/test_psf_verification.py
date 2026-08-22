@@ -25,14 +25,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.contracts import (
     ContractCode,
     ContractError,
     Frame,
     RayBundle,
     ReferencePlane,
 )
-from multiscale_optics_agent.evaluation.psf_oracles import (
+from evaluation.psf_oracles import (
     AIRY_FIRST_NULL_COEFFICIENT_EXACT,
     AIRY_FIRST_NULL_COEFFICIENT_ROUNDED,
     AIRY_J1_FIRST_ZERO,

@@ -6,7 +6,7 @@ Run inside the container:
         --write knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
 
 The declaration made by
-``multiscale_optics_agent.couplers.optiland_handoff.declare_coherent_bundle`` is
+``couplers.optiland_handoff.declare_coherent_bundle`` is
 only worth the name if it can be checked against something that does not come
 from this repository. It can:
 
@@ -47,12 +47,12 @@ from typing import Any
 import numpy as np
 import yaml
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest
-from multiscale_optics_agent.adapters.optiland_adapter import (
+from adapters.base import ModelRunRequest
+from adapters.optiland_adapter import (
     _scientific_array_hash,
     get_adapter,
 )
-from multiscale_optics_agent.couplers.optiland_handoff import (
+from couplers.optiland_handoff import (
     DeclaredHandoffPlane,
     HandoffPerturbation,
     declare_coherent_bundle,
@@ -95,7 +95,7 @@ def _optiland_wavefront_pv_waves(sample: str) -> dict[str, Any]:
     import optiland.backend as be
     from optiland.wavefront import Wavefront
 
-    from multiscale_optics_agent.adapters.optiland_adapter import _resolve_lens
+    from adapters.optiland_adapter import _resolve_lens
 
     be.set_backend("numpy")
     lens = _resolve_lens(sample, __import__("optiland.samples.objectives", fromlist=["x"]), be)

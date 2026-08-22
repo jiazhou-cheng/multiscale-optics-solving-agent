@@ -28,9 +28,9 @@ import numpy as np
 import pytest
 from conftest import load_coupler_probe_expected
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest
-from multiscale_optics_agent.couplers import ContractCode, ContractError, RayBundle
-from multiscale_optics_agent.couplers.optiland_handoff import (
+from adapters.base import ModelRunRequest
+from couplers import ContractCode, ContractError, RayBundle
+from couplers.optiland_handoff import (
     AMPLITUDE_MAPPING,
     AMPLITUDE_MAPPING_WITH_QUADRATURE_WEIGHT,
     DeclaredHandoffPlane,
@@ -38,11 +38,11 @@ from multiscale_optics_agent.couplers.optiland_handoff import (
     declare_coherent_bundle,
     reconstruct_hashed_arrays,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import Projection, ray_to_wave
+from couplers.ray_to_wave import Projection, ray_to_wave
 
 pytest.importorskip("optiland")
 
-from multiscale_optics_agent.adapters.optiland_adapter import (
+from adapters.optiland_adapter import (
     _scientific_array_hash,
     get_adapter,
 )
@@ -151,7 +151,7 @@ def test_an_explicitly_unverified_reference_is_refused_by_name():
         directions=directions,
         wavelength_m=WAVELENGTH_M,
         reference_plane=__import__(
-            "multiscale_optics_agent.couplers", fromlist=["ReferencePlane"]
+            "couplers", fromlist=["ReferencePlane"]
         ).ReferencePlane(name="p", z_m=0.0),
     )
     with pytest.raises(ContractError) as excinfo:

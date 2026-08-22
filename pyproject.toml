@@ -55,17 +55,25 @@ torch = [
 ]
 
 [project.scripts]
-multiscale-optics = "multiscale_optics_agent.cli:app"
+multiscale-optics = "cli:app"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true
+# `cli` is a loose module under src/, not a package member, and
+# `packages.find` does not pick up loose modules -- it has to be declared.
+py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+# Explicit rather than discovered. CHE-89 removed the
+# `multiscale_optics_agent/` level, so `where = ["src"]` now discovers whatever
+# directory happens to sit there; an enumeration means a stray scratch directory
+# cannot silently become a shipped package.
+include = ["adapters*", "benchmarks*", "core*", "couplers*", "evaluation*", "registry*"]
 
 [tool.setuptools.package-data]
-"multiscale_optics_agent.registry" = ["*.yaml"]
+"registry" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 # CHE-67: `tests` is the whole default suite. Two active test trees deliberately
@@ -131,7 +139,16 @@ python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
+# With no top-level package, mypy has to be told where the roots are: without
+# `mypy_path` it cannot resolve `from core.precision import ...`, and without
+# `explicit_package_bases` it computes a module name for `src/core/specs.py` by
+# walking up to the first directory without `__init__.py`, which is `src/`, and
+# reports every module twice under two names.
+mypy_path = "src"
+explicit_package_bases = true
 
 [tool.coverage.run]
-source = ["multiscale_optics_agent"]
+# Enumerated for the same reason as packages.find: there is no single top-level
+# package to name any more.
+source = ["adapters", "benchmarks", "core", "couplers", "evaluation", "registry", "cli"]
 branch = true

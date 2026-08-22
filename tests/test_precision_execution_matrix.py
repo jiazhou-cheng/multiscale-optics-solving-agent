@@ -49,12 +49,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.arrays import array_state, xp_for
-from multiscale_optics_agent.core.capabilities import (
+from core.arrays import array_state, xp_for
+from core.capabilities import (
     C_RAY_TO_WAVE_CAPABILITIES,
     CHROMATIX_CAPABILITIES,
 )
-from multiscale_optics_agent.core.precision import (
+from core.precision import (
     ArrayNamespace,
     BridgeError,
     BridgePolicy,
@@ -66,8 +66,8 @@ from multiscale_optics_agent.core.precision import (
     Precision,
     plan_bridge,
 )
-from multiscale_optics_agent.couplers.bridge import bridge_complex_field, bridge_ray_bundle
-from multiscale_optics_agent.couplers.contracts import (
+from couplers.bridge import bridge_complex_field, bridge_ray_bundle
+from couplers.contracts import (
     PSF,
     ComplexField,
     ContractCode,
@@ -76,12 +76,12 @@ from multiscale_optics_agent.couplers.contracts import (
     RayBundle,
     ReferencePlane,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import (
+from couplers.ray_to_wave import (
     collimated_bundle,
     compute_precision_for,
     ray_to_wave,
 )
-from multiscale_optics_agent.couplers.wave_to_ray import decompose, wave_to_ray
+from couplers.wave_to_ray import decompose, wave_to_ray
 
 pytestmark = pytest.mark.coupler
 
@@ -563,7 +563,7 @@ class TestGpuResidency:
         torch = pytest.importorskip("torch")
         if not torch.cuda.is_available():  # pragma: no cover - guarded by the gpu marker
             pytest.skip("no CUDA torch build")
-        from multiscale_optics_agent.core.arrays import to_namespace
+        from core.arrays import to_namespace
 
         tensor = torch.arange(6, dtype=torch.float32, device="cuda").reshape(2, 3)
         converted = to_namespace(tensor, namespace=ArrayNamespace.JAX)

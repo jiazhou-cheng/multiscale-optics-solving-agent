@@ -17,8 +17,8 @@ import json
 import optiland.backend as be
 import torch
 
-from multiscale_optics_agent.adapters.optiland_builder import build_optiland_system
-from multiscale_optics_agent.registry.prescriptions import resolve_prescription
+from adapters.optiland_builder import build_optiland_system
+from registry.prescriptions import resolve_prescription
 
 WAVELENGTH_UM = 0.55
 NUM_RAYS = 64

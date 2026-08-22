@@ -4,15 +4,15 @@ import json
 import jax
 import numpy as np
 
-from multiscale_optics_agent.core.precision import ArrayNamespace, Precision
-from multiscale_optics_agent.couplers.contracts import (
+from core.precision import ArrayNamespace, Precision
+from couplers.contracts import (
     ComplexField,
     Frame,
     RayBundle,
     ReferencePlane,
 )
-from multiscale_optics_agent.couplers.ray_to_wave import collimated_bundle, ray_to_wave
-from multiscale_optics_agent.couplers.wave_to_ray import wave_to_ray
+from couplers.ray_to_wave import collimated_bundle, ray_to_wave
+from couplers.wave_to_ray import wave_to_ray
 
 WL, PITCH, N = 500e-9, 1.0e-6, 16
 GRID, PIT = (N, N), (PITCH, PITCH)

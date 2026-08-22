@@ -24,9 +24,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.core.artifacts import ArtifactRecord
-from multiscale_optics_agent.core.specs import ArtifactKind, Device, Framework
-from multiscale_optics_agent.couplers.contracts import (
+from core.artifacts import ArtifactRecord
+from core.specs import ArtifactKind, Device, Framework
+from couplers.contracts import (
     PSF,
     ComplexField,
     ContractCode,
@@ -34,7 +34,7 @@ from multiscale_optics_agent.couplers.contracts import (
     Frame,
     ReferencePlane,
 )
-from multiscale_optics_agent.evaluation.psf_measurement import (
+from evaluation.psf_measurement import (
     COHERENCE_MODEL,
     M3_ORACLE_NORMALIZATION,
     NORMALIZATION_RATIONALE,
@@ -102,7 +102,7 @@ def test_no_field_to_psf_coupler_is_implemented_or_registered() -> None:
         f"it as one: {implementations}"
     )
 
-    registry = (ROOT / "src" / "multiscale_optics_agent" / "registry" / "couplers.yaml").read_text()
+    registry = (ROOT / "src" / "registry" / "couplers.yaml").read_text()
     declarations = [
         line for line in registry.splitlines() if line.strip() == "- id: C_FIELD_TO_PSF"
     ]
@@ -495,15 +495,15 @@ def test_the_protocol_records_the_normalization_blind_spot() -> None:
 pytest.importorskip("optiland")
 pytest.importorskip("chromatix")
 
-from multiscale_optics_agent.adapters.base import ModelRunRequest, RunStatus  # noqa: E402
-from multiscale_optics_agent.adapters.chromatix_adapter import (  # noqa: E402
+from adapters.base import ModelRunRequest, RunStatus  # noqa: E402
+from adapters.chromatix_adapter import (  # noqa: E402
     get_adapter as get_wave_adapter,
 )
-from multiscale_optics_agent.adapters.optiland_adapter import (  # noqa: E402
+from adapters.optiland_adapter import (  # noqa: E402
     get_adapter as get_ray_adapter,
 )
-from multiscale_optics_agent.couplers.base import CouplerRunRequest  # noqa: E402
-from multiscale_optics_agent.couplers.ray_to_wave_node import RayToWaveCoupler  # noqa: E402
+from couplers.base import CouplerRunRequest  # noqa: E402
+from couplers.ray_to_wave_node import RayToWaveCoupler  # noqa: E402
 
 # The frozen M3-SLICE-CPU-V1 geometry, as M3.6 used it.
 PUPIL_Z_M = 0.06814345991561233e-3

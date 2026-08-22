@@ -71,8 +71,8 @@ GEOMETRY = {
 
 
 def _trace(directory: Path, *, hy: float):
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.optiland_adapter import get_adapter
+    from adapters.base import ModelRunRequest
+    from adapters.optiland_adapter import get_adapter
 
     result = get_adapter().run(
         ModelRunRequest(
@@ -93,7 +93,7 @@ def _trace(directory: Path, *, hy: float):
 
 
 def _bundle(rays, *, perturbation=None):
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,
@@ -108,10 +108,10 @@ def _bundle(rays, *, perturbation=None):
 
 def _psf(bundle, directory: Path, *, transpose: bool = False):
     """Pupil field -> Chromatix ASM -> measured PSF, through the shipping calls."""
-    from multiscale_optics_agent.adapters.base import ModelRunRequest
-    from multiscale_optics_agent.adapters.chromatix_adapter import get_adapter
-    from multiscale_optics_agent.couplers.ray_to_wave import Perturbation, ray_to_wave
-    from multiscale_optics_agent.evaluation.psf_measurement import (
+    from adapters.base import ModelRunRequest
+    from adapters.chromatix_adapter import get_adapter
+    from couplers.ray_to_wave import Perturbation, ray_to_wave
+    from evaluation.psf_measurement import (
         M3_ORACLE_NORMALIZATION,
         measure_psf_from_record,
     )
@@ -195,7 +195,7 @@ def _geometric_spot(geometry_point: dict[str, Any], airy_radius_m: float) -> dic
 
 def _wavefront(bundle, geometry_point: dict[str, Any]) -> dict[str, Any]:
     """The pupil wavefront against the traced chief-ray point, fitted and not."""
-    from multiscale_optics_agent.evaluation.psf_oracles import pupil_aberration
+    from evaluation.psf_oracles import pupil_aberration
 
     observation = (
         geometry_point["chief_ray_image_point_m"][0],
@@ -296,7 +296,7 @@ def _profile_residual_about(
     center_m: tuple[float, float],
 ) -> float | None:
     """CHE-37's azimuthally-averaged metric, about a stated centre."""
-    from multiscale_optics_agent.evaluation.psf_oracles import azimuthal_profile
+    from evaluation.psf_oracles import azimuthal_profile
 
     radii_m, profile_m = azimuthal_profile(
         measured / float(np.max(measured)),
@@ -341,7 +341,7 @@ def _axis_transpose_control(
     bundle, geometry_point: dict[str, Any], directory: Path
 ) -> dict[str, Any]:
     """Re-run CHE-37's axis-transpose control against a working off-axis PSF."""
-    from multiscale_optics_agent.evaluation.psf_oracles import airy_psf_on_grid
+    from evaluation.psf_oracles import airy_psf_on_grid
 
     unperturbed = _psf(bundle, directory / "unperturbed")
     transposed = _psf(bundle, directory / "transposed", transpose=True)
@@ -481,7 +481,7 @@ def _axis_transpose_control(
 
 
 def characterize() -> dict[str, Any]:
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         OPL_REFERENCE_VERSION,
         SUPERSEDED_OPL_REFERENCE,
         HandoffPerturbation,

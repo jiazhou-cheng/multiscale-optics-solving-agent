@@ -277,7 +277,7 @@ supports for `ScalarField`; a `complex128` input is silently downcast to
 output field even when its input was explicitly `complex64` -- i.e. the
 *output* dtype can still silently follow the ambient x64 setting despite the
 input-side downcast above. `jax_enable_x64` is process-global, and
-`multiscale_optics_agent.adapters.registry._discover()` eagerly imports every
+`adapters.registry._discover()` eagerly imports every
 `*_adapter.py` module to read its `MODEL_ID`, so any module that sets the flag as
 an import side effect can flip it process-wide before a chromatix-specific test
 runs, purely as a consequence of collection order. This repository's own float64

@@ -99,7 +99,9 @@ Phases 2-3, which is most of the deficit:
 | `benchmarks/metalens_controller.py` | 663 | 48% | keep; `studies/metalens/` in Phase 5 |
 
 **Totals:** 7,337 statements, **68.8%** covered. The full per-module table is
-reproducible with the command above; the JSON lands in `tmp_probes/`, which is
+reproducible with the command above — note that the `--cov` target was renamed
+when CHE-89 flattened `src/`, so reproducing this *baseline* needs the commit it
+was taken at; afterwards it is `--cov=core --cov=couplers --cov=solvers ...`; the JSON lands in `tmp_probes/`, which is
 gitignored scratch by design.
 
 The two solver adapters that Phase 6 splits sit at 87% (`optiland_adapter.py`,

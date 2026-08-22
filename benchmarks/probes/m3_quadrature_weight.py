@@ -11,7 +11,7 @@ changes on the REAL traced (aberrated) system rather than the synthetic one.
 
 What changed
 ------------
-``multiscale_optics_agent.couplers.quadrature`` implements the same
+``couplers.quadrature`` implements the same
 radial-trapezoid weight CHE-38 measured, scaled to an ABSOLUTE area in square
 metres (``pi a^2 / (3 num_rings^2)`` per interior ray, corrected 3/4 at the
 center and 1/2 at the outermost ring). ``optiland_adapter.py`` regenerates the
@@ -78,7 +78,7 @@ def _load_sensor_probe():
 
 
 def _weighted_bundle(sensor: Any, rays: Any, *, apply_quadrature_weight: bool):
-    from multiscale_optics_agent.couplers.optiland_handoff import (
+    from couplers.optiland_handoff import (
         DeclaredHandoffPlane,
         HandoffPerturbation,
         declare_coherent_bundle,

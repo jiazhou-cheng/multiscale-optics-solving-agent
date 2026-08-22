@@ -29,8 +29,8 @@ from typing import Any
 
 import numpy as np
 
-from multiscale_optics_agent.adapters.base import RunStatus
-from multiscale_optics_agent.adapters.chromatix_adapter import (
+from adapters.base import RunStatus
+from adapters.chromatix_adapter import (
     ChromatixAdapter,
     ChromatixWaveRequest,
     ChromatixWaveResult,
@@ -100,7 +100,7 @@ def _forbidden_modules_loaded() -> list[str]:
         for name in sys.modules
         if name == "optiland"
         or name.startswith("optiland.")
-        or name.startswith("multiscale_optics_agent.couplers")
+        or name.startswith("couplers")
     )
 
 

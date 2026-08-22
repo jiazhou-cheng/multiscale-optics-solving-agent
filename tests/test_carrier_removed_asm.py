@@ -26,7 +26,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from multiscale_optics_agent.evaluation.asm_oracle import (
+from evaluation.asm_oracle import (
     CarrierConvention,
     absolute_phase_representation_floor,
     angular_spectrum_float64,
@@ -56,7 +56,7 @@ def _pinned_wave_engine_precision():
     `chromatix_adapter` has carried the same defence since M1; this module needs
     it too because it builds `Field`s directly.
     """
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         pin_wave_engine_precision,
     )
 
@@ -91,7 +91,7 @@ def _absolute_path(u: np.ndarray, z_m: float, pitch_m: float = SAMPLE_PITCH_M) -
 
 
 def _carrier_removed_path(u: np.ndarray, z_m: float, pitch_m: float = SAMPLE_PITCH_M):
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagate,
     )
 
@@ -293,7 +293,7 @@ def test_propagator_matches_chromatix_up_to_the_carrier_in_float64() -> None:
     Chromatix's own kernel, because Chromatix's is complex64 and would contribute
     the error being measured.
     """
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagator,
     )
 
@@ -317,7 +317,7 @@ def test_evanescent_orders_decay_rather_than_being_zeroed() -> None:
     grids have none, which is why this is tested deliberately rather than assumed
     from the sweep.
     """
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagator,
     )
 
@@ -343,7 +343,7 @@ def test_evanescent_orders_decay_rather_than_being_zeroed() -> None:
 
 def test_padding_is_chromatix_padding() -> None:
     """`pad_width` must reach Chromatix's own `pad`, and `mode='same'` must crop."""
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagate,
     )
 
@@ -362,7 +362,7 @@ def test_padding_is_chromatix_padding() -> None:
 # ---------------------------------------------------------------------------
 def test_removed_carrier_is_reported_and_not_silently_reapplied() -> None:
     """A consumer must be able to see that absolute phase is missing, and recover it."""
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         GLOBAL_PHASE_POLICY,
         reconstruct_absolute_phase,
     )
@@ -400,7 +400,7 @@ def test_field_derived_wavelength_is_float32_and_says_so() -> None:
     float32 route is wrong to offer, but that it must be labelled, so a consumer
     reconstructing absolute phase can see what it is standing on.
     """
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagate,
     )
 
@@ -435,7 +435,7 @@ def test_propagation_pins_jax_x64_off_regardless_of_ambient_state() -> None:
     """
     import jax
 
-    from multiscale_optics_agent.adapters.chromatix_carrier_removed import (
+    from adapters.chromatix_carrier_removed import (
         carrier_removed_asm_propagate,
     )
 
