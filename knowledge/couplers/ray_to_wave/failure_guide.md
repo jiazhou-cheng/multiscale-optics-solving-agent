@@ -60,8 +60,8 @@ Do not chase this by adding rays — it is first order in the spacing, so 1e-3 o
 `N_f ≈ 23` system needs of order `10⁶` rays. Measured in CHE-38 (M3.9R). The evidence key is
 `attribution_quadrature_weights` in `benchmarks/probes/records/
 m3r_sensor_handoff.json` — a record that **has never been generated**; read
-`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md` §8.1–8.2 instead until CHE-63
-lands it (disposition: `benchmarks/M3_M3_5_CLEANUP_DISPOSITION.md` item 1).
+`benchmarks/reports/2026-08/sensor_handoff_convergence.md` §8.1–8.2 instead until CHE-63
+lands it (disposition: `benchmarks/reports/2026-08/slice_cleanup_disposition.md` item 1).
 
 **CHE-47 implemented the reweighting this section describes**, as a producer-side
 default: `optiland_handoff.declare_coherent_bundle` folds

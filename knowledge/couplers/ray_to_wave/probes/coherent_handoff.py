@@ -60,7 +60,7 @@ from couplers.handoff import (
 )
 
 ROOT = Path(__file__).resolve().parents[4]
-PROTOCOL = ROOT / "benchmarks" / "slice_protocol.yaml"
+PROTOCOL = ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 
 WAVELENGTH_UM = 0.55
 WAVELENGTH_M = WAVELENGTH_UM * 1e-6

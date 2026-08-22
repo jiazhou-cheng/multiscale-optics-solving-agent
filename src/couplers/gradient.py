@@ -2,7 +2,7 @@
 
 AGENTS.md forbids claiming a gradient across an untested boundary. This module
 produces the test. It is expected to end in a *characterization*, not a
-certification, and `benchmarks/coupler_protocol.yaml` keeps
+certification, and `benchmarks/protocols/coupler_protocol.yaml` keeps
 ``derivative.verified`` false unless the named evidence exists.
 
 Two quantities, which must not be conflated

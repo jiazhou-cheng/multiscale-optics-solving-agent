@@ -360,7 +360,7 @@ staleness signal if it disappears in a future pinned version.
 
 CHE-12 verified that Optiland 0.6.0 geometry coordinates use millimetres and
 trace wavelengths use micrometres. The executable probe
-`benchmarks/probes/verify_m1_engines.py --engine ray` constructs planar
+`benchmarks/probes/engine_independence.py --engine ray` constructs planar
 surfaces separated by `thickness=10.0` and observes every final ray at
 `z=10.0`. The pinned `optiland.paraxial` source independently labels an
 offset in the same prescription coordinates as `10 mm before first
@@ -498,7 +498,7 @@ the accumulation starts from, and that is now declared
 (`opd_reference_surface`, `opd_omits_incoming_wavefront_tilt`).
 
 Evidence: `knowledge/solvers/optiland/probes/off_axis_opd_reference.py` and its
-recorded output, plus `benchmarks/probes/m3_off_axis_handoff.py` for the
+recorded output, plus `benchmarks/probes/off_axis_handoff.py` for the
 downstream consequence.
 
 ## CHE-13 standalone ray-state boundary

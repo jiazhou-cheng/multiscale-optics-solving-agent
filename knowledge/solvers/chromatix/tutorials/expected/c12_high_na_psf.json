@@ -38,7 +38,7 @@
       "passed": true
     },
     {
-      "detail": "refining ONLY the pupil sampling (128 -> 192 -> 256 px) with wavelength, NA, focal length, camera shape and camera pitch all fixed gives Iz/Ix = 0.011431, 0.004438, 0.003619 and |E_z| second-moment radii of 117.339, 100.186, 93.144 px. A correct high-NA focusing calculation converges under pupil refinement; this one does not. Root cause (CHE-18): high_na_ff_lens derives s_z from field.f_grid * lambda / n -- the FREQUENCY grid -- rather than the pupil position grid, so the obliquity Jacobian, the defocus phase and the output zoom factor all degenerate to constants. This check is a guard, not a validation: it should start failing if the bug is ever fixed upstream, which is the signal to re-validate against the Richards-Wolf oracle in benchmarks/level1/L1-WAVE-01.",
+      "detail": "refining ONLY the pupil sampling (128 -> 192 -> 256 px) with wavelength, NA, focal length, camera shape and camera pitch all fixed gives Iz/Ix = 0.011431, 0.004438, 0.003619 and |E_z| second-moment radii of 117.339, 100.186, 93.144 px. A correct high-NA focusing calculation converges under pupil refinement; this one does not. Root cause (CHE-18): high_na_ff_lens derives s_z from field.f_grid * lambda / n -- the FREQUENCY grid -- rather than the pupil position grid, so the obliquity Jacobian, the defocus phase and the output zoom factor all degenerate to constants. This check is a guard, not a validation: it should start failing if the bug is ever fixed upstream, which is the signal to re-validate against the Richards-Wolf oracle in archive/benchmarks/gen1/benchmarks/L1-WAVE-01.",
       "kind": "analytic",
       "name": "high_na_ff_lens_is_not_sampling_independent",
       "passed": true

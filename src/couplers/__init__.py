@@ -1,7 +1,7 @@
 """Bidirectional ray-wave couplers and their boundary artifact contracts.
 
 Physics and provenance for these couplers live in ``knowledge/couplers/``; the
-frozen execution contract lives in ``benchmarks/M2_COUPLER_PROTOCOL.md``.
+frozen execution contract lives in ``benchmarks/protocols/m2_coupler_protocol.md``.
 """
 
 from core.boundary import (

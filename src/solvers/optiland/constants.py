@@ -38,7 +38,7 @@ _SUPPORTED_BACKENDS = ("numpy", "torch")
 # need to be.
 _SUPPORTED_SAMPLES = prescription_names()
 
-# M3-SINGLET-REF's numbers (frozen by M3.2 in benchmarks/slice_protocol.yaml)
+# M3-SINGLET-REF's numbers (frozen by M3.2 in benchmarks/protocols/slice_protocol.yaml)
 # moved to the prescription itself, registry/prescriptions.py, so there is one
 # definition rather than a copy here and a construction site there.
 

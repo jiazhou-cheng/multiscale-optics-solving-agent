@@ -1,7 +1,7 @@
 """CHE-25 — C_WAVE_TO_RAY as a Monte Carlo estimator, characterized not asserted.
 
 The ordering here is the point, and it is the ordering
-``benchmarks/coupler_protocol.yaml`` makes mandatory:
+``benchmarks/protocols/coupler_protocol.yaml`` makes mandatory:
 
 1. **Exactness limit first.** Enumerate every propagating bin. That estimator
    has no sampling error, so if it misses the reference the defect is in the

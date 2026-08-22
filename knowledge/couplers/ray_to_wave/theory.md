@@ -196,4 +196,4 @@ Two results, measured rather than assumed:
   aberration/quadrature defect, since the aberration-matched oracle should then
   track the coupler more closely, not less. The likelier explanation is the wave
   oracle's own ring-averaged, linearly-interpolated pupil-fit quality at this
-  resolution; not decomposed further (`benchmarks/probes/m3_quadrature_weight.py`).
+  resolution; not decomposed further (`benchmarks/probes/quadrature_weight.py`).

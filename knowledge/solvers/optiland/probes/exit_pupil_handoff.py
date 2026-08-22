@@ -10,7 +10,7 @@ share a probe:
    (``OptilandAdapter.run`` -> ``_build_ray_bundle_artifact``) rather than a
    separate custom-prescription path, which stays refused.
 2. ``handoff_plane="exit_pupil"`` must reproduce the exit-pupil geometry frozen
-   in ``benchmarks/slice_protocol.yaml`` for both M3 systems, and the projection
+   in ``benchmarks/protocols/slice_protocol.yaml`` for both M3 systems, and the projection
    it performs must be checked as *geometry* rather than by re-running the
    formula that produced it.
 
@@ -52,7 +52,7 @@ from solvers.base import ModelRunRequest, RunStatus
 from solvers.optiland.adapter import OptilandAdapter
 
 ROOT = Path(__file__).resolve().parents[4]
-SLICE_PROTOCOL = ROOT / "benchmarks" / "slice_protocol.yaml"
+SLICE_PROTOCOL = ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 
 SYSTEMS = {
     "ReverseTelephoto": "M3-REVERSE-TELEPHOTO",

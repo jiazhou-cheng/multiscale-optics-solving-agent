@@ -31,7 +31,7 @@ from core.optical_system import (
 
 # --- M3-SINGLET-REF ---------------------------------------------------------
 #
-# Frozen by M3.2 in benchmarks/slice_protocol.yaml. Plano-convex, convex toward
+# Frozen by M3.2 in benchmarks/protocols/slice_protocol.yaml. Plano-convex, convex toward
 # the collimated side (the low-aberration orientation), real refractive surfaces
 # because CHE-30 ruled out surface_type='paraxial' as an OPL source. An ideal
 # constant-index material keeps it independent of any glass catalog. Scaled to
@@ -55,6 +55,15 @@ SINGLET_ENTRANCE_PUPIL_DIAMETER_MM = SINGLET_EFFECTIVE_FOCAL_LENGTH_MM / SINGLET
 
 M3_SINGLET_REF = OpticalSystemSpec(
     name="M3SingletRef",
+    # DO NOT edit this description for a path move. `description` is part of the
+    # spec, and the spec is hashed into `prescription_fingerprint`, which every
+    # recorded trace carries as its statement of *which optical system ran*.
+    # CHE-93 renamed benchmarks/slice_protocol.yaml -> benchmarks/protocols/ and
+    # the sweep touched this string; the fingerprint changed from e0d03eae to
+    # 65604679 and two tests caught it. The string is deliberately left citing
+    # the old path -- the current one is in the comment above -- because a
+    # fingerprint that moves when a document is renamed is worse than a stale
+    # path inside one. Tracked as its own issue.
     description=(
         "M3-SINGLET-REF (benchmarks/slice_protocol.yaml): plano-convex singlet, "
         "convex toward the collimated side, admitting an analytic Airy oracle."

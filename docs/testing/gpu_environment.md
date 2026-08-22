@@ -149,7 +149,7 @@ image CHE-60 built.
 | Default suite, CPU image | `./run.sh pytest -q` | **769 passed, 48 skipped, 182 s** |
 | Fast subset | `./run.sh pytest -q -m "not slow"` | 751 passed, 48 skipped, 18 deselected, 37 s |
 | Legacy Tier A expression (still names the deleted `sax` marker) | `-m "not slow and not benchmark and not fmmax and not fdtdx and not sax"` | 799/817 collected — the marker is gone but the expression still parses |
-| Agent benchmark gate | `./run.sh pytest -q benchmarks_agent` | 52 passed, 7.6 s |
+| Agent benchmark gate | `./run.sh pytest -q benchmarks/agents` | 52 passed, 7.6 s |
 
 Against the CHE-60 baseline of 770 passed / 48 skipped, the default suite moved by
 exactly two accounted-for deltas and nothing else:
@@ -163,7 +163,7 @@ exactly two accounted-for deltas and nothing else:
 
 ### Clean-interpreter evidence
 
-`benchmarks/probes/gpu/che72_gpu_revalidation.py`, run in a process pytest never
+`benchmarks/probes/gpu/cuda_stack_revalidation.py`, run in a process pytest never
 touches, because the old harness repair meant "works under pytest" and "works in a
 clean interpreter" were different claims:
 

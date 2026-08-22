@@ -14,7 +14,7 @@ Three things are under test, and they are deliberately separated:
 The migration checks use two *independent* oracles rather than the new code's
 own output: ``optiland.samples.objectives.ReverseTelephoto`` for the bundled
 system (structural equality of ``Optic.to_dict()`` plus element-wise trace
-equality), and ``benchmarks/slice_protocol.yaml``'s frozen derived geometry for
+equality), and ``benchmarks/protocols/slice_protocol.yaml``'s frozen derived geometry for
 the adapter-owned singlet. The bundled sample is kept for exactly this purpose:
 it is no longer a construction path, it is an oracle.
 
@@ -79,7 +79,7 @@ OptilandMaterial = pytest.importorskip("optiland.materials").Material
 pytestmark = pytest.mark.optiland
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SLICE_PROTOCOL = REPO_ROOT / "benchmarks" / "slice_protocol.yaml"
+SLICE_PROTOCOL = REPO_ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 
 WAVELENGTH_UM = 0.55
 #: float64 round-off over a handful of accumulations. Every geometric identity
@@ -839,7 +839,7 @@ def test_canonical_reverse_telephoto_traces_identically(field_hy) -> None:
 
 
 def test_canonical_singlet_reproduces_the_frozen_protocol_geometry() -> None:
-    """M3-SINGLET-REF against benchmarks/slice_protocol.yaml, not against itself.
+    """M3-SINGLET-REF against benchmarks/protocols/slice_protocol.yaml, not against itself.
 
     The protocol is M3.2's independently frozen record of this system, so it is
     the right oracle for a construction change: if the canonical prescription

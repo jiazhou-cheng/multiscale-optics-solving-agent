@@ -16,7 +16,7 @@ the sampled grid (no RNG, hence nothing to seed) and propagated one Rayleigh
 range by ``chromatix.functional.asm_propagate``. This probe establishes
 determinism, the field/grid/padding/power contract, and the runtime budget --
 it is deliberately NOT an accuracy oracle. Analytic Gaussian accuracy is
-benchmarked separately by ``benchmarks/level1/L1-WAVE-01``.
+benchmarked separately by ``archive/benchmarks/gen1/benchmarks/L1-WAVE-01``.
 """
 
 from __future__ import annotations

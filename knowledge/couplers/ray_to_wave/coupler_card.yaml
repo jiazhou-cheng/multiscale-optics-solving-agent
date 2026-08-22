@@ -1,6 +1,6 @@
 # Routing-critical facts for C_RAY_TO_WAVE.
 # Contract follows AGENTS.md "Initial Artifact Boundary" and the frozen
-# M2-COUPLER-CPU-V1 boundary table in benchmarks/M2_COUPLER_PROTOCOL.md.
+# M2-COUPLER-CPU-V1 boundary table in benchmarks/protocols/m2_coupler_protocol.md.
 # Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
 # main text eq 2 and SI Figure S1.
 
@@ -68,7 +68,7 @@ the_plane_z_is_not_a_kernel_parameter:
     benchmarks/probes/records/m3r_sensor_handoff.json
     (experiment_e_shipping_sensor_path.missing_quadratic_phase) -- NOT COMMITTED,
     see CHE-63; the numbers above are quoted from
-    benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md section 5, which is committed.
+    benchmarks/reports/2026-08/sensor_handoff_convergence.md section 5, which is committed.
 
 # CHE-68 (R5 of the M3.5 exit report). CHE-50 closed with a decision and the
 # decision lived only in a Linear comment, so no consumer could see it. This is
@@ -99,7 +99,7 @@ known_limitations:
       where: at the 5-Airy-radius gate edge, against an exact spherical-wave reference
       intensity_residual: 1e-3, converging
       complex_field_residual: 0.127, flat rather than convergent
-      source: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md section 5 (CHE-38)
+      source: benchmarks/reports/2026-08/sensor_handoff_convergence.md section 5 (CHE-38)
     correct_remedy_today: >-
       To obtain a field on a different plane, advance the RAY STATE to that plane
       and reconstruct there. That is exact, not an approximation -- see
@@ -148,7 +148,7 @@ known_limitations:
       exactness_limit_without_band_limit: 2.8e-09 relative field error, float64
       exactness_limit_with_band_limit: 8.9e-14 relative field error, float64
       float32_phase_representation_error_rad: 7e3
-      source: benchmarks/CHE70_METALENS_BRIDGE_REPORT.md section 6
+      source: benchmarks/reports/2026-08/metalens_bridge.md section 6
     current_handling: >-
       Declared band limit at the caller, NOT a kernel change.
       couplers.streaming.grazing_floor_for_phase_budget derives the floor from the
@@ -163,7 +163,7 @@ known_limitations:
     surfaced_in:
       - knowledge/couplers/ray_to_wave/conventions.md (hazard H4)
       - src/couplers/streaming.py (module docstring)
-      - benchmarks/CHE70_METALENS_BRIDGE_REPORT.md
+      - benchmarks/reports/2026-08/metalens_bridge.md
       - this card
     test: tests/test_coherent_bridge.py::TestExactnessLimit::test_the_grazing_band_limit_is_what_makes_the_exactness_limit_exact
 
@@ -330,7 +330,7 @@ validity_conditions:
       over a 16x range of ring counts. Applying a radial trapezoid weight (outer
       ring 1/2, central ray 3/4) collapses the residual to a CONVERGED 4.07e-4,
       flat from 64 rings upward and inside the 1e-3 gate. CHE-47
-      (benchmarks/probes/m3_quadrature_weight.py) reproduced this mechanism as
+      (benchmarks/probes/quadrature_weight.py) reproduced this mechanism as
       the PRODUCTION default and re-measured it on the REAL (residually
       aberrated) M3-SINGLET-REF trace: the sensor-plane residual against the O2
       wave oracle improves 1.58x (3.91e-3 -> 2.48e-3 at 787969 rays) but does
@@ -526,7 +526,7 @@ coherent_handoff_from_a_ray_trace:
         more general choice: a chief-ray frame can be layered on a
         wavefront-referenced OPL, while recovering the tilt from a chief-ray frame
         needs object-space data the exit-pupil export does not carry. Full
-        reasoning: benchmarks/slice_protocol.yaml amendment A4.
+        reasoning: benchmarks/protocols/slice_protocol.yaml amendment A4.
       sampling_consequence: >-
         the pupil field carries the tilt, so pitch <= lambda /
         (2 max|transverse direction cosine|). On M3-REVERSE-TELEPHOTO the frozen
@@ -627,7 +627,7 @@ coherent_handoff_from_a_ray_trace:
 observation_side_handoff:
   status: verified
   verified_by: CHE-38 (M3.9R)
-  probe: benchmarks/probes/m3r_sensor_handoff.py
+  probe: benchmarks/probes/sensor_handoff_convergence.py
   evidence: benchmarks/probes/records/m3r_sensor_handoff.json
   tests: >-
     archive/tests/gen1/tests/test_m3r_sensor_handoff.py -- ARCHIVED by CHE-67 and
@@ -635,8 +635,11 @@ observation_side_handoff:
     (CHE-63); archiving removed the 6 live ones too, so this verification is now
     unguarded. Unarchiving is an explicit git mv back under tests/, per
     archive/tests/gen1/README.md.
-  report: benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md
-  figures: outputs/M3/CHE-38-M3.9R/
+  report: benchmarks/reports/2026-08/sensor_handoff_convergence.md
+  # Local-only: `outputs/` is gitignored and exists on the machine that
+  # produced the run. The measurement this card relies on is stated in the
+  # fields above; the figures are illustration, not the evidence.
+  figures_local_only: outputs/M3/CHE-38-M3.9R/
   system_verified: M3-SINGLET-REF, on axis, 550 nm
   verdict: >-
     A. Sensor-side Ray->Wave handoff verified. The residual against two independent
@@ -714,7 +717,7 @@ observation_side_handoff:
 off_axis_handoff:
   status: verified at one field
   verified_by: CHE-41
-  probe: benchmarks/probes/m3_off_axis_handoff.py
+  probe: benchmarks/probes/off_axis_handoff.py
   evidence: benchmarks/probes/records/m3_off_axis_handoff.json
   tests: >-
     archive/tests/gen1/tests/test_m3_off_axis_handoff.py -- ARCHIVED by CHE-67 and

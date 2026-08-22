@@ -67,7 +67,7 @@ reconstruct again -- exact, not an approximation (``consequence_1`` on the card)
 This module imports neither Optiland nor Chromatix. The coupler core is the
 physics under test; if it could import an engine, a coupler defect could be
 misattributed to engine behaviour and M1's independence evidence would stop
-bounding the search. ``benchmarks/coupler_protocol.yaml`` declares the rule and
+bounding the search. ``benchmarks/protocols/coupler_protocol.yaml`` declares the rule and
 ``tests/test_ray_to_wave.py`` enforces it.
 """
 

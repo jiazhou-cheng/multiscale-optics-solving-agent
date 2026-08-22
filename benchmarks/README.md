@@ -40,7 +40,7 @@ to `archive/benchmarks/gen1/`, with the three benchmark-only adapters and
 `archive/benchmarks/gen1/README.md` records what each one guarded and what is
 therefore unguarded now.
 
-The M1 exit report ([`M1_BASELINE_REPORT.md`](M1_BASELINE_REPORT.md)) and the
+The M1 exit report ([`reports/2026-08/ray_and_wave_baselines.md`](reports/2026-08/ray_and_wave_baselines.md)) and the
 `M1-BASELINE-CPU-V1`/`V2` contracts still describe those runs accurately. They
 are the milestone record; the code that produced them is one directory away.
 

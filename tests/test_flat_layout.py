@@ -119,7 +119,7 @@ def test_no_module_still_imports_the_old_package_name() -> None:
         [
             "git", "grep", "-l", "multiscale_optics_agent", "--",
             "src/*.py", "src/**/*.py", "tests/*.py", "scripts/*.py",
-            "benchmarks/**/*.py", "benchmarks_agent/*.py", "tests_tutorial/*.py",
+            "benchmarks/**/*.py", "benchmarks/agents/*.py", "tests_tutorial/*.py",
             # This file names the old level in its own docstring and in the
             # pattern above, so it would match itself. `git grep` only searches
             # tracked files, which meant the self-match appeared the moment this

@@ -103,7 +103,7 @@ canonical_system_construction:
       Optic.to_dict() equal to optiland.samples.objectives.ReverseTelephoto()
       (name aside) and element-wise identical traces at Hy = 0, 0.5, 1.0.
     m3_singlet_ref: >
-      reproduces benchmarks/slice_protocol.yaml's frozen efl/bfl/image-plane
+      reproduces benchmarks/protocols/slice_protocol.yaml's frozen efl/bfl/image-plane
       z/EPD/semi-aperture, the superseded hand-written builder's to_dict() and
       trace bit-for-bit, and the M1 standalone_baseline scientific-array SHA-256.
   construction_hazards:
@@ -314,7 +314,7 @@ exit_pupil_handoff:
   # would put the plane a whole focal length away and still look plausible.
   plane_expression: exit_pupil_z = image_surface_z + XPL
   protocol_agreement:
-    against: benchmarks/slice_protocol.yaml (M3-SLICE-CPU-V1, frozen by M3.2)
+    against: benchmarks/protocols/slice_protocol.yaml (M3-SLICE-CPU-V1, frozen by M3.2)
     M3-REVERSE-TELEPHOTO:
       exit_pupil_z_mm: 2.1547825721481666
       exit_pupil_diameter_mm: 0.46053493637581633
@@ -392,7 +392,7 @@ adapter_owned_systems:
       inputs['system'] is still refused. The difference from a bundled system is
       only where the prescription is written down, not how loosely it is
       admitted; both are probed and pinned to the same M1 standard.
-    prescription_source: benchmarks/slice_protocol.yaml, systems[M3-SINGLET-REF]
+    prescription_source: benchmarks/protocols/slice_protocol.yaml, systems[M3-SINGLET-REF]
     construction:
       plano_convex_singlet: convex toward the collimated side
       surface_type: standard          # NOT paraxial -- CHE-30 ruled that out as an OPL source
@@ -408,7 +408,7 @@ adapter_owned_systems:
       waves against Rayleigh's 0.25, and ReverseTelephoto is 1.02. None is
       diffraction-limited, so M3.2's Airy oracle has no bundled vehicle.
     diffraction_limited_evidence:
-      measured_by: M3.2, recorded in benchmarks/slice_protocol.yaml
+      measured_by: M3.2, recorded in benchmarks/protocols/slice_protocol.yaml
       not_measured_by: CHE-32
       peak_to_valley_waves: 0.01699595356250618
       criterion: Rayleigh quarter wave, peak-to-valley

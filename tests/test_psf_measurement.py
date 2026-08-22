@@ -453,7 +453,7 @@ def test_the_protocol_freeze_matches_the_implementation() -> None:
     """
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
     frozen = protocol["psf_measurement"]
 
     assert frozen["is_a_coupler"] is False
@@ -481,7 +481,7 @@ def test_the_protocol_records_the_normalization_blind_spot() -> None:
     """A freeze that only states the choice would hide the cost of the choice."""
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
     normalization = protocol["psf_measurement"]["normalization"]
 
     assert "constant multiplicative error" in normalization["what_it_hides"]

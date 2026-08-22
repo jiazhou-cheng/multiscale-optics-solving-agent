@@ -48,7 +48,7 @@ SAMPLE = "ReverseTelephoto"
 #: The field CHE-37 measured the defect at, and the largest field at which the
 #: frozen M3-REVERSE-TELEPHOTO pitch still admits a tilt-carrying pupil.
 FIELD_HY = 0.2
-#: The frozen pupil pitch for M3-REVERSE-TELEPHOTO, from benchmarks/slice_protocol.yaml.
+#: The frozen pupil pitch for M3-REVERSE-TELEPHOTO, from benchmarks/protocols/slice_protocol.yaml.
 FROZEN_PITCH_M = 1.8258157981959995e-06
 
 

@@ -12,7 +12,7 @@ either (`rglob('*.zmx')` over the installed package returns nothing). This
 reproduction therefore exercises the same import path on a prescription the
 repository already owns and has validated analytically: Edmund Optics TECHSPEC
 **#45-362**, the 20 mm x 50 mm EFL N-BK7 plano-convex singlet used by
-`benchmarks/level1/L1-RAY-01/` (see `knowledge/solvers/optiland/source_manifest.yaml`).
+`archive/benchmarks/gen1/benchmarks/L1-RAY-01/` (see `knowledge/solvers/optiland/source_manifest.yaml`).
 The prescription is written out with ``save_zemax_file`` and read back with
 ``load_zemax_file``, which exercises both halves of Optiland's Zemax handler.
 

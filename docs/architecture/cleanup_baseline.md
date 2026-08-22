@@ -39,7 +39,7 @@ tree to describe:
 | `./run.sh python scripts/validate_package.py` | reused | pass — 7 models, 10 couplers, all YAML, all example graphs | < 5 s |
 | `./run.sh python scripts/export_schemas.py` | reused | **regenerates a diff — see Finding 1** | < 5 s |
 | `./run.sh --gpu pytest -q -m gpu` (own session, `MOA_GPUS=device=0`) | reused | **48 passed, 769 deselected** | **69.68 s** |
-| `./run.sh pytest -q benchmarks_agent` | reused | **52 passed** | 7.51 s |
+| `./run.sh pytest -q benchmarks/agents` | reused | **52 passed** | 7.51 s |
 | `make test-agent-benchmark` | — | **fails on the host — see Finding 2** | — |
 | `make test-tutorial` | — | deliberately skipped — see below | — |
 
@@ -131,9 +131,9 @@ The regenerated files were reverted here so the baseline tree stays clean.
 
 ### Finding 2 — `make test-agent-benchmark` does not run at all
 
-The target is bare `pytest -q benchmarks_agent`, which executes on the **host**,
+The target is bare `pytest -q benchmarks/agents`, which executes on the **host**,
 where the dependencies do not exist; it aborts with a collection error in 0.11 s.
-The suite itself is healthy — `./run.sh pytest -q benchmarks_agent` is 52 passed
+The suite itself is healthy — `./run.sh pytest -q benchmarks/agents` is 52 passed
 in 7.51 s.
 
 This is Phase 8 Part E, and it is worse than the "contradicts AGENTS.md"
@@ -186,6 +186,6 @@ did not block a clean `git status`; they are Phase 1's to remove.
   phase explicitly predicts. Phase 2 predicts a drop of about one per removed
   adapter, from the parametrized adapter-discovery test.
 * **48 passed** on `./run.sh --gpu pytest -q -m gpu`, in its own session.
-* **52 passed** on `./run.sh pytest -q benchmarks_agent`.
+* **52 passed** on `./run.sh pytest -q benchmarks/agents`.
 * Zero swap growth. If a phase's run pushes the host into swap, stop it and
   reduce the work — do not record the number and move on.

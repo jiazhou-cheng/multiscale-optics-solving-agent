@@ -5,7 +5,7 @@ pupil focused by `cf.high_na_ff_lens` at NA 1.3 in n = 1.5, computed once as a
 scalar field and once as a `VectorField` polarized along x.
 
 **This repository already knows `high_na_ff_lens` is defective.**
-`benchmarks/level1/L1-WAVE-01` Case 3 (CHE-18) found it *not sampling-independent*
+`archive/benchmarks/gen1/benchmarks/L1-WAVE-01` Case 3 (CHE-18) found it *not sampling-independent*
 and root-caused it: the function derives `s_z` from `field.f_grid * lambda / n` --
 the *frequency* grid -- rather than from the pupil position grid, so on any
 physically sampled pupil `|s_grid| ~ 0.015`, `s_z ~ 1`, and the intended
@@ -203,7 +203,7 @@ def run() -> TutorialResult:
         "grid, so the obliquity Jacobian, the defocus phase and the output zoom factor all "
         "degenerate to constants. This check is a guard, not a validation: it should start "
         "failing if the bug is ever fixed upstream, which is the signal to re-validate "
-        "against the Richards-Wolf oracle in benchmarks/level1/L1-WAVE-01.",
+        "against the Richards-Wolf oracle in archive/benchmarks/gen1/benchmarks/L1-WAVE-01.",
     )
     result.note(
         "Do NOT use high_na_ff_lens for quantitative work in this pinned commit. "

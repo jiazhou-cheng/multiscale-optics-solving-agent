@@ -85,7 +85,7 @@ __all__ = [
 # flattened src/, and would have needed changing again for CHE-90's move -- and a
 # wrong count does not fail at import, it points REPO_ROOT somewhere plausible.
 REPO_ROOT = repository_root()
-SUITE_DIR = REPO_ROOT / "benchmarks_agent"
+SUITE_DIR = REPO_ROOT / "benchmarks/agents"
 
 
 class ContextPolicy(StrEnum):
@@ -1144,7 +1144,7 @@ def run_suite(
 
 
 def write_expected() -> list[Path]:
-    """Record each reference solution's output under ``benchmarks_agent/expected/``.
+    """Record each reference solution's output under ``benchmarks/agents/expected/``.
 
     Mirrors the CHE-57 tutorial pattern: a recorded output is a regression signal,
     **not** the oracle. The oracle is the closed form on every ``CheckSpec``, which

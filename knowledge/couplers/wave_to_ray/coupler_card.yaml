@@ -1,6 +1,6 @@
 # Routing-critical facts for C_WAVE_TO_RAY.
 # Contract follows AGENTS.md "Initial Artifact Boundary" and the frozen
-# M2-COUPLER-CPU-V1 boundary table in benchmarks/M2_COUPLER_PROTOCOL.md.
+# M2-COUPLER-CPU-V1 boundary table in benchmarks/protocols/m2_coupler_protocol.md.
 # Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
 # main text eq 1 and Figure 1c; SI S2 (eqs S1-S5), S3 (eqs S6-S9),
 # S4 (Algorithm S1), S7 (Algorithm S2).
@@ -308,7 +308,7 @@ registry_note: >
 
   Where they are checked has moved twice, and the second move is the one worth
   knowing about. They were originally string-matched inside
-  benchmarks/verify_m1_independence.py; CHE-88 archived that script with the
+  archive/benchmarks/gen1/benchmarks/verify_m1_independence.py; CHE-88 archived that script with the
   gen1 suite, which would have retired the audit a second time in exactly the
   way this note warns against. They are now asserted against the packaged
   registry by

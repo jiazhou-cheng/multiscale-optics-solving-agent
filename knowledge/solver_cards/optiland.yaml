@@ -47,5 +47,5 @@ required_probes:
   - one surface-parameter gradient  # done for one path (torch backend, lens radius -> trace -> RMS-spot proxy), relative error 1.11e-03 vs finite difference -- looser than JAX solvers, not root-caused
   - wavefront/OPD export convention  # not done
   - pupil power and coordinate orientation  # not done
-  - known-distance native-unit check  # done, see benchmarks/probes/verify_m1_engines.py
+  - known-distance native-unit check  # done, see benchmarks/probes/engine_independence.py
 benchmarks: [L1-RAY-01, L2-PSF-01, L3-HYBRID-01]

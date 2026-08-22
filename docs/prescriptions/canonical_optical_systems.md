@@ -179,7 +179,7 @@ against oracles that are independent of the new code:
   interaction models, aperture, fields, wavelengths), and traces are element-wise
   identical at Hy = 0, 0.5 and 1.0. The bundled sample is retained as this
   oracle; it is no longer a construction path.
-* **`M3SingletRef`** — reproduces `benchmarks/slice_protocol.yaml`'s frozen
+* **`M3SingletRef`** — reproduces `benchmarks/protocols/slice_protocol.yaml`'s frozen
   derived geometry (EFL, BFL, image-plane z, EPD, semi-aperture) and the
   hand-written builder's `to_dict()` and trace bit-for-bit. The M1
   `standalone_baseline` scientific-array SHA-256 and summary metrics are

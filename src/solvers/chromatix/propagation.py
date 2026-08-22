@@ -229,7 +229,7 @@ def run_asm_propagate(
     removed_carrier_phase_rad: float | None = None
     if propagation_method == "asm_carrier_removed":
         # CHE-40's kernel, over Chromatix's own FFTs, padding, frequency grid
-        # and evanescent policy. Required by benchmarks/slice_protocol.yaml for
+        # and evanescent policy. Required by benchmarks/protocols/slice_protocol.yaml for
         # any phase-insensitive M3 PSF path; the field's ABSOLUTE phase is not
         # physical afterwards, which the output metadata states.
         from solvers.chromatix.carrier_removed_asm import (

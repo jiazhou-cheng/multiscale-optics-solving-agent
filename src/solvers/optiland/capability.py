@@ -173,7 +173,7 @@ def capability_problems(request: ModelRunRequest) -> list[tuple[str, str]]:
                 f"{_SUPPORTED_HANDOFF_PLANES!r}. A reference sphere in "
                 "particular is not implemented: the ray-to-wave coupler "
                 "accumulates onto a plane (M3.2). (The coupler is named here "
-                "only in prose -- benchmarks/verify_m1_independence.py fails "
+                "only in prose -- archive/benchmarks/gen1/benchmarks/verify_m1_independence.py fails "
                 "the ray branch if its identifier appears in this source.)",
             )
         )

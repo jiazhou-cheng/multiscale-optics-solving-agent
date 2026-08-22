@@ -3,7 +3,7 @@
 CHE-12 re-verified the installed distribution as version 0.6.0 from exact
 Git commit `d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee`, with JAX 0.6.2 on
 CPU, NumPy 2.2.6, and `jax_enable_x64=False`. See
-`benchmarks/probes/verify_m1_engines.py --engine wave`. This is an
+`benchmarks/probes/engine_independence.py --engine wave`. This is an
 environment and convention check, not an analytic propagation benchmark.
 
 Every fact below was either read from `inspect.getsource`/`inspect.getdoc` on
@@ -333,7 +333,7 @@ complex64), because it assumes the field occupies the full Nyquist bandwidth.
 A Gaussian with a `10 um` waist occupies only `~0.05 um^-1` of a `1 um^-1`
 Nyquist band, and an explicit `pad_width = 256` (a `640 x 640` grid)
 reproduces the analytic result to `7e-5` relative beam radius — verified in
-`benchmarks/level1/L1-WAVE-01`.
+`archive/benchmarks/gen1/benchmarks/L1-WAVE-01`.
 
 **Implication:** choose padding from the *occupied* bandwidth (the physical
 ray displacement `z * lambda * f_max` must fit inside the padded window), not

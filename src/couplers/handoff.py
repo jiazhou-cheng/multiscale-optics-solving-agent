@@ -27,7 +27,7 @@ Nothing here is new physics. Three prior results are being *applied*:
     ``n = 1`` is true for both M3 systems and is checked rather than believed.
 
 ``CHE-40`` -- the required ray-side conditioning
-    ``benchmarks/slice_protocol.yaml`` requires
+    ``benchmarks/protocols/slice_protocol.yaml`` requires
     ``phi_i = (2*pi/lambda) (OPL_i - OPL_ref)``, never absolute accumulated OPL.
     That is not a stylistic preference: on ``M3-SINGLET-REF`` the exported
     absolute OPL is 1.0e4 waves at the image surface and the piston removed here

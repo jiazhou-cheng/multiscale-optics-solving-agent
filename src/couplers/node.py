@@ -106,7 +106,7 @@ __all__ = ["COUPLER_ID", "RayToWaveCoupler", "get_coupler"]
 COUPLER_ID = "C_RAY_TO_WAVE"
 
 #: Measured on this project's CPU by M3.2's feasibility probe and frozen in
-#: benchmarks/slice_protocol.yaml. Used only to turn the cost driver into
+#: benchmarks/protocols/slice_protocol.yaml. Used only to turn the cost driver into
 #: seconds; the driver itself -- rays x grid points -- is the honest part.
 _RAY_PIXEL_PRODUCTS_PER_SECOND = 5.5e8
 
@@ -340,7 +340,7 @@ class RayToWaveCoupler:
                 "declarations": bundle.provenance.get("handoff"),
                 "source_artifact_id": record.id,
                 "gradient_claim": (
-                    "none. Forward-only, per benchmarks/slice_protocol.yaml; "
+                    "none. Forward-only, per benchmarks/protocols/slice_protocol.yaml; "
                     "derivative.verified is false for this coupler."
                 ),
             },

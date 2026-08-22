@@ -57,7 +57,7 @@ from verification.asm_oracle import (
 )
 
 ROOT = Path(__file__).resolve().parents[4]
-PROTOCOL = ROOT / "benchmarks" / "slice_protocol.yaml"
+PROTOCOL = ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 
 WAVELENGTH_UM = 0.55
 WAVELENGTH_M = 5.5e-7

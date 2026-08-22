@@ -100,7 +100,7 @@ Grounded in the real `optiland` 0.6.0 API surface and the probes in
   `probes/system_construction_probe.py`). `ReverseTelephoto` built from its
   canonical prescription is structurally equal to the bundled sample's
   `Optic.to_dict()` and traces element-wise identically; `M3SingletRef`
-  reproduces `benchmarks/slice_protocol.yaml`'s frozen geometry and the M1
+  reproduces `benchmarks/protocols/slice_protocol.yaml`'s frozen geometry and the M1
   scientific-array hash. What is *not* admitted by that path is listed under
   "Still not exercised" and in `docs/prescriptions/canonical_optical_systems.md`.
   CHE-57's original note follows.: the 41 tutorial reproductions build systems from 4 to 44 surfaces
@@ -132,7 +132,7 @@ Grounded in the real `optiland` 0.6.0 API surface and the probes in
 
 ## CHE-17 analytic accuracy evidence
 
-`benchmarks/level1/L1-RAY-01/` independently checks free-space intersection
+`archive/benchmarks/gen1/benchmarks/L1-RAY-01/` independently checks free-space intersection
 and path accumulation, ideal paraxial focusing at three launch slopes, and a
 full trace of Edmund Optics TECHSPEC #45-362. The catalog case uses the
 manufacturer's published prescription and SCHOTT N-BK7 dispersion rather

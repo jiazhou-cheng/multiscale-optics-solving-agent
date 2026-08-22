@@ -259,7 +259,7 @@ validation_status: analytically_validated_scalar_asm_cpu
 validation_note: >
   CHE-12 verified the exact pinned CPU environment and frozen boundary
   conventions. CHE-14 froze the deterministic standalone scalar
-  angular-spectrum contract. CHE-18 (benchmarks/level1/L1-WAVE-01) validated
+  angular-spectrum contract. CHE-18 (archive/benchmarks/gen1/benchmarks/L1-WAVE-01) validated
   that path in two stages. Case 1 is exact: FFT-bin plane-wave eigenmodes
   propagated unpadded reproduce u * exp(i k_z z) to float32 round-off (3.3e-4
   rad of phase error at 2952 rad of accumulated phase), pinning the phasor

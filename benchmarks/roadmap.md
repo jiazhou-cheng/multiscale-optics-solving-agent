@@ -37,7 +37,7 @@ Two internal models:
 
 * `M_SENSOR_IDEAL` — pixel integration and noise on a PSF. Deliberately excluded
   from M3, and the exclusion is recorded at length in
-  `benchmarks/slice_protocol.yaml`: it is why the M3 graph terminates at the
+  `benchmarks/protocols/slice_protocol.yaml`: it is why the M3 graph terminates at the
   propagated `ComplexField` and PSF extraction is a measurement rather than an
   edge. Restoring it means deciding a radiometric normalization, which is the
   actual work.

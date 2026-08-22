@@ -127,7 +127,7 @@ def test_the_opt_in_trees_are_not_swept_up_by_a_root_directory_run(
     # it is nondeterministic and consumes model tokens. Its *harness* is in the
     # default suite (tests/test_agent_benchmark.py) deliberately, because the
     # grader decides whether an agent passed.
-    assert "benchmarks_agent" in norecurse
+    assert "benchmarks/agents" in norecurse
     for default in ("*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv"):
         assert default in norecurse, f"norecursedirs dropped the pytest default {default!r}"
 

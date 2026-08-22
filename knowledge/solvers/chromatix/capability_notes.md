@@ -47,7 +47,7 @@ commit (`d24bdf0`, tag `0.6.0`) and the probes in `probes/`.
   angular-spectrum baseline. Two CPU runs produce identical summary metrics
   and byte-identical field arrays; nine distinct rejection paths each return
   a structured diagnostic and no field.
-- `benchmarks/level1/L1-WAVE-01` Case 1 (CHE-18): **exact** homogeneous
+- `archive/benchmarks/gen1/benchmarks/L1-WAVE-01` Case 1 (CHE-18): **exact** homogeneous
   propagation. FFT-bin plane-wave eigenmodes propagated unpadded reproduce
   `u * exp(i k_z z)` with the exact `sqrt` dispersion relation to
   floating-point round-off -- max wrapped phase error `6.5e-6` rad at
@@ -56,7 +56,7 @@ commit (`d24bdf0`, tag `0.6.0`) and the probes in `probes/`.
   `+z` then `-z` round trip are all exact to `<= 5e-7`. This validates the
   phasor sign, the non-paraxial dispersion relation, the SI scaling, the axis
   order, and the grid centring with no approximation in the way.
-- `benchmarks/level1/L1-WAVE-01` Case 2 (CHE-18): ideal paraxial focusing of a
+- `archive/benchmarks/gen1/benchmarks/L1-WAVE-01` Case 2 (CHE-18): ideal paraxial focusing of a
   finite rectangular pupil with three signed tilts. The focus lands at
   `+f * theta` to within `0.055` input pixels, FWHM matches `0.8859 lambda f / L`
   to `1e-4` (x) and `1.3e-2` (y), and the `sinc^2` first-sidelobe ratio matches
@@ -70,7 +70,7 @@ and nothing else.
 
 ## Known defective: `high_na_ff_lens` (do not use for quantitative work)
 
-`benchmarks/level1/L1-WAVE-01` Case 3 attempted to validate the vectorial
+`archive/benchmarks/gen1/benchmarks/L1-WAVE-01` Case 3 attempted to validate the vectorial
 high-NA path against an independent float64 Richards–Wolf quadrature oracle
 and found the solver **not sampling-independent**. Refining only the pupil
 sampling, with wavelength, NA, focal length, output grid, and output pitch all

@@ -42,7 +42,7 @@ Absolute phase is deliberately not required
 -------------------------------------------
 ``|u|^2`` is invariant under a global phase, so a field from CHE-40's
 carrier-removed propagation path -- whose absolute phase is explicitly not
-physical -- is admissible here, and ``benchmarks/slice_protocol.yaml`` requires
+physical -- is admissible here, and ``benchmarks/protocols/slice_protocol.yaml`` requires
 that path for any phase-insensitive M3 PSF. The measurement records which path it
 consumed rather than inferring that the phase was meaningful.
 

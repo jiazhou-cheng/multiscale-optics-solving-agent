@@ -3,7 +3,7 @@
 This is the half of the benchmark that belongs in the default suite: the grader's
 staging, the taxonomy, the trial arithmetic, the context policy and the CLI's
 argument handling are all deterministic and cost milliseconds. The half that runs
-solvers and agents is `benchmarks_agent/`, opt-in by location.
+solvers and agents is `benchmarks/agents/`, opt-in by location.
 
 The split matters for one specific reason. The grader decides whether an agent
 passed, so a regression in *it* silently changes every score the benchmark has

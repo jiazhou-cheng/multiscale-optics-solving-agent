@@ -56,7 +56,7 @@ WAVELENGTH_UM = 0.55
 WAVELENGTH_M = 5.5e-7
 MM_PER_M = 1e-3
 
-# Frozen by M3.2 in benchmarks/slice_protocol.yaml, restated here as the plane a
+# Frozen by M3.2 in benchmarks/protocols/slice_protocol.yaml, restated here as the plane a
 # consumer declares. Read as literals on purpose: the point of the check is that
 # the consumer states the plane independently of the producer.
 SINGLET_PUPIL_Z_M = 0.06814345991561233 * MM_PER_M
@@ -305,7 +305,7 @@ def test_a_wrong_declaration_changes_the_reconstructed_field(
         np.linalg.norm(wrong_intensity - correct_intensity) / np.linalg.norm(correct_intensity)
     )
     # An order-unity change, not a tolerance-scale one. The gates in
-    # benchmarks/slice_protocol.yaml sit at 1e-3, so this is >100x any of them.
+    # benchmarks/protocols/slice_protocol.yaml sit at 1e-3, so this is >100x any of them.
     assert relative_l2 > 0.5, relative_l2
 
 
@@ -391,7 +391,7 @@ def test_probe_fixture_records_the_protocol_geometry_disagreement():
     saying so until amendment A2's correction is what the protocol carries."""
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
     frozen = {system["id"]: system["derived"] for system in protocol["systems"]}
     for sample, system_id in (
         ("M3SingletRef", "M3-SINGLET-REF"),

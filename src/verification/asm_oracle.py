@@ -2,7 +2,7 @@
 
 CHE-40 (M3.2A). M3.2 measured Chromatix's ``complex64`` cast against a float64
 angular-spectrum reference written inline in
-``benchmarks/probes/m3_slice_feasibility.py``. M3.2A needs the same reference
+``benchmarks/probes/slice_feasibility.py``. M3.2A needs the same reference
 from a probe *and* from tests, and needs it in two algebraically identical
 forms, so it is factored here rather than copied.
 

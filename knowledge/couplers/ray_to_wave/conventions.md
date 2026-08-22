@@ -151,7 +151,7 @@ is a kernel question with its own oracle, and it needs its own ticket — the sa
 disposition CHE-50 took. Any caller propagating a wide-angle spectrum through this
 kernel will meet it, and nothing in the kernel currently warns them.
 
-Evidence: `benchmarks/CHE70_METALENS_BRIDGE_REPORT.md` §6,
+Evidence: `benchmarks/reports/2026-08/metalens_bridge.md` §6,
 `tests/test_coherent_bridge.py::TestExactnessLimit`.
 
 ## Sign and orientation checklist
@@ -226,7 +226,7 @@ is linear in the transverse coordinate.
 | composes the field into a further propagation | **yes**, and `\|U\|²` will not warn it |
 
 Measured on `M3-SINGLET-REF`, on axis, 550 nm (CHE-38,
-`benchmarks/M3_9R_SENSOR_HANDOFF_REPORT.md` §5): ~`1.2 rad` of phase against an
+`benchmarks/reports/2026-08/sensor_handoff_convergence.md` §5): ~`1.2 rad` of phase against an
 exact spherical-wave reference at the 5-Airy-radius gate edge, while the
 intensity residual sits at `1e-3` and the complex-field residual (`~0.127`) is
 flat rather than convergent. PB7 (CHE-58) put three PSF routes on the Cooke

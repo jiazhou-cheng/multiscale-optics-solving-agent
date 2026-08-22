@@ -9,7 +9,7 @@ a predicted distance. An oracle that has not been checked against something it
 cannot get wrong is not an oracle.
 
 The rest read ``benchmarks/probes/records/m3_psf_verification.json``, recorded by
-``benchmarks/probes/m3_psf_verification.py`` against the real engines. Re-running
+``benchmarks/probes/psf_oracle_verification.py`` against the real engines. Re-running
 the full slice at six ray counts inside the test suite would cost minutes; the
 probe is the evidence and these assertions pin what it found -- including the two
 gate failures, which are pinned as failures so that a later change cannot quietly
@@ -115,7 +115,7 @@ def test_the_frozen_protocol_airy_radius_is_actually_the_diameter() -> None:
     """
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
     singlet = next(s for s in protocol["systems"] if s["id"] == "M3-SINGLET-REF")
     frozen_um = float(singlet["airy_radius_um"])
     na = float(singlet["derived"]["numerical_aperture"])

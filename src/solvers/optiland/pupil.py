@@ -363,7 +363,7 @@ def _resolve_ray_pupil_sampling(
     count, and the aperture radius -- not a ring index or a weight. The actual
     quadrature math (`couplers.quadrature`) is coupler
     physics, not adapter physics, and this module must import no coupler: the
-    M1 independence check (`benchmarks/level1/L1-RAY-01`) asserts that tracing
+    M1 independence check (`archive/benchmarks/gen1/benchmarks/L1-RAY-01`) asserts that tracing
     a ray bundle loads no `couplers.*` module, and an
     import here would violate that for every caller of this adapter, not only
     CHE-47's. `optiland_handoff.py` (already coupler-side) computes the ring

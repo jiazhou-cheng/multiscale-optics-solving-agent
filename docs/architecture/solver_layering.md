@@ -1,7 +1,10 @@
 # The solver tier — Physics Solver, Knowledge, Adapter
 
-**Issue:** unassigned (report requested directly; file a CHE issue before merge)
-**Date:** 2026-08-20
+**Status: the canonical architecture document for this repository.** Promoted by
+CHE-93. `README.md` orients a new reader; `AGENTS.md` states the rules; this
+states how the pieces fit and which file wins when two disagree.
+
+**Date:** 2026-08-20, with the gap list updated as CHE-84's phases closed each one
 **Stance:** normative for the solver tier, with a gap list (§8)
 **Scope:** the solver tier only. Couplers, artifacts, the registry schema and the
 graph get a pointer in §9, not a description.
@@ -629,7 +632,23 @@ Ordered. Each step's output is the next step's input, and the registry entry is
 ## 8. Gaps and recommendations
 
 Each item: what, the evidence, and the options. All were verified while writing
-this report. None is fixed here.
+this report, and none was fixed *by* it. Five of the six have since been closed
+by CHE-84's phases; the status line on each says which.
+
+| Gap | Status | Closed by |
+| -- | -- | -- |
+| 1 — "capabilities" names two layers | open | CHE-92 renames `capability_notes.md` |
+| 2 — device/dtype claims in three places | **partially resolved** | CHE-87 closed the registry half; the card half is CHE-92 |
+| 3 — two knowledge tiers, already drifted | open | CHE-92 collapses them to one card |
+| 4 — a stale `not_yet_probed` entry | open | CHE-92 |
+| 5 — the three tiers disagree on scope | **resolved** | CHE-87 |
+| 6 — `validation_status` has no executable meaning | open | CHE-92 constrains it to the ladder |
+
+The pattern in what closed and what did not is worth naming: the gaps that were
+about **executable declarations** were closable by deleting or enforcing, and
+the four still open are all about **prose that restates an executable
+declaration**. That is one problem with four faces, and CHE-92 addresses it by
+removing the restatement rather than by policing it.
 
 ### Gap 1 — "capabilities" is one word for two layers
 

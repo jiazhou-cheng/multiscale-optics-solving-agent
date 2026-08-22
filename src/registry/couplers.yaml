@@ -156,7 +156,7 @@ couplers:
         neglects gradients associated with changes in the sampled directions, so
         it is a deliberately biased estimator of the true derivative. CHE-28
         measures that bias; verified stays false until the evidence named in
-        benchmarks/coupler_protocol.yaml exists.
+        benchmarks/protocols/coupler_protocol.yaml exists.
     validity:
       assumptions:
         - Scalar, monochromatic, fully coherent field on a planar tangent patch.

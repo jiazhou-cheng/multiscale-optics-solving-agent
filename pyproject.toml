@@ -82,7 +82,7 @@ include = ["agent*", "core*", "couplers*", "registry*", "solvers*", "studies*", 
 #     33 min of pinned-dependency regression, so opting *in* is the safe default.
 #   * `archive/tests/<generation>/` -- historical tests, also blocked by
 #     `norecursedirs` below and by a hard abort in each generation's conftest.
-#   * `benchmarks_agent/` -- the CHE-71 V1 agent benchmark (`make test-agent-benchmark`).
+#   * `benchmarks/agents/` -- the CHE-71 V1 agent benchmark (`make test-agent-benchmark`).
 testpaths = ["tests"]
 # The pytest defaults, plus the two opt-in trees. Listing the defaults is
 # required: this key replaces them rather than extending them.
@@ -101,7 +101,7 @@ norecursedirs = [
   # default suite is a required gate. Opt in by naming the directory. Its
   # *harness* is unit-tested in `tests/test_agent_benchmark.py`, which does run by
   # default and is deterministic.
-  "benchmarks_agent",
+  "benchmarks/agents",
   "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
 ]
 addopts = "-ra"

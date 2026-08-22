@@ -668,7 +668,7 @@ def test_standalone_empty_or_nonfinite_output_is_structured(tmp_path, bad_value)
 #
 # Two oracles are used deliberately, and they are independent of each other:
 #
-#   * benchmarks/slice_protocol.yaml -- M3.2's frozen exit-pupil geometry.
+#   * benchmarks/protocols/slice_protocol.yaml -- M3.2's frozen exit-pupil geometry.
 #     Read here from the protocol file, not from the probe fixture, so the
 #     export is checked against the milestone's own declared numbers.
 #   * knowledge/solvers/optiland/expected/exit_pupil_handoff.json -- recorded by
@@ -688,14 +688,14 @@ _M3_SYSTEMS = [
 
 
 def _frozen_protocol_system(protocol_system_id: str) -> dict:
-    """The `derived` block M3.2 froze for one system in benchmarks/slice_protocol.yaml."""
+    """The `derived` block M3.2 froze for one system in benchmarks/protocols/slice_protocol.yaml."""
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
     for entry in protocol["systems"]:
         if entry["id"] == protocol_system_id:
             return entry["derived"]
-    raise AssertionError(f"{protocol_system_id!r} is not in benchmarks/slice_protocol.yaml")
+    raise AssertionError(f"{protocol_system_id!r} is not in benchmarks/protocols/slice_protocol.yaml")
 
 
 def _exported(sample: str, handoff_plane: str | None, output_directory) -> tuple:

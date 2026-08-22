@@ -3,7 +3,7 @@
 # CHE-31 (M3.2) reconciled this file with what M3 actually executes. It was
 # written before any of it was implemented and declared several things nothing
 # in the repository does; those are now marked M4 rather than left to read as
-# capability. The frozen configuration lives in benchmarks/slice_protocol.yaml
+# capability. The frozen configuration lives in benchmarks/protocols/slice_protocol.yaml
 # (M3-SLICE-CPU-V1) and is the source of truth for the numbers below.
 #
 # Executes in M3:  M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX
@@ -111,5 +111,5 @@ metadata:
     declared exit pupil, M1-verified Chromatix angular-spectrum propagation to
     focus, normalized PSF. Forward-only in M3.
   protocol_id: M3-SLICE-CPU-V1
-  protocol_path: benchmarks/slice_protocol.yaml
+  protocol_path: benchmarks/protocols/slice_protocol.yaml
   m3_issue: CHE-31
