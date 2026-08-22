@@ -54,7 +54,7 @@ sources:
     retrieved_at: "2026-08-19"
     usage_note: >
       CHE-57 (PB6) reproduced Chromatix 101 as repo-owned executable code
-      (knowledge/solvers/chromatix/tutorials/c00_chromatix_101.py). Every printed
+      (tests_tutorial/cases/chromatix/c00_chromatix_101.py). Every printed
       shape, dtype and dx reproduces exactly; the printed Field.power of 1.0000002
       does NOT (the pinned commit gives 1.0000118). Both are float32 normalisation
       residue of a 512x512 plane wave, so the page was built from a different
@@ -69,7 +69,7 @@ sources:
       in the landing page's hrefs. Seven of the ticket's titles do not match their
       live URL slugs (sas, bandlimited_angular_spectrum, rescaled_propagation, dmd,
       polarized_multislice, highNA_PSF, modified_born) -- the mapping is recorded in
-      knowledge/solvers/chromatix/tutorials/README.md. All fifteen were located and
+      tests_tutorial/cases/chromatix/README.md. All fifteen were located and
       reproduced; none was out of scope.
 
   - url: https://github.com/chromatix-team/chromatix/tree/main/docs/examples

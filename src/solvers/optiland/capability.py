@@ -202,7 +202,7 @@ def capability_problems(request: ModelRunRequest) -> list[tuple[str, str]]:
                     "parameter paths this adapter has validated (only "
                     "'surfaces.surfaces[<index>].geometry.radius' on the "
                     "selected sample lens, matching "
-                    "knowledge/solvers/optiland/probes/gradient_probe.py).",
+                    "benchmarks/probes/optiland/gradient_probe.py).",
                 )
             )
 

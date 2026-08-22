@@ -6,7 +6,7 @@ in the same shape as a `knowledge/solvers/<name>/` pack:
 
 ```
 <direction>/
-  coupler_card.yaml     routing-critical facts, validation status, what is NOT verified
+  card.yaml     routing-critical facts, validation status, what is NOT verified
   theory.md             the governing equations, transcribed with their source labels
   conventions.md        units, axes, frame, phase sign, normalization, reference plane
   failure_guide.md      how it breaks, what the diagnostic must say
@@ -39,5 +39,5 @@ the limit of complete sampling, which is what makes a round trip a usable test.
 1. `theory.md` — what the transformation is.
 2. `conventions.md` — what the symbols mean in this repository's frame. This is
    where a coupler goes wrong in practice, not in the algebra.
-3. `coupler_card.yaml` — what has actually been verified, and what has not.
+3. `card.yaml` — what has actually been verified, and what has not.
 4. `failure_guide.md` — before debugging a surprising result.

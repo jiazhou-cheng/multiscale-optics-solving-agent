@@ -23,8 +23,8 @@ here because tests patch them at this path, and a patch target is part of a
 module's contract even when the name is private. The conventions below apply to
 the integration as a whole, not only to this file.
 
-Grounded in ``knowledge/solvers/optiland/`` (``solver_card.yaml``,
-``conventions.md``, ``capability_notes.md``, ``api_minimal_examples.md``,
+Grounded in ``knowledge/solvers/optiland/`` (``card.yaml``,
+``conventions.md``, ``usage_notes.md``, ``api_minimal_examples.md``,
 ``failure_guide.md``) and the probes/expected fixtures under that directory,
 all captured against the ``agent_solver`` container on 2026-07-30. Nothing
 below relies on training-data memory of an older/different Optiland API.
@@ -61,7 +61,7 @@ while a P0 model/coupler lacks tests")
 - Only one design-parameter path is supported for the differentiable
   (torch-backend) case: ``surfaces.surfaces[<index>].geometry.radius`` on the
   selected sample lens, matching
-  ``knowledge/solvers/optiland/probes/gradient_probe.py`` exactly. This is
+  ``benchmarks/probes/optiland/gradient_probe.py`` exactly. This is
   narrower than the registry's ``derivative.parameters: ["*"]`` claim in
   ``registry/models.yaml`` -- that field describes an aspiration for the
   model class in general, not a guarantee that this adapter implementation
@@ -102,7 +102,7 @@ Consequently:
   called ``set_precision`` at all while reporting ``dtype: 'float64'`` in its
   diagnostics, so **every torch-backend run traced in float32 under a float64
   label**. The recorded gradient-probe evidence in
-  ``knowledge/solvers/optiland/expected/gradient_probe.json`` is therefore the
+  ``benchmarks/probes/records/optiland/gradient_probe.json`` is therefore the
   float32 path, and ``config['dtype']='float32'`` reproduces it bit-identically;
   the float64 default now genuinely runs float64 and differs from that record by
   1.3e-05 relative on the objective and 2.3e-06 on the gradient
@@ -122,7 +122,7 @@ Consequently:
   hold a live tensor with an attached autograd graph.
 - The one gradient path this adapter exposes has a directional-derivative
   relative error of 1.11e-03 against centered finite difference (see
-  ``knowledge/solvers/optiland/expected/gradient_probe.json``), looser than
+  ``benchmarks/probes/records/optiland/gradient_probe.json``), looser than
   every JAX-based solver in this repository and not yet root-caused.
   ``registry/models.yaml`` already declares ``derivative.verified: false``
   for ``M_RAY_OPTILAND``; nothing in this adapter changes that, and this
@@ -521,7 +521,7 @@ class OptilandAdapter:
                 "mean(x^2 + y^2) over traced rays at the requested field point "
                 "-- an RMS-spot-size proxy, the only design_parameter -> "
                 "objective path characterized for this adapter "
-                "(knowledge/solvers/optiland/probes/gradient_probe.py)."
+                "(benchmarks/probes/optiland/gradient_probe.py)."
             )
             # Kept undetached on purpose (repository scientific-contract requirements): a
             # caller needing the gradient must call .backward() on this exact

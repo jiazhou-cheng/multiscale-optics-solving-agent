@@ -13,7 +13,7 @@ Why the builder validates before it constructs
 Optiland's ``GeometryFactory.create`` filters ``**kwargs`` down to the fields of
 the geometry config it selected, so a prescription key that does not belong to
 the chosen surface type is **discarded with no error at all** -- measured in
-``knowledge/solvers/optiland/probes/system_construction_probe.py``, case
+``benchmarks/probes/optiland/system_construction_probe.py``, case
 ``surface_kwargs_are_silently_filtered``. Passing a prescription straight
 through would therefore convert a caller's mistake into a silently different
 optical system. Every mapping below is explicit: the surface type is chosen

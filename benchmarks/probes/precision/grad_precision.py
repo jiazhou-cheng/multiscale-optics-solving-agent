@@ -2,7 +2,7 @@
 
 Quantifies what changed when the adapter started calling ``set_precision``
 explicitly. The recorded probe evidence in
-``knowledge/solvers/optiland/expected/gradient_probe.json`` was captured without
+``benchmarks/probes/records/optiland/gradient_probe.json`` was captured without
 that call, i.e. at Optiland's torch default of float32, so:
 
 * ``declared_float32`` reproduces the record bit-identically (relative error 0);

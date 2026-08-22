@@ -13,7 +13,7 @@ nodes:
 metadata:
   description: >-
     Single-node forward-only smoke graph for M_RAY_OPTILAND, mirroring
-    knowledge/solvers/optiland/probes/raytrace_probe.py: the bundled
+    benchmarks/probes/optiland/raytrace_probe.py: the bundled
     ReverseTelephoto sample lens traced on the default (non-differentiable)
     numpy backend. No edges, design variables, or objectives -- this graph
     only exercises node/model validation against the packaged registry.

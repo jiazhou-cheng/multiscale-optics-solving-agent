@@ -25,10 +25,10 @@ Units (fixed by the schema contract; CHE-12 established the Optiland side)
 - Even-asphere coefficient ``coefficients[i]`` multiplies ``r**(2*(i+1))`` with
   ``r`` in millimetres, so its unit is ``mm**(1 - 2*(i+1))``. The series starts
   at ``r**2``, verified to 5.6e-17 mm against an independent evaluation in
-  ``knowledge/solvers/optiland/probes/system_construction_probe.py``.
+  ``benchmarks/probes/optiland/system_construction_probe.py``.
 - Wavelengths are **micrometres**.
 - Grating period is **micrometres** -- deliberately *not* the geometry unit.
-  ``knowledge/solvers/optiland/probes/system_construction_probe.py`` establishes
+  ``benchmarks/probes/optiland/system_construction_probe.py`` establishes
   this by reproducing ``sin(theta_m) = m * lambda / d`` exactly for three
   periods; the millimetre reading is wrong by 1000x.
 - Angular field coordinates are **degrees**; grating groove orientation is
@@ -298,7 +298,7 @@ class GratingInteractionSpec(_Frozen):
     with the surrounding millimetre geometry; ``groove_orientation_rad`` is
     radians, and at 0 the grating vector points along +y so the diffracted
     order is deviated in y. Both established by
-    ``knowledge/solvers/optiland/probes/system_construction_probe.py``.
+    ``benchmarks/probes/optiland/system_construction_probe.py``.
     """
 
     kind: Literal[InteractionKind.GRATING] = InteractionKind.GRATING
@@ -368,7 +368,7 @@ class CatalogMaterialSpec(_Frozen):
     then by Levenshtein similarity, returning the best row -- so ``SK15``
     resolves to HIKARI while ``N-SK10`` resolves to SCHOTT, and up to seven rows
     survive the filter before scoring
-    (``knowledge/solvers/optiland/probes/system_construction_probe.py``). A
+    (``benchmarks/probes/optiland/system_construction_probe.py``). A
     prescription that records only the name has therefore not pinned its glass.
 
     ``catalog`` narrows the search the way the solver's own ``reference``

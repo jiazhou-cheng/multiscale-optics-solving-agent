@@ -75,7 +75,7 @@ solver imports inside adapter modules"). For the coupler core this is not a
 convention but an assertion: `tests/test_ray_to_wave.py` contains both
 `test_coupler_core_imports_no_solver_engine` (an AST walk of the module) and
 `test_coupler_core_loads_no_engine_at_runtime` (a `sys.modules` check). The
-reason is stated in `knowledge/couplers/ray_to_wave/coupler_card.yaml`:
+reason is stated in `knowledge/couplers/ray_to_wave/card.yaml`:
 
 > The coupler core is the physics under test, so it imports neither optiland
 > nor chromatix. […] if the core could import one, a coupler defect could be
@@ -96,13 +96,13 @@ from its wrapper at `:252` "so tests can force an `ImportError`").
 **(c) A pin is a physics claim, not hygiene.** Two measured reasons, one per
 solver:
 
-- Chromatix — `knowledge/solvers/chromatix/solver_card.yaml:15-20`:
+- Chromatix — `knowledge/solvers/chromatix/card.yaml:15-20`:
   > The PyPI package literally named "chromatix" (0.0.1, published 2022-07-10,
   > 2.6 kB wheel) is an unrelated namesquat with no optics code. `pip install
   > chromatix` alone silently installs the wrong package.
 - Optiland — `torch` is not a declared dependency even though the project
   advertises PyTorch differentiability, so a bare install is silently
-  non-differentiable (`knowledge/solvers/optiland/solver_card.yaml:15-21`,
+  non-differentiable (`knowledge/solvers/optiland/card.yaml:15-21`,
   confirmed via installed wheel metadata). `docker/Dockerfile:43` therefore
   installs `torch==2.13.0` separately from the CPU-only wheel index.
 
@@ -213,14 +213,15 @@ component, in both directions:
 *good for* and what must not be assumed of it. Not machine-actionable, and
 deliberately so: most of it cannot be expressed as a dtype set.
 
-**Files.** `knowledge/solvers/<name>/capability_notes.md`, sections
+**Files.** `knowledge/solvers/<name>/usage_notes.md`, sections
 `## Use Optiland for` (`:6`), `## Do not assume (per repository
 scientific-contract requirements)` (`:54`), `## Not yet exercised in this
 repository` (`:78`), `## Confirmed NOT trustworthy in the pinned version`
-(`:144`); plus the flat routing card `knowledge/solver_cards/<name>.yaml` with
-`agent_should_use_for` / `agent_should_not_assume`.
+(`:144`); plus `agent_should_use_for` / `agent_should_not_assume` on the card.
+Those two lived on a separate flat routing card until CHE-92 merged the two card
+tiers into one (Gap 3).
 
-**The example worth citing**, `knowledge/solver_cards/optiland.yaml:41`:
+**The example worth citing**, `knowledge/solvers/optiland/card.yaml`:
 
 ```yaml
 agent_should_not_assume:
@@ -249,11 +250,11 @@ answer.
 
 **Files.** `knowledge/solvers/<name>/conventions.md` (Optiland's is 534 lines /
 21 sections; Chromatix's 361 / 16) plus the machine-readable mirror in
-`solver_card.yaml` for the conventions a consumer must act on.
+`card.yaml` for the conventions a consumer must act on.
 
 **Worked example — `RealRays.opd`**, the best one in the repo, established by
 CHE-30 and extended by CHE-41
-(`knowledge/solvers/optiland/solver_card.yaml:206+`):
+(`knowledge/solvers/optiland/card.yaml:206+`):
 
 ```yaml
 opd_convention:
@@ -318,7 +319,7 @@ And where a convention is genuinely unknown, it is refused rather than defaulted
 **The sign trap, in one line.** Optiland's own wavefront code reports
 `opd_ref - opd` (chief-minus-ray), the reverse of this repo's evaluator
 convention: "A consumer that mixes the two conjugates the wavefront"
-(`solver_card.yaml::opd_convention.wavefront_sign_note`).
+(`card.yaml::opd_convention.wavefront_sign_note`).
 
 ### 3.3 Constraints
 
@@ -327,7 +328,7 @@ the distinction is load-bearing: what is **known false or hazardous**, and what
 has simply **never been tried**. Collapsing them turns an untested path into an
 implied guarantee.
 
-Fields in `solver_card.yaml`, each with a real example:
+Fields in `card.yaml`, each with a real example:
 
 - **`package_reported_unverified_regimes`** — the package claims it, we have not
   seen it. Optiland: "the NumPy backend on any device other than 'cpu' --
@@ -336,7 +337,7 @@ Fields in `solver_card.yaml`, each with a real example:
   an OPL here spans ~1e4 waves". Chromatix: "TPU execution. `jax.devices()`
   reports no TPU on this host and none has ever been attempted; **the package
   claims one and this project does not**."
-- **`not_yet_probed`** (`optiland/solver_card.yaml:473`) — the honest unknowns:
+- **`not_yet_probed`** (`optiland/card.yaml:473`) — the honest unknowns:
   "TPU. Never attempted"; "an off-axis field in x, or in both axes at once
   (CHE-41 used y only and did so deliberately, because a one-axis field is what
   makes the transpose control non-vacuous)".
@@ -344,7 +345,7 @@ Fields in `solver_card.yaml`, each with a real example:
   "`GeometryFactory.create` silently DISCARDS kwargs that are not fields of the
   selected geometry config"; "`grating_period` shares the wavelength's unit (um),
   not the geometry's (mm) -- a 1000x trap"; "`Material('SK1')` returns SK16".
-- **`known_defective`** (`chromatix/solver_card.yaml:145`) — present in the
+- **`known_defective`** (`chromatix/card.yaml:145`) — present in the
   package, wrong in the pinned commit. `high_na_ff_lens` is not
   sampling-independent: refining only the pupil sampling moved the `|E_z|` ring
   radius from 246 to 2536 nm against a Richards-Wolf oracle converged to 2e-14,
@@ -425,9 +426,9 @@ decorative:
 > the card's explicit `not_yet_probed` list against the intended task.
 
 Current values: Optiland `environment_verified`
-(`solvers/optiland/solver_card.yaml:497`); Chromatix `environment_verified` on
+(`solvers/optiland/card.yaml:497`); Chromatix `environment_verified` on
 the flat card but `analytically_validated_scalar_asm_cpu` on the deep card
-(`solvers/chromatix/solver_card.yaml:258`) — a value not on the ladder. See gaps
+(`solvers/chromatix/card.yaml:258`) — a value not on the ladder. See gaps
 3 and 6 (§8).
 
 ## 4. Layer 3 — API / Adapter
@@ -532,7 +533,7 @@ file that satisfies each item:
 | Requirement | Satisfied by |
 |---|---|
 | typed request and result contract | `optiland_adapter.py:280-330` |
-| pinned version, one import probe, one minimal forward probe | `docker/requirements.txt:104`; `knowledge/solvers/optiland/probes/{import_probe,raytrace_probe}.py` |
+| pinned version, one import probe, one minimal forward probe | `docker/requirements.txt:104`; `benchmarks/probes/optiland/{import_probe,raytrace_probe}.py` |
 | explicit conventions and supported devices/dtypes | `knowledge/solvers/optiland/conventions.md`; `core/capabilities.py:70-97` |
 | one analytic or independently reviewed validation case | L1-RAY-01 free-space + paraxial oracles (CHE-17); `opd_convention_probe` against closed-form geometries |
 | structured failure behavior | `OptilandRayFailure`, `HandoffPlaneError`, `UnsupportedCapabilityError` |
@@ -547,14 +548,14 @@ it.
 |---|---|---|---|
 | `docker/requirements.txt:104` | Solver | the pin | `optiland==0.6.0` |
 | `docker/Dockerfile:43` | Solver | the opt-in differentiability dependency | `pip install --index-url .../whl/cpu torch==2.13.0` |
-| `knowledge/solver_cards/optiland.yaml` | Knowledge (routing) | 45-line card an agent reads *first*: role, install hazard, `agent_should_not_assume`, `required_probes`, pointer to the deep pack | `- exported ray weight is already a coherent field amplitude` |
-| `knowledge/solvers/optiland/solver_card.yaml` | Knowledge (facts) | 511 lines of routing-critical, machine-readable fact: `supported_regimes`, `opd_convention`, `exit_pupil_handoff`, `derivative`, `not_yet_probed`, `validation_status` | `piston_is_aperture_dependent: true` |
+| `knowledge/solvers/optiland/card.yaml` | Knowledge | the one card: role, install hazard, conventions, `agent_should_not_assume`, `not_yet_probed`. Merged with the deleted flat routing card by CHE-92 | `- exported ray weight is already a coherent field amplitude` |
+| `knowledge/solvers/optiland/card.yaml` | Knowledge (facts) | 511 lines of routing-critical, machine-readable fact: `supported_regimes`, `opd_convention`, `exit_pupil_handoff`, `derivative`, `not_yet_probed`, `validation_status` | `piston_is_aperture_dependent: true` |
 | `knowledge/solvers/optiland/conventions.md` | Knowledge (conventions) | 534 lines / 21 sections: backend abstraction, units, torch float32 default, `RealRays.opd` | `## Torch backend precision defaults to float32 (CHE-57)` |
-| `knowledge/solvers/optiland/capability_notes.md` | Knowledge (guidance) | "Use Optiland for" / "Do not assume" / "Not yet exercised" / "Confirmed NOT trustworthy" | `## Do not assume (per repository scientific-contract requirements)` |
+| `knowledge/solvers/optiland/usage_notes.md` | Knowledge (guidance) | "Use Optiland for" / "Do not assume" / "Not yet exercised" / "Confirmed NOT trustworthy" | `## Do not assume (per repository scientific-contract requirements)` |
 | `knowledge/solvers/optiland/api_minimal_examples.md` | Knowledge (guidance) | 12 executed snippets with captured outputs | `# rays.x.shape == (817,)  -- NOT 16` |
 | `knowledge/solvers/optiland/failure_guide.md` | Knowledge (guidance) | 448 lines, symptom-keyed, observed failures only | `## Optic.draw3D() never returns` |
-| `knowledge/solvers/optiland/probes/` + `expected/` | Knowledge (evidence) | 8 probe/JSON pairs — the executable substrate every card claim cites | `opd_convention_probe.py` → `opd_convention_probe.json` |
-| `knowledge/solvers/optiland/tutorials/` | Knowledge (dependency gate) | 41 reproductions, 459 declared checks; run by `tests_tutorial/` | `t10_differentiable_ray_tracing.py` |
+| `benchmarks/probes/optiland/` + `expected/` | Knowledge (evidence) | 8 probe/JSON pairs — the executable substrate every card claim cites | `opd_convention_probe.py` → `opd_convention_probe.json` |
+| `tests_tutorial/cases/optiland/` | Knowledge (dependency gate) | 41 reproductions, 459 declared checks; run by `tests_tutorial/` | `t10_differentiable_ray_tracing.py` |
 | `core/capabilities.py:70-97` | Capability declaration | the authoritative device/dtype/namespace claim + its evidence string | `device_namespaces={DeviceKind.CUDA: frozenset({ArrayNamespace.TORCH})}` |
 | `registry/models.yaml:53-54` | Registry (reflection) | the graph planner's view, held equal to the above by test | `devices: [cpu, gpu]` / `dtypes: [float32, float64]` |
 | `registry/prescriptions.py` | Project data | canonical named optical systems, so "adding a system" is data not code | `M3-SINGLET-REF` |
@@ -574,14 +575,14 @@ we have measured to be defective.
 | Path | Layer | What it holds | One real line |
 |---|---|---|---|
 | `docker/requirements.txt:57` | Solver | the pin — a commit, not a version, because of the namesquat | `chromatix @ git+…@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee` |
-| `knowledge/solver_cards/chromatix.yaml` | Knowledge (routing) | flat card; `pypi_name_is_a_namesquat: true`, `required_probes` with done/not-done | `- Airy-pattern analytic comparison  # not yet done` |
-| `knowledge/solvers/chromatix/solver_card.yaml` | Knowledge (facts) | 275 lines: `install_hazard`, `precision_verdict_che61`, `known_defective`, `m3_pupil_to_focus`, `not_yet_probed` | `install_hazard: … an unrelated namesquat with no optics code` |
+| `knowledge/solvers/chromatix/card.yaml` | Knowledge | the one card; `pypi_name_is_a_namesquat: true`, `not_yet_probed` | `- Airy-pattern analytic comparison` |
+| `knowledge/solvers/chromatix/card.yaml` | Knowledge (facts) | 275 lines: `install_hazard`, `precision_verdict_che61`, `known_defective`, `m3_pupil_to_focus`, `not_yet_probed` | `install_hazard: … an unrelated namesquat with no optics code` |
 | `knowledge/solvers/chromatix/conventions.md` | Knowledge (conventions) | 361 lines / 16 sections; note the two entries that exist only because a name lies | `## kykx means two different things (CHE-57)` |
-| `knowledge/solvers/chromatix/capability_notes.md` | Knowledge (guidance) | plus a dedicated defect section | `## Known defective: high_na_ff_lens (do not use for quantitative work)` |
+| `knowledge/solvers/chromatix/usage_notes.md` | Knowledge (guidance) | plus a dedicated defect section | `## Known defective: high_na_ff_lens (do not use for quantitative work)` |
 | `knowledge/solvers/chromatix/api_minimal_examples.md` | Knowledge (guidance) | 12 executed sections incl. vector fields and the full-wave solver | `# component order is (E_z, E_y, E_x) -- the REVERSE of this project's convention` |
 | `knowledge/solvers/chromatix/failure_guide.md` | Knowledge (guidance) | 363 lines; the first entry is the install trap | `## pip install chromatix installs the wrong package` |
-| `knowledge/solvers/chromatix/probes/` + `expected/` | Knowledge (evidence) | incl. `m3_pupil_to_focus.py` — whose *test* was archived by CHE-67, so the probe still runs but nothing guards the convention | `tests: … ARCHIVED by CHE-67 and not runnable` |
-| `knowledge/solvers/chromatix/tutorials/` | Knowledge (dependency gate) | 16 reproductions, 205 declared checks | — |
+| `benchmarks/probes/chromatix/` + `expected/` | Knowledge (evidence) | incl. `m3_pupil_to_focus.py` — whose *test* was archived by CHE-67, so the probe still runs but nothing guards the convention | `tests: … ARCHIVED by CHE-67 and not runnable` |
+| `tests_tutorial/cases/chromatix/` | Knowledge (dependency gate) | 16 reproductions, 205 declared checks | — |
 | `core/capabilities.py:100-135` | Capability declaration | FP32-only, `lossy_input_dtypes={COMPLEX128}` — the FP32 floor of the whole stack | `precisions=frozenset({Precision.FP32})` |
 | `registry/models.yaml:146-147` | Registry (reflection) | `tpu` deliberately absent: "nothing has executed there" | `devices: [cpu, gpu]` / `dtypes: [complex64]` |
 | `solvers/chromatix/adapter.py` | Adapter | `MODEL_ID` (`:159`), lazy import (`:220`), conventions as request fields, `WaveHandoffError` | `MODEL_ID = "M_WAVE_CHROMATIX"` |
@@ -603,15 +604,15 @@ Ordered. Each step's output is the next step's input, and the registry entry is
 
 1. **Pin it** in `docker/requirements.txt` (version *or* commit — commit if the
    name is ambiguous anywhere), and record any install hazard.
-2. **Import probe** → `knowledge/solvers/<name>/probes/import_probe.py` +
-   `expected/import_probe.json`.
-3. **Flat routing card** `knowledge/solver_cards/<name>.yaml` at
-   `validation_status: unvalidated`, with `agent_should_not_assume` and
-   `required_probes`. The solver is now planning-only, and nothing may execute it
-   unattended.
+2. **Import probe** → `benchmarks/probes/<name>/import_probe.py` +
+   `benchmarks/probes/records/<name>/import_probe.json`.
+3. **Card** `knowledge/solvers/<name>/card.yaml` at
+   `validation_status: unvalidated`, with `agent_should_not_assume` and a
+   `not_yet_probed` list. The solver is now planning-only, and nothing may
+   execute it unattended.
 4. **Conventions probe** — units, axes, sign, normalization, reference plane —
    then write `conventions.md` and the machine-readable mirror in
-   `solver_card.yaml`. Unknowns are recorded as unknown, not defaulted.
+   `card.yaml`. Unknowns are recorded as unknown, not defaulted.
 5. **Minimal forward probe** + captured `expected/*.json`, then
    `api_minimal_examples.md` with the real outputs pasted in.
 6. **Capability probe** under `benchmarks/probes/precision/` — devices,
@@ -637,7 +638,7 @@ by CHE-84's phases; the status line on each says which.
 
 | Gap | Status | Closed by |
 | -- | -- | -- |
-| 1 — "capabilities" names two layers | open | CHE-92 renames `capability_notes.md` |
+| 1 — "capabilities" names two layers | open | CHE-92 renames `usage_notes.md` |
 | 2 — device/dtype claims in three places | **partially resolved** | CHE-87 closed the registry half; the card half is CHE-92 |
 | 3 — two knowledge tiers, already drifted | open | CHE-92 collapses them to one card |
 | 4 — a stale `not_yet_probed` entry | open | CHE-92 |
@@ -650,39 +651,52 @@ the four still open are all about **prose that restates an executable
 declaration**. That is one problem with four faces, and CHE-92 addresses it by
 removing the restatement rather than by policing it.
 
-### Gap 1 — "capabilities" is one word for two layers
+### Gap 1 — "capabilities" is one word for two layers — **RESOLVED (CHE-92)**
+
+Resolved by taking option (b) *and* (a): `capability_notes.md` is now
+`usage_notes.md`, and each side cross-references the other. One meaning per
+word beats a convention that both files have to remember.
+
 
 **What.** `core/capabilities.py` (executable, authoritative) and
-`knowledge/solvers/*/capability_notes.md` (prose, advisory) share a name and have
+`knowledge/solvers/*/usage_notes.md` (prose, advisory) share a name and have
 no cross-reference beyond a comment.
 
 **Evidence.** `capabilities.py` never mentions the knowledge packs;
-`capability_notes.md` never mentions `capabilities.py`. The only link is a comment
-inside `solver_card.yaml`.
+`usage_notes.md` never mentions `capabilities.py`. The only link is a comment
+inside `card.yaml`.
 
 **Options.** (a) Adopt *capability declaration* vs *capability guidance* as
 project vocabulary and add one pointer line to each file — cheap, no code change.
-(b) Rename `capability_notes.md` to `usage_notes.md`. (a) is enough.
+(b) Rename `usage_notes.md` to `usage_notes.md`. (a) is enough.
 
-### Gap 2 — device/dtype claims live in three places; only two are enforced — **PARTIALLY RESOLVED (CHE-87)**
+### Gap 2 — device/dtype claims live in three places; only two are enforced — **RESOLVED (CHE-87, CHE-92)**
 
-CHE-87 closed the half of this that was a *scope* problem: there is no longer a
-registry entry without a capability declaration, and the equality check now
-covers every entry rather than an `_OWNED` subset. What remains is the third
-place — `knowledge/solvers/*/solver_card.yaml`'s restated `devices_tested` /
-`dtypes_validated_for_m1` / `precision_verdict_che61` tables, still unchecked.
-CHE-92 demotes them to pointers, which removes the drift surface instead of
-policing it.
+CHE-87 closed the half that was a *scope* problem: there is no longer a registry
+entry without a capability declaration, and the equality check covers every
+entry rather than an `_OWNED` subset. CHE-92 closed the rest by **deleting the
+third copy**: the cards' `devices_tested`, `dtypes_validated_for_m1` and
+`precision_verdict_che61` tables are gone, replaced by a `capabilities:` pointer
+at the authoritative declaration, and
+`tests/test_solver_knowledge_pack.py` fails a card that restates one.
+
+What the cards keep is what a device/dtype table cannot say: that CUDA is
+torch-backend-only, so choosing a device is not independent of choosing a
+backend; that the torch backend defaults to float32 while numpy defaults to
+float64, which once produced float32 traces under a float64 label; and that
+XLA:GPU computes complex64 matmuls in TF32 by default, 1500x less accurately,
+with the array still reporting `dtype=complex64`. Those are consequences, not
+claims of support, and removing them would have been the lossy kind of cleanup.
 
 **What.** The same claim is written in `core/capabilities.py`, in
-`registry/*.yaml`, and in `knowledge/solvers/*/solver_card.yaml`. Only the first
+`registry/*.yaml`, and in `knowledge/solvers/*/card.yaml`. Only the first
 pair is enforced.
 
 **Evidence.** `tests/test_registry_matches_capabilities.py` asserts equality
 between `capabilities.py` and the registry, per component. Nothing checks
-`solver_card.yaml`'s `devices_tested`, `dtypes_validated_for_m1` or
+`card.yaml`'s `devices_tested`, `dtypes_validated_for_m1` or
 `precision_verdict_che61` — even though the YAML itself concedes authority
-(`optiland/solver_card.yaml:176-179`: "the authoritative machine-readable table is
+(`optiland/card.yaml:176-179`: "the authoritative machine-readable table is
 `core/capabilities.py`, which `tests/test_registry_matches_capabilities.py` holds
 the registry to").
 
@@ -690,41 +704,44 @@ the registry to").
 (b) Extend the test to cover the cards. (a) is smaller and removes the drift
 surface rather than policing it.
 
-### Gap 3 — two knowledge tiers, no consistency check, and they have already drifted
+### Gap 3 — two knowledge tiers, already drifted — **RESOLVED (CHE-92)**
 
-**What.** Every solver has a flat routing card *and* a deep pack card. The
-duplication is deliberate ("This supplements, and does not replace,
-`knowledge/solver_cards/optiland.yaml`") but unguarded, and three disagreements
-exist today.
+**What it was.** Every solver had a flat routing card *and* a deep pack card.
+The duplication was declared deliberate — "This supplements, and does not
+replace, `knowledge/solver_cards/optiland.yaml`" — and guarded by nothing, and
+three disagreements existed:
 
-**Evidence.**
-
-1. `knowledge/solver_cards/optiland.yaml:48` lists
-   `- wavefront/OPD export convention  # not done`, while
-   `knowledge/solvers/optiland/solver_card.yaml:206` records
-   `opd_convention: {status: verified, verified_by: CHE-30}`. These may be
-   different claims — the *export* path versus the accumulator convention — which
-   is exactly why one disambiguating line is needed.
-2. `knowledge/solvers/optiland/capability_notes.md:75` still says: "That
-   `RealRays.opd` is absolute OPL or piston-removed OPD. Its reference and sign
-   remain unverified" — contradicted by CHE-30, which established
+1. The flat Optiland card listed `- wavefront/OPD export convention  # not done`
+   while the deep card recorded `opd_convention: {status: verified}`.
+2. `usage_notes.md` said `RealRays.opd`'s "reference and sign remain unverified",
+   contradicted by the probe that established
    `quantity: absolute_optical_path_length` and the sign.
-3. Chromatix's `validation_status` is `environment_verified` on the flat card and
-   `analytically_validated_scalar_asm_cpu` on the deep card.
+3. Chromatix's `validation_status` was `environment_verified` on the flat card
+   and `analytically_validated_scalar_asm_cpu` on the deep one.
 
-Note the asymmetry: `tests/test_coupler_knowledge_pack.py` guards evidence honesty
-for *couplers*. There is no solver equivalent.
+All three drifted in the direction of **understating** what was verified, which
+wastes effort rather than causing errors — and is the harder failure to notice,
+because nothing goes wrong.
 
-**Options.** (a) Add `tests/test_solver_knowledge_pack.py` mirroring the coupler
-test. (b) Collapse the flat cards into a generated index. (a) first — the drift is
-already real, and it is in the direction of *understating* what has been verified,
-which wastes work.
+**How it was resolved.** Both recorded options, taken together. The deep card
+absorbed the flat one and `knowledge/solver_cards/` is gone, so there is one
+card per component and no second place to disagree with. The asymmetry the gap
+also noted — coupler packs guarded for evidence honesty, solver packs not, and
+the solver cards being the ones that drifted — is closed by
+`tests/test_solver_knowledge_pack.py`, mirroring the coupler test.
 
-### Gap 4 — a stale `not_yet_probed` entry, which is a live defect
+### Gap 4 — a stale `not_yet_probed` entry, which is a live defect — **RESOLVED (CHE-92)**
+
+The stale entries were **removed**, not annotated as done. `knowledge/README.md`
+makes the list a gate on unattended execution, so an entry that says "outstanding
+(but actually cleared)" either blocks validated work or teaches the reader to
+discount the whole list. Both cards' GPU-suite entries are gone; the dedicated
+run is 48 passed in 69 s on one RTX A6000, re-confirmed 2026-08-22.
+
 
 **What.** Optiland's card still lists the GPU suite as outstanding.
 
-**Evidence.** `knowledge/solvers/optiland/solver_card.yaml:477`: "the gpu-marked
+**Evidence.** `knowledge/solvers/optiland/card.yaml:477`: "the gpu-marked
 suite since CHE-60. It is expected to pass and has not been re-run; a dedicated
 `./run.sh --gpu pytest -q -m gpu` pass is outstanding." `AGENTS.md` records
 CHE-72/CHE-73 revalidating it on 2026-08-20 — 48 passed in 70 s on one RTX A6000
@@ -780,13 +797,21 @@ unresolved phase/sign convention (energy closed to ~1e-7, the complex
 amplitude's sign did not match the Fresnel convention), and JAX-FEM's GPLv3
 licence against this project's MIT.
 
-### Gap 6 — `validation_status` has no executable meaning for solvers
+### Gap 6 — `validation_status` has no executable meaning for solvers — **RESOLVED (CHE-92)**
+
+Option (a). All four cards now carry one of the three ladder values, and the
+qualifier moved to a separate `validation_scope` field rather than being
+dropped — "scalar angular-spectrum, complex64, CPU and CUDA" is exactly the
+thing a reader needs before deciding whether their task is in scope, and it was
+previously fused into the status string where nothing could check either half.
+`tests/test_solver_knowledge_pack.py` enforces the ladder.
+
 
 **What.** It is a free string. Two of the eight cards carry values that are not on
 the ladder at all: `analytically_validated_scalar_asm_cpu`
-(`solvers/chromatix/solver_card.yaml:258`) and, on the coupler side,
+(`solvers/chromatix/card.yaml:258`) and, on the coupler side,
 `characterized_stochastic_scalar_planar_cpu`
-(`knowledge/couplers/wave_to_ray/coupler_card.yaml:358`).
+(`knowledge/couplers/wave_to_ray/card.yaml:358`).
 
 **Evidence.** `knowledge/README.md:11-18` defines exactly three values. Nothing
 validates the field for solvers.

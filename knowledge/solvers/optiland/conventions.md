@@ -2,7 +2,7 @@
 
 Every fact below was either read from `optiland.backend.__doc__` /
 `inspect` on the installed package, or observed directly by running
-`knowledge/solvers/optiland/probes/*.py` inside the `agent_solver`
+`benchmarks/probes/optiland/*.py` inside the `agent_solver`
 container. None of it is copied from memory or from a description of an
 older/different version.
 
@@ -53,7 +53,7 @@ Verbatim from `optiland.backend.__doc__` (Kramer Harrison, 2025):
 
 ## Torch backend precision defaults to float32 (CHE-57)
 
-**This resolves the open item `capability_notes.md` recorded as "root-causing why
+**This resolves the open item `usage_notes.md` recorded as "root-causing why
 the torch-backend gradient tolerance (1.11e-03) is looser than the JAX-based
 solvers' tolerances in this repository".**
 
@@ -88,7 +88,7 @@ Consequences for this project:
 - `be.grad_mode` (`enable`/`disable`/`temporary_enable`/`requires_grad`) is a
   separate global switch again.
 
-Evidence: `knowledge/solvers/optiland/tutorials/t10_differentiable_ray_tracing.py`
+Evidence: `tests_tutorial/cases/optiland/t10_differentiable_ray_tracing.py`
 and its recorded output.
 
 ## Paraxial cardinal points use two different reference planes (CHE-57)
@@ -377,7 +377,7 @@ below.
 **Superseded:** M1 recorded `opd_reference` and `opd_sign` as `unverified`,
 and the coupler contract layer refused a real trace as an optical path
 length on that basis. Both are now established. The machine-readable form is
-`opd_convention:` in `solver_card.yaml`; the probe is
+`opd_convention:` in `card.yaml`; the probe is
 `probes/opd_convention_probe.py`, its recorded output is
 `expected/opd_convention_probe.json`, and `tests/test_optiland_opd_convention.py`
 asserts each claim **together with the competing hypothesis it rules out**.
@@ -497,7 +497,7 @@ flag stands — but the flag was never the question. The question was which surf
 the accumulation starts from, and that is now declared
 (`opd_reference_surface`, `opd_omits_incoming_wavefront_tilt`).
 
-Evidence: `knowledge/solvers/optiland/probes/off_axis_opd_reference.py` and its
+Evidence: `benchmarks/probes/optiland/off_axis_opd_reference.py` and its
 recorded output, plus `benchmarks/probes/off_axis_handoff.py` for the
 downstream consequence.
 

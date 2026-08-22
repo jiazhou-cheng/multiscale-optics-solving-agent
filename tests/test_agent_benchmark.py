@@ -289,7 +289,7 @@ class TestContextPolicy:
 
     def test_a_warm_task_is_offered_the_card_and_the_examples_but_not_conventions(self):
         names = [path.name for path in _task(context_policy=ContextPolicy.WARM).context_files()]
-        assert "solver_card.yaml" in names
+        assert "card.yaml" in names
         assert "conventions.md" not in names
 
     def test_a_guided_task_is_additionally_offered_the_conventions(self):

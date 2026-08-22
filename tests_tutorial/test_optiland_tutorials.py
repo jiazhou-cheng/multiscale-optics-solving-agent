@@ -1,18 +1,18 @@
 """CHE-57 (PB6): the repo-owned Optiland tutorial reproductions, as a regression gate.
 
 Each test executes one reproduction from
-`knowledge/solvers/optiland/tutorials/` against the pinned `optiland==0.6.0`
+`tests_tutorial/cases/optiland/` against the pinned `optiland==0.6.0`
 install and asserts two things:
 
 1. every validation check the reproduction declares still passes, and
-2. the recorded evidence in `knowledge/solvers/optiland/tutorials/expected/`
+2. the recorded evidence in `tests_tutorial/cases/optiland/expected/`
    still describes what the solver does -- numeric metrics are compared with a
    tolerance, and the *set* of checks is compared exactly, so a silently
    dropped check fails the test rather than passing vacuously.
 
 Refresh the recorded evidence with
 
-    ./run.sh python knowledge/solvers/optiland/tutorials/run_all.py --write-expected
+    ./run.sh python tests_tutorial/cases/optiland/run_all.py --write-expected
 
 A reproduction that is genuinely stochastic declares its own ``metric_rtol`` in
 its ``TutorialMeta`` (with the reason in its docstring); everything else replays
@@ -41,9 +41,11 @@ from pathlib import Path
 
 import pytest
 
-TUTORIAL_DIR = (
-    Path(__file__).resolve().parents[1] / "knowledge" / "solvers" / "optiland" / "tutorials"
-)
+# The reproductions live beside this harness now. CHE-92 moved them out of
+# `knowledge/`, which had left this file doing a `sys.path.insert` back into a
+# directory marked retrieval-only -- a split brain where the test tree and the
+# agent-facing context were the same files.
+TUTORIAL_DIR = Path(__file__).resolve().parent / "cases" / "optiland"
 sys.path.insert(0, str(TUTORIAL_DIR))
 
 pytest.importorskip("optiland")

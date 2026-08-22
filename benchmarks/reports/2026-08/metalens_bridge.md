@@ -570,7 +570,7 @@ interesting part:
   forbids concurrent GPU jobs and Phase 15 forbids parallel candidates; the
   authorisation for two GPUs was not needed and not used.
 * **The reference implementation was not vendored, pinned, fetched or executed**,
-  by instruction. `knowledge/couplers/*/coupler_card.yaml`'s `vendored: false`,
+  by instruction. `knowledge/couplers/*/card.yaml`'s `vendored: false`,
   `pinned: false`, `executed_by_this_repository: false` claims and
   `test_reference_implementation_is_recorded_as_unused` are therefore unchanged.
   The estimator structure (`P` spatial launches × `S` angular samples, the

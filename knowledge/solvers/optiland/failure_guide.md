@@ -111,7 +111,7 @@ in the ray-only process.
 
 Every entry below was hit while reproducing the official 41-tutorial Optiland
 scope against the pinned `0.6.0`. Each has an executable reproduction under
-`knowledge/solvers/optiland/tutorials/` and recorded evidence in `expected/`.
+`tests_tutorial/cases/optiland/` and recorded evidence in `expected/`.
 
 ## `Optic.draw3D()` never returns
 

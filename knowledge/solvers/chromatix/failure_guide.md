@@ -49,7 +49,7 @@ delta function and a large propagation distance relative to `dx`.
 padding conservatively from wavelength/dx/z; a poorly-conditioned
 combination (fine `dx`, long `z`) produces very large recommended padding.
 This is real memory-and-compute-cost behavior, not a bug — see
-`solver_card.yaml` `cost_scaling`.
+`card.yaml` `cost_scaling`.
 
 **Fix:** check the returned pad width before committing to a shape in an
 adapter's cost estimator; do not call the propagator blind on
@@ -159,7 +159,7 @@ requirement the same way rather than assuming a clean process.
 
 Every entry below was hit while reproducing Chromatix 101 and all 15 documented
 examples against the pinned commit `d24bdf0`. Each has an executable reproduction
-under `knowledge/solvers/chromatix/tutorials/` and recorded evidence in `expected/`.
+under `tests_tutorial/cases/chromatix/` and recorded evidence in `expected/`.
 
 ## A tilted beam lands in the wrong place after `transform_propagate`
 

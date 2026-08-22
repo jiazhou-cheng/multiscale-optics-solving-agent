@@ -23,7 +23,7 @@ Scope
 -----
 This adapter implements exactly one physical path, chosen because it is the
 only one with any evidence behind it in
-``knowledge/solvers/chromatix/expected/propagation_probe.json``:
+``benchmarks/probes/records/chromatix/propagation_probe.json``:
 
     ScalarField (2D, monochromatic)
         -> ``chromatix.functional.asm_propagate`` (angular-spectrum method)
@@ -95,7 +95,7 @@ Derivative policy (repository gradient policy)
 ``M_WAVE_CHROMATIX`` is registered with ``derivative.mode: native_autodiff``
 and ``derivative.verified: false``. The only directional-derivative evidence
 in this repository
-(``knowledge/solvers/chromatix/expected/gradient_probe.json``) exercises
+(``benchmarks/probes/records/chromatix/gradient_probe.json``) exercises
 ``thin_lens`` -> ``transform_propagate``, a path this adapter does not
 implement. No evidence exists for a gradient through ``asm_propagate``.
 Accordingly this adapter raises ``UnsupportedCapabilityError`` for any

@@ -293,7 +293,7 @@ class AgentTask:
         if self.context_policy is ContextPolicy.COLD:
             return ()
         solver = REPO_ROOT / "knowledge" / "solvers" / self.library
-        files = [solver / "solver_card.yaml", solver / "api_minimal_examples.md"]
+        files = [solver / "card.yaml", solver / "api_minimal_examples.md"]
         if self.context_policy is ContextPolicy.GUIDED:
             files.append(solver / "conventions.md")
         return tuple(path for path in files if path.exists())

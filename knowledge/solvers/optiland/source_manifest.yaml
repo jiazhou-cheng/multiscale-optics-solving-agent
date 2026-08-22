@@ -71,7 +71,7 @@ sources:
       tutorials this index listed on 2026-08-19: 8 Beginner, 16 Intermediate and
       17 Advanced. Each tutorial page was fetched, its code blocks and any stated
       numerical results extracted, and then REIMPLEMENTED as repo-owned
-      executable code under knowledge/solvers/optiland/tutorials/ rather than
+      executable code under tests_tutorial/cases/optiland/ rather than
       executed as an upstream notebook. Per AGENTS.md "Sources of Truth" the
       pinned install won every disagreement: several tutorials call APIs the
       pinned 0.6.0 does not accept (ThinFilmCoating's stack argument), use units

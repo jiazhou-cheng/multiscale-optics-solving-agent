@@ -19,8 +19,8 @@ the adapter-owned singlet. The bundled sample is kept for exactly this purpose:
 it is no longer a construction path, it is an oracle.
 
 Evidence for the two newly admitted construction paths (even asphere, grating)
-is recorded in ``knowledge/solvers/optiland/expected/system_construction_probe.json``
-by ``knowledge/solvers/optiland/probes/system_construction_probe.py``.
+is recorded in ``benchmarks/probes/records/optiland/system_construction_probe.json``
+by ``benchmarks/probes/optiland/system_construction_probe.py``.
 """
 
 from __future__ import annotations

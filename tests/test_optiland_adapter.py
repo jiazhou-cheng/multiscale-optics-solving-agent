@@ -5,8 +5,8 @@ Scope reminder (see module docstring of
 supports the bundled ``ReverseTelephoto`` sample lens, the ``numpy``
 (default) and ``torch`` (opt-in) backends, and exactly one design-parameter
 path for gradients. Every numeric expectation below is read from
-``knowledge/solvers/optiland/expected/*.json``, captured by actually running
-``knowledge/solvers/optiland/probes/*.py`` against the pinned install --
+``benchmarks/probes/records/optiland/*.json``, captured by actually running
+``benchmarks/probes/optiland/*.py`` against the pinned install --
 nothing here is a re-derived or assumed oracle.
 """
 
@@ -89,7 +89,7 @@ QUADRATURE_ARRAY_NAMES = frozenset(
 
 
 def _smoke_request(**config_overrides) -> ModelRunRequest:
-    """Mirror knowledge/solvers/optiland/probes/raytrace_probe.py exactly.
+    """Mirror benchmarks/probes/optiland/raytrace_probe.py exactly.
 
     Passing an empty config relies on the adapter's declared defaults
     (wavelength=0.55, num_rays=16, Hx=Hy=0, sample=ReverseTelephoto, backend=
@@ -194,7 +194,7 @@ def test_matches_recorded_raytrace_probe_evidence() -> None:
 def test_gradient_matches_recorded_probe_within_known_tolerance(
     dtype, objective_rel, grad_rel
 ) -> None:
-    """Reproduce knowledge/solvers/optiland/probes/gradient_probe.py through the adapter.
+    """Reproduce benchmarks/probes/optiland/gradient_probe.py through the adapter.
 
     This is a regression lock on a *recorded* directional-derivative check,
     not the full repository gradient-verification bundle (that
@@ -251,7 +251,7 @@ def test_gradient_matches_recorded_probe_within_known_tolerance(
     assert relative_error < 2e-3, (
         f"AD-vs-finite-difference relative error {relative_error:.3e} exceeds the "
         "known, not-yet-root-caused 1.11e-03 tolerance recorded in "
-        "knowledge/solvers/optiland/expected/gradient_probe.json."
+        "benchmarks/probes/records/optiland/gradient_probe.json."
     )
 
     # The new guarantee: the precision the run REPORTS is the precision it ran
@@ -671,8 +671,8 @@ def test_standalone_empty_or_nonfinite_output_is_structured(tmp_path, bad_value)
 #   * benchmarks/protocols/slice_protocol.yaml -- M3.2's frozen exit-pupil geometry.
 #     Read here from the protocol file, not from the probe fixture, so the
 #     export is checked against the milestone's own declared numbers.
-#   * knowledge/solvers/optiland/expected/exit_pupil_handoff.json -- recorded by
-#     knowledge/solvers/optiland/probes/exit_pupil_handoff.py against the pinned
+#   * benchmarks/probes/records/optiland/exit_pupil_handoff.json -- recorded by
+#     benchmarks/probes/optiland/exit_pupil_handoff.py against the pinned
 #     install; this is the M1-standard determinism/hash evidence.
 #
 # Everything below drives the ordinary export path (OptilandAdapter.run ->
@@ -805,7 +805,7 @@ def test_m3_singlet_ref_matches_recorded_m1_standard_evidence(tmp_path) -> None:
 
     Deterministic trace, finite output, unit-norm direction cosines, a stable
     scientific-array hash, and a survivor count -- at both handoff planes,
-    compared against knowledge/solvers/optiland/expected/exit_pupil_handoff.json,
+    compared against benchmarks/probes/records/optiland/exit_pupil_handoff.json,
     which was recorded by running the probe against the pinned install.
     """
     expected = load_probe_expected("optiland", "exit_pupil_handoff")
@@ -1009,7 +1009,7 @@ def test_omitting_handoff_plane_preserves_the_default_image_surface_fingerprint(
     """No `handoff_plane` key at all must still be the L1 default-path export.
 
     The expected hash is the one already frozen by CHE-13 in
-    knowledge/solvers/optiland/expected/standalone_baseline.json -- the same
+    benchmarks/probes/records/optiland/standalone_baseline.json -- the same
     value L1-RAY-01 is built on -- not a value re-recorded for this ticket.
     """
     frozen_hash = load_probe_expected("optiland", "standalone_baseline")["stable_result"][

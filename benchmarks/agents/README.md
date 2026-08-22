@@ -34,8 +34,8 @@ make agent-benchmark PARTICIPANT=broken:trap
 **Declared per task, and recorded in every result.** This is the most
 consequential knob here, because it changes *what is being measured* rather than
 how well. This repository has mature knowledge packs —
-`knowledge/solvers/{optiland,chromatix}/` each carry `solver_card.yaml`,
-`api_minimal_examples.md`, `conventions.md`, `capability_notes.md`,
+`knowledge/solvers/{optiland,chromatix}/` each carry `card.yaml`,
+`api_minimal_examples.md`, `conventions.md`, `usage_notes.md`,
 `failure_guide.md` — and `AGENTS.md` instructs an agent to load a solver card when
 the issue uses that solver. With those in context the benchmark asks *"can it
 follow our cards"*; without them, *"can it discover and use the tool"*. Both are
@@ -44,7 +44,7 @@ legitimate, and they are **different benchmarks**.
 | policy | what the participant is handed | what it measures |
 |---|---|---|
 | `cold` | the problem statement only | discovery: find the library and its API unaided |
-| `warm` | `+ solver_card.yaml`, `api_minimal_examples.md` | correct use of a documented tool |
+| `warm` | `+ card.yaml`, `api_minimal_examples.md` | correct use of a documented tool |
 | `guided` | `+ conventions.md` (which names the unit and sign hazards) | whether it reads a warning it has been handed |
 
 V1 uses `cold` for the four straightforward tasks and `warm` for the two traps.

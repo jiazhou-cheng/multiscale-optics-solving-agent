@@ -6,7 +6,7 @@ blocker rather than a fabricated value when the solver refuses. It is not the
 `ModelAdapter` protocol and nothing in a graph reaches it.
 
 Not archived with the gen1 suites, despite being M1 machinery, because
-`knowledge/solvers/chromatix/probes/standalone_baseline.py` is a live consumer
+`benchmarks/probes/chromatix/standalone_baseline.py` is a live consumer
 and is the executable evidence behind a card claim.
 
 `_BaselineError` is internal to this module by design: it exists so the several
@@ -159,7 +159,7 @@ def _baseline_problems(typed: ChromatixWaveRequest) -> list[tuple[str, str, str]
                 f"field_kind={typed.field_kind!r} is not implemented; only "
                 f"{_BASELINE_FIELD_KIND!r} (chromatix ScalarField) has been probed. "
                 "No Jones-basis ordering or vector propagation frame has been verified "
-                "(knowledge/solvers/chromatix/capability_notes.md).",
+                "(knowledge/solvers/chromatix/usage_notes.md).",
                 "capability_gate",
             )
         )

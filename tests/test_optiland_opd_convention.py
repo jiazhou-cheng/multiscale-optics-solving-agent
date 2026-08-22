@@ -22,8 +22,8 @@ The established convention, all four parts:
    prescriptions.
 
 Evidence is recorded in
-`knowledge/solvers/optiland/expected/opd_convention_probe.json`, captured by
-running `knowledge/solvers/optiland/probes/opd_convention_probe.py` against the
+`benchmarks/probes/records/optiland/opd_convention_probe.json`, captured by
+running `benchmarks/probes/optiland/opd_convention_probe.py` against the
 pinned install.
 """
 

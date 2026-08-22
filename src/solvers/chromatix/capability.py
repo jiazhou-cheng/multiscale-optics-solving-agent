@@ -59,7 +59,7 @@ def check_capability(spec: ModelSpec, request: ModelRunRequest) -> None:
             "M_WAVE_CHROMATIX adapter only implements scalar fields "
             f"(chromatix ScalarField); got field_kind={field_kind!r}. "
             "Vector/polarized propagation has not been probed (see "
-            "knowledge/solvers/chromatix/capability_notes.md)."
+            "knowledge/solvers/chromatix/usage_notes.md)."
         )
 
     if request.require_gradients:
@@ -68,7 +68,7 @@ def check_capability(spec: ModelSpec, request: ModelRunRequest) -> None:
             "for asm_propagate. Only one narrow probe "
             "(thin_lens focal length -> transform_propagate -> intensity) "
             "passed a directional-derivative check "
-            "(knowledge/solvers/chromatix/expected/gradient_probe.json); "
+            "(benchmarks/probes/records/chromatix/gradient_probe.json); "
             "that path is not implemented by this adapter and asm_propagate "
             "has no such evidence. require_gradients=True is rejected."
         )

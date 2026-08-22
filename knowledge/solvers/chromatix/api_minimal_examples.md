@@ -192,12 +192,12 @@ on a homogeneous domain the axial phase gradient is `12.5656` against the analyt
 ## 12. Full-fidelity example reproductions
 
 16 executable reproductions of Chromatix 101 and all 15 documented examples live
-under `knowledge/solvers/chromatix/tutorials/`, each printing machine-readable
+under `tests_tutorial/cases/chromatix/`, each printing machine-readable
 evidence. They are the fastest way to find a working minimal example of a
 specific API:
 
 ```bash
-./run.sh python knowledge/solvers/chromatix/tutorials/c06_off_axis_propagation.py
+./run.sh python tests_tutorial/cases/chromatix/c06_off_axis_propagation.py
 ```
 
 See `tutorials/README.md` for the API-to-example index, the coverage table, and the

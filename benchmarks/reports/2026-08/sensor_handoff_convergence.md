@@ -120,7 +120,7 @@ quadrature in direction space** — through which rays exist.
 | **implemented here** | **no** | **yes** |
 | **verified here** | — | **yes** |
 
-`knowledge/couplers/ray_to_wave/coupler_card.yaml` now states this under
+`knowledge/couplers/ray_to_wave/card.yaml` now states this under
 `reconstruction_semantics`, and the old `aperture_edge_…` validity condition is
 *scoped* to the first mode instead of being written as a global bound.
 
@@ -600,7 +600,7 @@ Executed in the `agent_solver` container through `./run.sh`, CPU, float64/comple
 | arrays | `outputs/M3/CHE-38-M3.9R/arrays.npz` *(pending)* |
 | figures 1–5 | `outputs/M3/CHE-38-M3.9R/` *(pending)* |
 | tests | `tests/test_m3r_sensor_handoff.py` |
-| coupler card | `knowledge/couplers/ray_to_wave/coupler_card.yaml` |
+| coupler card | `knowledge/couplers/ray_to_wave/card.yaml` |
 | coupler theory / failures | `knowledge/couplers/ray_to_wave/{theory,failure_guide}.md` |
 | slice protocol | `benchmarks/protocols/slice_protocol.yaml`, `benchmarks/protocols/m3_slice_protocol.md` |
 | this report | `benchmarks/reports/2026-08/sensor_handoff_convergence.md` |

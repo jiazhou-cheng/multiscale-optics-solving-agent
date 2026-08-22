@@ -280,7 +280,7 @@ def _sampling(bundle) -> dict[str, Any]:
             "the tilt is IN the pupil field, so it is sampled, so it constrains the "
             "pitch. That is the price of declaring the incoming wavefront rather than a "
             "chief-ray-referenced frame, and it is paid at this field with 5.4% to "
-            "spare. The full field scan (knowledge/solvers/optiland/expected/"
+            "spare. The full field scan (benchmarks/probes/records/optiland/"
             "off_axis_opd_reference.json) puts the limit at Hy ~ 0.25 and the "
             "refinement needed at full field at 2.58x."
         ),

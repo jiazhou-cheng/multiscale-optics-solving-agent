@@ -33,7 +33,7 @@ def _installed_chromatix_provenance() -> tuple[str | None, str | None, list[str]
 
     The commit is read from the installed distribution's ``direct_url.json``
     (PEP 610), which pip writes for a VCS install. This is the real installed
-    revision, not the value copied into ``solver_card.yaml``; a mismatch
+    revision, not the value copied into ``card.yaml``; a mismatch
     between the two is surfaced as a warning rather than silently ignored.
     """
     warnings: list[str] = []
@@ -55,7 +55,7 @@ def _installed_chromatix_provenance() -> tuple[str | None, str | None, list[str]
     if version != _PINNED_VERSION:
         warnings.append(
             f"installed chromatix version {version!r} differs from the pinned "
-            f"{_PINNED_VERSION!r} in knowledge/solvers/chromatix/solver_card.yaml."
+            f"{_PINNED_VERSION!r} in knowledge/solvers/chromatix/card.yaml."
         )
     if commit is None:
         warnings.append(
@@ -65,7 +65,7 @@ def _installed_chromatix_provenance() -> tuple[str | None, str | None, list[str]
     elif commit != _PINNED_COMMIT:
         warnings.append(
             f"installed chromatix commit {commit!r} differs from the pinned "
-            f"{_PINNED_COMMIT!r} in knowledge/solvers/chromatix/solver_card.yaml."
+            f"{_PINNED_COMMIT!r} in knowledge/solvers/chromatix/card.yaml."
         )
     return version, commit, warnings
 

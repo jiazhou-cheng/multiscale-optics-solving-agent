@@ -107,7 +107,7 @@ without testing it directly.
 Use the typed CHE-13 boundary rather than serializing solver objects:
 
 ```bash
-./run.sh python knowledge/solvers/optiland/probes/standalone_baseline.py \
+./run.sh python benchmarks/probes/optiland/standalone_baseline.py \
   --output-dir /tmp/optiland-che13
 ```
 
@@ -198,11 +198,11 @@ are `resolve_prescription('ReverseTelephoto' | 'M3SingletRef')`. Full guide:
 ## 8. Full-fidelity tutorial reproductions
 
 41 executable reproductions of the official Optiland tutorial index live under
-`knowledge/solvers/optiland/tutorials/`, each printing machine-readable evidence.
+`tests_tutorial/cases/optiland/`, each printing machine-readable evidence.
 They are the fastest way to find a working minimal example of a specific API:
 
 ```bash
-./run.sh python knowledge/solvers/optiland/tutorials/t26_zernike_decomposition.py
+./run.sh python tests_tutorial/cases/optiland/t26_zernike_decomposition.py
 ```
 
 See `tutorials/README.md` for the API-to-tutorial index and the coverage table.

@@ -150,8 +150,8 @@ nobody wrote it for.
 CHE-57 executed and validated **41 Optiland tutorials and 16 Chromatix
 tutorials**, then folded the results into knowledge assets rather than leaving
 them as scripts: `knowledge/solvers/{optiland,chromatix}/` each now carry
-`api_minimal_examples.md`, `capability_notes.md`, `conventions.md`,
-`failure_guide.md`, `solver_card.yaml`, `source_manifest.yaml`, plus `probes/`,
+`api_minimal_examples.md`, `usage_notes.md`, `conventions.md`,
+`failure_guide.md`, `card.yaml`, `source_manifest.yaml`, plus `probes/`,
 `expected/`, and `tutorials/` (45 and 20 files respectively).
 
 ## PB7 — three PSF routes on one lens, and the FFT route is the outlier
@@ -293,7 +293,7 @@ curvature term. The decision lived only in a Linear comment.
 
 **Now stated in four places, one of which travels with the artifact:** the
 `C_RAY_TO_WAVE` module docstring, the graph-edge wrapper's docstring,
-`knowledge/couplers/ray_to_wave/` (`coupler_card.yaml`
+`knowledge/couplers/ray_to_wave/` (`card.yaml`
 `known_limitations.no_wavefront_curvature_term` and `conventions.md`), and
 `provenance["validity"]` on every emitted `ComplexField` — so a downstream
 consumer reads it off the field rather than having to have read a document. Two
@@ -449,7 +449,7 @@ hard way. **No tolerance was set**, per F2.
 The knowledge-asset summary cards were reviewed in the same pass and no longer
 claim "no GPU/accelerator in this container": both solver cards, both coupler
 cards, `knowledge/solver_cards/{optiland,chromatix}.yaml` and
-`knowledge/solvers/optiland/capability_notes.md`. Card pointers to tests CHE-67
+`knowledge/solvers/optiland/usage_notes.md`. Card pointers to tests CHE-67
 archived are now labelled as archived and unguarded rather than reading as live
 evidence.
 

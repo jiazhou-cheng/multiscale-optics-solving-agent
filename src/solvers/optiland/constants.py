@@ -62,7 +62,7 @@ _WAVELENGTH_M_PER_UM = 1e-6
 _BASELINE_SEED = 20260811
 
 # The only design-parameter path characterized by
-# knowledge/solvers/optiland/probes/gradient_probe.py.
+# benchmarks/probes/optiland/gradient_probe.py.
 _VALIDATED_DESIGN_PARAMETER_PATTERN = re.compile(r"^surfaces\.surfaces\[(\d+)\]\.geometry\.radius$")
 
 _DEFAULT_WAVELENGTH = 0.55  # micrometres; verified by CHE-12

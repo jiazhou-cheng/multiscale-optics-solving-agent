@@ -28,14 +28,14 @@ _SUPPORTED_DTYPES = {"complex64", "complex128"}
 # exp(-i k sqrt(rho^2 + R^2)) -- focuses under asm_propagate, reaching 0.990 of
 # the analytic Airy peak (pi a^2 / (lambda R))^2, while its complex conjugate
 # does not (peak ratio 1008x, and off axis). See
-# knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py.
+# benchmarks/probes/chromatix/m3_pupil_to_focus.py.
 #
 # Because the sign is now known, a mismatched input phasor is refused rather than
 # forwarded: for a converging pupil field it is the difference between focusing
 # and defocusing, and nothing downstream could tell the two apart.
 _CHROMATIX_SPATIAL_FACTOR = "exp(+i k_z z) for z > 0"
 _PHASOR_ESTABLISHED_BY = (
-    "CHE-35 (M3.6), knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json"
+    "CHE-35 (M3.6), benchmarks/probes/records/chromatix/m3_pupil_to_focus.json"
 )
 
 _PROPAGATION_METHODS = ("asm_propagate", "asm_carrier_removed")

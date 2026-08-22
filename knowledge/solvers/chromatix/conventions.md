@@ -8,7 +8,7 @@ environment and convention check, not an analytic propagation benchmark.
 
 Every fact below was either read from `inspect.getsource`/`inspect.getdoc` on
 the installed package, or observed directly by running
-`knowledge/solvers/chromatix/probes/propagation_probe.py` inside the
+`benchmarks/probes/chromatix/propagation_probe.py` inside the
 `agent_solver` container. None of it is copied from memory or from a
 description of an older/different version.
 
@@ -181,8 +181,8 @@ field written under *this project's* declaration will focus in it. That is now
 settled by a manufactured test rather than by the "consistent with" argument
 this section used to make.
 
-Probe: `knowledge/solvers/chromatix/probes/m3_pupil_to_focus.py`; recorded
-output: `knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json`;
+Probe: `benchmarks/probes/chromatix/m3_pupil_to_focus.py`; recorded
+output: `benchmarks/probes/records/chromatix/m3_pupil_to_focus.json`;
 regression tests: `archive/tests/gen1/tests/test_m3_pupil_to_focus.py` — **archived
 by CHE-67 and not runnable**, so nothing in the default suite fails if this
 convention regresses. The probe and its recorded output above still run.
@@ -246,7 +246,7 @@ Established from three independent entry points:
 - `chromatix.experimental.modified_born_series.solve()` uses the same ordering for
   its own output (`tutorials/c15_modified_born_series.py`).
 
-This matches, and now measures, the note `capability_notes.md` recorded from
+This matches, and now measures, the note `usage_notes.md` recorded from
 reading `high_na_ff_lens`'s source during CHE-18.
 
 ### Tensorial propagation verified (CHE-57)

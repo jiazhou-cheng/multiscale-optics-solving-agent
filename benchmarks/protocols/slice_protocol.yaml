@@ -70,8 +70,8 @@ amendments:
       Every other derived number for that system is unaffected: efl, bfl, NA,
       exit-pupil location and diameter, and the image plane z were all measured
       independently and all still agree with the trace.
-    evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
-    probe: knowledge/couplers/ray_to_wave/probes/coherent_handoff.py
+    evidence: benchmarks/probes/records/ray_to_wave/coherent_handoff.json
+    probe: benchmarks/probes/ray_to_wave/coherent_handoff.py
   - id: A3-ray-refinement-does-not-close-the-oracle-gate
     issue: CHE-38 (M3.9)
     supersedes: >-
@@ -164,10 +164,10 @@ amendments:
       PSF back by 115 pixels.
     evidence:
       - benchmarks/probes/records/m3_off_axis_handoff.json
-      - knowledge/solvers/optiland/expected/off_axis_opd_reference.json
+      - benchmarks/probes/records/optiland/off_axis_opd_reference.json
     probe:
       - benchmarks/probes/off_axis_handoff.py
-      - knowledge/solvers/optiland/probes/off_axis_opd_reference.py
+      - benchmarks/probes/optiland/off_axis_opd_reference.py
 scope:
   benchmark_ids: [L2-PSF-01]
   execution: end_to_end_graph
@@ -276,7 +276,7 @@ handoff_plane:
         pupil-grid figure and does not transfer.
     # UNLANDED -- see unlanded_evidence at the top of this file (CHE-62/CHE-63).
     evidence: benchmarks/probes/records/m3r_sensor_handoff.json
-    coupler_card: knowledge/couplers/ray_to_wave/coupler_card.yaml (reconstruction_semantics)
+    coupler_card: knowledge/couplers/ray_to_wave/card.yaml (reconstruction_semantics)
 
 # ---------------------------------------------------------------------------
 # Required numerical conditioning (CHE-40, M3.2A)
@@ -374,7 +374,7 @@ required_conditioning:
       all; it is the missing dA, not a bad distribution, that makes the scale
       diverge. A per-ray area model is therefore a smaller change than CHE-33
       feared, but it is still unverified physics and still needs its own ticket.
-    evidence: knowledge/couplers/ray_to_wave/expected/coherent_handoff.json
+    evidence: benchmarks/probes/records/ray_to_wave/coherent_handoff.json
     regression_tests: tests/test_optiland_coherent_handoff.py
 
 # ---------------------------------------------------------------------------
@@ -760,7 +760,7 @@ tolerance_budget:
         pad_width = 94 agrees with 566 to 0.06% on edge-energy fraction and 0.01%
         on peak intensity, and is 73x worse at the intensity level. The cheap
         indicators do not see it.
-      evidence: knowledge/solvers/chromatix/expected/m3_pupil_to_focus.json
+      evidence: benchmarks/probes/records/chromatix/m3_pupil_to_focus.json
   gates:
     airy_peak_intensity_relative:
       value: 2.0e-3
@@ -1408,7 +1408,7 @@ open_structural_items:
         Measured directly: the launch z spread is exactly 0 and the launch
         direction spread is 2.8e-17 across 3169 rays, so the seeded reference
         surface is a plane perpendicular to z rather than a wavefront
-        (knowledge/solvers/optiland/expected/off_axis_opd_reference.json).
+        (benchmarks/probes/records/optiland/off_axis_opd_reference.json).
       opd_is_relative_to_chief_ray: >-
         still False, and now tested where it is testable: off axis the chief ray's
         own opd_native is 11051.3 waves rather than zero. The flag was correct; it
@@ -1667,7 +1667,7 @@ open_structural_items:
       what_is_actually_required_instead: >-
         a per-ray pupil/phase-space quadrature weight, supplied by the PRODUCER. See
         observation_side_handoff and per_ray_area_weight_at_the_aperture_boundary in
-        knowledge/couplers/ray_to_wave/coupler_card.yaml. CHE-38 section 14 forbade
+        knowledge/couplers/ray_to_wave/card.yaml. CHE-38 section 14 forbade
         implementing it there and section 15 assigned it its own ticket; CHE-47
         (M3.9R extension) is that ticket and implements it as a producer-side
         default (optiland_handoff.declare_coherent_bundle). This item's own subject

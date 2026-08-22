@@ -113,7 +113,7 @@ here spans ~1e4 waves.
 `set_backend('numpy')` (`benchmarks/probes/precision/default_precision.py`). Before CHE-61
 the adapter never called `set_precision` while reporting `dtype: 'float64'`, so
 **every torch-backend run traced in float32 under a float64 label**. The recorded
-gradient probe in `knowledge/solvers/optiland/expected/gradient_probe.json` is
+gradient probe in `benchmarks/probes/records/optiland/gradient_probe.json` is
 therefore the float32 path; `config['dtype']='float32'` reproduces it
 bit-identically, and the float64 default now genuinely runs float64, differing by
 1.3e-05 relative on the objective and 2.3e-06 on the gradient

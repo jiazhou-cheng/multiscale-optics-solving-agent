@@ -122,26 +122,32 @@ def registry() -> Registry:
     return Registry.from_package()
 
 
-def load_probe_expected(solver: str, probe: str) -> dict:
-    """Load the recorded ground truth from knowledge/solvers/<solver>/expected/<probe>.json.
+#: Recorded probe evidence, moved out of `knowledge/` by CHE-92: that directory
+#: is what gets disclosed to an agent, and a recorded array is not context.
+#:
+#: It lives under `benchmarks/probes/` rather than a top-level `verification/`,
+#: which is where CHE-92 originally aimed it. Phase 5 had already created a
+#: `src/verification/` package, and a repository-root directory of the same name
+#: shadows it for anything run from the root -- `tests/test_flat_layout.py`
+#: caught that. `benchmarks/probes/records/` is where the other recorded
+#: evidence already was, so this is also the less surprising home.
+RECORDS_ROOT = ROOT / "benchmarks" / "probes" / "records"
 
-    This is evidence captured by running knowledge/solvers/<solver>/probes/<probe>.py
-    against the real solver; adapter tests compare against it instead of
-    re-deriving an oracle.
+
+def load_probe_expected(component: str, probe: str) -> dict:
+    """The recorded ground truth for one probe.
+
+    Captured by running ``benchmarks/probes/<component>/<probe>.py`` against
+    the real solver or coupler. Tests compare against it rather than re-deriving
+    an oracle, which is the point: a test that re-derives its own reference is
+    checking itself.
     """
-    path = KNOWLEDGE_ROOT / solver / "expected" / f"{probe}.json"
+    path = RECORDS_ROOT / component / f"{probe}.json"
     return json.loads(path.read_text())
 
 
-COUPLER_KNOWLEDGE_ROOT = ROOT / "knowledge" / "couplers"
-
-
-def load_coupler_probe_expected(coupler: str, probe: str) -> dict:
-    """The coupler-side counterpart of :func:`load_probe_expected`.
-
-    Coupler probes characterize a transformation rather than a package, so their
-    evidence lives under ``knowledge/couplers/<coupler>/expected/`` beside the
-    coupler card that cites it.
-    """
-    path = COUPLER_KNOWLEDGE_ROOT / coupler / "expected" / f"{probe}.json"
-    return json.loads(path.read_text())
+#: Kept as a distinct name because the *claim* differs: a solver probe
+#: characterizes a package, a coupler probe characterizes a transformation this
+#: repository owns. They now read from one directory, and that is fine -- what
+#: must not merge is the two kinds of claim.
+load_coupler_probe_expected = load_probe_expected

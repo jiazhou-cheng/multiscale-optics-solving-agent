@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COUPLERS = ROOT / "knowledge/couplers"
 DIRECTIONS = ("ray_to_wave", "wave_to_ray")
 PACK_FILES = (
-    "coupler_card.yaml",
+    "card.yaml",
     "theory.md",
     "conventions.md",
     "failure_guide.md",
@@ -32,7 +32,7 @@ DOI = "10.1021/acsphotonics.6c00818"
 
 
 def _card(direction: str) -> dict:
-    return yaml.safe_load((COUPLERS / direction / "coupler_card.yaml").read_text())
+    return yaml.safe_load((COUPLERS / direction / "card.yaml").read_text())
 
 
 def _manifest(direction: str) -> dict:
@@ -208,9 +208,22 @@ def test_curvature_bound_is_recorded_with_its_assumptions() -> None:
 
 
 def test_papers_policy_exception_is_documented_rather_than_contradicted() -> None:
-    """knowledge/README.md forbids storing copyrighted full papers. Two full
-    PDFs now live under knowledge/papers/. Either the rule or the exception has
-    to be written down."""
+    """The rule and its exception must both be written down, and agree.
+
+    `knowledge/README.md` forbids storing copyrighted full papers. The owner is
+    this paper's first author, which is the recorded exception -- so storing
+    them *was* permitted, and this test used to assert the two PDFs were
+    present.
+
+    CHE-92 removed them anyway, on cost rather than permission: 11.5 MB of
+    binary in a `retrieval_only` directory is paid for by every clone, for
+    something no agent reads. The exception still stands and is still recorded,
+    because a future contributor should not have to re-derive it.
+
+    So what is asserted flipped, and the flip is the point: the policy, the
+    exception, and the DOI must all be findable, and the bytes must **not** be
+    here. A rule that says "no PDFs" with a PDF beside it is worse than either.
+    """
     readme = (ROOT / "knowledge/README.md").read_text()
     assert "do not store copyrighted full papers" in readme.lower()
     assert "exception" in readme.lower()
@@ -218,10 +231,20 @@ def test_papers_policy_exception_is_documented_rather_than_contradicted() -> Non
 
     paper_readme = ROOT / "knowledge/papers/raywave_tracing/README.md"
     assert paper_readme.is_file()
-    assert DOI in paper_readme.read_text()
+    paper_text = paper_readme.read_text()
+    assert DOI in paper_text
+    # The exception is recorded, not silently dropped along with the files.
+    assert "first author" in paper_text
 
-    for name in ("paper.pdf", "supporting_information.pdf"):
-        assert (ROOT / "knowledge/papers/raywave_tracing" / name).is_file()
+    stored = sorted(p.name for p in (ROOT / "knowledge").rglob("*.pdf"))
+    assert not stored, (
+        f"knowledge/ holds {stored}. The directory is disclosed to an agent and "
+        "marked retrieval_only; a PDF there is cost without a reader. The paper "
+        "is retrievable from the DOI recorded in papers/raywave_tracing/README.md, "
+        "and every claim taken from it is stated in the coupler packs with its "
+        "section cited, so no claim depends on the file being present."
+    )
+
 
 
 def test_ray_to_wave_card_carries_che50s_decision_and_names_who_it_affects() -> None:
@@ -260,7 +283,7 @@ def test_ray_to_wave_card_does_not_present_the_missing_record_as_evidence() -> N
     """CHE-63's record has never been generated. The card may cite it as the
     intended evidence path, but not without saying it is absent -- otherwise a
     reader takes a filename for a measurement."""
-    text = (COUPLERS / "ray_to_wave/coupler_card.yaml").read_text()
+    text = (COUPLERS / "ray_to_wave/card.yaml").read_text()
     record = "benchmarks/probes/records/m3r_sensor_handoff.json"
 
     assert not (ROOT / record).exists(), (

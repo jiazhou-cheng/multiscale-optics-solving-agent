@@ -10,11 +10,20 @@ Primary scientific source for the M2 bidirectional ray–wave coupler.
 | DOI | [10.1021/acsphotonics.6c00818](https://doi.org/10.1021/acsphotonics.6c00818) |
 | Preprint | [arXiv:2605.15418](https://arxiv.org/abs/2605.15418) |
 | Reference implementation | <https://github.com/jiazhou-cheng/raywave-tracing> — **not vendored, not pinned, and not executed by this repository** |
-| Files | `paper.pdf`, `supporting_information.pdf` (23 pp, 8 figures, 3 tables) |
+| Files | **not stored here** — 23 pp, 8 figures, 3 tables; retrieve from the DOI or the preprint above |
 
-Stored in full because the repository owner is the first author. This is the
-documented exception to the `knowledge/README.md` rule against storing
-copyrighted full papers; see that file for the policy.
+The repository owner is the first author, which is the documented exception to
+the `knowledge/README.md` rule against storing copyrighted full papers — so
+storing them here would have been *permitted*. CHE-92 took the PDFs out of git
+anyway, for a different reason: 11.5 MB of binary in a directory marked
+`retrieval_only` is a cost every clone pays for something no agent reads, and
+the section map below is what a reader actually needs. The exception still
+stands and is recorded here so that a future contributor does not re-derive it;
+what changed is the judgement about cost, not the permission.
+
+The paper is retrievable from the DOI or the arXiv preprint above. Every claim
+this repository takes from it is stated in the coupler packs with its section
+cited, so no claim depends on having the file.
 
 ## What each section supplies to M2
 

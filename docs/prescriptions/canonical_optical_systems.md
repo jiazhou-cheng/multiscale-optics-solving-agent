@@ -19,7 +19,7 @@ OpticalSystemSpec  ->  build_optiland_system(spec)  ->  optiland.optic.Optic
 | The schema, its validation, and canonical normalization | `src/core/optical_system.py` (imports no solver) |
 | Translation to the pinned Optiland API | `src/solvers/optiland/builder.py` |
 | The named prescriptions the adapter supports | `src/registry/prescriptions.py` |
-| Executable evidence for the admitted construction paths | `knowledge/solvers/optiland/probes/system_construction_probe.py` (+ `expected/system_construction_probe.json`) |
+| Executable evidence for the admitted construction paths | `benchmarks/probes/optiland/system_construction_probe.py` (+ `expected/system_construction_probe.json`) |
 | Tests | `tests/test_optiland_canonical_prescriptions.py` |
 
 ## Units

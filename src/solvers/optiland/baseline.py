@@ -7,7 +7,7 @@ protocol and nothing in a graph reaches it.
 
 CHE-91 considered archiving it with the gen1 suites and did not: it has a live
 consumer outside them in
-``knowledge/solvers/optiland/probes/standalone_baseline.py``, which is the
+``benchmarks/probes/optiland/standalone_baseline.py``, which is the
 executable evidence behind a card claim. Moving it out of the adapter is the same
 separation without losing the evidence.
 

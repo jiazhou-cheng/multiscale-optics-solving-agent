@@ -9,7 +9,7 @@ call. Every test below is marked ``@pytest.mark.jax`` and
 ``@pytest.mark.integration`` because even the "failure" tests import the
 adapter module, which is only meaningfully exercised together with the real
 pinned chromatix/jax install described in
-``knowledge/solvers/chromatix/solver_card.yaml``.
+``knowledge/solvers/chromatix/card.yaml``.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from core.errors import AdapterDependencyError, UnsupportedCapabilityError
 from core.specs import ArtifactKind
 from solvers.base import ModelRunRequest, RunStatus
 from solvers.chromatix import adapter as mod
+
 # CHE-91 moved the lazy import, device selection and precision bridge into
 # `solvers.chromatix.execution`. The monkeypatches below target it directly
 # rather than the adapter, because patching a re-export would bind a name the
@@ -135,7 +136,7 @@ def test_matches_propagation_probe_asm_propagate(tmp_path: Path) -> None:
 
     # Build exactly the same plane-wave input the probe used, so the adapter
     # is exercised on the identical physical configuration recorded in
-    # knowledge/solvers/chromatix/expected/propagation_probe.json.
+    # benchmarks/probes/records/chromatix/propagation_probe.json.
     plane = cf.plane_wave(shape=shape, dx=dx, spectrum=wavelength, power=1.0)
     u_in = np.asarray(jax.device_get(plane.u))
 
@@ -433,7 +434,7 @@ def test_spec_loaded_from_registry(registry) -> None:
 
 # The canonical CHE-14 case. `knowledge/` is not an importable package, so
 # these mirror the constants in
-# knowledge/solvers/chromatix/probes/standalone_baseline.py;
+# benchmarks/probes/chromatix/standalone_baseline.py;
 # test_standalone_baseline_case_matches_the_probe_that_generated_it below
 # fails if the two ever drift apart.
 WAVELENGTH_M = 532e-9

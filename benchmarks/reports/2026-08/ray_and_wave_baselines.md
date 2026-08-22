@@ -351,7 +351,7 @@ Root cause, from the pinned source: `s_z` is derived from `field.f_grid·λ/n`
 Reported as **blocked, not failed**: "failed" would imply a measured
 disagreement between two well-defined numbers, and there is no converged
 solver quantity to disagree with. No tolerance was changed. Recorded in
-`knowledge/solvers/chromatix/solver_card.yaml` under `known_defective`.
+`knowledge/solvers/chromatix/card.yaml` under `known_defective`.
 
 ### L2 — The two branches run different protocol versions, and V2 is undocumented
 

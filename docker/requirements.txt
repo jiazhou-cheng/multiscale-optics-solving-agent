@@ -7,8 +7,8 @@
 # is a capability claim the image cannot back.
 #
 # Regenerate this file (do not hand-edit versions without re-verifying on
-# PyPI/the package's own metadata) whenever a knowledge/solver_cards/*.yaml
-# or knowledge/solvers/*/solver_card.yaml entry is refreshed. Versions below
+# PyPI/the package's own metadata) whenever a knowledge/solvers/*/card.yaml
+# entry is refreshed. Versions below
 # were verified against PyPI JSON metadata and each package's own
 # Requires-Dist constraints on 2026-07-30 -- see
 # knowledge/solvers/<name>/source_manifest.yaml per solver for how each was

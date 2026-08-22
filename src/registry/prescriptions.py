@@ -100,7 +100,7 @@ M3_SINGLET_REF = OpticalSystemSpec(
 # a bare name by substring filter plus Levenshtein ranking, so `SK15` selects
 # HIKARI while `N-SK10` selects SCHOTT, and up to seven rows survive the filter
 # before scoring. Recording the winning file (measured by
-# knowledge/solvers/optiland/probes/system_construction_probe.py) turns a future
+# benchmarks/probes/optiland/system_construction_probe.py) turns a future
 # catalog change into a structured error rather than a quietly different trace.
 
 

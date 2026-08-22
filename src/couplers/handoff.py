@@ -62,7 +62,7 @@ Nothing here is new physics. Three prior results are being *applied*:
 
 Verification, not assertion
 ---------------------------
-``knowledge/couplers/ray_to_wave/probes/coherent_handoff.py`` checks the declared
+``benchmarks/probes/ray_to_wave/coherent_handoff.py`` checks the declared
 OPL against an oracle that uses nothing from this repository: for a
 diffraction-limited system every ray reaches the focus with equal total optical
 path, so the pupil OPL must satisfy ``OPL(rho) - OPL(0) = R - sqrt(rho^2 + R^2)``.

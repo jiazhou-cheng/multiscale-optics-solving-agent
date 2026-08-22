@@ -52,8 +52,8 @@ directory. `tests/test_suite_layout.py` fails if a tutorial test reappears under
 Refresh the recorded evidence these tests compare against with:
 
 ```bash
-./run.sh python knowledge/solvers/optiland/tutorials/run_all.py  --write-expected
-./run.sh python knowledge/solvers/chromatix/tutorials/run_all.py --write-expected
+./run.sh python tests_tutorial/cases/optiland/run_all.py  --write-expected
+./run.sh python tests_tutorial/cases/chromatix/run_all.py --write-expected
 ```
 
 Known flake: `test_optiland_tutorials.py::test_tutorial_reproduction[t21_surface_roughness_scattering]`

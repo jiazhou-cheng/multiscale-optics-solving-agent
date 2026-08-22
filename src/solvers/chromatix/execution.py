@@ -87,7 +87,7 @@ def _import_chromatix() -> tuple[Any, Any, Any, Any, Any]:
         raise AdapterDependencyError(
             "chromatix and/or jax could not be imported. This adapter requires "
             "the pinned commit in "
-            "knowledge/solvers/chromatix/solver_card.yaml "
+            "knowledge/solvers/chromatix/card.yaml "
             "(git+https://github.com/chromatix-team/chromatix.git@"
             "d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee, tag 0.6.0); the PyPI "
             "package literally named 'chromatix' is an unrelated namesquat. "
