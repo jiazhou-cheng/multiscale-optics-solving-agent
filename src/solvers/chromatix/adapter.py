@@ -206,8 +206,15 @@ class ChromatixAdapter:
     def _check_capability(self, request: ModelRunRequest) -> None:
         check_capability(self.spec, request)
 
-    def _run_asm_propagate(self, *args: Any, **kwargs: Any) -> Any:
-        return run_asm_propagate(self.spec, *args, **kwargs)
+    def _run_asm_propagate(self, *args: Any, **kwargs: Any) -> ModelRunResult:
+        """Kept as a method because a test reaches for it at this path.
+
+        The implementation is `propagation.run_asm_propagate`, which takes the
+        spec explicitly rather than reading it off an adapter -- propagation
+        needs to know the model it is running, not the object that owns it.
+        """
+        result: ModelRunResult = run_asm_propagate(self.spec, *args, **kwargs)
+        return result
 
     def validate_request(self, request: ModelRunRequest) -> ValidationReport:
         issues: list[ValidationIssue] = []

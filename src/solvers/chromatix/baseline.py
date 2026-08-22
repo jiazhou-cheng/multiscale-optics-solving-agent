@@ -71,7 +71,7 @@ class _BaselineError(Exception):
 
 
 def run_standalone(
-    self, request: ChromatixWaveRequest | Mapping[str, Any]
+    adapter: Any, request: ChromatixWaveRequest | Mapping[str, Any]
 ) -> ChromatixWaveResult:
     """Run the one deterministic CHE-14 CPU wave baseline and persist its bundle.
 
