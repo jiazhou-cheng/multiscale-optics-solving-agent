@@ -26,6 +26,12 @@ from core.errors import AdapterDependencyError, UnsupportedCapabilityError
 from core.specs import ArtifactKind
 from solvers.base import ModelRunRequest, RunStatus
 from solvers.chromatix import adapter as mod
+# CHE-91 moved the lazy import, device selection and precision bridge into
+# `solvers.chromatix.execution`. The monkeypatches below target it directly
+# rather than the adapter, because patching a re-export would bind a name the
+# call site no longer reads -- and two of these assert that the solver is
+# *not* imported, so a patch that silently did nothing would pass.
+from solvers.chromatix import execution as chromatix_execution
 
 pytestmark = [pytest.mark.jax, pytest.mark.integration, pytest.mark.chromatix]
 
@@ -125,7 +131,7 @@ def test_matches_propagation_probe_asm_propagate(tmp_path: Path) -> None:
     asm_expected = expected["asm_propagate"]
     z = asm_expected["z"]
 
-    jax, _jnp, _chromatix, cf, _compute_padding_transfer = mod._do_import_chromatix()
+    jax, _jnp, _chromatix, cf, _compute_padding_transfer = chromatix_execution._do_import_chromatix()
 
     # Build exactly the same plane-wave input the probe used, so the adapter
     # is exercised on the identical physical configuration recorded in
@@ -188,7 +194,7 @@ def test_gradient_probe_regression_thin_lens_transform_propagate() -> None:
     """
     expected = load_probe_expected("chromatix", "gradient_probe")
 
-    jax, jnp, _chromatix, cf, _compute_padding_transfer = mod._do_import_chromatix()
+    jax, jnp, _chromatix, cf, _compute_padding_transfer = chromatix_execution._do_import_chromatix()
 
     shape = (64, 64)
     dx = 1.0
@@ -230,7 +236,7 @@ def test_missing_chromatix_dependency_surfaces_as_adapter_dependency_error(
     def _boom() -> None:
         raise ImportError("simulated: chromatix is not installed in this environment")
 
-    monkeypatch.setattr(mod, "_do_import_chromatix", _boom)
+    monkeypatch.setattr(chromatix_execution, "_do_import_chromatix", _boom)
 
     adapter = mod.get_adapter()
     request = ModelRunRequest(
@@ -280,7 +286,7 @@ def test_unsupported_capability_rejected_before_any_chromatix_call(
             "chromatix must not be imported for a request _check_capability should reject"
         )
 
-    monkeypatch.setattr(mod, "_do_import_chromatix", _must_not_be_called)
+    monkeypatch.setattr(chromatix_execution, "_do_import_chromatix", _must_not_be_called)
 
     adapter = mod.get_adapter()
     request = ModelRunRequest(run_id="cap-fail", node_id="wave", inputs={}, config=config)
@@ -302,7 +308,7 @@ def test_fp64_is_refused_because_chromatix_has_no_complex128_path(
     rather than a shared precision.
     """
     monkeypatch.setattr(
-        mod,
+        chromatix_execution,
         "_do_import_chromatix",
         lambda: (_ for _ in ()).throw(AssertionError("must not import for an FP64 request")),
     )
@@ -340,7 +346,7 @@ def test_cuda_is_gated_on_the_process_not_on_the_request() -> None:
         inputs={},
         config={"propagation": "angular_spectrum", "z_m": 1.0e-4, "device": "cuda"},
     )
-    reason = mod._jax_gpu_unavailable_reason()
+    reason = chromatix_execution._jax_gpu_unavailable_reason()
 
     if reason is None:
         # No exception from the capability gate; the request is admissible.
@@ -367,7 +373,7 @@ def test_gpu_unavailability_names_a_process_global_platform_pin() -> None:
     """
     import jax
 
-    reason = mod._jax_gpu_unavailable_reason()
+    reason = chromatix_execution._jax_gpu_unavailable_reason()
     if reason is None:
         pytest.skip("this process has a working GPU, so there is no reason to inspect")
     if jax.config.read("jax_platform_name") == "cpu":
@@ -380,7 +386,7 @@ def test_require_gradients_rejected_before_any_chromatix_call(
     def _must_not_be_called() -> None:
         raise AssertionError("chromatix must not be imported when require_gradients=True")
 
-    monkeypatch.setattr(mod, "_do_import_chromatix", _must_not_be_called)
+    monkeypatch.setattr(chromatix_execution, "_do_import_chromatix", _must_not_be_called)
 
     adapter = mod.get_adapter()
     request = ModelRunRequest(
@@ -695,7 +701,7 @@ def test_standalone_baseline_missing_dependency_is_structured(
     def _boom() -> None:
         raise ImportError("simulated: chromatix is not installed in this environment")
 
-    monkeypatch.setattr(mod, "_do_import_chromatix", _boom)
+    monkeypatch.setattr(chromatix_execution, "_do_import_chromatix", _boom)
 
     result = mod.ChromatixAdapter().run_standalone(_baseline_payload(tmp_path / "failed"))
 
