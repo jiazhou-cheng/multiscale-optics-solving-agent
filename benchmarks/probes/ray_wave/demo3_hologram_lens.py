@@ -67,7 +67,7 @@ from core.optical_system import (
 from core.precision import ArrayNamespace, DeviceKind, DevicePlacement, DType, Precision
 from couplers.cascade import planar_doe_step
 from couplers.patch import patch_secondary_rays, plan_patches
-from couplers.ray_to_wave import Projection
+from couplers.ray_to_wave import DEFAULT_KSPACE_OVERSAMPLE, Projection, Reconstruction
 from couplers.streaming import StreamingReconstruction
 from solvers.optiland.builder import build_optiland_system
 from solvers.optiland.coherent_trace import (
@@ -196,6 +196,8 @@ def run_route(
     precision: str,
     secondary_chunks: int = 1,
     route: str = "patch",
+    reconstruction_route: str = "ramp_sum",
+    kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
 ) -> dict[str, Any]:
     """Rays from the DOE, an Optiland trace, and one coherent sensor field.
 
@@ -316,6 +318,13 @@ def run_route(
         complex_dtype=DType.COMPLEX128 if precision == "fp64" else DType.COMPLEX64,
         total_rays=total_rays,
         projection=Projection.ASM_CONSISTENT,
+        # No matched k-grid is available here, and saying so is the point: the
+        # rays reaching this plane have been refracted by the singlet, so their
+        # directions are no longer bins of the DOE's spectrum and no k-grid
+        # period puts them on nodes. demo2's reconstruction is exact; this one is
+        # an interpolation, and `on_node_fraction` in the record reports which.
+        reconstruction=Reconstruction(reconstruction_route),
+        kspace_oversample=kspace_oversample,
     )
 
     trace_plans = None
@@ -336,12 +345,27 @@ def run_route(
     started = time.perf_counter()
 
     chunk_count = 0
+    # Per-stage wall clock, because CHE-96 attributed all of demo3's cost to the
+    # O(N_rays x N_pixels) reconstruction and CHE-101 measured the reconstruction
+    # kernel at 0.18 s per 1e6-ray chunk against a 2.4 s chunk. A cost model that
+    # names the wrong stage sends the next ticket to optimize the wrong thing, so
+    # the breakdown is recorded rather than inferred from a total.
+    stage_s: dict[str, float] = {
+        "emit_patch_spectra": 0.0,
+        "host_to_device": 0.0,
+        "optiland_trace": 0.0,
+        "power_bookkeeping": 0.0,
+        "reconstruct": 0.0,
+    }
     for group in groups:
         if group.size == 0:
             continue
         for part in secondary_parts:
             chunk_count += 1
+            stage_started = time.perf_counter()
             bundle, emitter_diagnostics = emit(group, part)
+            stage_s["emit_patch_spectra"] += time.perf_counter() - stage_started
+            stage_started = time.perf_counter()
             chunk_amplitude = np.abs(np.asarray(bundle.amplitude)) ** 2
             launched_power += float(chunk_amplitude.sum())
             launched_empty += int(np.count_nonzero(chunk_amplitude == 0.0))
@@ -368,6 +392,8 @@ def run_route(
                 valid=xp.ones(moved.count, dtype=bool),
             )
             next_id += moved.count
+            stage_s["host_to_device"] += time.perf_counter() - stage_started
+            stage_started = time.perf_counter()
             if trace_plans is None:
                 trace_plans = plan_trace_bridges(
                     batch, home=C_RAY_TO_WAVE_CAPABILITIES, device=device
@@ -381,6 +407,8 @@ def run_route(
                 }
                 first_trace["residency"] = trace_diagnostics["residency"]
                 first_trace["emitter"] = emitter_diagnostics
+            stage_s["optiland_trace"] += time.perf_counter() - stage_started
+            stage_started = time.perf_counter()
             clipped += int(trace_diagnostics["invalid_rays"])
             traced_power = np.abs(np.asarray(traced.bundle.amplitude)) ** 2
             survived_power += float(traced_power.sum())
@@ -394,7 +422,10 @@ def run_route(
                 np.abs(traced_xy[:, 1]) <= half_extent_m
             )
             captured_power += float(traced_power[inside].sum())
+            stage_s["power_bookkeeping"] += time.perf_counter() - stage_started
+            stage_started = time.perf_counter()
             reconstruction.add_chunk(traced)
+            stage_s["reconstruct"] += time.perf_counter() - stage_started
             del bundle, moved, batch, traced
 
     result = reconstruction.finalize(provenance={"probe": "demo3"})
@@ -419,6 +450,20 @@ def run_route(
                 "pad_width": pad_width,
             }
         ),
+        "stage_wall_clock_s": {
+            **{k: round(v, 3) for k, v in stage_s.items()},
+            "note": (
+                "Sums to slightly less than wall_clock_s: finalize and the plan "
+                "setup are outside the loop. `power_bookkeeping` is this probe's "
+                "own accounting -- three host round-trips per chunk -- not part of "
+                "the physics, and is separated so it cannot be mistaken for one."
+            ),
+        },
+        "reconstruction": {
+            "route": reconstruction_route,
+            "kspace_oversample": kspace_oversample if reconstruction_route != "ramp_sum" else None,
+            "measured": (reconstruction._first_diagnostics or {}).get("kspace"),
+        },
         "total_rays": total_rays,
         "secondary_per_patch": per_patch,
         "batches": chunk_count,
@@ -586,6 +631,39 @@ PRESETS: dict[str, dict[str, Any]] = {
 }
 
 
+def build_doe_and_lens(*, backend: str, precision: str):
+    """The demo3 optical system, built in the one order that works.
+
+    Returns ``(doe, lens, spec, execution)``: the prescription and the resolved
+    execution state come back with the objects because both are recorded in
+    every demo3 artifact, and a probe that rebuilt them separately could record
+    a configuration it did not run.
+
+    Extracted so a second probe cannot rebuild it and get the order wrong.
+    `configure_optiland_execution` switches Optiland's **global** backend, and a
+    surface built under the previous one keeps its geometry parameters in that
+    namespace: the trace then fails as `numpy.ndarray * Tensor` one frame inside
+    an optiland geometry class, which is not where anyone would look for an
+    ordering bug. Configure first, build second, and never the reverse.
+    """
+    doe = build_doe("demo3_smile_phase_profile.npy", pitch_m=PITCH_M)
+    spec = demo3_system()
+    execution = configure_optiland_execution(
+        device=DevicePlacement(
+            kind=DeviceKind.CUDA if backend == "jax" else DeviceKind.CPU, index=0
+        ),
+        precision=Precision.FP64 if precision == "fp64" else Precision.FP32,
+        enable_grad=False,
+    )
+    lens = build_optiland_system(spec)
+    if execution.grad_enabled:
+        raise RuntimeError(
+            "Optiland grad mode is enabled; this is a forward characterization and "
+            "must not record computational graphs"
+        )
+    return doe, lens, spec, execution
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preset", choices=sorted(PRESETS), default="smoke")
@@ -606,6 +684,13 @@ def main() -> int:
             "grouping alone cannot bound it; the secondary draw is split too."
         ),
     )
+    parser.add_argument(
+        "--reconstruction",
+        choices=("ramp_sum", "kspace_splat"),
+        default="ramp_sum",
+        help="ramp_sum is the exact O(rays x pixels) route; kspace_splat is CHE-101's fast path",
+    )
+    parser.add_argument("--kspace-oversample", type=float, default=DEFAULT_KSPACE_OVERSAMPLE)
     parser.add_argument("--output-name", default=None)
     parser.add_argument(
         "--agreement-from",
@@ -638,28 +723,14 @@ def main() -> int:
         precisions=[preset[r]["precision"] for r in routes if r in preset],
     )
 
-    doe = build_doe("demo3_smile_phase_profile.npy", pitch_m=PITCH_M)
-    spec = demo3_system()
-    # Configure BEFORE building. `configure_optiland_execution` switches
-    # Optiland's global backend, and a surface built under the previous one
-    # keeps its geometry parameters in that namespace -- the trace then fails
-    # inside optiland with `numpy.ndarray * Tensor`, one frame deep in a
-    # geometry class, which is not where anyone would look for an ordering bug.
-    execution = configure_optiland_execution(
-        device=DevicePlacement(
-            kind=DeviceKind.CUDA if args.backend == "jax" else DeviceKind.CPU, index=0
+    doe, lens, spec, execution = build_doe_and_lens(
+        backend=args.backend,
+        precision=(
+            "fp64"
+            if any(preset[r]["precision"] == "fp64" for r in routes if r in preset)
+            else "fp32"
         ),
-        precision=Precision.FP64 if any(
-            preset[r]["precision"] == "fp64" for r in routes if r in preset
-        ) else Precision.FP32,
-        enable_grad=False,
     )
-    lens = build_optiland_system(spec)
-    if execution.grad_enabled:
-        raise RuntimeError(
-            "Optiland grad mode is enabled; this is a forward characterization and "
-            "must not record computational graphs"
-        )
 
     record: dict[str, Any] = {
         "probe": "demo3_hologram_lens",
@@ -710,6 +781,10 @@ def main() -> int:
             ),
             "seeds": seeds,
             "backend_requested": args.backend,
+            "reconstruction": args.reconstruction,
+            "kspace_oversample": (
+                args.kspace_oversample if args.reconstruction != "ramp_sum" else None
+            ),
         },
         "conventions": {
             "origin_rule": "coordinate zero at index n // 2 (upstream uses (n-1)/2)",
@@ -765,6 +840,8 @@ def main() -> int:
                 backend=args.backend,
                 precision=settings["precision"],
                 secondary_chunks=_secondary_chunks(settings, args.rays_per_chunk),
+                reconstruction_route=args.reconstruction,
+                kspace_oversample=args.kspace_oversample,
             )
             fields[name].append(run.pop("field"))
             run["seed"] = seed

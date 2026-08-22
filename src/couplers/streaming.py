@@ -88,7 +88,12 @@ from core.boundary import (
     ReferencePlane,
 )
 from core.precision import Precision
-from couplers.ray_to_wave import Projection, ray_to_wave
+from couplers.ray_to_wave import (
+    DEFAULT_KSPACE_OVERSAMPLE,
+    Projection,
+    Reconstruction,
+    ray_to_wave,
+)
 from couplers.wave_to_ray import (
     AngularSpectrum,
     SamplingDensity,
@@ -546,6 +551,9 @@ class StreamingReconstruction:
         complex_dtype: Any,
         total_rays: int,
         projection: Projection = Projection.ASM_CONSISTENT,
+        reconstruction: Reconstruction = Reconstruction.RAMP_SUM,
+        kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
+        kspace_grid_shape: tuple[int, int] | None = None,
     ) -> None:
         self.grid_shape = grid_shape
         self.sample_pitch_m = sample_pitch_m
@@ -553,6 +561,14 @@ class StreamingReconstruction:
         self.wavelength_m = wavelength_m
         self.total_rays = int(total_rays)
         self.projection = projection
+        # Chunking and the reconstruction algorithm are independent: the 1/N is
+        # still applied once at finalize, so a chunk boundary cannot change the
+        # answer under either route. See ray_to_wave.Reconstruction for the
+        # k-grid's exactness condition, which the *caller* owns because only the
+        # caller knows what grid its ray directions were enumerated on.
+        self.reconstruction = reconstruction
+        self.kspace_oversample = kspace_oversample
+        self.kspace_grid_shape = kspace_grid_shape
         self._xp = xp_for(namespace)
         self._complex_dtype = complex_dtype
         self._accumulator = self._xp.zeros(grid_shape, dtype=numpy_dtype(complex_dtype))
@@ -570,6 +586,9 @@ class StreamingReconstruction:
             # See the class docstring: the 1/N is the estimator's, not the chunk's.
             normalization="none",
             projection=self.projection,
+            reconstruction=self.reconstruction,
+            kspace_oversample=self.kspace_oversample,
+            kspace_grid_shape=self.kspace_grid_shape,
         )
         self._accumulator = self._accumulator + chunk_field.u
         self.valid_rays += batch.valid_count

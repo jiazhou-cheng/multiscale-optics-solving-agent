@@ -43,7 +43,10 @@ sources:
     executed_by_this_repository: false
     retrieved_at: null
     read_at: "2026-08-22"
-    read_scope: configuration_and_option_inventory
+    read_revision: "777e753be7778b09bf13fb55c633a56ac4ad04e5"
+    read_scope: configuration_and_option_inventory_plus_reconstruction_algorithm
+    read_files:
+      - deeplens/raywave.py  # RayWave.huygens_psf, read in full for CHE-101
     usage_note: >
       Read, never executed, and never vendored -- and the distinction between
       those three is the point of this entry.
@@ -64,6 +67,36 @@ sources:
       primary-position sampler is offered as an option rather than adopted,
       because the paper does not justify sampling positions uniformly while
       sampling directions by spectrum magnitude.
+
+      CHE-101 read further, and the scope above says so rather than leaving it
+      implied. `RayWave.huygens_psf` was read in full at revision `777e753`, and
+      what was taken from it is an **algorithm**, not an equation: evaluate the
+      same eq-2 wavelet sum as a bilinear splat into a k-grid followed by one
+      inverse FFT, instead of as a real-space contraction. That is a strictly
+      larger debt than CHE-95's option inventory and is recorded as one.
+
+      The equations are still the paper's. A plane wavelet is a k-space delta by
+      SI S2's own construction, so the two evaluations are the same operator --
+      which is why the ported route reproduces this repository's exact route to
+      7.1e-13 on the full-enumeration limit rather than merely resembling it.
+
+      Three details were deliberately NOT copied, each because measurement said
+      not to. Upstream crops the padded field at `(K - n) // 2`, which is a
+      sample off this repository's `n // 2` coordinate origin whenever the two
+      grids differ in parity. Upstream requires a full four-neighbour footprint
+      and discards any ray in the top k-bin; here the upper neighbour is clamped,
+      whose interpolation weight is zero there anyway, so the ray is kept.
+      Upstream also drops rays landing outside the sensor extent before
+      accumulating, which is a sensor model rather than a reconstruction: a
+      wavelet contributes a ramp across the whole plane regardless of where it
+      crosses it, and this repository's exact route has no such crop, so porting
+      it would have made the two routes disagree for a reason unrelated to the
+      algorithm.
+
+      Nothing about upstream's *accuracy* was inherited. It has no test suite, so
+      the ported route was verified against this repository's own exact route,
+      and the k-grid oversampling it defaults to (1.5) was measured here to leave
+      9% intensity error on demo3 and is not used at that value.
 
       No number in any coupler card comes from this source. Every one comes from
       a probe run in the agent_solver container, and the entries below say which.

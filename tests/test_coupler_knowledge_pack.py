@@ -56,6 +56,39 @@ def test_card_pins_the_doi_and_names_the_paper_equations(direction: str) -> None
     assert source["equations"], "a coupler card must name the equations it implements"
 
 
+def test_the_ported_reconstruction_algorithm_is_recorded_with_its_revision() -> None:
+    """CHE-101 took an algorithm from upstream, and the record must say so.
+
+    CHE-95's debt was an *option inventory*: four knobs exist, each then
+    specified from its physical description. CHE-101's is larger -- the k-space
+    splat plus inverse FFT in ``Reconstruction.KSPACE_SPLAT`` is upstream's
+    evaluation strategy, read from ``deeplens/raywave.py``. A manifest that
+    still described only the inventory would understate what was borrowed.
+
+    So this asserts the three things a future reader needs and cannot recover:
+    which revision was read, which file, and that the *equations* are still the
+    paper's. Without the revision the claim is uncheckable; a read of a moving
+    branch tip is not a record.
+    """
+    entries = [
+        entry
+        for entry in _manifest("ray_to_wave")["sources"]
+        if entry.get("source_type") == "reference_implementation"
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+    revision = entry.get("read_revision")
+    assert revision and len(revision) >= 7, (
+        "an algorithm read off a branch tip with no revision recorded cannot be "
+        "checked against the source it came from"
+    )
+    assert "reconstruction_algorithm" in entry["read_scope"]
+    assert any("raywave.py" in name for name in entry.get("read_files", []))
+    note = entry["usage_note"]
+    assert "algorithm" in note
+    assert "equations are still the paper" in note
+
+
 @pytest.mark.parametrize("direction", DIRECTIONS)
 def test_reference_implementation_is_recorded_as_read_but_never_executed(direction: str) -> None:
     """The paper's code is public, and what this repository did with it must be exact.

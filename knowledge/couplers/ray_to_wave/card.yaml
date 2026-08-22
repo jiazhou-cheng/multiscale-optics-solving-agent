@@ -19,6 +19,14 @@ scientific_source:
     cite it as evidence. All mathematics is taken from the paper; all evidence is
     produced by this repository's own probes.
 
+    READ, twice and at recorded scope: CHE-95 for an option inventory, CHE-101 for
+    the k-space reconstruction algorithm now available as
+    `Reconstruction.KSPACE_SPLAT`. That is an algorithm debt, not an equation
+    debt -- a plane wavelet is a k-space delta by SI S2 -- and it is recorded in
+    source_manifest.yaml with the revision read. The ported route is verified
+    against this repository's own exact route, never against upstream, which
+    ships no tests.
+
 framework: numpy
 frameworks_deliberately_avoided:
   - reason: >

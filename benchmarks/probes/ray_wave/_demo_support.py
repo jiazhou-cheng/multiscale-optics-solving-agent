@@ -25,7 +25,7 @@ import numpy as np
 from core.boundary import ReferencePlane
 from core.precision import ArrayNamespace, DType
 from couplers.patch import patch_secondary_rays, plan_patches
-from couplers.ray_to_wave import Projection
+from couplers.ray_to_wave import Projection, Reconstruction
 from couplers.streaming import StreamingReconstruction
 
 REPO = Path(__file__).resolve().parents[3]
@@ -186,6 +186,9 @@ class _DualAccumulator(StreamingReconstruction):
             plane=self.plane,
             normalization="none",
             projection=self.projection,
+            reconstruction=self.reconstruction,
+            kspace_oversample=self.kspace_oversample,
+            kspace_grid_shape=self.kspace_grid_shape,
         )
         self._accumulator = self._accumulator + chunk_field.u
         self.notebook_intensity += np.abs(np.asarray(chunk_field.u)) ** 2
@@ -267,6 +270,68 @@ def to_namespace(bundle: Any, *, backend: str, precision: str) -> Any:
     return moved
 
 
+def matched_kspace_grid(
+    *,
+    pad_px: int,
+    doe_pitch_m: float,
+    sensor_pitch_m: float,
+    min_shape: tuple[int, int],
+    max_grid: int = 8192,
+) -> dict[str, Any]:
+    """Smallest k-grid on which this patch's spectral bins land exactly on nodes.
+
+    `patch.py` draws secondary directions from `fftshift(fftfreq(pad, d=pitch))`,
+    so every ray's transverse wavevector is an exact integer multiple of
+    ``dk_mode = 2 pi / (pad_px * doe_pitch)``. The reconstruction's k-grid has
+    spacing ``dk_grid = 2 pi / (K * sensor_pitch)``. The splat is exact -- not
+    interpolated -- exactly when ``dk_mode / dk_grid = K * sensor_pitch /
+    (pad_px * doe_pitch)`` is an integer.
+
+    So the k-grid is not a free tuning knob for a route whose rays came from an
+    enumeration or from a draw over that enumeration: there is a *right* answer,
+    and picking an oversampling factor instead converts an exactness measurement
+    into an interpolation error. This is the CHE-96 oracle-padding lesson in a
+    different coordinate.
+
+    Note the DOE and sensor pitches need not match -- demo3 samples at 4.2 um a
+    field whose modes were enumerated at 6.3 um -- which is why the ratio is
+    carried explicitly rather than assumed to be one.
+
+    Returns the grid and the residual, so a caller can record how exact
+    "exact" was rather than trusting this function.
+    """
+    period = pad_px * doe_pitch_m
+    ratio = period / sensor_pitch_m
+    need = max(int(min_shape[0]), int(min_shape[1]))
+    best: dict[str, Any] | None = None
+    for multiple in range(1, max_grid):
+        k = multiple * ratio
+        rounded = round(k)
+        if rounded > max_grid:
+            break
+        residual = abs(k - rounded) / max(k, 1.0)
+        if residual > 1e-12 or rounded < need:
+            continue
+        best = {
+            "kspace_grid_shape": [rounded, rounded],
+            "spectral_periods_per_kgrid": multiple,
+            "integrality_residual": residual,
+            "basis": (
+                f"pad_px={pad_px} at {doe_pitch_m:.3e} m reconstructed at "
+                f"{sensor_pitch_m:.3e} m; K * sensor_pitch is {multiple} whole "
+                "spectral periods, so every drawn bin lands on a node"
+            ),
+        }
+        break
+    if best is None:
+        raise ValueError(
+            f"no k-grid <= {max_grid} makes pad_px={pad_px} at {doe_pitch_m} m "
+            f"commensurate with a {sensor_pitch_m} m sensor grid of at least {need}; "
+            "the fast path would be interpolating and must be reported as such"
+        )
+    return best
+
+
 def patch_route(
     doe: Doe,
     *,
@@ -282,6 +347,9 @@ def patch_route(
     backend: str,
     precision: str,
     advance: bool = True,
+    reconstruction: str = "ramp_sum",
+    kspace_oversample: float | None = None,
+    kspace_grid_shape: tuple[int, int] | str | None = None,
 ) -> dict[str, Any]:
     """One full patch-route run, chunked so the ray budget never lands at once.
 
@@ -306,6 +374,20 @@ def patch_route(
     )
     centers = np.asarray(plan.centers_xy_m)
     n_patches = centers.shape[0]
+
+    # "matched" can only be resolved here: the k-grid that makes the splat exact
+    # is a function of plan.pad_px, which plan_patches derives (and may dilate)
+    # rather than the caller choosing. Resolving it in the caller would pin a pad
+    # the plan did not use.
+    kspace_basis: dict[str, Any] | None = None
+    if kspace_grid_shape == "matched":
+        kspace_basis = matched_kspace_grid(
+            pad_px=plan.pad_px,
+            doe_pitch_m=doe.pitch_m[0],
+            sensor_pitch_m=doe.pitch_m[0],
+            min_shape=sensor_shape,
+        )
+        kspace_grid_shape = tuple(kspace_basis["kspace_grid_shape"])
     groups = np.array_split(np.arange(n_patches), max(1, min(batches, n_patches)))
 
     # The total must be known before the first chunk: the 1/N is the
@@ -334,6 +416,13 @@ def patch_route(
         complex_dtype=DType.COMPLEX128 if precision == "fp64" else DType.COMPLEX64,
         total_rays=total_rays,
         projection=Projection.ASM_CONSISTENT,
+        reconstruction=Reconstruction(reconstruction),
+        **(
+            {"kspace_oversample": kspace_oversample}
+            if kspace_oversample is not None
+            else {}
+        ),
+        kspace_grid_shape=tuple(kspace_grid_shape) if kspace_grid_shape else None,
     )
     started = time.perf_counter()
     diagnostics: dict[str, Any] = {}
@@ -380,6 +469,17 @@ def patch_route(
             "patch_count": n_patches,
         },
         "patch_diagnostics": diagnostics,
+        "reconstruction": {
+            "route": reconstruction,
+            "requested_kspace_grid_shape": list(kspace_grid_shape) if kspace_grid_shape else None,
+            "requested_kspace_oversample": kspace_oversample,
+            "matched_grid_basis": kspace_basis,
+            # Read off the first chunk's diagnostics rather than restated from
+            # the request: on_node_fraction is what says whether this run was an
+            # exactness measurement or an interpolation, and dropped_fraction is
+            # what stops a lossy run from reading like a clean one.
+            "measured": (accumulator._first_diagnostics or {}).get("kspace"),
+        },
         "streaming": result.as_dict(),
         "total_rays": total_rays,
         "secondary_per_patch": per_patch,
