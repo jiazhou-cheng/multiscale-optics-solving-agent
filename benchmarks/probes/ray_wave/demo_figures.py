@@ -35,10 +35,20 @@ RECORDS = Path(__file__).resolve().parents[1] / "records" / "ray_wave"
 DATA = Path(__file__).resolve().parents[1] / "data"
 
 FACECOLOR = "#fcfcfb"
-#: gamma < 1 lifts the diffraction rings out of the black floor. Every intensity
-#: panel in a figure shares one norm, so panels are comparable to each other and
-#: not each to its own maximum.
-GAMMA = 0.4
+#: Intensity stretch. 1.0 is linear and is the default, because a gamma < 1 lifts
+#: the speckle floor by the same factor it lifts the signal and so makes an
+#: unconverged demo3 panel read as a formed image. Override with --gamma when the
+#: point of a panel is faint structure whose *presence* is the claim, never its
+#: contrast. Every intensity panel in a figure shares one norm, so panels are
+#: comparable to each other and not each to its own maximum.
+GAMMA = 1.0
+
+
+def _intensity_norm(vmax: float):
+    """One shared norm for every intensity panel in a figure."""
+    if GAMMA == 1.0:
+        return matplotlib.colors.Normalize(vmin=0.0, vmax=vmax)
+    return matplotlib.colors.PowerNorm(gamma=GAMMA, vmin=0.0, vmax=vmax)
 
 
 def _load(name: str) -> dict[str, np.ndarray]:
@@ -106,7 +116,7 @@ def figure_demo2(output: Path) -> dict[str, Any]:
 
     intensities = {key: _unit_sum(np.abs(fields[key]) ** 2) for key, _, _ in panels}
     vmax = max(float(v.max()) for v in intensities.values())
-    norm = matplotlib.colors.PowerNorm(gamma=GAMMA, vmin=0.0, vmax=vmax)
+    norm = _intensity_norm(vmax)
 
     figure, axes = plt.subplots(2, 4, figsize=(17.5, 9.2), layout="constrained")
     figure.suptitle(
@@ -209,7 +219,7 @@ def figure_demo3(output: Path) -> dict[str, Any]:
     f_single, f_mean = stack(rwf)
     p_single, p_mean = stack(rwp)
     vmax = max(float(v.max()) for v in (f_single, f_mean, p_single, p_mean))
-    norm = matplotlib.colors.PowerNorm(gamma=GAMMA, vmin=0.0, vmax=vmax)
+    norm = _intensity_norm(vmax)
 
     figure, axes = plt.subplots(2, 3, figsize=(14.5, 9.0), layout="constrained")
     figure.suptitle(
@@ -336,7 +346,7 @@ def figure_demo3_kspace(output: Path) -> dict[str, Any]:
 
     fast_mean, old_mean = coherent_mean(fast), coherent_mean(old)
     vmax = max(float(v.max()) for v in (ia, ib, fast_mean, old_mean))
-    norm = matplotlib.colors.PowerNorm(gamma=GAMMA, vmin=0.0, vmax=vmax)
+    norm = _intensity_norm(vmax)
 
     figure, axes = plt.subplots(2, 4, figsize=(19.0, 9.4), layout="constrained")
     figure.suptitle(
@@ -531,10 +541,18 @@ def figure_demo3_kspace(output: Path) -> dict[str, Any]:
 
 
 def main() -> int:
+    global GAMMA
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/CHE-96"))
     parser.add_argument("--demos", default="demo2,demo3,demo3-kspace")
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=GAMMA,
+        help="intensity stretch; 1.0 (default) is a linear colour bar",
+    )
     args = parser.parse_args()
+    GAMMA = args.gamma
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     wanted = {d.strip() for d in args.demos.split(",") if d.strip()}
