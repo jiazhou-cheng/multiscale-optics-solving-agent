@@ -11,8 +11,8 @@ This is therefore a *second, narrow* capability rather than a change to the
 first, and it is deliberately small: one entry point, no system construction
 (the caller passes a built ``Optic``), no persistence, no field/pupil concepts.
 
-Torch lives inside this function
---------------------------------
+Torch lives inside this function, and only when it is needed
+------------------------------------------------------------
 Boundary artifacts are NumPy/JAX by contract -- ``RayBundle`` refuses a torch
 tensor outright, so that a conversion cannot happen implicitly. Optiland's CUDA
 capability is torch-backend-only. Both facts hold, so the torch representation
@@ -21,6 +21,15 @@ a JAX batch comes out, and the two conversions are planned by
 ``core.precision.plan_bridge`` and reported, rather than performed by whichever
 operation touched the array first. On CUDA both directions go through DLPack, so
 the buffer never leaves the device.
+
+On the **host** there is no torch representation at all, and CHE-102 is why:
+``plan_bridge`` keeps a NumPy batch in NumPy there, so selecting torch anyway
+meant Optiland converted every array on entry and the trace executed in a
+namespace no caller had chosen -- which cost the exactness limit ~32% of its
+runs. :func:`~solvers.optiland.execution.resolve_optiland_namespace` now decides
+the backend from the same declaration ``plan_bridge`` reads, and
+:func:`_require_backend_matches_plan` refuses a trace where the two disagree
+rather than converting silently.
 
 Only a real intensity crosses into Optiland
 -------------------------------------------
@@ -78,6 +87,10 @@ from core.precision import (
     DevicePlacement,
     Precision,
 )
+from solvers.optiland.execution import (
+    NAMESPACE_BACKEND,
+    resolve_optiland_namespace,
+)
 
 __all__ = [
     "OptilandExecutionState",
@@ -102,6 +115,7 @@ class OptilandExecutionState:
     requested_backend: str
     requested_device: str
     requested_precision: str
+    observed_backend: str
     observed_device: str
     observed_precision: str
     grad_enabled: bool
@@ -121,6 +135,9 @@ class OptilandExecutionState:
                 "precision": self.requested_precision,
             },
             "observed": {
+                # Read back from optiland, never echoed: CHE-102 found a trace
+                # that every artifact described as NumPy executing in torch.
+                "backend": self.observed_backend,
                 "device": self.observed_device,
                 "precision": self.observed_precision,
                 "grad_enabled": self.grad_enabled,
@@ -150,21 +167,22 @@ def configure_optiland_execution(
 ) -> OptilandExecutionState:
     """Drive Optiland's global execution controls and report the observed state.
 
-    ``device=cuda`` selects the torch backend, because it is the only one with a
-    device concept -- ``set_device`` raises ``BackendCapabilityError`` on numpy,
-    which ``OPTILAND_CAPABILITIES.device_namespaces`` already declares. That
-    declaration is honoured here rather than re-derived.
+    The backend comes from :func:`resolve_optiland_namespace`: the host executes
+    in NumPy, the namespace ``plan_bridge`` actually delivers there, and torch is
+    selected only for CUDA (the only namespace with a device concept --
+    ``set_device`` raises ``BackendCapabilityError`` on numpy) or for gradients.
+    Before CHE-102 this function preferred torch whenever torch was admissible,
+    which on the host meant every array was converted on entry to a backend
+    nothing had asked for; see :func:`resolve_optiland_namespace` for what that
+    cost the exactness limit.
 
-    All three setters are process-global and none is thread-safe in optiland
-    0.6.0, so all three are set on every call rather than inherited from
-    whatever a previous call left behind.
+    All the setters are process-global and none is thread-safe in optiland 0.6.0,
+    so each is set on every call rather than inherited from whatever a previous
+    call left behind.
     """
     be, _ = _import_optiland()
-    namespaces = OPTILAND_CAPABILITIES.device_namespaces[device.kind]
-    namespace = (
-        ArrayNamespace.TORCH if ArrayNamespace.TORCH in namespaces else ArrayNamespace.NUMPY
-    )
-    backend_name = "torch" if namespace is ArrayNamespace.TORCH else "numpy"
+    namespace = resolve_optiland_namespace(device, require_gradients=enable_grad)
+    backend_name = NAMESPACE_BACKEND[namespace]
 
     torch_module: Any = None
     cuda_name: str | None = None
@@ -197,16 +215,22 @@ def configure_optiland_execution(
         observed_device = str(be.get_device())
     else:
         observed_device = "cpu (numpy backend has no device concept)"
-    if enable_grad:
-        be.grad_mode.enable()
-    else:
-        be.grad_mode.disable()
+    # `be.grad_mode` itself raises BackendCapabilityError on the numpy backend:
+    # NumPy has no autodiff to switch, so there is no flag to set rather than a
+    # flag that happens to be off. `enable_grad=True` never reaches here on numpy
+    # -- resolve_optiland_namespace selects torch for it.
+    if backend_name == "torch":
+        if enable_grad:
+            be.grad_mode.enable()
+        else:
+            be.grad_mode.disable()
 
     raw_precision = be.get_precision()
     return OptilandExecutionState(
         requested_backend=backend_name,
         requested_device=device_string,
         requested_precision=str(precision.real_dtype),
+        observed_backend=str(be.get_backend()),
         observed_device=observed_device,
         observed_precision=(
             f"float{int(raw_precision)}" if isinstance(raw_precision, int) else str(raw_precision)
@@ -232,8 +256,18 @@ def _solver_module(namespace: ArrayNamespace) -> Any:
 
 
 def _grad_enabled(be: Any) -> bool:
-    """Read Optiland's grad-mode flag under either spelling the pinned API uses."""
-    mode = be.grad_mode
+    """Read Optiland's grad-mode flag under either spelling the pinned API uses.
+
+    A backend with no autodiff has no flag: ``be.grad_mode`` raises
+    ``BackendCapabilityError`` on numpy rather than returning a disabled mode, so
+    the absence is reported as ``False`` instead of propagated. That is a
+    statement about the backend, not a swallowed error -- the backend name is
+    reported alongside it in :class:`OptilandExecutionState`.
+    """
+    try:
+        mode = be.grad_mode
+    except Exception:
+        return False
     for attribute in ("requires_grad", "enabled", "is_enabled"):
         value = getattr(mode, attribute, None)
         if isinstance(value, bool):
@@ -317,11 +351,49 @@ def plan_trace_bridges(
 
     source = array_state(batch.bundle.positions_m)
     inbound = plan_bridge(source, OPTILAND_CAPABILITIES, policy=policy, target_device=device)
+    # The namespace the trace comes back in is the one it executed in, which is
+    # `inbound.target_namespace` -- not torch unconditionally. Hardcoding torch
+    # here described a host trace as leaving torch buffers when it leaves NumPy
+    # ones, so the outbound plan recorded in the manifest was a plan for a
+    # conversion that never happened (CHE-102).
     traced_state = ArrayState(
-        inbound.target_dtype, inbound.target_device, ArrayNamespace.TORCH
+        inbound.target_dtype, inbound.target_device, inbound.target_namespace
     )
     outbound = plan_bridge(traced_state, home, policy=policy, target_device=device)
     return TracePlans(inbound=inbound, outbound=outbound, home=home)
+
+
+def _require_backend_matches_plan(be: Any, plans: TracePlans) -> None:
+    """Refuse a trace whose solver backend and array namespace disagree (CHE-102).
+
+    ``plan_bridge`` decides which namespace the arrays are handed over in;
+    ``configure_optiland_execution`` decides which backend Optiland dispatches
+    to. Both are correct in isolation and neither could see the other, so the
+    combination "NumPy arrays, torch backend" was reachable and reached: every
+    array was silently converted on entry, the trace executed in a namespace no
+    caller had chosen, and the exactness limit failed a third of the time in a
+    way no artifact could explain.
+
+    Read off the solver, not off the request -- the CHE-61 rule. This is the
+    constraint an executor running a ray node and a wave node in one process
+    inherits: process-global solver state must be *checked* at the boundary that
+    depends on it, because setting it correctly somewhere earlier is not a
+    property the boundary can observe.
+    """
+    observed = str(be.get_backend())
+    expected = NAMESPACE_BACKEND.get(plans.inbound.target_namespace)
+    if expected is None or observed == expected:
+        return
+    raise UnsupportedCapabilityError(
+        f"FAIL_BACKEND_NAMESPACE_MISMATCH: the trace was planned to hand Optiland "
+        f"{plans.inbound.target_namespace} arrays, but optiland.backend is "
+        f"currently '{observed}', which would convert every array on entry and "
+        f"execute in a namespace the plan does not describe. Call "
+        f"configure_optiland_execution(device=..., precision=...) for this device "
+        f"before tracing; it resolves the backend from the same declaration "
+        f"plan_bridge uses. Optiland's backend is process-global and not "
+        f"thread-safe, so another component in this process may have changed it."
+    )
 
 
 def trace_ray_batch(
@@ -335,10 +407,15 @@ def trace_ray_batch(
     """Propagate ``batch`` through ``lens`` and return the traced batch.
 
     ``batch`` arrives in a compute namespace (NumPy or JAX) and leaves in the
-    same one. The intermediate torch representation is created and discarded
-    inside this call, under ``plans``.
+    same one. Any intermediate solver-side representation is created and
+    discarded inside this call, under ``plans``.
+
+    The one thing this function refuses to assume is that Optiland's
+    process-global backend is the backend ``plans`` was negotiated for. See
+    :func:`_require_backend_matches_plan`.
     """
     be, real_rays_cls = _import_optiland()
+    _require_backend_matches_plan(be, plans)
     bundle = batch.bundle
     surfaces_m = _require_launch_plane(lens, bundle.reference_plane, skip)
     amplitude, _ = bundle.require_coherent()

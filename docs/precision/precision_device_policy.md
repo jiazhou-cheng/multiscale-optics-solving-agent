@@ -251,10 +251,11 @@ The GPU availability probe compiles and runs a kernel rather than trusting
 `[CudaDevice(id=0)]` while the first jitted call died with "No PTX compilation
 provider is available".
 
-## Two silent precision losses found by measurement
+## Three silent precision losses found by measurement
 
-Both were found by holding the GPU to the CPU-derived tolerance and refusing to
-loosen it. Both are fixed rather than tolerated.
+The first two were found by holding the GPU to the CPU-derived tolerance and
+refusing to loosen it; the third by refusing to widen a gate that failed
+intermittently. All three are fixed rather than tolerated.
 
 ### 1. JAX drops 64-bit requests without erroring
 
@@ -283,6 +284,69 @@ missed the CPU-derived bound by 170×; a looser tolerance would have "passed" it
 and buried the loss in a constant. `core.arrays.matmul_precision_kwargs` requests
 `highest` for JAX dot products and returns nothing for NumPy, which needs no such
 knob — one operation, one "and mean it" flag that differs by namespace.
+
+### 3. A host trace executing on a backend nothing asked for (CHE-102)
+
+The third has the same shape as the first two -- an array that reported the right
+dtype while the arithmetic behind it was not the arithmetic requested -- but the
+mismatched axis is the **namespace**, not the dtype, and that is why it went
+unnoticed for longer.
+
+Two decisions had no way to see each other:
+
+* `core.precision.plan_bridge` decides which namespace the arrays are handed
+  over in. Rule E keeps a NumPy source in NumPy when the target admits NumPy, so
+  on the host the coherent ray batch stays NumPy.
+* `configure_optiland_execution` decides which backend `optiland.backend`
+  dispatches to. It preferred torch whenever torch was admissible, and
+  `OPTILAND_CAPABILITIES.device_namespaces[CPU]` admits both.
+
+So a host/float64 request produced NumPy arrays and `set_backend("torch")`.
+Optiland converted every array on entry, and a trace that every artifact
+described as `numpy:float64@cpu` -- residency log included, because residency is
+read off the *boundary* arrays, which really were NumPy -- executed in torch.
+
+What it cost: `tests/test_coherent_bridge.py::TestExactnessLimit::test_the_exactness_limit_reproduces_the_analytic_oracle[air]`,
+the executable form of the mandatory zero-sampling-error limit in
+`benchmarks/protocols/coupler_protocol.yaml`, failed ~32% of `-m optiland` runs
+at 8.9e-9 against its 1e-11 gate -- 900x, bimodal, and with the same value every
+time. Measured cause: in air `u = n1/n2` is exactly 1 and `dot` is exactly `N0`,
+so `RealRays.refract` reduces to the identity
+`N -> sqrt(1 - u^2 (1 - dot^2)) == N0`. On the torch path a **contiguous
+`ceil(N/4)` chunk** of that expression came back at roughly `2^-34` absolute
+accuracy instead of float64, nondeterministically, in a different chunk on each
+occurrence -- tracing the same bit-identical rays twice in one process gave a
+corrupted chunk on the first call and a clean result on the second. The NumPy
+backend is exact to 4.4e-16 and the gate now lands at 9.1e-14 with 100x headroom.
+
+The mechanism, and the constraint an executor inherits
+-----------------------------------------------------
+
+Three changes, none of them a tolerance:
+
+1. `solvers.optiland.execution.resolve_optiland_namespace` is the single place
+   that answers "which backend does this request need". The host executes in the
+   namespace the bridge delivers; torch is selected only when it is the *only*
+   namespace that can serve the request -- CUDA, and gradients.
+2. `plan_trace_bridges` derives the traced namespace from `inbound.target_namespace`
+   instead of hardcoding torch, so the outbound plan recorded in the manifest
+   describes a conversion that actually happens.
+3. `trace_ray_batch` **checks** `optiland.backend.get_backend()` against the
+   namespace the plan negotiated and raises `FAIL_BACKEND_NAMESPACE_MISMATCH`
+   rather than tracing. `OptilandExecutionState` reports `observed.backend`
+   alongside the observed device and precision.
+
+Point 3 is the general rule, and it is the constraint **M3's graph executor must
+satisfy**: process-global solver state (Optiland's backend, precision and device;
+JAX's platform pin and `jax_enable_x64`) must be *checked at the boundary that
+depends on it*, not merely set correctly somewhere earlier. A node cannot observe
+that an earlier node left the process configured the way its own plan assumes, so
+"configure once at startup" is not a mechanism -- it is a hope. Setting the state
+remains the caller's job; verifying it is the boundary's.
+
+The exactness assertion now reports the dtype, device, namespace and observed
+solver backend it computed in, read off the arrays and off the solver. Without
+that, this was diagnosable only by statistics.
 
 ## Measured tolerances
 
@@ -372,6 +436,7 @@ knowable in advance.
 | `SILENT_DTYPE_DOWNCAST` | A cast did not land; the requested precision is unavailable here. |
 | `REPRESENTATION_INCONSISTENT` | One artifact spanning two devices or two array ecosystems. |
 | `NUMPY_CANNOT_LEAVE_HOST` | A CUDA placement requested for a NumPy target. |
+| `FAIL_BACKEND_NAMESPACE_MISMATCH` | Optiland's process-global backend contradicts the namespace the trace's bridge plan negotiated. Checked at the trace, not assumed from configuration (CHE-102). |
 
 ## Verification commands
 
