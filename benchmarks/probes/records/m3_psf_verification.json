@@ -14,8 +14,13 @@
   "true_radius_in_pixels": 2.439339782533009
  },
  "amplitude_degree_of_freedom": {
-  "consequence": "the amplitude_weight_omitted control below is reported as undetected. That is the honest result, not a passing test.",
-  "finding": "Optiland's per-ray intensity weights on this configuration are uniform to ~1e-5 relative, so replacing every amplitude with 1 is an almost exact global scale -- and the frozen peak normalization cannot see a global scale. The amplitude path of the reconstruction is therefore NOT exercised by any M3 configuration. Exercising it needs a non-uniform weight: apodization, vignetting or a polarized Fresnel transmission, none of which M3 has.",
+  "amplitude_is_exercised": true,
+  "consequence": "the amplitude_weight_omitted control below is a real perturbation: it removes the rim/centre trapezoid correction, which changes the normalized profile by a measured amount rather than by nothing. It is still reported as undetected against the Airy-residual threshold, because the effect is small -- that is the honest result, and it is a weaker statement than the exact no-op this record used to carry.",
+  "declared_amplitude_distinct_values": 3,
+  "declared_amplitude_max": 6.358581012324661e-11,
+  "declared_amplitude_min": 3.1792905061623305e-11,
+  "declared_amplitude_relative_spread": 0.5156618664063134,
+  "finding": "Optiland's per-ray intensity weights on this configuration are uniform to ~1e-5 relative. The LAUNCHED amplitude is not: since CHE-47 it is sqrt(intensity) * quadrature_weight_m2, and the hexapolar area weight takes three distinct values by construction (centre ray 3/4 of the nominal cell, rim ring 1/2, interior 1). So the amplitude path of the reconstruction IS exercised on this configuration -- as a mild radial apodization at the pupil rim, not as a free amplitude pattern. What remains unexercised is a NON-QUADRATURE amplitude variation: apodization, vignetting or a polarized Fresnel transmission, none of which M3 has, and the quadrature weight cannot stand in for them because it is fixed by the sampling rather than by the physics.",
   "ray_intensity_max": 1.0,
   "ray_intensity_min": 1.0,
   "ray_intensity_spread": 0.0,
@@ -36,34 +41,34 @@
     "psf_integral_over_propagated_out": "must be 1 to float rounding: the measurement is |u|^2 on the same grid with the same pitch. A deviation is a measurement-layer defect, not physics.",
     "pupil_over_traced": "NOT a conservation law and not expected to be 1. The two sides measure different things: a sum of dimensionless ray weights versus sum(|u|^2)*dy*dx over a grid. The bundle declares reconstruction_normalization='none', so this ratio is the measure conversion of the wavelet sum, reported rather than compared to unity."
    },
-   "measured_psf_integral": 0.0007030256114365082,
+   "measured_psf_integral": 2.712316587379022e-24,
    "padding": {
     "edge_energy_is_a_weak_indicator": "CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 relative intensity error from wraparound and a correctly padded one. Use it to notice window truncation, not to certify padding.",
-    "input_edge_energy_fraction": 0.016281940853533874,
-    "output_edge_energy_fraction": 5.070144841854915e-10,
+    "input_edge_energy_fraction": 0.015350710013742906,
+    "output_edge_energy_fraction": 4.1957841935946417e-10,
     "pad_width": 566
    },
-   "propagated_power_in": 0.000703025667462498,
-   "propagated_power_out": 0.0007030257256701589,
-   "psf_border_energy_fraction": 5.070143801425569e-10,
+   "propagated_power_in": 2.7123175734551535e-24,
+   "propagated_power_out": 2.712316587379022e-24,
+   "psf_border_energy_fraction": 4.1957841935946417e-10,
    "ratios": {
-    "propagated_in_over_pupil": 1.0000000411764747,
-    "propagated_out_over_in": 1.0000000827959257,
-    "psf_integral_over_propagated_out": 0.9999998375114217,
-    "pupil_over_traced": 2.2184463190734635e-07
+    "propagated_in_over_pupil": 0.999999923278508,
+    "propagated_out_over_in": 0.9999996364451784,
+    "psf_integral_over_propagated_out": 1.0,
+    "pupil_over_traced": 8.558907483585423e-28
    },
-   "reconstructed_pupil_power": 0.0007030256385143806,
+   "reconstructed_pupil_power": 2.7123177815482205e-24,
    "traced_ray_power": 3169.0,
    "traced_ray_power_units": "sum of Optiland per-ray intensity weights over survivors. A COUNT-like weight, not watts, and not an area integral"
   },
   "psf": {
-   "border_energy_fraction": 5.070143801425569e-10,
+   "border_energy_fraction": 4.1957841935946417e-10,
    "peak_index": [
     660,
     660
    ],
-   "raw_peak_intensity": 6530117.987254038,
-   "raw_window_energy": 0.0007030256114365082
+   "raw_peak_intensity": 2.5677680129203816e-14,
+   "raw_window_energy": 2.712316587379022e-24
   },
   "pupil_wavefront_at_best_focus": {
    "marechal_strehl": 0.9999286761509221,
@@ -128,18 +133,18 @@
   "strehl": {
    "marechal_strehl": 0.7289168112594471,
    "marechal_valid_regime": true,
-   "measured_strehl": 0.6734048793355898,
+   "measured_strehl": 0.6884711452408991,
    "measured_strehl_definition": "(peak/energy)_aberrated / (peak/energy)_diffraction_limited, from the raw scale retained by the measurement. Energy normalization makes it independent of the uncalibrated ray-weight scale.",
-   "ratio_measured_over_marechal": 0.9238432547221104,
+   "ratio_measured_over_marechal": 0.9445126447987054,
    "rms_waves": 0.08949485912799528,
    "validity": "exp(-(2 pi sigma)^2) is a small-aberration expansion, conventionally trusted to a few percent below ~0.1 waves RMS. This is a sanity cross-check, NOT a tolerance gate: its purpose is to catch a gross error that the FFT oracle cannot, because that oracle shares the traced OPD map with the shipping path."
   },
   "vs_analytic_airy_should_disagree": {
-   "max_abs_profile_residual": 0.05474119306760579,
+   "max_abs_profile_residual": 0.05407649747044721,
    "max_radius_m": 3.242779371186616e-05,
    "radial_samples": 400,
-   "relative_l2_profile_residual": 0.08954024406869517,
-   "rms_profile_residual": 0.02027266266874659
+   "relative_l2_profile_residual": 0.0914409499897064,
+   "rms_profile_residual": 0.020702998439772496
   },
   "vs_fft_oracle": {
    "amplitude_source": "fitted",
@@ -151,15 +156,15 @@
    "fit_residual_rms_waves": 2.927365107306734e-10,
    "fitted_wavefront_rms_waves": 0.08662367567898308,
    "independent_of": "C_RAY_TO_WAVE reconstruction and Chromatix ASM propagation",
-   "max_abs_residual": 0.01473170819680273,
+   "max_abs_residual": 0.01270886407023697,
    "max_radius_m": 3.242779371186616e-05,
    "oracle": "fraunhofer_fft",
    "pixel_scale_rule": "lambda * R / (N_fft * pupil_pitch)",
    "pupil_grid_n": 188,
    "pupil_pitch_m": 2.6587352810843895e-06,
    "pupil_samples_inside_aperture": 27709,
-   "relative_l2_residual": 0.033294102876481414,
-   "rms_residual": 0.002484330166776199,
+   "relative_l2_residual": 0.029032489852538385,
+   "rms_residual": 0.0021840612127009412,
    "sample_pitch_m": [
     3.409330404687392e-07,
     3.409330404687392e-07
@@ -188,28 +193,28 @@
     "psf_integral_over_propagated_out": "must be 1 to float rounding: the measurement is |u|^2 on the same grid with the same pitch. A deviation is a measurement-layer defect, not physics.",
     "pupil_over_traced": "NOT a conservation law and not expected to be 1. The two sides measure different things: a sum of dimensionless ray weights versus sum(|u|^2)*dy*dx over a grid. The bundle declares reconstruction_normalization='none', so this ratio is the measure conversion of the wavelet sum, reported rather than compared to unity."
    },
-   "measured_psf_integral": 0.0007030256125611442,
+   "measured_psf_integral": 2.7123161929485693e-24,
    "padding": {
     "edge_energy_is_a_weak_indicator": "CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 relative intensity error from wraparound and a correctly padded one. Use it to notice window truncation, not to certify padding.",
-    "input_edge_energy_fraction": 0.016281940853533874,
-    "output_edge_energy_fraction": 4.790737464792908e-10,
+    "input_edge_energy_fraction": 0.015350710013742906,
+    "output_edge_energy_fraction": 3.964819915805652e-10,
     "pad_width": 566
    },
-   "propagated_power_in": 0.000703025667462498,
-   "propagated_power_out": 0.0007030250853858888,
-   "psf_border_energy_fraction": 4.79073598342199e-10,
+   "propagated_power_in": 2.7123175734551535e-24,
+   "propagated_power_out": 2.7123169818094746e-24,
+   "psf_border_energy_fraction": 3.964819915805652e-10,
    "ratios": {
-    "propagated_in_over_pupil": 1.0000000411764747,
-    "propagated_out_over_in": 0.9999991720407432,
-    "psf_integral_over_propagated_out": 1.00000074986692,
-    "pupil_over_traced": 2.2184463190734635e-07
+    "propagated_in_over_pupil": 0.999999923278508,
+    "propagated_out_over_in": 0.999999781867107,
+    "psf_integral_over_propagated_out": 0.9999997091560793,
+    "pupil_over_traced": 8.558907483585423e-28
    },
-   "reconstructed_pupil_power": 0.0007030256385143806,
+   "reconstructed_pupil_power": 2.7123177815482205e-24,
    "traced_ray_power": 3169.0,
    "traced_ray_power_units": "sum of Optiland per-ray intensity weights over survivors. A COUNT-like weight, not watts, and not an area integral"
   },
   "psf": {
-   "border_energy_fraction": 4.79073598342199e-10,
+   "border_energy_fraction": 3.964819915805652e-10,
    "coherence_model": "monochromatic, fully coherent, scalar (single wavelength)",
    "grid_center_index": [
     660,
@@ -299,32 +304,32 @@
     "analytic_estimator_bias": 0.10925374051154435,
     "analytic_same_grid_first_null_m": 7.194130294284856e-06,
     "center_index_used": null,
-    "measured_first_null_m": 7.167686838355016e-06,
+    "measured_first_null_m": 7.442414497843459e-06,
     "method": "azimuthal average by bilinear interpolation, parabola-refined minimum; the same estimator is applied to the analytic pattern on the same grid so its sampling bias cancels in ratio_measured_over_analytic",
     "pixels_per_airy_radius": 2.439339871593739,
     "predicted_first_null_m": 6.485558742373233e-06,
-    "ratio_measured_over_analytic": 0.9963243012222274,
-    "ratio_measured_over_predicted": 1.1051764578933063
+    "ratio_measured_over_analytic": 1.0345120526599088,
+    "ratio_measured_over_predicted": 1.1475363640172793
    },
-   "max_abs_profile_residual": 0.004612931705154699,
+   "max_abs_profile_residual": 0.004159184101294122,
    "max_radius_m": 3.242779371186616e-05,
    "peak_intensity": {
     "definition": "(peak / summed energy) of the measured PSF over the same ratio for the analytic Airy sampled on the same grid. Equal-energy normalization, so the uncalibrated ray-weight scale cancels. Reported over the full window and over a bounded one, because a ray-starved reconstruction puts energy in a broad pedestal and the full-window sum is dominated by it.",
     "energy_pixels": 1742400,
     "energy_window_airy_radii": null,
-    "peak_intensity_relative_deficit": 0.5036891593993642,
-    "strehl_against_analytic_airy": 0.49631084060063585
+    "peak_intensity_relative_deficit": 0.505222796522816,
+    "strehl_against_analytic_airy": 0.494777203477184
    },
    "peak_intensity_within_5_airy_radii": {
     "definition": "(peak / summed energy) of the measured PSF over the same ratio for the analytic Airy sampled on the same grid. Equal-energy normalization, so the uncalibrated ray-weight scale cancels. Reported over the full window and over a bounded one, because a ray-starved reconstruction puts energy in a broad pedestal and the full-window sum is dominated by it.",
     "energy_pixels": 473,
     "energy_window_airy_radii": 5.0,
-    "peak_intensity_relative_deficit": -0.01216272686766473,
-    "strehl_against_analytic_airy": 1.0121627268676647
+    "peak_intensity_relative_deficit": 0.008102452980081054,
+    "strehl_against_analytic_airy": 0.991897547019919
    },
    "radial_samples": 400,
-   "relative_l2_profile_residual": 0.005866140069598695,
-   "rms_profile_residual": 0.0013281433397406752
+   "relative_l2_profile_residual": 0.005509110940044263,
+   "rms_profile_residual": 0.0012473089486615056
   },
   "vs_fft_oracle": {
    "amplitude_source": "fitted",
@@ -336,33 +341,33 @@
    "fit_residual_rms_waves": 2.7833441677971314e-10,
    "fitted_wavefront_rms_waves": 0.005061248020672515,
    "independent_of": "C_RAY_TO_WAVE reconstruction and Chromatix ASM propagation",
-   "max_abs_residual": 0.009600525095494916,
+   "max_abs_residual": 0.008059977228028758,
    "max_radius_m": 3.242779371186616e-05,
    "oracle": "fraunhofer_fft",
    "oracle_first_null": {
     "analytic_estimator_bias": 0.00042050873445709236,
     "analytic_same_grid_first_null_m": 6.509675094536176e-06,
     "center_index_used": null,
-    "measured_first_null_m": 6.501688151010429e-06,
+    "measured_first_null_m": 6.591590788850982e-06,
     "method": "azimuthal average by bilinear interpolation, parabola-refined minimum; the same estimator is applied to the analytic pattern on the same grid so its sampling bias cancels in ratio_measured_over_analytic",
     "pixels_per_airy_radius": 19.55912688638546,
     "predicted_first_null_m": 6.506938869906802e-06,
-    "ratio_measured_over_analytic": 0.9987730657199081,
-    "ratio_measured_over_predicted": 0.9991930585177838
+    "ratio_measured_over_analytic": 1.0125836839973106,
+    "ratio_measured_over_predicted": 1.0130094842808002
    },
    "pixel_scale_rule": "lambda * R / (N_fft * pupil_pitch)",
    "profile_comparison_on_mismatched_grids": {
-    "max_abs_profile_residual": 0.1452982375584353,
+    "max_abs_profile_residual": 0.14314201152118744,
     "max_radius_m": 3.242779371186616e-05,
     "radial_samples": 400,
-    "relative_l2_profile_residual": 0.13472176579749406,
-    "rms_profile_residual": 0.03414753431789866
+    "relative_l2_profile_residual": 0.13212312370453203,
+    "rms_profile_residual": 0.03366104740338521
    },
    "pupil_grid_n": 188,
    "pupil_pitch_m": 2.6587352810843895e-06,
    "pupil_samples_inside_aperture": 27709,
-   "relative_l2_residual": 0.015087255918918473,
-   "rms_residual": 0.0010635315675197672,
+   "relative_l2_residual": 0.012282402609327572,
+   "rms_residual": 0.0008748343002750958,
    "sample_pitch_m": [
     3.32680436489018e-07,
     3.32680436489018e-07
@@ -375,173 +380,179 @@
  },
  "gates": {
   "airy_peak_intensity_relative": {
-   "best_over_ray_count_sweep": 0.0002927046167160441,
-   "full_window_variant": 0.5036891593993642,
+   "best_over_ray_count_sweep": 0.005398499874539886,
+   "full_window_variant": 0.505222796522816,
    "gate": 0.002,
-   "measured": 0.01216272686766473,
+   "measured": 0.008102452980081054,
    "measured_metric": "peak/energy within 5 Airy radii, vs the same for analytic Airy",
    "note": "the gate composes 9.1e-4 of residual aberration + 3.5e-4 float32 + margin. The 9.1e-4 was derived at BEST FOCUS (0.00479 waves RMS); the slice observes the frozen image plane, 7.2 um away, where the wavefront is 0.00538 waves RMS and the Marechal deficit is 1.14e-3. Still inside the gate, but the term was derived at a plane the slice does not use.",
-   "ratio_measured_over_gate": 6.081363433832365,
+   "ratio_measured_over_gate": 4.051226490040527,
    "ray_sampling_dependence": "the full-window deficit collapses from 0.886 at 817 traced rays to -0.007 at 12481, so this metric is dominated by the same unmeasured ray_sampling_error term as the FFT-oracle gate: a ray-starved reconstruction puts energy into a broad pedestal, which is exactly what a peak/energy ratio penalizes.",
    "verdict": "FAIL",
    "why_two_variants": "over the full 1320^2 window the analytic Airy's own wings, which decay as 1/r^3, dominate its energy sum out to the grid corners at +/-1.7 mm, while the measured PSF's are truncated. The bounded window is the comparison that means something; the full-window number is reported so the difference is visible rather than chosen."
   },
   "energy_accounting_unexplained_residual": {
    "gate": 0.001,
-   "measured_unattributed": 7.498669198913177e-07,
+   "measured_unattributed": 2.9084392072498133e-07,
    "note": "the only step in the ledger that must be unity is psf_integral / propagated_power_out, because the measurement is |u|^2 on the same grid. Every other step is attributed to a named mechanism; the ray-weight-to-field-power step is a measure conversion and is not expected to be 1.",
    "verdict": "pass"
   },
   "fft_oracle_intensity_relative_l2": {
-   "best_over_gate": 6.670167585402156,
-   "best_residual_at_highest_ray_count": 0.006670167585402157,
+   "best_over_gate": 6.157153193339412,
+   "best_residual_at_highest_ray_count": 0.0061571531933394125,
    "diagnosis": "FAILS. Most of it is attributed by measurement rather than by argument: ray_count_convergence holds the grid, padding, plane and system fixed and varies only the ray count, and the residual falls monotonically. That is the protocol's own ray_sampling_error term -- value null, status to_be_measured, owner CHE-38 -- which this gate's text explicitly requires to fit inside it, and CHE-35 independently found the reconstruction far from ray-converged at these counts.",
    "gate": 0.001,
-   "measured": 0.015087255918918473,
-   "ratio_measured_over_gate": 15.087255918918473,
-   "ray_sampling_accounts_for": "2.3x of the excess",
+   "measured": 0.012282402609327572,
+   "ratio_measured_over_gate": 12.282402609327573,
+   "ray_sampling_accounts_for": "2x of the excess",
    "unresolved": "the trend FLATTENS above the gate. It does not extrapolate to 1.0e-3, so ray sampling is not the whole story and a residual floor remains unattributed. Leading hypothesis, untested here: the shipping reconstruction's pupil edge is set by where the rays stop and is soft over roughly one ray spacing, while the oracle applies a hard circular mask at the largest traced radius -- a difference in the aperture function, which is what sets the ring structure the residual is measuring. Reported as an open finding. No tolerance was widened, and the gate is left as it stands.",
    "verdict": "FAIL"
   }
  },
  "issue": "CHE-37 (M3.8)",
+ "measurement_precision": {
+  "note": "Chromatix's ScalarField unconditionally casts to complex64, so the propagated field and every PSF measured from it are single precision, and the protocol budgets 3.5e-4 for it. Under jax_enable_x64 the FFTs behind kernel_propagate promote to complex128 and these numbers silently gain 8 digits -- which is what the pre-CHE-103 records carried. Equal dtypes here and in an older record are a precondition for comparing them, not a detail.",
+  "propagated_field_dtype": "complex64",
+  "psf_intensity_dtype": "float32",
+  "pupil_field_dtype": "complex128"
+ },
  "negative_controls": {
   "controls": [
    {
-    "border_energy_fraction": 8.93954043974726e-10,
+    "border_energy_fraction": 8.177695494101003e-10,
     "control": "opl_sign_flip",
     "description": "HandoffPerturbation(opl_sign=-1): conjugates the wavefront, so the converging pupil field diverges instead.",
     "detected": true,
-    "detection_margin": 38.91629049442065,
+    "detection_margin": 42.07856515322924,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.14323719815636218,
+    "max_abs_difference_vs_unperturbed": 0.14562995731830597,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      660,
      660
     ],
-    "raw_peak_intensity": 371218.32637435786,
-    "raw_peak_ratio_vs_control": 0.03828112024427709,
-    "raw_window_energy": 0.0005940562775265267,
-    "relative_l2_vs_airy": 0.22828841102946376,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 1.4695517650258495e-15,
+    "raw_peak_ratio_vs_control": 0.03940169550742585,
+    "raw_window_energy": 2.2988732064461055e-24,
+    "relative_l2_vs_airy": 0.2318154836270205,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    },
    {
-    "border_energy_fraction": 4.781037949114038e-10,
+    "border_energy_fraction": 3.95647211245018e-10,
     "control": "reconstruction_phase_sign_flip",
     "description": "Perturbation(phase_sign=-1): the same conjugation, applied one stage later, inside the wavelet sum.",
     "detected": true,
-    "detection_margin": 39.340816176382475,
+    "detection_margin": 34.28508447634904,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.1481023690006096,
+    "max_abs_difference_vs_unperturbed": 0.12087598443031311,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      660,
      660
     ],
-    "raw_peak_intensity": 361968.30774329434,
-    "raw_peak_ratio_vs_control": 0.03732723125141404,
-    "raw_window_energy": 0.0007030256141243645,
-    "relative_l2_vs_airy": 0.23077873814299374,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 1.6390080117832423e-15,
+    "raw_peak_ratio_vs_control": 0.043945164880516335,
+    "raw_window_energy": 2.712317376239927e-24,
+    "relative_l2_vs_airy": 0.18888033396899623,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    },
    {
-    "border_energy_fraction": 4.790782027393037e-10,
+    "border_energy_fraction": 3.9648275436619434e-10,
     "control": "axis_transpose",
     "description": "Perturbation(transpose_axes=True): the output grid's axes swapped.",
     "detected": false,
-    "detection_margin": 1.000006568159038,
+    "detection_margin": 0.999996423705142,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.0018370115987712543,
+    "max_abs_difference_vs_unperturbed": 0.0018990039825439453,
     "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition, and this entry exists to show the blind spot rather than to claim a pass. CHE-41 established that the off-axis configuration does not rescue it either, and why: this SCORE azimuthally averages about the grid centre, which cannot tell a peak at (114, 0) from one at (0, 114) for any configuration. See benchmarks/probes/records/m3_off_axis_handoff.json.",
     "outcome": "ran",
     "peak_index": [
      660,
      660
     ],
-    "raw_peak_intensity": 9697164.654100182,
-    "raw_peak_ratio_vs_control": 0.9999999994014436,
-    "raw_window_energy": 0.0007030255956912948,
-    "relative_l2_vs_airy": 0.005866178599339611,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 3.72966631537186e-14,
+    "raw_peak_ratio_vs_control": 1.0,
+    "raw_window_energy": 2.7123175734551535e-24,
+    "relative_l2_vs_airy": 0.005509091237839136,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    },
    {
-    "border_energy_fraction": 4.79073598342199e-10,
+    "border_energy_fraction": 4.790737464792908e-10,
     "control": "amplitude_weight_omitted",
     "description": "Every ray's declared amplitude replaced by 1, through the RayBundle contract, leaving the OPL untouched.",
     "detected": false,
-    "detection_margin": 1.0,
+    "detection_margin": 1.0647895455071446,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.0,
-    "note": "Expected WEAK: hexapolar weights on this configuration are near uniform, so the omission is close to an exact constant scale, and the frozen peak normalization cannot see a constant. The raw scale is what shows it -- compare raw_peak_intensity against the control.",
+    "max_abs_difference_vs_unperturbed": 0.009283170104026794,
+    "note": "Expected WEAK, and weak for a different reason since CHE-47. This control reverts the launch amplitude to exactly 1, which is the pre-CHE-47 convention, so it removes BOTH the absolute per-ray area element (a global scale of ~6.2e-11 m^2, which the frozen peak normalization cannot see -- compare raw_peak_intensity against the control, the ratio is ~2.6e20) AND the rim/centre trapezoid correction, which is a real non-uniform perturbation of the normalized profile. The hexapolar weights are NOT near uniform: they take three values (centre 3/4, rim 1/2, interior 1). What keeps the control undetected is that the shape term is small against the Airy-residual threshold, not that it is absent.",
     "outcome": "ran",
     "peak_index": [
      660,
      660
     ],
-    "raw_peak_intensity": 9697164.659904482,
-    "raw_peak_ratio_vs_control": 1.0,
-    "raw_window_energy": 0.0007030256125611442,
-    "relative_l2_vs_airy": 0.005866140069598695,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 9697163.0,
+    "raw_peak_ratio_vs_control": 2.600008199133804e+20,
+    "raw_window_energy": 0.0007030253764241934,
+    "relative_l2_vs_airy": 0.005866043733998168,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    },
    {
-    "border_energy_fraction": 1.8285400443530784e-15,
+    "border_energy_fraction": 1.9755790253240947e-15,
     "control": "oblique_ramp_omitted",
     "description": "Perturbation(apply_oblique_ramp=False): off-axis rays deposit a piston instead of a ramp.",
     "detected": true,
-    "detection_margin": 357.09346511049705,
+    "detection_margin": 380.2356379400487,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999957535366745,
+    "max_abs_difference_vs_unperturbed": 0.9999964833259583,
     "note": "M2 found this inert for a single centred on-axis ray. Here the bundle fills the pupil, so it should bite.",
     "outcome": "ran",
     "peak_index": [
      581,
      581
     ],
-    "raw_peak_intensity": 21723.025087790804,
-    "raw_peak_ratio_vs_control": 0.0022401419228870534,
-    "raw_window_energy": 0.002718768633531736,
-    "relative_l2_vs_airy": 2.0947602842765303,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 6.464881031733921e-17,
+    "raw_peak_ratio_vs_control": 0.0017333671393306269,
+    "raw_window_energy": 8.091189321531779e-24,
+    "relative_l2_vs_airy": 2.094760312770232,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    },
    {
-    "border_energy_fraction": 4.780999063973675e-10,
+    "border_energy_fraction": 3.9565701395909406e-10,
     "control": "propagation_distance_sign",
     "description": "Propagate -z instead of +z: away from focus rather than to it.",
     "detected": true,
-    "detection_margin": 39.340816768865764,
+    "detection_margin": 34.28508401562456,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.14810237181914132,
+    "max_abs_difference_vs_unperturbed": 0.12087595462799072,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      660,
      660
     ],
-    "raw_peak_intensity": 361968.3013178057,
-    "raw_peak_ratio_vs_control": 0.037327230588798846,
-    "raw_window_energy": 0.0007030256196397343,
-    "relative_l2_vs_airy": 0.23077874161858372,
-    "unperturbed_relative_l2_vs_airy": 0.005866140069598695
+    "raw_peak_intensity": 1.6390080117832423e-15,
+    "raw_peak_ratio_vs_control": 0.043945164880516335,
+    "raw_window_energy": 2.712317376239927e-24,
+    "relative_l2_vs_airy": 0.18888033143081398,
+    "unperturbed_relative_l2_vs_airy": 0.005509110940044263
    }
   ],
   "detection_threshold": "detection_margin > 10x the unperturbed residual",
-  "graph_node_residual_for_reference": 0.005866140069598695,
-  "method": "perturbations are applied through couplers.optiland_handoff.HandoffPerturbation and couplers.ray_to_wave.Perturbation -- the hooks the shipping code already carries -- and the pupil field is built by the same ray_to_wave call the graph node wraps. CHE-34 pinned that node as bit-identical to this call.",
+  "graph_node_residual_for_reference": 0.005509110940044263,
+  "method": "perturbations are applied through couplers.handoff.HandoffPerturbation and couplers.ray_to_wave.Perturbation -- the hooks the shipping code already carries -- and the pupil field is built by the same ray_to_wave call the graph node wraps. CHE-34 pinned that node as bit-identical to this call.",
   "status": "ran",
   "unperturbed_control": {
-   "border_energy_fraction": 4.79073598342199e-10,
+   "border_energy_fraction": 3.964819915805652e-10,
    "max_abs_difference_vs_unperturbed": 0.0,
    "peak_index": [
     660,
     660
    ],
-   "raw_peak_intensity": 9697164.659904482,
-   "raw_window_energy": 0.0007030256125611442,
-   "relative_l2_vs_airy": 0.005866140069598695
+   "raw_peak_intensity": 3.72966631537186e-14,
+   "raw_window_energy": 2.7123161929485693e-24,
+   "relative_l2_vs_airy": 0.005509110940044263
   }
  },
  "num_rays_requested": 32,
@@ -566,28 +577,28 @@
     "psf_integral_over_propagated_out": "must be 1 to float rounding: the measurement is |u|^2 on the same grid with the same pitch. A deviation is a measurement-layer defect, not physics.",
     "pupil_over_traced": "NOT a conservation law and not expected to be 1. The two sides measure different things: a sum of dimensionless ray weights versus sum(|u|^2)*dy*dx over a grid. The bundle declares reconstruction_normalization='none', so this ratio is the measure conversion of the wavelet sum, reported rather than compared to unity."
    },
-   "measured_psf_integral": 0.0007115949517974757,
+   "measured_psf_integral": 3.583371326201533e-25,
    "padding": {
     "edge_energy_is_a_weak_indicator": "CHE-35 measured it moving by only 2x between a run carrying 1.4e-1 relative intensity error from wraparound and a correctly padded one. Use it to notice window truncation, not to certify padding.",
-    "input_edge_energy_fraction": 0.028035414579929998,
-    "output_edge_energy_fraction": 3.363248128648037e-09,
+    "input_edge_energy_fraction": 0.0278485677605041,
+    "output_edge_energy_fraction": 3.0309285175669533e-09,
     "pad_width": 762
    },
-   "propagated_power_in": 0.0007115953485481441,
-   "propagated_power_out": 0.0007115941261872649,
-   "psf_border_energy_fraction": 3.363245336246218e-09,
+   "propagated_power_in": 3.5833765031012237e-25,
+   "propagated_power_out": 3.583371819239599e-25,
+   "psf_border_energy_fraction": 3.0309285175669533e-09,
    "ratios": {
-    "propagated_in_over_pupil": 1.0000000637760373,
-    "propagated_out_over_in": 0.999998282224748,
-    "psf_integral_over_propagated_out": 1.0000011602262868,
-    "pupil_over_traced": 2.2458813515016402e-07
+    "propagated_in_over_pupil": 1.0000001395798725,
+    "propagated_out_over_in": 0.9999986928915728,
+    "psf_integral_over_propagated_out": 0.9999998624094594,
+    "pupil_over_traced": 1.1309570628991785e-28
    },
-   "reconstructed_pupil_power": 0.0007115953031654155,
+   "reconstructed_pupil_power": 3.583376002934058e-25,
    "traced_ray_power": 3168.4456647259167,
    "traced_ray_power_units": "sum of Optiland per-ray intensity weights over survivors. A COUNT-like weight, not watts, and not an area integral"
   },
   "psf": {
-   "border_energy_fraction": 3.363245336246218e-09,
+   "border_energy_fraction": 3.0309285175669533e-09,
    "grid_center_index": [
     889,
     889
@@ -695,128 +706,128 @@
  "off_axis_negative_controls": {
   "controls": [
    {
-    "border_energy_fraction": 1.92085508268724e-09,
+    "border_energy_fraction": 1.8390582714317808e-09,
     "control": "opl_sign_flip",
     "description": "HandoffPerturbation(opl_sign=-1): conjugates the wavefront, so the converging pupil field diverges instead.",
     "detected": true,
-    "detection_margin": 651.3174028886127,
+    "detection_margin": 87.63505661514318,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.999984408722563,
+    "max_abs_difference_vs_unperturbed": 0.999997615814209,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      1022,
      914
     ],
-    "raw_peak_intensity": 40741.75146830977,
-    "raw_peak_ratio_vs_control": 0.004681051185507306,
-    "raw_window_energy": 0.0006757486826090373,
-    "relative_l2_vs_airy": 0.9650804968633797,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 2.1059747080359167e-17,
+    "raw_peak_ratio_vs_control": 0.00480573374776401,
+    "raw_window_energy": 3.4143682310573125e-25,
+    "relative_l2_vs_airy": 0.9722113595336825,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    },
    {
-    "border_energy_fraction": 3.35973166727943e-09,
+    "border_energy_fraction": 3.02717976273573e-09,
     "control": "reconstruction_phase_sign_flip",
     "description": "Perturbation(phase_sign=-1): the same conjugation, applied one stage later, inside the wavelet sum.",
     "detected": true,
-    "detection_margin": 670.7682420756847,
+    "detection_margin": 89.72897170227975,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999889528081389,
+    "max_abs_difference_vs_unperturbed": 0.9999880194664001,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      776,
      889
     ],
-    "raw_peak_intensity": 102925.68954148327,
-    "raw_peak_ratio_vs_control": 0.011825716953334148,
-    "raw_window_energy": 0.0007115949727871456,
-    "relative_l2_vs_airy": 0.9939015071170845,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 5.56059659817911e-17,
+    "raw_peak_ratio_vs_control": 0.012689015982767136,
+    "raw_window_energy": 3.583371326201533e-25,
+    "relative_l2_vs_airy": 0.9954409677777122,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    },
    {
-    "border_energy_fraction": 3.3632625771550473e-09,
+    "border_energy_fraction": 3.030943324305651e-09,
     "control": "axis_transpose",
     "description": "Perturbation(transpose_axes=True): the output grid's axes swapped.",
     "detected": true,
-    "detection_margin": 674.8780140231794,
+    "detection_margin": 90.13918462209328,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999982197650873,
+    "max_abs_difference_vs_unperturbed": 0.9999954700469971,
     "note": "Expected INVISIBLE here: a circular pupil and an on-axis PSF are symmetric under transposition, and this entry exists to show the blind spot rather than to claim a pass. CHE-41 established that the off-axis configuration does not rescue it either, and why: this SCORE azimuthally averages about the grid centre, which cannot tell a peak at (114, 0) from one at (0, 114) for any configuration. See benchmarks/probes/records/m3_off_axis_handoff.json.",
     "outcome": "ran",
     "peak_index": [
      889,
      1003
     ],
-    "raw_peak_intensity": 8703549.125517087,
-    "raw_peak_ratio_vs_control": 1.0000001836890364,
-    "raw_window_energy": 0.0007115949695651567,
-    "relative_l2_vs_airy": 0.9999911045015439,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 4.382211773497216e-15,
+    "raw_peak_ratio_vs_control": 0.9999998067111251,
+    "raw_window_energy": 3.583374037910895e-25,
+    "relative_l2_vs_airy": 0.999991813933054,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    },
    {
-    "border_energy_fraction": 3.363207262326456e-09,
+    "border_energy_fraction": 3.3632100311056856e-09,
     "control": "amplitude_weight_omitted",
     "description": "Every ray's declared amplitude replaced by 1, through the RayBundle contract, leaving the OPL untouched.",
     "detected": false,
-    "detection_margin": 1.00005044181449,
+    "detection_margin": 0.13356981800986273,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 4.461232340768895e-07,
-    "note": "Expected WEAK: hexapolar weights on this configuration are near uniform, so the omission is close to an exact constant scale, and the frozen peak normalization cannot see a constant. The raw scale is what shows it -- compare raw_peak_intensity against the control.",
+    "max_abs_difference_vs_unperturbed": 0.011658042669296265,
+    "note": "Expected WEAK, and weak for a different reason since CHE-47. This control reverts the launch amplitude to exactly 1, which is the pre-CHE-47 convention, so it removes BOTH the absolute per-ray area element (a global scale of ~6.2e-11 m^2, which the frozen peak normalization cannot see -- compare raw_peak_intensity against the control, the ratio is ~2.6e20) AND the rim/centre trapezoid correction, which is a real non-uniform perturbation of the normalized profile. The hexapolar weights are NOT near uniform: they take three values (centre 3/4, rim 1/2, interior 1). What keeps the control undetected is that the shape term is small against the Airy-residual threshold, not that it is absent.",
     "outcome": "ran",
     "peak_index": [
      1003,
      889
     ],
-    "raw_peak_intensity": 8705072.582838656,
-    "raw_peak_ratio_vs_control": 1.000175222351936,
-    "raw_window_energy": 0.0007117193640884138,
-    "relative_l2_vs_airy": 0.0014818108237157378,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 8705071.0,
+    "raw_peak_ratio_vs_control": 1.986455645537996e+21,
+    "raw_window_energy": 0.0007117187487892807,
+    "relative_l2_vs_airy": 0.0014818053342547388,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    },
    {
-    "border_energy_fraction": 1.4768092271675203e-15,
+    "border_energy_fraction": 1.634473162739657e-15,
     "control": "oblique_ramp_omitted",
     "description": "Perturbation(apply_oblique_ramp=False): off-axis rays deposit a piston instead of a ramp.",
     "detected": true,
-    "detection_margin": 1400.0087798474528,
+    "detection_margin": 186.99019600537014,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.999995199882743,
+    "max_abs_difference_vs_unperturbed": 0.9999983906745911,
     "note": "M2 found this inert for a single centred on-axis ray. Here the bundle fills the pupil, so it should bite.",
     "outcome": "ran",
     "peak_index": [
      996,
-     996
+     781
     ],
-    "raw_peak_intensity": 2660.5021513766405,
-    "raw_peak_ratio_vs_control": 0.0003056802003083603,
-    "raw_window_energy": 0.0002824390072056153,
-    "relative_l2_vs_airy": 2.0744435245795825,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 1.0264897811476797e-18,
+    "raw_peak_ratio_vs_control": 0.0002342400677545158,
+    "raw_window_energy": 1.0897218541538918e-25,
+    "relative_l2_vs_airy": 2.074443718068381,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    },
    {
-    "border_energy_fraction": 3.3598059446732486e-09,
+    "border_energy_fraction": 3.027222415648695e-09,
     "control": "propagation_distance_sign",
     "description": "Propagate -z instead of +z: away from focus rather than to it.",
     "detected": true,
-    "detection_margin": 670.768240972951,
+    "detection_margin": 89.72897159551667,
     "detection_mechanism": "analytic Airy profile residual, relative to the unperturbed residual on the same configuration",
-    "max_abs_difference_vs_unperturbed": 0.9999889528081389,
+    "max_abs_difference_vs_unperturbed": 0.9999880194664001,
     "note": "",
     "outcome": "ran",
     "peak_index": [
      776,
      889
     ],
-    "raw_peak_intensity": 102925.71760909446,
-    "raw_peak_ratio_vs_control": 0.011825720178181382,
-    "raw_window_energy": 0.0007115949765963539,
-    "relative_l2_vs_airy": 0.9939015054831243,
-    "unperturbed_relative_l2_vs_airy": 0.0014817360822591535
+    "raw_peak_intensity": 5.56059527469013e-17,
+    "raw_peak_ratio_vs_control": 0.012689012962628466,
+    "raw_window_energy": 3.5833708331634675e-25,
+    "relative_l2_vs_airy": 0.9954409665932971,
+    "unperturbed_relative_l2_vs_airy": 0.011093863541427622
    }
   ],
   "detection_threshold": "detection_margin > 10x the unperturbed residual",
-  "method": "perturbations are applied through couplers.optiland_handoff.HandoffPerturbation and couplers.ray_to_wave.Perturbation -- the hooks the shipping code already carries -- and the pupil field is built by the same ray_to_wave call the graph node wraps. CHE-34 pinned that node as bit-identical to this call.",
+  "method": "perturbations are applied through couplers.handoff.HandoffPerturbation and couplers.ray_to_wave.Perturbation -- the hooks the shipping code already carries -- and the pupil field is built by the same ray_to_wave call the graph node wraps. CHE-34 pinned that node as bit-identical to this call.",
   "scoring_centre_m_y_x": [
    0.0002089232631081093,
    0.0
@@ -824,15 +835,15 @@
   "scoring_note": "the analytic Airy reference and the azimuthal average are both centred on the traced geometric image point, not on the grid origin. Measured with them at the origin instead, all six controls score within 2.6x of 1.0 -- including an x/y transpose that visibly moves the peak from (1003, 889) to (889, 1003) -- because an azimuthal average about a point the PSF is not at is nearly invariant under anything a perturbation can do. CHE-41's own record scores the transpose a second way, with no azimuthal average at all.",
   "status": "ran",
   "unperturbed_control": {
-   "border_energy_fraction": 3.363245336246218e-09,
+   "border_energy_fraction": 3.0309285175669533e-09,
    "max_abs_difference_vs_unperturbed": 0.0,
    "peak_index": [
     1003,
     889
    ],
-   "raw_peak_intensity": 8703547.526770828,
-   "raw_window_energy": 0.0007115949517974757,
-   "relative_l2_vs_airy": 0.0014817360822591535
+   "raw_peak_intensity": 4.382212620530164e-15,
+   "raw_window_energy": 3.583371326201533e-25,
+   "relative_l2_vs_airy": 0.011093863541427622
   }
  },
  "orientation_control": {
@@ -863,66 +874,148 @@
  "probe": "m3_psf_verification",
  "protocol_id": "M3-SLICE-CPU-V1",
  "ray_count_convergence": {
-  "first_over_last_ratio": 4.934560406207578,
+  "first_over_last_ratio": 3.326706652657121,
   "monotonically_falling": true,
   "protocol_term": "ray_sampling_error (value: null, status: to_be_measured, owner CHE-38)",
   "purpose": "attribute the FFT-oracle residual. Only the ray count changes; the grid, padding, plane and system are the frozen ones.",
   "rows": [
    {
-    "airy_peak_deficit_full_window": 0.8858378248549057,
-    "airy_peak_deficit_within_5_airy_radii": -0.03207229259579503,
-    "max_abs_residual": 0.021797952327995085,
+    "airy_peak_deficit_full_window": 0.8862255061589187,
+    "airy_peak_deficit_within_5_airy_radii": 0.005398499874539886,
+    "max_abs_residual": 0.014951067032810239,
     "num_rays_requested": 16,
-    "psf_border_energy_fraction": 7.484179844844266e-10,
-    "relative_l2_vs_fft_oracle": 0.03291434486969469,
+    "psf_border_energy_fraction": 6.020182411245921e-10,
+    "relative_l2_vs_fft_oracle": 0.02048304248971126,
     "traced_rays": 817
    },
    {
-    "airy_peak_deficit_full_window": 0.7620314463461417,
-    "airy_peak_deficit_within_5_airy_radii": -0.005389183512280127,
-    "max_abs_residual": 0.011810771292911415,
+    "airy_peak_deficit_full_window": 0.7620196381734725,
+    "airy_peak_deficit_within_5_airy_radii": 0.02033914672039916,
+    "max_abs_residual": 0.008845123604708793,
     "num_rays_requested": 24,
-    "psf_border_energy_fraction": 6.990410788278202e-10,
-    "relative_l2_vs_fft_oracle": 0.017506939215856627,
+    "psf_border_energy_fraction": 5.872642266485421e-10,
+    "relative_l2_vs_fft_oracle": 0.013717529399770563,
     "traced_rays": 1801
    },
    {
-    "airy_peak_deficit_full_window": 0.5036891593993642,
-    "airy_peak_deficit_within_5_airy_radii": -0.01216272686766473,
-    "max_abs_residual": 0.009600404274317853,
+    "airy_peak_deficit_full_window": 0.505222796522816,
+    "airy_peak_deficit_within_5_airy_radii": 0.008102452980081054,
+    "max_abs_residual": 0.008059860554172738,
     "num_rays_requested": 32,
-    "psf_border_energy_fraction": 4.79073598342199e-10,
-    "relative_l2_vs_fft_oracle": 0.015087205599279193,
+    "psf_border_energy_fraction": 3.964819915805652e-10,
+    "relative_l2_vs_fft_oracle": 0.012282320633542902,
     "traced_rays": 3169
    },
    {
-    "airy_peak_deficit_full_window": 0.1448754059856786,
-    "airy_peak_deficit_within_5_airy_radii": -0.00378598838239097,
-    "max_abs_residual": 0.0037562329237716963,
+    "airy_peak_deficit_full_window": 0.14160109168607926,
+    "airy_peak_deficit_within_5_airy_radii": 0.009965879484515328,
+    "max_abs_residual": 0.0035638599463329035,
     "num_rays_requested": 48,
-    "psf_border_energy_fraction": 1.0227899772445307e-09,
-    "relative_l2_vs_fft_oracle": 0.009129627761974679,
+    "psf_border_energy_fraction": 9.470032802109888e-10,
+    "relative_l2_vs_fft_oracle": 0.008237811440096348,
     "traced_rays": 7057
    },
    {
-    "airy_peak_deficit_full_window": -0.006526029818250567,
-    "airy_peak_deficit_within_5_airy_radii": -0.0002927046167160441,
-    "max_abs_residual": 0.0024867019845191685,
+    "airy_peak_deficit_full_window": -0.002232585496393602,
+    "airy_peak_deficit_within_5_airy_radii": 0.010200697864174102,
+    "max_abs_residual": 0.002610702363593065,
     "num_rays_requested": 64,
-    "psf_border_energy_fraction": 3.1380405793283893e-10,
-    "relative_l2_vs_fft_oracle": 0.007401684458949098,
+    "psf_border_energy_fraction": 2.7855701849502297e-10,
+    "relative_l2_vs_fft_oracle": 0.006890136190999849,
     "traced_rays": 12481
    },
    {
-    "airy_peak_deficit_full_window": -0.006278178122194333,
-    "airy_peak_deficit_within_5_airy_radii": 0.0032575923723909828,
-    "max_abs_residual": 0.0021340080375742004,
+    "airy_peak_deficit_full_window": -0.0019131329255033247,
+    "airy_peak_deficit_within_5_airy_radii": 0.01037275772034929,
+    "max_abs_residual": 0.0018410791612728655,
     "num_rays_requested": 96,
-    "psf_border_energy_fraction": 3.050428632725637e-10,
-    "relative_l2_vs_fft_oracle": 0.006670167585402157,
+    "psf_border_energy_fraction": 2.825439678456226e-10,
+    "relative_l2_vs_fft_oracle": 0.0061571531933394125,
     "traced_rays": 27937
    }
   ]
+ },
+ "record_provenance": {
+  "code_fingerprint": {
+   "combined_sha256": "d4dc746e050617e2ac811c0667516c58b77b2fc1238b9a34c2de6800eec2803d",
+   "files": {
+    "benchmarks/probes/psf_oracle_verification.py": "4387da1df4b0f140096d5dbf071b374e7d92508155e7d375b0b5c3fa4af4c6f0",
+    "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+    "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+    "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
+    "src/core/capabilities.py": "54529ebbc079a3c6d7e785bcaceb1ea847ab1daf3c984062e0c6b7d528063ed0",
+    "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+    "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+    "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+    "src/core/optical_system.py": "a469d554531dd3d4550a8d3fadc7bd0c0fbae303e6295c37e50266d37f73dfa1",
+    "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+    "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+    "src/core/specs.py": "2de6b0421e75013dcec221570d1129dc2ff09aceef22c02dc19c6fa2543f702a",
+    "src/couplers/__init__.py": "36e91bb9ee450658c7575477d7c976e49ce964e7829af877617bd4044d6dc6d1",
+    "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+    "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+    "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+    "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+    "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
+    "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+    "src/couplers/patch.py": "4be20aab1d001612df6b934d51cf544651ab530eaf8f76b9fa220b70175ce4b2",
+    "src/couplers/patch_node.py": "952bc9390220006ea2f202b994ad6ad4867701e4df0477980f563b4036be1265",
+    "src/couplers/quadrature.py": "6c56cb1fa0b8eb3d0a68ce14f7bd0fa4a9fbcd95acfd592fbcffa030b080f3a9",
+    "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+    "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+    "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+    "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+    "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
+    "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/base.py": "b7510f0f6c1d96dd51ba71f543744409a1c381961ed45057c65cae8f57a4733e",
+    "src/solvers/chromatix/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/chromatix/adapter.py": "e87d5e3813bd64fb1ae0a2d3678c0c28c0d5ed0b8b1971faeaa7fa8b27201311",
+    "src/solvers/chromatix/baseline.py": "1e0af3babf4ad7ebaa898131fd3013ff9929cd8febe2e99d318e97a72c0b3c03",
+    "src/solvers/chromatix/capability.py": "368e2a8575892cb552f186f90c91bcc388527c6ea6316206ea31426ed876d8b1",
+    "src/solvers/chromatix/carrier_removed_asm.py": "edc705106b8bcd6a4c5fb2befdfa172c15f549f97d9e70e7b68fefb4868fb986",
+    "src/solvers/chromatix/constants.py": "689625a7ea5d7261db0917d4b2ea19e8cc5e13c15ee326501ee48a91edef9433",
+    "src/solvers/chromatix/execution.py": "86af5f444f0ed7f4e1a19777017a7e24c3a6b0646b7f7fe177a80b24a0fb29a2",
+    "src/solvers/chromatix/propagation.py": "ae2358b3732aaf4092e94a958dd65beed35776afd7e5f081cdb1b50dafd2f0d0",
+    "src/solvers/chromatix/provenance.py": "0a33fbc9607cc8cfb89c1716c5e5b95e6b04a1f941968cd9916183c128c58c4b",
+    "src/solvers/chromatix/requests.py": "317132780ee80c603c479283b46c648df41610df49a52bc66361eab2cdb47528",
+    "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/optiland/adapter.py": "ee8a3bae848bbd23e1cf88bbd4b7f69659cdccd7945e5c1d5f9289549e96560a",
+    "src/solvers/optiland/artifacts.py": "82c029dd0426ca15b93446dd067d0617f9b446ceae6d81107b55ad20d98240f5",
+    "src/solvers/optiland/baseline.py": "8aff7f2aad97ede8c4990bd81492e66cccc8486ae032f7fdc50557f5938e844d",
+    "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
+    "src/solvers/optiland/capability.py": "e52709847100f6648b69801df5629b189e791862b77a34ee2a2d870ed9844f98",
+    "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
+    "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7",
+    "src/solvers/optiland/provenance.py": "12b2e864c102093494369e894eba7d97e3c6e75a65309478d6d3573b026111d8",
+    "src/solvers/optiland/pupil.py": "9fa15d5cdbb6125ab695456c7794b5bd72aa74bd1033897d3cea8cc1848cb38f",
+    "src/solvers/optiland/requests.py": "061e6831139364a9e92c284055df9845076a285666977722e019cae3221442ed",
+    "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/verification/psf_measurement.py": "1f0b665685b92abe28d69cb4153331a0d308392be6145832d0d04bffbab66622",
+    "src/verification/psf_oracles.py": "56a98b8d894554c6e80ab2638dced1f30aff9598a509d0c299fc8fbee5482629"
+   }
+  },
+  "data_fingerprint": {
+   "benchmarks/protocols/slice_protocol.yaml": "dac81d969a86952eb20088ab33cc4587d88522bce8d0e31408d57a19ffe17188"
+  },
+  "environment_fingerprint": {
+   "combined_sha256": "54118fbb8522613f91b8543412783ee46054fa0c904f95ba448e86880b41e12c",
+   "packages": {
+    "chromatix": "0.6.0",
+    "jax": "0.6.2",
+    "jaxlib": "0.6.2",
+    "numpy": "2.2.6",
+    "optiland": "0.6.0",
+    "scipy": "1.15.3",
+    "torch": "2.13.0+cpu"
+   },
+   "python_version": "3.12.14"
+  },
+  "probe": "m3_psf_verification",
+  "schema_version": 2,
+  "source_commit": "95d3c4d475365fcee017545dcb5304903fb411a2",
+  "timestamp_utc": "2026-08-24T21:05:52.426617+00:00",
+  "working_tree_dirty": true
  },
  "wavelength_m": 5.5e-07
 }

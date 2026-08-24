@@ -1,0 +1,83 @@
+# Which committed probe records are checked against the tree that reads them.
+#
+# CHE-103 (M0.2). Three records under this directory stopped reproducing and
+# nothing failed, because the only things asserting on them read the file rather
+# than re-running the probe. The probe is expensive, the test is cheap, and
+# there was no link between them -- so the drift sat here for weeks and was
+# found by hand.
+#
+# The link is `core.provenance.record_provenance`: a probe stamps the source and
+# environment it ran under into its own record, and
+# `tests/test_provenance_fingerprint.py` recomputes both fingerprints from the
+# current tree on every run of the default gate. A record whose code has moved
+# now FAILS, and says which of code or environment moved.
+#
+# That check is only as good as its coverage, so this file exists to make the
+# coverage explicit rather than implied. Every `*.json` under this directory
+# must be one of:
+#
+#   * ENROLLED -- carries a `record_provenance` block, and is verified. Nothing
+#     lists enrolled records here; carrying the block IS the enrollment, so the
+#     two cannot drift apart.
+#   * UNENROLLED -- named below with a reason. A record that is neither fails
+#     the gate, which is what stops a new unstamped record from being added
+#     silently.
+#
+# To enroll a record: make its probe call `record_provenance` at the end of the
+# run, regenerate, and delete its line from this file.
+
+unenrolled:
+  # ---------------------------------------------------------------------------
+  # The ray_wave demo corpus. Regenerating these is hours of GPU compute (demo3
+  # at the paper's 60 M-ray configuration is ~200 s per point, and the
+  # enumerated-estimator shards are twelve of them), so they are not enrolled by
+  # the ticket that built the mechanism. M0.4 (CHE-105) re-runs demo2 and demo3
+  # to record performance baselines and is the natural place to enroll them,
+  # since it is paying the compute anyway.
+  # ---------------------------------------------------------------------------
+  "ray_wave/*.json": >-
+    hours of GPU compute to regenerate; enroll in M0.4 (CHE-105), which re-runs
+    demo2 and demo3 for performance baselines and can stamp them at no extra cost.
+
+  # ---------------------------------------------------------------------------
+  # Solver capability probes. Cheap, but they record what the PINNED PACKAGE
+  # does, not what this repository computes -- so a repository code fingerprint
+  # is the wrong instrument for them and would fail on every unrelated refactor
+  # while saying nothing about the thing they actually attest to. They want an
+  # environment fingerprint alone. Deferred rather than done badly.
+  # ---------------------------------------------------------------------------
+  "optiland/*.json": >-
+    attests to pinned optiland behaviour, not to repository code, so a code
+    fingerprint would fail on unrelated refactors while saying nothing about what
+    the record actually claims. `environment_fingerprint()` is the right
+    instrument and already exists; what is missing is an environment-ONLY
+    verification mode, which is a few lines nobody has written rather than an
+    unexpressed capability.
+  "chromatix/*.json": >-
+    same as optiland/: attests to pinned chromatix behaviour. Needs the
+    environment-only verification mode that has not been written.
+
+  # ---------------------------------------------------------------------------
+  # Individually deferred.
+  # ---------------------------------------------------------------------------
+  "che12_engine_report.json": >-
+    a survey of whether the same optical system gives the same answer across ray
+    engines, written against an adapter layout that no longer exists (it predates
+    the solver subpackages). Kept as reference material rather than live evidence,
+    so a code fingerprint over the current tree would say nothing useful. If it is
+    reference material it belongs under archive/ per the architecture boundaries,
+    and leaving it in the live records directory is the actual defect here; not
+    this ticket's to move, but recorded so the next reader does not have to
+    re-derive it.
+  "doe_step_sampler_cost.json": >-
+    cost measurement, not a physics claim; belongs to the performance harness
+    M0.4 (CHE-105) builds rather than to this correctness mechanism.
+  "planar_doe_step_device.json": >-
+    device-placement probe for C_PLANAR_DOE_STEP; enroll with that coupler's
+    benchmark in M2.3 (CHE-111), which has to regenerate it anyway.
+  "m3_quadrature_weight.json": >-
+    CHE-47's measurement of the weight this ticket attributes the record drift
+    to. Enroll in M2.1 (CHE-109), which re-derives the ray-to-wave error budget.
+  "ray_to_wave/coherent_handoff.json": >-
+    coupler handoff probe; enroll with the C_RAY_TO_WAVE benchmark in M2.1
+    (CHE-109) rather than stamping it ahead of the benchmark that owns it.

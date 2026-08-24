@@ -1,0 +1,169 @@
+{
+ "grid_refinement_holding_the_rays": {
+  "frozen_weighted_minus_uniform": 0.03607001486958927,
+  "reading": "the gap between the two conventions collapses from 0.0361 at the frozen 2.44 pixels per Airy radius to at most 0.0087 once the grid is refined. The deviation is the GRID, not the quadrature weight.",
+  "resolved_weighted_minus_uniform_max": 0.008717492227047652,
+  "rings": 48,
+  "rows": [
+   {
+    "grid_n": 188,
+    "grid_refine": 1,
+    "pixels_per_airy_radius": 2.439339871593739,
+    "sample_pitch_m": 2.6587352810843895e-06,
+    "uniform": 0.999311058802106,
+    "weighted": 1.0353810736716953
+   },
+   {
+    "grid_n": 376,
+    "grid_refine": 2,
+    "pixels_per_airy_radius": 4.878679743187478,
+    "sample_pitch_m": 1.3293676405421948e-06,
+    "uniform": 1.0006931686908116,
+    "weighted": 1.003925677484386
+   },
+   {
+    "grid_n": 752,
+    "grid_refine": 4,
+    "pixels_per_airy_radius": 9.757359486374956,
+    "sample_pitch_m": 6.646838202710974e-07,
+    "uniform": 1.0005632522328227,
+    "weighted": 1.0092807444598704
+   }
+  ]
+ },
+ "issue": "CHE-103 (M0.2)",
+ "probe": "m3_first_null_grid_convergence",
+ "question": "the frozen configuration reports first_null ratio_measured_over_analytic = 1.0345 with CHE-47's quadrature weight and 0.9963 without it. Is that 3.4% a physical consequence of the weight, a ray-sampling error, or an artifact of the frozen grid?",
+ "ray_refinement_holding_the_grid": {
+  "reading": "The weighted ratio is flat at ~1.034 across a 9x change in ray count (3169 -> 27937 rays), and the UNIFORM ratio drifts UP toward it (0.9963 -> 1.0189) over the same sweep. Both conventions are heading for the same ~1.03 on this grid, which is the diagnostic: a limit that both conventions share is a property of the grid, not of the amplitude. Note what this arm does NOT show -- the DIFFERENCE between the conventions does fall with ring count (0.0382 at 32 rings to 0.0150 at 96, roughly O(1/rings)), exactly as a rim-cell quadrature correction should. So the rim cell is behaving correctly; it is the common offset that needs explaining, and the grid arm explains it.",
+  "rows": [
+   {
+    "rings": 16,
+    "traced_rays": 817,
+    "uniform": 0.9750575338772078,
+    "weighted": 1.043373445135435
+   },
+   {
+    "rings": 24,
+    "traced_rays": 1801,
+    "uniform": 0.99393090465382,
+    "weighted": 1.0888895405064523
+   },
+   {
+    "rings": 32,
+    "traced_rays": 3169,
+    "uniform": 0.9963243001108935,
+    "weighted": 1.0345120526599088
+   },
+   {
+    "rings": 48,
+    "traced_rays": 7057,
+    "uniform": 0.999311058802106,
+    "weighted": 1.0353810736716953
+   },
+   {
+    "rings": 64,
+    "traced_rays": 12481,
+    "uniform": 1.0083324566591296,
+    "weighted": 1.0344964689127238
+   },
+   {
+    "rings": 96,
+    "traced_rays": 27937,
+    "uniform": 1.0189051607726418,
+    "weighted": 1.0338630271191378
+   }
+  ],
+  "weighted_spread_over_32_to_96_rings": 0.0015180465525574949
+ },
+ "record_provenance": {
+  "code_fingerprint": {
+   "combined_sha256": "8ccb403e27f8e008cdc21f59eba4280de7c23f1ba22ebd6826fbf82c18e48f3e",
+   "files": {
+    "benchmarks/probes/first_null_grid_convergence.py": "706775ab64fb0393aab8b6b19addff4b2a918729765608051bcb54dd34bf344f",
+    "benchmarks/probes/psf_oracle_verification.py": "4387da1df4b0f140096d5dbf071b374e7d92508155e7d375b0b5c3fa4af4c6f0",
+    "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+    "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+    "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
+    "src/core/capabilities.py": "54529ebbc079a3c6d7e785bcaceb1ea847ab1daf3c984062e0c6b7d528063ed0",
+    "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+    "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+    "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+    "src/core/optical_system.py": "a469d554531dd3d4550a8d3fadc7bd0c0fbae303e6295c37e50266d37f73dfa1",
+    "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+    "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+    "src/core/specs.py": "2de6b0421e75013dcec221570d1129dc2ff09aceef22c02dc19c6fa2543f702a",
+    "src/couplers/__init__.py": "36e91bb9ee450658c7575477d7c976e49ce964e7829af877617bd4044d6dc6d1",
+    "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+    "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+    "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+    "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+    "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
+    "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+    "src/couplers/patch.py": "4be20aab1d001612df6b934d51cf544651ab530eaf8f76b9fa220b70175ce4b2",
+    "src/couplers/patch_node.py": "952bc9390220006ea2f202b994ad6ad4867701e4df0477980f563b4036be1265",
+    "src/couplers/quadrature.py": "6c56cb1fa0b8eb3d0a68ce14f7bd0fa4a9fbcd95acfd592fbcffa030b080f3a9",
+    "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+    "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+    "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+    "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+    "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
+    "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/base.py": "b7510f0f6c1d96dd51ba71f543744409a1c381961ed45057c65cae8f57a4733e",
+    "src/solvers/chromatix/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/chromatix/adapter.py": "e87d5e3813bd64fb1ae0a2d3678c0c28c0d5ed0b8b1971faeaa7fa8b27201311",
+    "src/solvers/chromatix/baseline.py": "1e0af3babf4ad7ebaa898131fd3013ff9929cd8febe2e99d318e97a72c0b3c03",
+    "src/solvers/chromatix/capability.py": "368e2a8575892cb552f186f90c91bcc388527c6ea6316206ea31426ed876d8b1",
+    "src/solvers/chromatix/carrier_removed_asm.py": "edc705106b8bcd6a4c5fb2befdfa172c15f549f97d9e70e7b68fefb4868fb986",
+    "src/solvers/chromatix/constants.py": "689625a7ea5d7261db0917d4b2ea19e8cc5e13c15ee326501ee48a91edef9433",
+    "src/solvers/chromatix/execution.py": "86af5f444f0ed7f4e1a19777017a7e24c3a6b0646b7f7fe177a80b24a0fb29a2",
+    "src/solvers/chromatix/propagation.py": "ae2358b3732aaf4092e94a958dd65beed35776afd7e5f081cdb1b50dafd2f0d0",
+    "src/solvers/chromatix/provenance.py": "0a33fbc9607cc8cfb89c1716c5e5b95e6b04a1f941968cd9916183c128c58c4b",
+    "src/solvers/chromatix/requests.py": "317132780ee80c603c479283b46c648df41610df49a52bc66361eab2cdb47528",
+    "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/solvers/optiland/adapter.py": "ee8a3bae848bbd23e1cf88bbd4b7f69659cdccd7945e5c1d5f9289549e96560a",
+    "src/solvers/optiland/artifacts.py": "82c029dd0426ca15b93446dd067d0617f9b446ceae6d81107b55ad20d98240f5",
+    "src/solvers/optiland/baseline.py": "8aff7f2aad97ede8c4990bd81492e66cccc8486ae032f7fdc50557f5938e844d",
+    "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
+    "src/solvers/optiland/capability.py": "e52709847100f6648b69801df5629b189e791862b77a34ee2a2d870ed9844f98",
+    "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
+    "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7",
+    "src/solvers/optiland/provenance.py": "12b2e864c102093494369e894eba7d97e3c6e75a65309478d6d3573b026111d8",
+    "src/solvers/optiland/pupil.py": "9fa15d5cdbb6125ab695456c7794b5bd72aa74bd1033897d3cea8cc1848cb38f",
+    "src/solvers/optiland/requests.py": "061e6831139364a9e92c284055df9845076a285666977722e019cae3221442ed",
+    "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+    "src/verification/psf_measurement.py": "1f0b665685b92abe28d69cb4153331a0d308392be6145832d0d04bffbab66622",
+    "src/verification/psf_oracles.py": "56a98b8d894554c6e80ab2638dced1f30aff9598a509d0c299fc8fbee5482629"
+   }
+  },
+  "data_fingerprint": {
+   "benchmarks/protocols/slice_protocol.yaml": "dac81d969a86952eb20088ab33cc4587d88522bce8d0e31408d57a19ffe17188"
+  },
+  "environment_fingerprint": {
+   "combined_sha256": "54118fbb8522613f91b8543412783ee46054fa0c904f95ba448e86880b41e12c",
+   "packages": {
+    "chromatix": "0.6.0",
+    "jax": "0.6.2",
+    "jaxlib": "0.6.2",
+    "numpy": "2.2.6",
+    "optiland": "0.6.0",
+    "scipy": "1.15.3",
+    "torch": "2.13.0+cpu"
+   },
+   "python_version": "3.12.14"
+  },
+  "probe": "m3_first_null_grid_convergence",
+  "schema_version": 2,
+  "source_commit": "95d3c4d475365fcee017545dcb5304903fb411a2",
+  "timestamp_utc": "2026-08-24T21:06:34.503542+00:00",
+  "working_tree_dirty": true
+ },
+ "verdict": {
+  "deviation_is_a_grid_artifact": true,
+  "frozen_configuration_is_first_null_converged": false,
+  "not_claimed": "that either convention's first-null radius is correct in absolute terms, and not that the WEIGHTED arm is itself converged: it reads 1.0354, 1.0039, 1.0093 over the grid sweep, moving away at the finest point, and the 0.0087 gap there is only just inside the 1% the retired assertion required. Both arms are non-monotone at the ~0.5% level, which is the estimator's own floor. The rings=24 weighted point is a 5.4% excursion (1.0889) and is excluded from the flatness statistic, which is quoted over 32-96 rings only. Establishing an absolute first-null accuracy is M2.1 (CHE-109)'s error budget, not this probe's; this probe answers only which term is binding.",
+  "pixels_per_airy_radius_frozen": 2.439339871593739,
+  "statement": "The frozen M3 configuration does not sample the PSF finely enough to measure a first-null radius to 1%. It puts 2.44 pixels across the Airy radius and the disputed shift is 0.09 pixels. The old record's 0.9963 was the uniform-weight convention landing near unity at an unconverged sampling, not evidence that the measurement was sound. The supported statement about CHE-47's quadrature weight is the narrow one: the 3.6% is not a converged physical shift attributable to the weight. The weight is a necessary condition for the frozen gap -- without it there is no gap -- but at 4.88 pixels per Airy radius the two conventions agree to well under 1%, so what the frozen number measures is the sampling."
+ }
+}

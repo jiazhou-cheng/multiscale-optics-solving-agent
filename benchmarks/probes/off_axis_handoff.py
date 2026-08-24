@@ -42,6 +42,8 @@ from typing import Any
 import numpy as np
 import yaml
 
+from core.provenance import RECORD_PROVENANCE_KEY, record_provenance
+
 ROOT = Path(__file__).resolve().parents[2]
 PROTOCOL_PATH = ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 RECORD_PATH = Path(__file__).resolve().parent / "records" / "m3_off_axis_handoff.json"
@@ -729,6 +731,15 @@ def characterize() -> dict[str, Any]:
 
 def main() -> None:
     record = characterize()
+    # CHE-103: stamp the source and environment the record was produced by, so a
+    # later tree can tell whether this file still describes it. Built AFTER
+    # characterize() so `sys.modules` holds everything the run actually imported.
+    record[RECORD_PROVENANCE_KEY] = record_provenance(
+        probe="m3_off_axis_handoff",
+        root=ROOT,
+        extra_sources=[Path(__file__)],
+        data_inputs=[PROTOCOL_PATH],
+    )
     RECORD_PATH.parent.mkdir(parents=True, exist_ok=True)
     RECORD_PATH.write_text(json.dumps(record, indent=1, sort_keys=True, default=str) + "\n")
     print(f"wrote {RECORD_PATH.relative_to(ROOT)}")

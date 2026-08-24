@@ -796,15 +796,32 @@ tolerance_budget:
 # tests/test_m3_psf_verification.py. Numbers below are at the frozen
 # configuration and 3169 traced rays unless a ray count is named.
 m3_8_verification:
+  # RE-DERIVED at CHE-103 (M0.2) against the current tree. The values below were
+  # written before CHE-47 folded the per-ray quadrature area weight into the
+  # launch amplitude, and this block mirrors
+  # benchmarks/probes/records/m3_psf_verification.json, so leaving them was the
+  # same open loop CHE-103 exists to close. Every number here is now the
+  # regenerated one; the pre-CHE-47 value is given beside the two that moved for
+  # a reason a reader needs.
   verdict: >-
-    the diffraction-limited slice agrees with the analytic Airy pattern in shape
-    and scale, and the two intensity-level gates FAIL, both dominated by ray
-    sampling. The failures are reported with a measured attribution rather than a
-    widened tolerance.
+    the diffraction-limited slice agrees with the analytic Airy pattern in shape,
+    and the two intensity-level gates FAIL. The FFT-oracle failure is dominated
+    by ray sampling. The Airy-peak failure was attributed to ray sampling and no
+    longer is: since CHE-47 the metric no longer reaches its gate anywhere in the
+    ray sweep (5.40e-3 against 2.0e-3, best over the sweep). Re-diagnosis is
+    M4.2 (CHE-117). No tolerance was widened for either.
   diffraction_limited:
-    analytic_airy_profile_relative_l2: 5.866e-3
-    analytic_airy_profile_max_abs: 4.613e-3
-    first_null_ratio_measured_over_analytic_same_grid: 0.99632
+    analytic_airy_profile_relative_l2: 5.509e-3      # was 5.866e-3 pre-CHE-47
+    analytic_airy_profile_max_abs: 4.159e-3          # was 4.613e-3 pre-CHE-47
+    first_null_ratio_measured_over_analytic_same_grid: 1.03451
+    first_null_is_not_a_converged_measurement: >-
+      was 0.99632 pre-CHE-47, and neither number is evidence. The frozen grid
+      puts 2.44 pixels across the Airy radius and the difference between the two
+      amplitude conventions is 0.09 pixels; refining the grid collapses it by 4x
+      while refining the ray count by 9x does not move it. So this metric
+      measures the sampling, not the physics, and it is reported rather than
+      gated. Evidence:
+      benchmarks/probes/records/m3_first_null_grid_convergence.json
     first_null_estimator_bias_at_frozen_sampling: 0.1093
     first_null_method: >-
       the same estimator is run over the analytic pattern sampled on the same
@@ -816,7 +833,7 @@ m3_8_verification:
       this protocol's frozen 0.016996 and Optiland's own Wavefront 0.016999 --
       three implementations, one number
     best_focus_offset_from_the_frozen_image_plane_m: -7.224e-6
-    fft_oracle_relative_l2: 1.509e-2
+    fft_oracle_relative_l2: 1.228e-2                 # was 1.509e-2 pre-CHE-47
   aberrated_case:
     method: defocus of the diffraction-limited system, 120 um past the frozen plane
     rms_waves: 0.0895
@@ -828,31 +845,38 @@ m3_8_verification:
       limited, while still inside Marechal's ~0.1-wave validity regime. A more
       strongly aberrated case would leave that regime and make the Strehl
       cross-check meaningless.
-    airy_profile_relative_l2: 8.954e-2      # 15x the diffraction-limited case
-    fft_oracle_relative_l2: 3.329e-2
-    measured_strehl: 0.6734
-    marechal_strehl: 0.7289
-    strehl_ratio_measured_over_marechal: 0.9238
+    airy_profile_relative_l2: 9.144e-2      # 17x the diffraction-limited case
+    fft_oracle_relative_l2: 2.903e-2
+    measured_strehl: 0.68847
+    marechal_strehl: 0.72892
+    strehl_ratio_measured_over_marechal: 0.94451
     strehl_note: >-
-      agreement to 7.6%, which is what a small-aberration expansion evaluated at
+      agreement to 5.5%, which is what a small-aberration expansion evaluated at
       the edge of its regime can deliver. A sanity cross-check, not a gate. Its
       value is that it does not share the FFT oracle's dependence on the traced
       OPD map.
   gates:
-    energy_accounting_unexplained_residual: pass, 7.5e-7 against 1.0e-3
-    fft_oracle_intensity_relative_l2: FAIL, 1.509e-2 against 1.0e-3 (15x)
-    airy_peak_intensity_relative: FAIL, 1.216e-2 against 2.0e-3 (6.1x)
+    energy_accounting_unexplained_residual: pass, 2.9e-7 against 1.0e-3
+    fft_oracle_intensity_relative_l2: FAIL, 1.228e-2 against 1.0e-3 (12.3x)
+    airy_peak_intensity_relative: FAIL, 8.10e-3 against 2.0e-3 (4.05x)
+    airy_peak_attribution_withdrawn: >-
+      best_over_ray_count_sweep is 5.40e-3 against the 2.0e-3 gate, where before
+      CHE-47 it was 2.93e-4. Ray refinement no longer brings this metric inside
+      its gate, so the ray-sampling attribution this protocol previously carried
+      is withdrawn rather than restated. Owner M4.2 (CHE-117).
   energy_ledger:
-    psf_integral_over_propagated_out: 1.0000007
-    propagated_out_over_in: 0.9999986
-    propagated_in_over_pupil: 1.0000000
-    pupil_over_traced: 2.14e-7
+    psf_integral_over_propagated_out: 0.9999997
+    propagated_out_over_in: 0.9999998
+    propagated_in_over_pupil: 0.9999999
+    pupil_over_traced: 8.56e-28
     pupil_over_traced_is_not_a_conservation_law: >-
       it converts a sum of dimensionless ray weights into sum(|u|^2)*dy*dx on a
       grid. The bundle declares reconstruction_normalization = none, so this ratio
-      is reported as a measure conversion and is not compared to unity.
+      is reported as a measure conversion and is not compared to unity. It was
+      2.14e-7 before CHE-47; the change is the SQUARE of the per-ray area element
+      now carried in the launch amplitude (6.2e-11 m^2), not a loss of energy.
     every_step_has_a_named_mechanism: true
-    unattributed_remainder: 7.5e-7
+    unattributed_remainder: 2.9e-7
 
 # ---------------------------------------------------------------------------
 # M3.9 convergence study -- CHE-38

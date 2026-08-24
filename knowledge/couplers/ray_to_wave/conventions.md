@@ -21,6 +21,7 @@ coupler's contract."*
 | Spatial factor | `exp(+i k z)`; ray wavelet phase `exp(+i k·OPL)` |
 | Complex arrays | Amplitude, never intensity. Intensity is `\|u\|²` |
 | Normalization | Declared per call. No `1/N` when summing a *given* ray ensemble; `1/N` when the ensemble is a Monte Carlo sample of a spectrum |
+| Launch amplitude scale | `a = √w · dA`, with `dA` the ray's physical quadrature area element in m². Ray-density-independent, but **not** SI-absolute: the kernel omits the diffraction prefactor, so `U` is `iλz` times the SI field — see below |
 | Polarization | Scalar only in M2. A polarization basis must be declared before any vector claim |
 | Coherence | Fully coherent. Partial coherence is not modelled |
 
@@ -153,6 +154,100 @@ kernel will meet it, and nothing in the kernel currently warns them.
 
 Evidence: `benchmarks/reports/2026-08/metalens_bridge.md` §6,
 `tests/test_coherent_bridge.py::TestExactnessLimit`.
+
+
+## Launch amplitude carries the area element, and that fixes the absolute scale
+
+**The convention: `amplitude = sqrt(ray_intensity) * quadrature_weight_m2`, with
+`quadrature_weight_m2` the physical area in m² that the ray's quadrature cell
+represents.** Producer-side, in `couplers.handoff.declare_coherent_bundle`; the
+`C_RAY_TO_WAVE` kernel is unchanged by it and still sums whatever amplitude the
+bundle declares.
+
+### Why the area element, and not a bare relative weight
+
+The wavelet sum
+
+    U(r) = Σᵢ aᵢ · exp[i k (OPLᵢ + drᵢ(r))]
+
+is a discretization of a surface integral over the aperture, so `aᵢ` must carry
+the area element that integral is taken with. The consequence that was actually
+measured is numerical: `Σᵢ dAᵢ → π a²` as the ring count grows, so the
+reconstructed discrete power **converges under ray refinement**. Without it the
+sum is pinned to the ray count instead of to the aperture, which is CHE-33's
+measured `N^2.0024` raw-power scaling. CHE-47 closed that by introducing this
+weight.
+
+### What the scale is, and what it is not
+
+It is **ray-density-independent**. It is **not** an SI power, and reporting
+`propagated_power_out` in watts would be wrong by about 18 orders of magnitude.
+Two factors are missing:
+
+* The kernel above has **no `1/(iλz)` Kirchhoff prefactor** — it sums wavelets
+  and stops. So `U` is `iλz` times the SI field.
+* The incident amplitude density `A₀` is never declared; `√w` is Optiland's
+  bookkeeping weight, which on the frozen M3 systems is identically 1.
+
+The first factor has a clean analytic check, and the repository already records
+it. Stationary phase on a converging bundle gives `∫dA·exp(ik|r′−r|²/2R) = iλR`,
+so reconstructing a unit-amplitude-density pupil should return `|U| = λR`.
+`aperture_edge_hypothesis.edge_vs_ray_count[*].plateau_amplitude` in
+`benchmarks/probes/records/m3_convergence.json` converges to `2.675e-9` against
+`λR = 0.55e-6 × 4.8375e-3 = 2.6606e-9` — a ratio of 1.005, at the ~0.5% level
+the rest of that record sits at. Treat that as the oracle for this convention:
+if the reconstructed pupil plateau stops matching `λR`, the launch amplitude
+scale has moved.
+
+So `propagated_power_out` is a **relative** quantity. It is comparable between
+two runs of the same configuration, and it is not a physical power.
+
+A hexapolar fan's cell is `π a² / (3 n²)` in the interior, `3/4` of that for the
+central ray, and `1/2` for the rim ring, which sits on the aperture boundary and
+represents only the inner half of its annulus
+(`couplers.quadrature.hexapolar_area_weight_m2`).
+
+### The scale this replaced, and how to recognize it
+
+Before CHE-47 (`ec55839`) the launch amplitude was `√w` alone, and on the
+frozen M3 configurations `w ≡ 1`, so **every ray launched with amplitude exactly
+1**. The absolute scale of everything downstream therefore differs between the
+two conventions by `dA²` — about `3.9e-21` on `M3-SINGLET-REF`, whose per-ray
+cell is `6.2e-11 m²`.
+
+That factor is the signature to look for. A propagated power of `7.0e-04` on
+this system is the **pre-CHE-47** convention; `2.7e-24` is the current one. Any
+committed evidence still carrying the former was produced before the weight
+existed. CHE-103 found three such records and regenerated them.
+
+Peak-normalized metrics cannot see this, which is exactly why it survived: the
+frozen M3 oracle normalization divides by the peak, so a global scale cancels
+and only the *raw* fields distinguish the two conventions.
+
+### What the weight is not
+
+It is not an apodization, and it is not a substitute for one. The weight is
+fixed by how the pupil was sampled, not by the physics of the aperture, so a
+non-uniform launch amplitude arising from it does **not** exercise the
+reconstruction's response to a physically apodized, vignetted or Fresnel-weighted
+pupil. Those remain untested (CHE-103; `amplitude_degree_of_freedom` in
+`benchmarks/probes/records/m3_psf_verification.json`).
+
+It also should not be blamed for sampling artifacts. On the frozen
+configuration the weight appears to shift the measured first-null radius by
+3.6%; refining the grid shows that is the grid's 2.44 pixels per Airy radius,
+not the weight (`benchmarks/probes/records/m3_first_null_grid_convergence.json`).
+
+What it *does* do, and what is not yet explained, is off-axis. On the
+`ReverseTelephoto` field the reconstruction's residual against the analytic
+Airy profile went from `1.48e-3` to `1.11e-2` when the weight was introduced,
+and removing the weight again improves that residual by 7.5x
+(`off_axis_negative_controls` in
+`benchmarks/probes/records/m3_psf_verification.json`). On axis the same metric
+barely moved, `5.87e-3 → 5.51e-3`. The rim taper is a plausible cause — a
+uniform-pupil Airy oracle sees a tapered pupil as a mismatch, and an off-axis
+pupil is sampled asymmetrically — but that is a hypothesis, not a measurement.
+Owned by M2.1 (CHE-109), which sets the ray→wave error budget.
 
 ## Sign and orientation checklist
 

@@ -53,6 +53,8 @@ from typing import Any
 import numpy as np
 import yaml
 
+from core.provenance import RECORD_PROVENANCE_KEY, record_provenance
+
 ROOT = Path(__file__).resolve().parents[2]
 PROTOCOL_PATH = ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml"
 RECORD_PATH = Path(__file__).resolve().parent / "records" / "m3_psf_verification.json"
@@ -666,10 +668,17 @@ def _negative_controls(
             "Every ray's declared amplitude replaced by 1, through the RayBundle "
             "contract, leaving the OPL untouched.",
             {"unit_amplitude": True},
-            "Expected WEAK: hexapolar weights on this configuration are near "
-            "uniform, so the omission is close to an exact constant scale, and the "
-            "frozen peak normalization cannot see a constant. The raw scale is what "
-            "shows it -- compare raw_peak_intensity against the control.",
+            "Expected WEAK, and weak for a different reason since CHE-47. This "
+            "control reverts the launch amplitude to exactly 1, which is the "
+            "pre-CHE-47 convention, so it removes BOTH the absolute per-ray area "
+            "element (a global scale of ~6.2e-11 m^2, which the frozen peak "
+            "normalization cannot see -- compare raw_peak_intensity against the "
+            "control, the ratio is ~2.6e20) AND the rim/centre trapezoid "
+            "correction, which is a real non-uniform perturbation of the "
+            "normalized profile. The hexapolar weights are NOT near uniform: they "
+            "take three values (centre 3/4, rim 1/2, interior 1). What keeps the "
+            "control undetected is that the shape term is small against the "
+            "Airy-residual threshold, not that it is absent.",
         ),
         (
             "oblique_ramp_omitted",
@@ -805,6 +814,86 @@ def _psf_from_bundle(bundle, geometry, directory: Path, *, core_perturbation=Non
         normalization=M3_ORACLE_NORMALIZATION,
         expected_output_sample_pitch_m=(float(reported[0]), float(reported[1])),
     )
+
+
+def _amplitude_degree_of_freedom(rays, geometry: dict[str, Any]) -> dict[str, Any]:
+    """Is the reconstruction's amplitude input actually varying, or is it flat?
+
+    Both factors are reported separately, because they answer different
+    questions and conflating them is the error CHE-103 found:
+
+    * ``ray_intensity_*`` -- Optiland's ``RealRays.i``. Flat on every M3
+      configuration; exercising it would need apodization, vignetting or a
+      polarized Fresnel transmission, none of which M3 has.
+    * ``declared_amplitude_*`` -- what ``declare_coherent_bundle`` hands the
+      coupler, i.e. ``sqrt(intensity) * quadrature_weight_m2`` since CHE-47.
+      The hexapolar area weight takes three values by construction, so this is
+      not flat, and the ``amplitude_weight_omitted`` control below is therefore
+      no longer a no-op.
+    """
+    from couplers.handoff import DeclaredHandoffPlane, declare_coherent_bundle
+
+    ray_arrays = dict(np.load(rays.uri))
+    intensity = ray_arrays["intensity"]
+    survived = ray_arrays.get("survived")
+    kept = intensity if survived is None else intensity[survived.astype(bool)]
+
+    bundle = declare_coherent_bundle(
+        rays,
+        declared_plane=DeclaredHandoffPlane("exit_pupil", geometry["pupil_z_m"]),
+    ).bundle
+    amplitude = np.abs(np.asarray(bundle.amplitude))
+    # Rounded before counting: the three hexapolar weights are exact multiples of
+    # one nominal cell area, so distinct values are distinct by construction and
+    # not by float noise. The relative rounding keeps that true at any aperture.
+    distinct = np.unique(np.round(amplitude / max(float(amplitude.max()), 1e-300), 12))
+
+    exercised = bool(distinct.size > 1)
+    return {
+        "ray_intensity_min": float(kept.min()),
+        "ray_intensity_max": float(kept.max()),
+        "ray_intensity_spread": float(kept.max() - kept.min()),
+        "relative_spread": float((kept.max() - kept.min()) / kept.mean()),
+        "declared_amplitude_min": float(amplitude.min()),
+        "declared_amplitude_max": float(amplitude.max()),
+        "declared_amplitude_distinct_values": int(distinct.size),
+        "declared_amplitude_relative_spread": float(
+            (amplitude.max() - amplitude.min()) / amplitude.mean()
+        ),
+        "amplitude_is_exercised": exercised,
+        "finding": (
+            "Optiland's per-ray intensity weights on this configuration are uniform "
+            "to ~1e-5 relative. The LAUNCHED amplitude is not: since CHE-47 it is "
+            "sqrt(intensity) * quadrature_weight_m2, and the hexapolar area weight "
+            "takes three distinct values by construction (centre ray 3/4 of the "
+            "nominal cell, rim ring 1/2, interior 1). So the amplitude path of the "
+            "reconstruction IS exercised on this configuration -- as a mild radial "
+            "apodization at the pupil rim, not as a free amplitude pattern. What "
+            "remains unexercised is a NON-QUADRATURE amplitude variation: "
+            "apodization, vignetting or a polarized Fresnel transmission, none of "
+            "which M3 has, and the quadrature weight cannot stand in for them "
+            "because it is fixed by the sampling rather than by the physics."
+        )
+        if exercised
+        else (
+            "Both factors of the launched amplitude are flat on this configuration, "
+            "so replacing every amplitude with 1 is an exact global scale and the "
+            "frozen peak normalization cannot see it."
+        ),
+        "consequence": (
+            "the amplitude_weight_omitted control below is a real perturbation: it "
+            "removes the rim/centre trapezoid correction, which changes the "
+            "normalized profile by a measured amount rather than by nothing. It is "
+            "still reported as undetected against the Airy-residual threshold, "
+            "because the effect is small -- that is the honest result, and it is a "
+            "weaker statement than the exact no-op this record used to carry."
+        )
+        if exercised
+        else (
+            "the amplitude_weight_omitted control below is reported as undetected. "
+            "That is the honest result, not a passing test."
+        ),
+    }
 
 
 def _orientation_control(rays, geometry: dict[str, Any], directory: Path) -> dict[str, Any]:
@@ -1371,28 +1460,45 @@ def characterize() -> dict[str, Any]:
         )
         out["negative_controls"]["graph_node_residual_for_reference"] = reference_residual
 
-        # The amplitude degree of freedom, measured rather than assumed.
-        ray_arrays = dict(np.load(rays_dl.uri))
-        intensity = ray_arrays["intensity"]
-        survived = ray_arrays.get("survived")
-        kept = intensity if survived is None else intensity[survived.astype(bool)]
-        out["amplitude_degree_of_freedom"] = {
-            "ray_intensity_min": float(kept.min()),
-            "ray_intensity_max": float(kept.max()),
-            "ray_intensity_spread": float(kept.max() - kept.min()),
-            "relative_spread": float((kept.max() - kept.min()) / kept.mean()),
-            "finding": (
-                "Optiland's per-ray intensity weights on this configuration are "
-                "uniform to ~1e-5 relative, so replacing every amplitude with 1 is "
-                "an almost exact global scale -- and the frozen peak normalization "
-                "cannot see a global scale. The amplitude path of the reconstruction "
-                "is therefore NOT exercised by any M3 configuration. Exercising it "
-                "needs a non-uniform weight: apodization, vignetting or a polarized "
-                "Fresnel transmission, none of which M3 has."
+        # The amplitude degree of freedom, measured rather than assumed -- and
+        # measured on the amplitude that is actually LAUNCHED, which is the thing
+        # the reconstruction sees. CHE-103: this section previously reported only
+        # Optiland's per-ray intensity weight and concluded from its uniformity
+        # that the amplitude path was not exercised. That inference stopped being
+        # valid at CHE-47, which made the declared amplitude
+        # `sqrt(intensity) * quadrature_weight_m2` -- and the hexapolar area
+        # weight is deliberately NOT uniform (rim ring 1/2, centre ray 3/4 of the
+        # nominal cell). One factor being flat says nothing about the product.
+        out["amplitude_degree_of_freedom"] = _amplitude_degree_of_freedom(rays_dl, SINGLET)
+
+        # CHE-103: the precision this record's numbers were MEASURED in, read off
+        # the arrays rather than declared. A second, independent cause of the
+        # record drift was that the measured PSF used to be float64 and is now
+        # float32 -- the propagated field's dtype follows `jax_enable_x64`, which
+        # is process-global mutable state that `pin_wave_engine_precision` sets
+        # at Chromatix-import time and which nothing checks at this boundary. The
+        # call site is byte-identical to the commit that wrote the old record, so
+        # this was never a code change: it was import order. Recording the dtype
+        # here is what makes the next occurrence visible in the record instead of
+        # inferable from which decimal digits happen to be present.
+        from core.boundary import ComplexField as _ComplexField
+
+        out["measurement_precision"] = {
+            "pupil_field_dtype": str(
+                np.asarray(_ComplexField.from_artifact_record(dl["pupil_field"]).u).dtype
             ),
-            "consequence": (
-                "the amplitude_weight_omitted control below is reported as "
-                "undetected. That is the honest result, not a passing test."
+            "propagated_field_dtype": str(
+                np.load(dl["wave_result"].outputs["output_field"].uri).dtype
+            ),
+            "psf_intensity_dtype": str(measurement_dl.intensity.dtype),
+            "note": (
+                "Chromatix's ScalarField unconditionally casts to complex64, so the "
+                "propagated field and every PSF measured from it are single "
+                "precision, and the protocol budgets 3.5e-4 for it. Under "
+                "jax_enable_x64 the FFTs behind kernel_propagate promote to "
+                "complex128 and these numbers silently gain 8 digits -- which is "
+                "what the pre-CHE-103 records carried. Equal dtypes here and in an "
+                "older record are a precondition for comparing them, not a detail."
             ),
         }
 
@@ -1558,6 +1664,15 @@ def characterize() -> dict[str, Any]:
 
 def main() -> None:
     record = characterize()
+    # CHE-103: stamp the source and environment the record was produced by, so a
+    # later tree can tell whether this file still describes it. Built AFTER
+    # characterize() so `sys.modules` holds everything the run actually imported.
+    record[RECORD_PROVENANCE_KEY] = record_provenance(
+        probe="m3_psf_verification",
+        root=ROOT,
+        extra_sources=[Path(__file__)],
+        data_inputs=[PROTOCOL_PATH],
+    )
     RECORD_PATH.parent.mkdir(parents=True, exist_ok=True)
     RECORD_PATH.write_text(json.dumps(record, indent=1, sort_keys=True, default=str) + "\n")
     print(f"wrote {RECORD_PATH.relative_to(ROOT)}")

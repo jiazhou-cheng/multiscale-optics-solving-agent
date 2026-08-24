@@ -52,6 +52,12 @@ pytestmark = pytest.mark.coupler
 
 ROOT = Path(__file__).resolve().parents[1]
 RECORD_PATH = ROOT / "benchmarks" / "probes" / "records" / "m3_psf_verification.json"
+#: CHE-103. The sampling study that establishes which term the frozen
+#: configuration's first-null deviation belongs to, kept in its own record
+#: because it is a separate scientific question with its own sweeps.
+FIRST_NULL_CONVERGENCE_PATH = (
+    ROOT / "benchmarks" / "probes" / "records" / "m3_first_null_grid_convergence.json"
+)
 
 WAVELENGTH_M = 0.55e-6
 R_M = 4.837461300309598e-3
@@ -66,6 +72,16 @@ def record() -> dict:
     if not RECORD_PATH.exists():
         pytest.skip(f"{RECORD_PATH.relative_to(ROOT)} is missing; run the probe first")
     return json.loads(RECORD_PATH.read_text())
+
+
+@pytest.fixture(scope="module")
+def first_null_convergence() -> dict:
+    if not FIRST_NULL_CONVERGENCE_PATH.exists():
+        pytest.skip(
+            f"{FIRST_NULL_CONVERGENCE_PATH.relative_to(ROOT)} is missing; run "
+            "benchmarks/probes/first_null_grid_convergence.py first"
+        )
+    return json.loads(FIRST_NULL_CONVERGENCE_PATH.read_text())
 
 
 def _perfect_bundle(n: int = 6000) -> RayBundle:
@@ -95,9 +111,10 @@ def _perfect_bundle(n: int = 6000) -> RayBundle:
 def test_the_airy_coefficient_is_a_radius_not_a_diameter() -> None:
     """0.60983, from the first zero of J1. Not 1.22, which is the diameter."""
     assert pytest.approx(3.8317059702075125, rel=1e-15) == AIRY_J1_FIRST_ZERO
-    assert pytest.approx(
-        AIRY_J1_FIRST_ZERO / (2.0 * math.pi), rel=1e-15
-    ) == AIRY_FIRST_NULL_COEFFICIENT_EXACT
+    assert (
+        pytest.approx(AIRY_J1_FIRST_ZERO / (2.0 * math.pi), rel=1e-15)
+        == AIRY_FIRST_NULL_COEFFICIENT_EXACT
+    )
     assert pytest.approx(0.6098349456, rel=1e-9) == AIRY_FIRST_NULL_COEFFICIENT_EXACT
     # The rounded value the protocol quotes is 0.03% high, which is recorded rather
     # than absorbed: the oracle uses the exact one.
@@ -115,7 +132,9 @@ def test_the_frozen_protocol_airy_radius_is_actually_the_diameter() -> None:
     """
     import yaml
 
-    protocol = yaml.safe_load((ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text())
+    protocol = yaml.safe_load(
+        (ROOT / "benchmarks" / "protocols" / "slice_protocol.yaml").read_text()
+    )
     singlet = next(s for s in protocol["systems"] if s["id"] == "M3-SINGLET-REF")
     frozen_um = float(singlet["airy_radius_um"])
     na = float(singlet["derived"]["numerical_aperture"])
@@ -293,7 +312,11 @@ def test_resampling_preserves_a_known_pattern() -> None:
 
 
 def test_the_diffraction_limited_case_matches_the_analytic_airy(record: dict) -> None:
-    """Profile residual and first-null radius, on the frozen configuration."""
+    """The profile agrees. The first-null radius is not a converged measurement.
+
+    Both halves are the current truth and they point opposite ways, which is why
+    they are asserted separately rather than behind one tolerance.
+    """
     airy = record["diffraction_limited"]["vs_analytic_airy"]
 
     assert airy["relative_l2_profile_residual"] < 1.0e-2
@@ -303,7 +326,71 @@ def test_the_diffraction_limited_case_matches_the_analytic_airy(record: dict) ->
     # The estimator bias is ~11% at this sampling, so the meaningful comparison is
     # against the same estimator on the analytic pattern.
     assert null["analytic_estimator_bias"] > 0.08
-    assert null["ratio_measured_over_analytic"] == pytest.approx(1.0, abs=0.01)
+
+
+def test_the_first_null_radius_is_pinned_as_an_unconverged_measurement(
+    record: dict, first_null_convergence: dict
+) -> None:
+    """CHE-103: this metric used to be asserted within 1% of unity. It is not.
+
+    The number moved from 0.9963 to 1.0345 when the records were regenerated
+    against the current tree, and the tempting readings were both wrong: widen
+    the tolerance, or blame CHE-47's quadrature weight for apodizing the rim.
+    ``benchmarks/probes/first_null_grid_convergence.py`` measured it instead. The
+    frozen configuration puts 2.44 pixels across the Airy radius and the disputed
+    shift is 0.09 pixels; refining the grid collapses the difference between the
+    two amplitude conventions by 4x, while refining the ray count by 9x does not
+    move it at all.
+
+    So the metric is pinned as UNCONVERGED rather than as passing or failing. The
+    assertion below is deliberately not a physics tolerance -- it exists so that
+    a change which alters this number cannot pass quietly, and so that anyone who
+    wants to tighten it has to fix the sampling first. Absolute first-null
+    accuracy belongs to M2.1 (CHE-109)'s error budget.
+    """
+    null = record["diffraction_limited"]["vs_analytic_airy"]["first_null"]
+    verdict = first_null_convergence["verdict"]
+
+    assert verdict["frozen_configuration_is_first_null_converged"] is False
+    assert verdict["deviation_is_a_grid_artifact"] is True
+    assert verdict["pixels_per_airy_radius_frozen"] < 4.0, (
+        "under 4 pixels per Airy radius is what makes this measurement unconverged; "
+        "if the frozen grid is ever refined past that, re-derive the metric rather "
+        "than re-pinning it"
+    )
+
+    # Pinned at the measured value, not at a physically motivated bound.
+    assert null["ratio_measured_over_analytic"] == pytest.approx(1.0345, abs=5e-4)
+
+
+def test_the_quadrature_weight_is_exonerated_by_grid_refinement(
+    first_null_convergence: dict,
+) -> None:
+    """The controlled comparison that stopped CHE-47 being blamed for the shift.
+
+    Same rays, same grid, one bit changed: whether the per-ray quadrature area
+    weight is folded into the launch amplitude. At the frozen sampling the two
+    conventions differ by 3.6% on the first-null radius; once the grid resolves
+    the pattern they agree to well under 1%. A real apodization would not care
+    how finely it was sampled.
+
+    The collapse is quoted against the WORST refined point (4.1x), not the best
+    (11x). The refined arm is non-monotone at the ~0.5% level -- the estimator's
+    own floor on this grid -- and quoting the best point would be picking the
+    number that flatters the conclusion.
+    """
+    grid = first_null_convergence["grid_refinement_holding_the_rays"]
+    ring = first_null_convergence["ray_refinement_holding_the_grid"]
+
+    assert abs(grid["frozen_weighted_minus_uniform"]) > 0.03
+    assert grid["resolved_weighted_minus_uniform_max"] < 0.01
+    assert abs(grid["frozen_weighted_minus_uniform"]) > (
+        3.0 * grid["resolved_weighted_minus_uniform_max"]
+    ), "the probe's own criterion for calling the deviation a grid artifact"
+
+    # And the other arm: refining the rays alone does nothing, so this is not a
+    # ray-sampling term and not an under-resolved rim quadrature cell.
+    assert ring["weighted_spread_over_32_to_96_rings"] < 2.0e-3
 
 
 def test_the_wavefront_reproduces_the_frozen_peak_to_valley(record: dict) -> None:
@@ -373,8 +460,9 @@ def test_the_negative_controls_report_margins_and_two_of_them_are_blind(
     controls = {c["control"]: c for c in record["negative_controls"]["controls"]}
 
     # The unperturbed control reproduces the graph node bit for bit.
-    assert record["negative_controls"]["unperturbed_control"]["relative_l2_vs_airy"] == (
-        record["negative_controls"]["graph_node_residual_for_reference"]
+    assert (
+        record["negative_controls"]["unperturbed_control"]["relative_l2_vs_airy"]
+        == (record["negative_controls"]["graph_node_residual_for_reference"])
     )
 
     for name in ("opl_sign_flip", "reconstruction_phase_sign_flip", "oblique_ramp_omitted"):
@@ -389,22 +477,75 @@ def test_the_negative_controls_report_margins_and_two_of_them_are_blind(
         controls["reconstruction_phase_sign_flip"]["relative_l2_vs_airy"], rel=1e-6
     )
 
-    # And the two that cannot fire here are recorded as not firing.
+    # The transpose still cannot fire here: a circular pupil and an on-axis PSF
+    # are symmetric under it, and this SCORE azimuthally averages about the grid
+    # centre. Recorded as not firing rather than quietly omitted.
     assert controls["axis_transpose"]["detection_margin"] == pytest.approx(1.0, abs=1e-4)
     assert controls["axis_transpose"]["detected"] is False
-    assert controls["amplitude_weight_omitted"]["detection_margin"] == pytest.approx(
-        1.0, abs=1e-4
+
+    # amplitude_weight_omitted is a WEAKER statement than this record used to
+    # make, and the weakening is the CHE-103 finding rather than a regression.
+    # Before CHE-47 the launched amplitude was exactly 1 for every ray, so
+    # replacing it with 1 was an exact no-op and the difference was 0.0 -- which
+    # the old test asserted, calling it "a stronger and worse statement". Since
+    # CHE-47 the control removes a real rim/centre trapezoid correction, so it
+    # perturbs the normalized profile by a measured amount. It is still below the
+    # detection threshold, so the control still does not fire; what changed is
+    # that it is now a genuine perturbation that the Airy-residual score is too
+    # blunt to see, rather than nothing at all.
+    omitted = controls["amplitude_weight_omitted"]
+    assert omitted["max_abs_difference_vs_unperturbed"] > 0.0, (
+        "an exact 0.0 here would mean the quadrature weight had silently stopped "
+        "being applied -- the pre-CHE-47 configuration, and the state that made "
+        "the committed records stop reproducing"
     )
-    assert controls["amplitude_weight_omitted"]["detected"] is False
+    assert omitted["max_abs_difference_vs_unperturbed"] == pytest.approx(0.00928, abs=5e-5)
+    assert 1.0 < omitted["detection_margin"] < 1.2
+    assert omitted["detected"] is False
+
+    # The raw scale is what the frozen peak normalization cannot see, and it is
+    # ~2.6e20: the control reverts to unit amplitude while the shipping path
+    # launches an amplitude carrying the per-ray area element in m^2, so the
+    # intensities differ by the square of that element. This is the same factor
+    # that made the committed records look like they had lost 20 orders of
+    # magnitude of power, and it is the reason a peak-normalized score is blind
+    # to it.
+    assert omitted["raw_peak_ratio_vs_control"] > 1e19
 
 
-def test_the_amplitude_degree_of_freedom_is_not_exercised_at_all(record: dict) -> None:
-    """Not "weak" -- an exact no-op, which is a stronger and worse statement."""
+def test_the_amplitude_degree_of_freedom_is_exercised_but_only_by_the_quadrature(
+    record: dict,
+) -> None:
+    """CHE-103: this test used to assert the opposite, and was measuring one factor.
+
+    It read Optiland's per-ray intensity weight, found it flat, and concluded the
+    amplitude path was not exercised. That inference stopped holding at CHE-47,
+    which made the launched amplitude ``sqrt(intensity) * quadrature_weight_m2``.
+    The hexapolar area weight takes three values by construction -- centre ray
+    3/4 of the nominal cell, rim ring 1/2, interior 1 -- so the product is not
+    flat even though one factor is. The old assertion could not see this because
+    it never looked at the amplitude the coupler actually receives.
+
+    The distinction that survives is narrower and worth keeping: the amplitude is
+    exercised by the *sampling*, not by the *physics*. A quadrature weight is
+    fixed by how the pupil was diced, so it cannot stand in for apodization,
+    vignetting or a polarized Fresnel transmission -- none of which M3 has, and
+    all of which remain untested.
+    """
     amplitude = record["amplitude_degree_of_freedom"]
 
+    # One factor is still flat, and that part of the old finding was correct.
     assert amplitude["ray_intensity_spread"] == 0.0
     assert amplitude["relative_spread"] == 0.0
-    assert "NOT exercised" in amplitude["finding"]
+
+    # The product is not.
+    assert amplitude["amplitude_is_exercised"] is True
+    assert amplitude["declared_amplitude_distinct_values"] == 3
+    assert amplitude["declared_amplitude_relative_spread"] > 0.5
+    assert amplitude["declared_amplitude_min"] == pytest.approx(
+        0.5 * amplitude["declared_amplitude_max"], rel=1e-9
+    ), "the rim ring carries exactly half the nominal cell area"
+    assert "NON-QUADRATURE" in amplitude["finding"]
 
 
 def test_the_orientation_control_can_be_made_to_fail(record: dict) -> None:
@@ -451,10 +592,7 @@ def test_the_off_axis_handoff_puts_the_psf_where_the_rays_go(record: dict) -> No
     # 4. The shipping PSF lands there too, within one pixel of the prediction.
     assert abs(handoff["geometric_image_height_pixels"]) > 100
     assert (
-        abs(
-            handoff["measured_psf_peak_offset_pixels"]
-            - handoff["geometric_image_height_pixels"]
-        )
+        abs(handoff["measured_psf_peak_offset_pixels"] - handoff["geometric_image_height_pixels"])
         <= 1.0
     )
 
@@ -486,10 +624,24 @@ def test_the_two_failing_gates_are_pinned_as_failing_with_their_diagnosis(
 
     airy = gates["airy_peak_intensity_relative"]
     assert airy["verdict"] == "FAIL"
-    assert airy["best_over_ray_count_sweep"] < airy["gate"], (
-        "the metric must reach the gate at higher ray count, or the attribution to "
-        "ray sampling is not supported"
+    # CHE-103: this assertion used to require best_over_ray_count_sweep < gate,
+    # on the reasoning that "the metric must reach the gate at higher ray count,
+    # or the attribution to ray sampling is not supported". Against the current
+    # tree it does not: 5.40e-3 against a 2.0e-3 gate, where the old record had
+    # 2.93e-4. Refining the rays no longer brings this metric inside its gate.
+    #
+    # That is a finding, and the honest form of it is to say the attribution is
+    # no longer supported rather than to drop the check or widen the gate. It is
+    # NOT re-diagnosed here: M4.2 (CHE-117) owns settling L2-PSF-01's unmet gate,
+    # and CHE-103's scope is reconciling the evidence with the code, not
+    # rebuilding the coupler's error budget. What this test does is stop the
+    # changed state from being read as the old one.
+    assert airy["best_over_ray_count_sweep"] > airy["gate"], (
+        "if ray refinement has started reaching this gate again, the CHE-103 "
+        "finding has been resolved -- say so and re-derive the attribution, do "
+        "not restore the old assertion silently"
     )
+    assert airy["best_over_ray_count_sweep"] == pytest.approx(5.40e-3, abs=5e-5)
 
 
 def test_the_gate_failures_are_attributed_by_a_measured_ray_count_trend(
@@ -508,3 +660,79 @@ def test_the_gate_failures_are_attributed_by_a_measured_ray_count_trend(
     # both gate failures to the one unmeasured term.
     assert abs(rows[0]["airy_peak_deficit_full_window"]) > 0.5
     assert abs(rows[-1]["airy_peak_deficit_full_window"]) < 0.05
+
+
+# ---------------------------------------------------------------------------
+# CHE-103: two findings that had no test, which is how they drifted unnoticed
+# ---------------------------------------------------------------------------
+
+
+def test_the_off_axis_reconstruction_got_worse_and_that_is_recorded(record: dict) -> None:
+    """The off-axis residual moved 7.5x and nothing was asserting on it.
+
+    Regenerating against the current tree took
+    ``off_axis_negative_controls.unperturbed_control.relative_l2_vs_airy`` from
+    ``1.48e-3`` to ``1.11e-2``, and dropped every off-axis detection margin by
+    the same factor -- not because the controls got worse but because they are
+    quoted against that denominator. On axis the same metric barely moved
+    (``5.87e-3 -> 5.51e-3``), so this is specific to the off-axis field.
+
+    The ``amplitude_weight_omitted`` control is the informative one: its margin
+    is now ``0.134``, i.e. **removing** CHE-47's quadrature weight makes the
+    off-axis PSF agree with the analytic Airy 7.5x better. A rim taper against a
+    uniform-pupil oracle is the obvious candidate and is not established here.
+    M2.1 (CHE-109) owns the ray->wave error budget this belongs to.
+
+    This test exists so the number cannot move again without someone noticing.
+    """
+    off = record["off_axis_negative_controls"]
+    controls = {c["control"]: c for c in off["controls"]}
+
+    assert off["unperturbed_control"]["relative_l2_vs_airy"] == pytest.approx(1.109e-2, rel=1e-2)
+
+    # Removing the weight IMPROVES off-axis agreement. Asserted as < 1 rather
+    # than at a value, because the direction is the finding.
+    omitted = controls["amplitude_weight_omitted"]
+    assert omitted["detection_margin"] < 1.0, (
+        "the off-axis finding is that omitting the quadrature weight makes the "
+        "residual smaller; a margin >= 1 means that reversed and the CHE-103 "
+        "finding needs re-deriving"
+    )
+    assert omitted["detection_margin"] == pytest.approx(0.1336, abs=5e-4)
+
+    # The genuinely detectable controls still fire, by a wide margin.
+    for name in ("opl_sign_flip", "reconstruction_phase_sign_flip", "oblique_ramp_omitted"):
+        assert controls[name]["detection_margin"] > 10.0, name
+
+
+def test_the_record_states_the_precision_it_was_measured_in(record: dict) -> None:
+    """The second, independent cause of the CHE-100 record drift.
+
+    The 20-order-of-magnitude power change was CHE-47's quadrature weight. It was
+    not the only delta: the old records' PSF numbers carry float64 precision
+    (``9697164.659904482`` is not float32-representable) and the current ones are
+    float32-exact (``9697163.0``). Same amplitude convention on both sides of
+    that comparison, so it is a separate change.
+
+    The mechanism is ``jax_enable_x64``. Chromatix's ``ScalarField`` casts to
+    ``complex64``, but under x64 the FFTs behind ``kernel_propagate`` promote,
+    and ``pin_wave_engine_precision`` -- which turns the flag off at
+    Chromatix-import time -- "cannot retroactively downcast a field that was
+    already constructed under x64", as its own docstring says. That call site is
+    byte-identical between the commit that wrote the old record and this one, so
+    this was never a code change: it was import order deciding the precision of
+    committed scientific evidence.
+
+    Recording the dtype is the durable half of the fix. The other half -- check
+    the flag at the boundary that depends on it rather than setting it earlier
+    and hoping -- is CHE-102's rule applied to the wave solver, and is not this
+    ticket's scope.
+    """
+    precision = record["measurement_precision"]
+
+    assert precision["propagated_field_dtype"] == "complex64"
+    assert precision["psf_intensity_dtype"] == "float32"
+    # The pupil is reconstructed on the host in double and only loses precision
+    # at the Chromatix boundary, which is where the protocol's 3.5e-4 term sits.
+    assert precision["pupil_field_dtype"] == "complex128"
+    assert "jax_enable_x64" in precision["note"]
