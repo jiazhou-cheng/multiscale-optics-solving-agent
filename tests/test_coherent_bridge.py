@@ -36,6 +36,7 @@ pytest.importorskip("optiland")
 
 import optiland.backend as be
 
+from core.arrays import array_state
 from core.boundary import (
     ContractError,
     Frame,
@@ -51,7 +52,9 @@ from core.coherent_batch import (
     micrometres_to_metres,
     millimetres_to_metres,
 )
+from core.errors import UnsupportedCapabilityError
 from core.precision import (
+    ArrayNamespace,
     DeviceKind,
     DevicePlacement,
     Precision,
@@ -80,6 +83,7 @@ from solvers.optiland.coherent_trace import (
     surface_positions_m,
     trace_ray_batch,
 )
+from solvers.optiland.execution import resolve_optiland_namespace
 from studies.metalens.oracle import (
     AIR_CONFIG,
     SLAB_CONFIG,
@@ -156,6 +160,26 @@ def _relative_field_error(test: np.ndarray, reference: np.ndarray) -> float:
     return float(np.linalg.norm(test - reference) / np.linalg.norm(reference))
 
 
+def _measured_state(field_out, traced, diagnostics) -> str:
+    """The dtype/device/namespace this result was actually computed in.
+
+    Read off the arrays and off the solver, never off the request -- the CHE-61
+    rule. An exactness gate that cannot say what precision produced its number is
+    under-instrumented: CHE-99 measured this assertion failing 32% of runs at
+    ~900x its tolerance and the message could not distinguish a precision
+    regression from a genuine physics error, so the cause (CHE-102: a host trace
+    silently executing on Optiland's torch backend) had to be found by statistics
+    instead of read off the failure.
+    """
+    return (
+        f"measured state: field_out={array_state(field_out.u)}, "
+        f"positions={array_state(traced.bundle.positions_m)}, "
+        f"amplitude={array_state(traced.bundle.amplitude)}, "
+        f"optiland_backend={diagnostics['optiland_backend']!r}, "
+        f"residency={diagnostics['residency']}"
+    )
+
+
 # --- Phase 4 Test A: free space, and the exactness limit ----------------------
 
 
@@ -164,12 +188,15 @@ class TestExactnessLimit:
 
     @pytest.mark.parametrize("config", [AIR_CONFIG, SLAB_CONFIG], ids=["air", "slab"])
     def test_the_exactness_limit_reproduces_the_analytic_oracle(self, host_optiland, config):
-        field_out, _, _, _ = _traced_field(config, launch_positions=[[0.0, 0.0]])
+        field_out, traced, diagnostics, _ = _traced_field(
+            config, launch_positions=[[0.0, 0.0]]
+        )
         reference = reference_field(config, direction_cosine_floor=FLOOR)
         error = _relative_field_error(field_out.u, reference.u)
         assert error < 1.0e-11, (
             f"full enumeration under the uniform density must collapse onto the "
-            f"analytic field; got {error:.3e}"
+            f"analytic field; got {error:.3e}. "
+            f"{_measured_state(field_out, traced, diagnostics)}"
         )
 
     def test_the_grazing_band_limit_is_what_makes_the_exactness_limit_exact(
@@ -860,3 +887,85 @@ class TestBackendState:
         configure_optiland_execution(
             device=HOST, precision=Precision.FP64, enable_grad=False
         )
+
+    def test_a_host_request_executes_in_the_namespace_the_bridge_delivers(self):
+        """CHE-102's root cause, as a falsifiable statement.
+
+        ``plan_bridge`` keeps a NumPy source in NumPy on the host, so the host
+        backend must be NumPy too. When it was torch, Optiland converted every
+        array on entry and the exactness limit failed ~32% of runs at 8.9e-9
+        against its 1e-11 gate. Nothing in any artifact said so, which is why
+        both halves are asserted here: the resolved namespace *and* what the
+        solver reports back.
+        """
+        state = configure_optiland_execution(
+            device=HOST, precision=Precision.FP64, enable_grad=False
+        )
+        assert resolve_optiland_namespace(HOST) is ArrayNamespace.NUMPY
+        assert state.requested_backend == "numpy"
+        assert state.observed_backend == "numpy"
+        assert be.get_backend() == "numpy"
+
+    def test_gradients_still_select_the_only_backend_that_has_them(self):
+        """NumPy is preferred on the host, not imposed: torch remains reachable."""
+        assert (
+            resolve_optiland_namespace(HOST, require_gradients=True)
+            is ArrayNamespace.TORCH
+        )
+        state = configure_optiland_execution(
+            device=HOST, precision=Precision.FP64, enable_grad=True
+        )
+        assert state.observed_backend == "torch"
+        assert state.grad_enabled is True
+        configure_optiland_execution(
+            device=HOST, precision=Precision.FP64, enable_grad=False
+        )
+
+    def test_a_trace_is_refused_when_the_global_backend_contradicts_the_plan(self):
+        """The mechanism M3's executor inherits.
+
+        A graph executor runs a ray node and a wave node in one process, and
+        Optiland's backend is process-global and not thread-safe: any component
+        can change it between the plan and the trace. So the trace *checks* the
+        backend it is about to dispatch through rather than trusting that
+        something earlier set it correctly -- setting it correctly elsewhere is
+        not a property this boundary can observe.
+        """
+        field_in = metalens_field(AIR_CONFIG)
+        spectrum, _ = band_limit_spectrum(
+            decompose(field_in),
+            direction_cosine_floor=FLOOR,
+            max_optical_path_m=AIR_CONFIG.sensor_distance_m,
+            precision=str(Precision.FP64),
+            phase_budget_rad=1.0e-2,
+        )
+        density = sampling_density(spectrum, SamplingDensity.UNIFORM)
+        bundle = spectrum_to_rays(
+            spectrum,
+            enumerate_indices(density)[:8],
+            density,
+            launch_positions_xy_m=np.zeros((1, 2)),
+        )
+        batch = CoherentRayBatch(
+            bundle=bundle,
+            ray_id=np.arange(bundle.count, dtype=np.int64),
+            valid=np.ones(bundle.count, dtype=bool),
+        )
+        lens = build_optiland_system(optical_system_spec(AIR_CONFIG))
+        sensor = ReferencePlane(name="sensor", z_m=AIR_CONFIG.sensor_distance_m)
+        configure_optiland_execution(
+            device=HOST, precision=Precision.FP64, enable_grad=False
+        )
+        plans = plan_trace_bridges(batch, home=C_RAY_TO_WAVE_CAPABILITIES, device=HOST)
+        assert plans.inbound.target_namespace is ArrayNamespace.NUMPY
+        # Exactly the drift this guard exists to catch: a direct set_backend by
+        # some other component, which configure_optiland_execution never saw.
+        be.set_backend("torch")
+        try:
+            with pytest.raises(UnsupportedCapabilityError, match="BACKEND_NAMESPACE_MISMATCH"):
+                trace_ray_batch(batch, lens, image_plane=sensor, plans=plans)
+        finally:
+            configure_optiland_execution(
+                device=HOST, precision=Precision.FP64, enable_grad=False
+            )
+        assert be.get_backend() == "numpy"

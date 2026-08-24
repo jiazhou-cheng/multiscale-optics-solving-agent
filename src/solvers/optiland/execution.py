@@ -25,6 +25,7 @@ from core.precision import (
     ArrayNamespace,
     CapabilityError,
     DeviceKind,
+    DevicePlacement,
     DType,
     ExecutionRequest,
     ResolvedExecution,
@@ -38,6 +39,58 @@ _BACKEND_NAMESPACE = {
     "numpy": ArrayNamespace.NUMPY,
     "torch": ArrayNamespace.TORCH,
 }
+
+#: The inverse of ``_BACKEND_NAMESPACE``: which Optiland backend name owns a
+#: namespace. One mapping, read in both directions, so the pairing cannot drift.
+NAMESPACE_BACKEND = {namespace: name for name, namespace in _BACKEND_NAMESPACE.items()}
+
+
+def resolve_optiland_namespace(
+    device: DevicePlacement, *, require_gradients: bool = False
+) -> ArrayNamespace:
+    """Which array namespace Optiland must execute in for this request (CHE-102).
+
+    Optiland's backend is process-global, and the arrays handed to it are chosen
+    separately by ``core.precision.plan_bridge``. Nothing forced the two to
+    agree, and they did not: ``plan_bridge`` keeps a NumPy source in NumPy on the
+    host (Rule E -- a namespace change is a boundary operation, never a detail),
+    while the coherent path asked for ``set_backend('torch')`` for every request
+    including the host. Optiland then converted every array on entry, so a
+    host/float64 trace that every artifact described as NumPy actually executed
+    in torch. CHE-102 measured what that costs: the ray/wave exactness limit
+    failed ~32% of runs at 8.9e-9 against its 1e-11 gate, because a contiguous
+    ``ceil(N/4)`` chunk of ``sqrt(1 - u^2 (1 - dot^2))`` came back at roughly
+    2^-34 absolute accuracy instead of float64, nondeterministically and in a
+    different chunk each time.
+
+    So the rule is: **the host executes in the namespace the bridge delivers.**
+    Torch is selected only when it is the *only* namespace that can serve the
+    request -- CUDA, which ``device_namespaces`` already declares as
+    torch-only, and gradients, which NumPy has no concept of. The declaration is
+    honoured here rather than re-derived, and ``NAMESPACE_BACKEND`` turns the
+    answer into the backend name to set.
+    """
+    admissible = OPTILAND_CAPABILITIES.device_namespaces[device.kind]
+    if require_gradients:
+        if ArrayNamespace.TORCH not in admissible:  # pragma: no cover - CPU/CUDA both allow it
+            # The existing code rather than a near-duplicate: the refusal is the
+            # same fact the adapter path already reports under this name --
+            # gradients exist only on the torch backend -- reached from a device
+            # declaration instead of from an explicit config['backend'].
+            raise CapabilityError(
+                code="OPTILAND_GRADIENTS_REQUIRE_TORCH_BACKEND",
+                component=MODEL_ID,
+                message=(
+                    "require_gradients=True needs Optiland's torch backend, which "
+                    f"OPTILAND_CAPABILITIES.device_namespaces does not admit for {device}."
+                ),
+                requested=device,
+                supported=sorted(str(n) for n in admissible),
+            )
+        return ArrayNamespace.TORCH
+    if ArrayNamespace.NUMPY in admissible:
+        return ArrayNamespace.NUMPY
+    return ArrayNamespace.TORCH
 
 
 def _direction_norm_tolerance(dtype: DType) -> float:
