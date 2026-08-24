@@ -12,25 +12,9 @@ A runnable script or visually plausible result is not, by itself, a scientifical
 
 ## System Model
 
-Each supported physics model has four parts:
+Each supported physics model has four parts: an external solver/API, a narrow repository adapter, an agent-facing knowledge pack, and independent verification evidence and benchmarks. Each coupler has the same separation: implementation, explicit boundary contracts, agent-facing knowledge, and independent verification.
 
-1. an external solver/API,
-2. a narrow repository adapter,
-3. an agent-facing knowledge pack,
-4. independent verification evidence and benchmarks.
-
-Each coupler has the same separation: implementation, explicit boundary contracts, agent-facing knowledge, and independent verification.
-
-Knowledge packs live under `knowledge/` and contain the compact information an agent needs to use a component correctly, such as:
-
-- `card.yaml`
-- `conventions.md`
-- `usage_notes.md`
-- `api_minimal_examples.md`
-- `failure_guide.md`
-- coupler theory where needed
-
-Do not duplicate those details in this file. Load the relevant pack only when a task uses that solver or coupler.
+Knowledge packs live under `knowledge/` and contain the compact information an agent needs to use a component correctly — typically `card.yaml`, `conventions.md`, `usage_notes.md`, `api_minimal_examples.md`, `failure_guide.md`, and coupler theory where needed. Do not duplicate those details in this file. Load the relevant pack only when a task uses that solver or coupler.
 
 The currently supported core is the Optiland geometric-ray model, the Chromatix scalar-wave model, and the repository ray/wave couplers. Treat `src/registry/` and executable capability declarations as the source of truth for what is actually supported; do not infer capability from roadmap text or old milestone reports.
 
@@ -121,7 +105,11 @@ Do not treat an old milestone benchmark as canonical simply because it exists. I
 
 ## Execution Environment
 
-`./run.sh` is the only supported entry point for project execution. Run Python, imports, probes, tests, linters, solver jobs, benchmarks, and generated scripts inside the project container.
+`./run.sh` is the only supported entry point for project execution. Run Python, imports, probes, tests, linters, solver jobs, benchmarks, and generated scripts inside the `agent_solver` container. Do not run project commands such as `python`, `pip`, `pytest`, `ruff`, or `mypy` directly on the host; host-side work is limited to editing files, Git/Linear operations, and invoking Docker through `run.sh`.
+
+- `./run.sh --no-build pytest -q` — reuse the existing image; this is the default.
+- `./run.sh --rebuild pytest -q` — rebuild the image after `docker/Dockerfile` or dependency changes, or when it does not exist.
+- `./run.sh --gpu pytest -q -m gpu` — the opt-in `agent_solver_gpu` image, in its own session. `MOA_GPUS` picks devices. See `docs/testing/gpu_environment.md`.
 
 Do not silently fall back to host-side project execution. If a required check cannot run through `./run.sh`, report the environment failure.
 
@@ -141,12 +129,7 @@ Do not hard-code historical test counts or runtimes into this file; they become 
 
 This is a shared server. **System stability has priority over throughput.**
 
-Before any substantial GPU or memory-intensive run:
-
-- inspect GPU occupancy with `nvidia-smi`,
-- inspect physical RAM with `free -h`,
-- inspect the container/cgroup memory and swap state,
-- confirm the selected workload fits without relying on swap.
+Before any substantial GPU or memory-intensive run, inspect GPU occupancy (`nvidia-smi`), physical RAM (`free -h`), and the container/cgroup memory and swap state, and confirm the selected workload fits without relying on swap.
 
 GPU selection:
 
@@ -164,11 +147,7 @@ Memory safety:
 - Do not modify swap, `/etc/fstab`, mounts, GPU drivers, or systemd settings.
 - Never reboot or shut down the server without explicit permission.
 
-Parallelism:
-
-- Read-only analysis agents may run in parallel.
-- Compute-intensive agent jobs must obey the GPU/RAM limits above and should not overlap unless the task explicitly plans for it.
-- Do not leave detached compute with `nohup`, `&`, `screen`, or `tmux` unless the task explicitly authorizes unattended execution.
+Parallelism: read-only analysis agents may run in parallel; compute-intensive agent jobs must obey the GPU/RAM limits above and should not overlap unless the task explicitly plans for it. Do not leave detached compute with `nohup`, `&`, `screen`, or `tmux` unless the task explicitly authorizes unattended execution.
 
 ## Required Workflow
 
@@ -200,25 +179,9 @@ Implementation and review are separate roles. The agent that writes a non-trivia
 
 The repository may provide a tool-specific reviewer definition (for Claude Code, `.claude/agents/code-reviewer.md`). Keep the detailed reviewer prompt there rather than expanding this file.
 
-The reviewer is read-only by default and should evaluate:
+The reviewer is read-only by default. What it evaluates — scope compliance, solver API correctness, the validity of the chosen approximation, conventions and artifact boundaries, coupler assumptions, numerics and convergence, gradient claims, structured failures, oracle independence, GPU/RAM behavior, and unrelated changes — is enumerated in that reviewer definition, not here.
 
-- compliance with the task scope and acceptance criteria,
-- external solver API correctness,
-- scientific validity of the selected approximation,
-- units, conventions, reference planes, and artifact boundaries,
-- coupler assumptions and information preservation,
-- numerical stability, sampling, and convergence,
-- gradient/differentiability claims,
-- structured failures and unsupported cases,
-- adequacy and independence of tests/oracles,
-- GPU/RAM behavior for substantial workloads,
-- accidental unrelated changes.
-
-Review findings should be classified as:
-
-- **must fix before merge**,
-- **should fix soon**,
-- **safe to merge / no blocker**.
+Review findings are classified as **must fix before merge**, **should fix soon**, or **safe to merge / no blocker**.
 
 A reviewer may run narrow read-only checks through `./run.sh`, but should not duplicate expensive tutorial/GPU/full benchmark runs unless the task specifically requires them.
 
