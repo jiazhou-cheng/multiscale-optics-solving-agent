@@ -1,0 +1,173 @@
+{
+  "configuration": {
+    "kspace_oversample": 8.0,
+    "limit_positions": 0,
+    "optiland_execution": {
+      "cuda_device_name": "NVIDIA RTX A6000",
+      "cuda_version": "12.6",
+      "observed": {
+        "device": "cuda",
+        "grad_enabled": false,
+        "precision": "float32"
+      },
+      "requested": {
+        "backend": "torch",
+        "device": "cuda",
+        "device_note": "optiland 0.6.0 set_device takes 'cpu' or 'cuda' only; the physical GPU is selected by the container's visible devices",
+        "precision": "float32"
+      },
+      "torch_version": "2.13.0+cu126"
+    },
+    "pad_width": 0,
+    "position_grid": [
+      200,
+      200
+    ],
+    "position_note": "the DOE's own sample coordinates, indices -n//2 .. n//2 - 1. The sampled route draws from -n//2 .. n//2, whose extra edge aliases onto the opposite one; that population differs from this one by 1/201 of its positions and is far below the sampled runs' own noise, but it is a difference and not a rounding.",
+    "position_order_seed": 0,
+    "positions_per_chunk": 50,
+    "precision": "fp32",
+    "prescription_fingerprint": "1d4dd84dbab3a7f93b85f638f0370070ff60bfbb561bf0133cf21799b2875f2f",
+    "reconstruction": "ramp_sum",
+    "route": "full_field",
+    "sensor_grid": [
+      420,
+      420
+    ],
+    "sensor_pitch_m": 4.2e-06
+  },
+  "convergence": {
+    "claim": "This field IS the converged RW-F estimator, not an estimate of it: both of the estimator's draws are enumerated, so there is no seed and two runs agree bitwise. Convergence is therefore not measured here by correlating two realizations -- it is a property of the construction, and what is measured instead is the error of every sampled run against it.",
+    "ladder_in_position_count": {
+      "note": "cumulative shard sums, rescaled to the full position count. The last rung is the reference itself and is omitted. Every rung's field is saved next to the reference under `field_key`, so a figure can draw the ladder without recomputing it.",
+      "rungs": [
+        {
+          "field_key": "ladder_p003334",
+          "ncc_intensity": 0.17730900743069486,
+          "position_fraction": 0.08335,
+          "positions": 3334,
+          "relative_l2_field": 3.2353451251983643
+        },
+        {
+          "field_key": "ladder_p006668",
+          "ncc_intensity": 0.3416604783456986,
+          "position_fraction": 0.1667,
+          "positions": 6668,
+          "relative_l2_field": 2.1760802268981934
+        },
+        {
+          "field_key": "ladder_p010002",
+          "ncc_intensity": 0.48145668023725474,
+          "position_fraction": 0.25005,
+          "positions": 10002,
+          "relative_l2_field": 1.6834806203842163
+        },
+        {
+          "field_key": "ladder_p013336",
+          "ncc_intensity": 0.5971628769992623,
+          "position_fraction": 0.3334,
+          "positions": 13336,
+          "relative_l2_field": 1.3767246007919312
+        },
+        {
+          "field_key": "ladder_p016670",
+          "ncc_intensity": 0.6937263115385456,
+          "position_fraction": 0.41675,
+          "positions": 16670,
+          "relative_l2_field": 1.1510214805603027
+        },
+        {
+          "field_key": "ladder_p020004",
+          "ncc_intensity": 0.7697443825393658,
+          "position_fraction": 0.5001,
+          "positions": 20004,
+          "relative_l2_field": 0.9708370566368103
+        },
+        {
+          "field_key": "ladder_p023338",
+          "ncc_intensity": 0.8296861962517804,
+          "position_fraction": 0.58345,
+          "positions": 23338,
+          "relative_l2_field": 0.8189823627471924
+        },
+        {
+          "field_key": "ladder_p026672",
+          "ncc_intensity": 0.879980589869512,
+          "position_fraction": 0.6668,
+          "positions": 26672,
+          "relative_l2_field": 0.6860856413841248
+        },
+        {
+          "field_key": "ladder_p030006",
+          "ncc_intensity": 0.9215315641324235,
+          "position_fraction": 0.75015,
+          "positions": 30006,
+          "relative_l2_field": 0.5584560632705688
+        },
+        {
+          "field_key": "ladder_p033340",
+          "ncc_intensity": 0.9527966253317156,
+          "position_fraction": 0.8335,
+          "positions": 33340,
+          "relative_l2_field": 0.43276411294937134
+        },
+        {
+          "field_key": "ladder_p036674",
+          "ncc_intensity": 0.9786648875692676,
+          "position_fraction": 0.91685,
+          "positions": 36674,
+          "relative_l2_field": 0.29326164722442627
+        }
+      ]
+    },
+    "scored_against_reference": [
+      {
+        "field": "rw_f_seed20260822",
+        "mse_intensity_unit_sum": 1.538050000402328e-10,
+        "ncc_intensity": 0.06959640355835864,
+        "record": "demo3_characterization_rw_f",
+        "relative_l2_field": 5.101299285888672,
+        "total_rays": 60000000
+      },
+      {
+        "field": "rw_f_seed7",
+        "mse_intensity_unit_sum": 1.531362413076691e-10,
+        "ncc_intensity": 0.07694731385356772,
+        "record": "demo3_characterization_rw_f",
+        "relative_l2_field": 5.122546195983887,
+        "total_rays": 60000000
+      },
+      {
+        "field": "rw_f_seed131",
+        "mse_intensity_unit_sum": 1.5410431477244135e-10,
+        "ncc_intensity": 0.06879406356363016,
+        "record": "demo3_characterization_rw_f",
+        "relative_l2_field": 5.1248369216918945,
+        "total_rays": 60000000
+      }
+    ]
+  },
+  "coupler": "C_PLANAR_DOE_STEP",
+  "enumeration": {
+    "deterministic": true,
+    "empty_fraction": 0.0,
+    "gpu_seconds_total": 3514.162499876984,
+    "positions_summed": 40000,
+    "rays_in_the_normalization": 1600000000,
+    "rays_traced": 1600000000,
+    "shards": 12
+  },
+  "environment": {
+    "commit": "41f8a1e1225069082d9099a5c0dddd089090f4d9",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "TFRT_CPU_0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-102",
+  "mode": "combine",
+  "note": "Deviations from the earlier runs that are NOT ray count: the reconstruction is the CHE-101 k-space path at the recorded oversampling, and fp32 accumulation is systematic rather than stochastic, so it does not fall with ray count. Both are small against the errors tabulated above and both are recorded.",
+  "probe": "demo3_enumerated_reference",
+  "route": "full_field"
+}

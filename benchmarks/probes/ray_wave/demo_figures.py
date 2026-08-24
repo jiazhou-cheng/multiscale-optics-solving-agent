@@ -8,11 +8,21 @@ produced the field, not a re-measurement that could quietly disagree with the
 record.
 
 demo2 is a validation: three routes against an independent float64 ASM oracle,
-and the panels are expected to be indistinguishable by eye. demo3 is a
-*characterization* -- the paper states no conventional reference exists for that
-system, and neither of our routes converges at a budget that fits on this
-machine -- so its panels are expected to look like noise, and the figure says so
-rather than cropping or smoothing until they do not.
+and the panels are expected to be indistinguishable by eye.
+
+demo3 is a *characterization* -- the paper states no conventional reference
+exists for that system. Its two figures now say different things, and the
+difference is the point:
+
+* `demo3` and `demo3-kspace-patch` draw **sampled** runs of the patch route at
+  6e7 rays. Those are not converged, so their panels are expected to look like
+  noise and the figures say so rather than cropping or smoothing until they do
+  not.
+* `demo3-kspace` draws the **full-aperture** route enumerated rather than
+  sampled -- every launch position on the DOE grid times every propagating mode
+  of one unpadded global spectrum, 1.6e9 rays, no RNG. That field is converged
+  by construction, and it is the only demo3 panel here that is allowed to look
+  like a formed image.
 
 Run (CPU is sufficient; nothing here touches a solver):
     ./run.sh python benchmarks/probes/ray_wave/demo_figures.py
@@ -317,6 +327,286 @@ ROUTE_COLOUR = {"ramp_sum": "#2a78d6", "kspace_splat": "#eb6834"}
 INK = "#0b0b0b"
 INK_MUTED = "#52514e"
 
+#: Measured, not asserted: summing four shards of an enumerated 8e6-ray RW-F
+#: subset against running the same subset in one process
+#: (`demo3_enum_rwf_cal_a000_of001` vs `demo3_enum_rwf_cal_b*_of004`). fp32
+#: accumulation round-off is the whole of it, and it bounds what sharding can
+#: contribute to the residual panel below.
+SHARD_EXACTNESS = 9.763e-6
+
+
+def figure_demo3_kspace_rwf(output: Path) -> dict[str, Any]:
+    """CHE-102: the same comparison on the full-aperture route, converged exactly.
+
+    What this replaces, and why. The CHE-101 version of this figure
+    (`figure_demo3_kspace`, still runnable as `--demos demo3-kspace-patch`) drew
+    the **patch** route -- RW-P, `C_PATCH_WFT` -- and had to say in its own
+    caption that neither panel was converged, because the only convergence
+    statistic a Monte Carlo estimator has about itself is a seed-to-seed
+    correlation, and at 6e7 rays that correlation was 0.04.
+
+    This one draws the **full-aperture** route -- RW-F, `C_PLANAR_DOE_STEP` --
+    and does not need that caveat, because RW-F's two draws are both finite and
+    enumerable: 40,000 launch positions on the DOE's own sample grid times
+    40,000 propagating modes of one unpadded global spectrum is 1.6e9 rays, and
+    that sum *is* the estimator's expectation rather than an estimate of it. So
+    the top row is a comparison of two converged fields and the residual between
+    them is the reconstruction kernel alone -- not, as before, the difference of
+    two noise realizations.
+
+    Nothing here is recomputed. The ladder panels are the cumulative shard sums
+    the combine step already wrote, which is why a convergence curve costs no
+    rays: the shards partition a shuffled position list, so the first k of them
+    are an unbiased subset of the aperture rather than a crop of it.
+    """
+    ramp = _load("demo3_enumerated_reference_rwf_ramp_fields")
+    kspace = _load("demo3_enumerated_reference_rwf_kspace_fields")
+    ramp_record = _record("demo3_enumerated_reference_rwf_ramp")
+    kspace_record = _record("demo3_enumerated_reference_rwf_kspace")
+    sweep = _record("demo3_equivalence_rwf_enumerated")
+    shard = _record("demo3_enum_rwf_ramp000_of012")
+    sampled_record = _record("demo3_characterization_rw_f")
+
+    enumeration = ramp_record["enumeration"]
+    positions_total = enumeration["positions_summed"]
+    modes = enumeration["rays_in_the_normalization"] // positions_total
+    pitch = ramp_record["configuration"]["sensor_pitch_m"]
+    exact, fast = ramp["reference"], kspace["reference"]
+    extent = _extent_mm(exact.shape, pitch)
+
+    rungs = ramp_record["convergence"]["ladder_in_position_count"]["rungs"]
+    # The two rungs drawn as pictures: the smallest, and the one nearest half the
+    # aperture. Chosen by fraction rather than by index so the figure survives a
+    # different shard count.
+    early = rungs[0]
+    half = min(rungs, key=lambda r: abs(r["position_fraction"] - 0.5))
+
+    panels = [
+        (exact, "Exact route (ramp_sum)", f"converged: all {positions_total:,} positions"),
+        (fast, "Fast route (kspace_splat, 8x)", "same 1.6e9 rays, reconstruction only"),
+        (
+            ramp[early["field_key"]],
+            f"{early['position_fraction']:.0%} of positions",
+            f"{early['positions'] * modes / 1e6:.0f} M rays, NCC {early['ncc_intensity']:.3f}",
+        ),
+        (
+            ramp[half["field_key"]],
+            f"{half['position_fraction']:.0%} of positions",
+            f"{half['positions'] * modes / 1e6:.0f} M rays, NCC {half['ncc_intensity']:.3f}",
+        ),
+    ]
+    intensities = [_unit_sum(np.abs(f) ** 2) for f, _, _ in panels]
+    norm = _intensity_norm(max(float(v.max()) for v in intensities))
+
+    figure, axes = plt.subplots(2, 4, figsize=(19.0, 9.4), layout="constrained")
+    figure.suptitle(
+        "CHE-102 demo3 (paper Fig 5c), FULL-APERTURE route RW-F — the enumerated "
+        "1.6e9-ray field, and the fast reconstruction of it",
+        fontsize=13,
+    )
+    for slot, image, (_, title, sub) in zip(
+        (axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]), intensities, panels, strict=True
+    ):
+        handle = _show(slot, image, title=title, extent=extent, norm=norm, subtitle=sub)
+    figure.colorbar(
+        handle,
+        ax=[axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]],
+        location="left",
+        shrink=0.45,
+        label="unit-sum intensity",
+    )
+
+    # Same rays by construction, not by seed: both draws are enumerated, so this
+    # residual is the splat's interpolation error and contains no Monte Carlo
+    # difference at all.
+    residual = np.abs(fast - exact) / float(np.abs(exact).max())
+    _show(
+        axes[0, 2],
+        residual,
+        title="|fast - exact| / max|exact|, identical rays",
+        extent=extent,
+        cmap="magma",
+        subtitle=(
+            "no seed on either side -- the whole residual is the\n"
+            "k-space kernel interpolating off-node rays"
+        ),
+    )
+
+    # --- error against oversampling, on the same enumerated discretization.
+    axis = axes[0, 3]
+    oversamples = [row["kspace_oversample"] for row in sweep["comparisons"]]
+    errors = [row["relative_l2_field_after_global_phase"] for row in sweep["comparisons"]]
+    axis.plot(
+        oversamples,
+        errors,
+        color=ROUTE_COLOUR["kspace_splat"],
+        lw=2.0,
+        marker="o",
+        ms=8,
+        markeredgecolor=FACECOLOR,
+        markeredgewidth=2,
+    )
+    chosen = float(kspace_record["configuration"]["kspace_oversample"])
+    if chosen in oversamples:
+        index = oversamples.index(chosen)
+        axis.annotate(
+            f"used here: {chosen:g}x\n{errors[index]:.1e}",
+            xy=(oversamples[index], errors[index]),
+            xytext=(-10, 30),
+            textcoords="offset points",
+            fontsize=8.5,
+            color=INK,
+            ha="right",
+            arrowprops={"arrowstyle": "-", "color": INK_MUTED, "lw": 1},
+        )
+    axis.set_xscale("log")
+    axis.set_yscale("log")
+    axis.set_xlabel("k-grid oversampling", fontsize=8.5)
+    axis.set_ylabel("field error vs exact route", fontsize=8.5)
+    axis.set_title(
+        "The splat's only cost is interpolation,\nand it buys down with a bigger FFT",
+        fontsize=10,
+    )
+    axis.spines[["top", "right"]].set_visible(False)
+    axis.tick_params(labelsize=8)
+    axis.grid(alpha=0.2, which="both")
+
+    # --- the convergence ladder, on a ray axis so the sampled runs sit on it.
+    axis = axes[1, 2]
+    rays = [r["positions"] * modes for r in rungs] + [positions_total * modes]
+    nccs = [r["ncc_intensity"] for r in rungs] + [1.0]
+    axis.plot(
+        rays,
+        nccs,
+        color=ROUTE_COLOUR["ramp_sum"],
+        lw=2.0,
+        marker="o",
+        ms=6,
+        markeredgecolor=FACECOLOR,
+        markeredgewidth=1.5,
+    )
+    axis.annotate(
+        "enumerated modes,\ngrowing position count",
+        xy=(rays[4], nccs[4]),
+        xytext=(14, -34),
+        textcoords="offset points",
+        fontsize=8.5,
+        color=ROUTE_COLOUR["ramp_sum"],
+        arrowprops={"arrowstyle": "-", "color": ROUTE_COLOUR["ramp_sum"], "lw": 1},
+    )
+    # The CHE-96 sampled runs, scored against this same exact field. Their x is
+    # rays, so they are directly comparable to the ladder rather than to each
+    # other -- which is all a seed-to-seed NCC could ever compare them to.
+    scored = ramp_record["convergence"]["scored_against_reference"]
+    axis.scatter(
+        [row["total_rays"] for row in scored],
+        [row["ncc_intensity"] for row in scored],
+        s=64,
+        color=ROUTE_COLOUR["kspace_splat"],
+        zorder=3,
+        edgecolor=FACECOLOR,
+        linewidth=1.5,
+    )
+    axis.annotate(
+        "CHE-96 sampled RW-F,\n3 seeds at 6e7 rays",
+        xy=(scored[0]["total_rays"], scored[0]["ncc_intensity"]),
+        xytext=(10, 26),
+        textcoords="offset points",
+        fontsize=8.5,
+        color=ROUTE_COLOUR["kspace_splat"],
+        arrowprops={"arrowstyle": "-", "color": ROUTE_COLOUR["kspace_splat"], "lw": 1},
+    )
+    axis.axhline(1.0, color=INK_MUTED, lw=0.8, ls=":")
+    axis.set_xscale("log")
+    axis.set_xlabel("rays", fontsize=8.5)
+    axis.set_ylabel("NCC against the exact field", fontsize=8.5)
+    axis.set_ylim(0.0, 1.08)
+    axis.set_title(
+        "Convergence measured against the exact field,\nnot against another realization",
+        fontsize=10,
+    )
+    axis.spines[["top", "right"]].set_visible(False)
+    axis.tick_params(labelsize=8)
+    axis.grid(alpha=0.2)
+
+    # --- the numbers, stated rather than left to the eye.
+    def ncc_of(x: np.ndarray, y: np.ndarray) -> float:
+        u, v = x - x.mean(), y - y.mean()
+        return float((u * v).sum() / np.sqrt((u * u).sum() * (v * v).sum()))
+
+    stages = shard["run"]["stage_wall_clock_s"]
+    stage_total = sum(v for k, v in stages.items() if k != "note")
+    seed_pairs = sampled_record["routes"]["rw_f"]["seed_reproducibility"]["pairwise"]
+    worst_seed_ncc = min(p["ncc_intensity"] for p in seed_pairs)
+    against_ramp = kspace_record["convergence"]["scored_against_reference"][0]
+    ia, ib = np.abs(exact) ** 2, np.abs(fast) ** 2
+    lines = [
+        "CONVERGED, by construction rather than",
+        "by extrapolation. Both of RW-F's draws",
+        "are enumerated, so there is no seed:",
+        f"  launch positions   {positions_total:,}  (the DOE grid)",
+        f"  modes per position {modes:,}  (pad 0)",
+        f"  rays               {enumeration['rays_in_the_normalization'] / 1e9:.2f}e9",
+        f"  GPU time           {enumeration['gpu_seconds_total'] / 60:.0f} min, 12 shards",
+        "  two runs agree bitwise; sharding was",
+        f"  checked at rel-L2 {SHARD_EXACTNESS:.1e} on a subset.",
+        "",
+        "Fast vs exact reconstruction, SAME rays:",
+        f"  NCC intensity      {ncc_of(ia, ib):.6f}",
+        f"  rel-L2 field       {against_ramp['relative_l2_field']:.3e}",
+        f"  power ratio        {float(ib.sum() / ia.sum()):.4f}",
+        "",
+        "What sampling could see instead. The",
+        "CHE-96 RW-F runs at 6e7 rays scored",
+        f"  seed-to-seed NCC   {worst_seed_ncc:.4f}",
+        f"  vs the exact field {scored[0]['ncc_intensity']:.4f}",
+        "  and sqrt(0.0037) = 0.061 predicts the",
+        "  second from the first, so those runs",
+        "  were unbiased -- only unconverged.",
+        "",
+        "Speckle contrast (std/mean) separates",
+        "them physically: 1.00 for the sampled",
+        "field, which is fully developed noise,",
+        "against 2.02 for the exact one.",
+        "",
+        f"Stage cost, one shard of {stage_total:.0f} s:",
+        *[
+            f"  {key:<18} {stages[key]:>5.0f} s  ({100 * stages[key] / stage_total:.0f}%)"
+            for key in (
+                "optiland_trace",
+                "reconstruct",
+                "host_to_device",
+                "emit_patch_spectra",
+                "power_bookkeeping",
+            )
+        ],
+        "The trace, not the reconstruction, is",
+        "what a faster demo3 has to attack.",
+    ]
+    axes[1, 3].axis("off")
+    axes[1, 3].text(
+        0.0,
+        1.0,
+        "\n".join(lines),
+        va="top",
+        ha="left",
+        fontsize=7.2,
+        family="monospace",
+        color=INK,
+        transform=axes[1, 3].transAxes,
+    )
+
+    figure.savefig(output, dpi=150, facecolor=FACECOLOR)
+    plt.close(figure)
+    return {
+        "figure": str(output),
+        "route": "rw_f / C_PLANAR_DOE_STEP",
+        "rays": enumeration["rays_in_the_normalization"],
+        "ncc_fast_vs_exact": ncc_of(ia, ib),
+        "relative_l2_fast_vs_exact": against_ramp["relative_l2_field"],
+        "sampled_vs_exact_ncc": [row["ncc_intensity"] for row in scored],
+    }
+
 
 def figure_demo3_kspace(output: Path) -> dict[str, Any]:
     """CHE-101: the fast reconstruction against the exact one, on demo3's own rays.
@@ -544,7 +834,9 @@ def main() -> int:
     global GAMMA
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/CHE-96"))
-    parser.add_argument("--demos", default="demo2,demo3,demo3-kspace")
+    parser.add_argument(
+        "--demos", default="demo2,demo3,demo3-kspace"
+    )
     parser.add_argument(
         "--gamma",
         type=float,
@@ -562,8 +854,16 @@ def main() -> int:
     if "demo3" in wanted:
         summary["demo3"] = figure_demo3(args.output_dir / "demo3_fig5c_sensor_fields.png")
     if "demo3-kspace" in wanted:
-        summary["demo3-kspace"] = figure_demo3_kspace(
+        # The full-aperture route, and the converged one. The patch-route version
+        # this replaced is still drawable by name, because its records are still
+        # the evidence CHE-101 was reviewed on and a figure that can no longer be
+        # regenerated is not evidence.
+        summary["demo3-kspace"] = figure_demo3_kspace_rwf(
             args.output_dir / "demo3_kspace_vs_exact.png"
+        )
+    if "demo3-kspace-patch" in wanted:
+        summary["demo3-kspace-patch"] = figure_demo3_kspace(
+            args.output_dir / "demo3_kspace_vs_exact_patch.png"
         )
     for name, info in summary.items():
         print(f"{name}: wrote {info['figure']}")

@@ -72,6 +72,26 @@ def main() -> int:
     parser.add_argument("--sensor-px", type=int, default=None)
     parser.add_argument("--oversamples", default="1.0,1.5,2.0,3.0,4.0")
     parser.add_argument("--rays-per-chunk", type=float, default=1e6)
+    parser.add_argument(
+        "--pad-width",
+        type=int,
+        default=None,
+        help=(
+            "override the route's spectral padding. Set 0 with --enumerate-modes "
+            "to measure the splat on the same discretization the enumerated "
+            "reference uses, rather than on a differently interpolated one"
+        ),
+    )
+    parser.add_argument(
+        "--enumerate-modes",
+        action="store_true",
+        help=(
+            "emit every propagating mode instead of sampling. The rays are then "
+            "deterministic, so the two reconstructions are compared on identical "
+            "rays by construction rather than by sharing a seed -- and the "
+            "reference they are scored against carries no Monte Carlo noise"
+        ),
+    )
     parser.add_argument("--output-name", default=None)
     args = parser.parse_args()
 
@@ -80,9 +100,12 @@ def main() -> int:
     for key, value in (
         ("patch_count", args.patch_count),
         ("secondary_count", args.secondary_count),
+        ("pad_width", args.pad_width),
     ):
         if value is not None:
             settings[key] = value
+    if args.enumerate_modes:
+        settings["secondary_count"] = None
     sensor_px = args.sensor_px or preset["sensor_px"]
     sensor_pitch_m = preset["sensor_pitch_m"]
     x64 = enable_x64_if_needed(backend=args.backend, precisions=[settings["precision"]])
@@ -107,8 +130,12 @@ def main() -> int:
             seed=args.seed,
             backend=args.backend,
             precision=settings["precision"],
-            secondary_chunks=max(
-                1, int(np.ceil(settings["secondary_count"] / args.rays_per_chunk))
+            # Enumeration has nothing stochastic to split, so it is left whole
+            # and the device budget is met by the patch grouping alone.
+            secondary_chunks=(
+                1
+                if settings["secondary_count"] is None
+                else max(1, int(np.ceil(settings["secondary_count"] / args.rays_per_chunk)))
             ),
             reconstruction_route=reconstruction,
             kspace_oversample=oversample,
@@ -160,6 +187,9 @@ def main() -> int:
             "sensor_pitch_m": sensor_pitch_m,
             "patch_count": settings["patch_count"],
             "secondary_count": settings["secondary_count"],
+            "pad_width": settings["pad_width"],
+            "enumerated_modes": bool(args.enumerate_modes),
+            "modes_per_position": exact["secondary_per_patch"],
             "precision": settings["precision"],
             "backend": args.backend,
             "seed": args.seed,

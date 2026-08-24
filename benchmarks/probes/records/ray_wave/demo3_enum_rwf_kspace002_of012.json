@@ -1,0 +1,247 @@
+{
+  "configuration": {
+    "kspace_oversample": 8.0,
+    "limit_positions": 0,
+    "optiland_execution": {
+      "cuda_device_name": "NVIDIA RTX A6000",
+      "cuda_version": "12.6",
+      "observed": {
+        "device": "cuda",
+        "grad_enabled": false,
+        "precision": "float32"
+      },
+      "requested": {
+        "backend": "torch",
+        "device": "cuda",
+        "device_note": "optiland 0.6.0 set_device takes 'cpu' or 'cuda' only; the physical GPU is selected by the container's visible devices",
+        "precision": "float32"
+      },
+      "torch_version": "2.13.0+cu126"
+    },
+    "pad_width": 0,
+    "position_grid": [
+      200,
+      200
+    ],
+    "position_note": "the DOE's own sample coordinates, indices -n//2 .. n//2 - 1. The sampled route draws from -n//2 .. n//2, whose extra edge aliases onto the opposite one; that population differs from this one by 1/201 of its positions and is far below the sampled runs' own noise, but it is a difference and not a rounding.",
+    "position_order_seed": 0,
+    "positions_per_chunk": 50,
+    "precision": "fp32",
+    "prescription_fingerprint": "1d4dd84dbab3a7f93b85f638f0370070ff60bfbb561bf0133cf21799b2875f2f",
+    "reconstruction": "kspace_splat",
+    "route": "full_field",
+    "sensor_grid": [
+      420,
+      420
+    ],
+    "sensor_pitch_m": 4.2e-06
+  },
+  "coupler": "C_PLANAR_DOE_STEP",
+  "enumeration": {
+    "deterministic": true,
+    "modes_per_position": 40000,
+    "note": "Both draws are enumerated, so this shard is a slice of a deterministic sum and carries no seed. It divides by the WHOLE run's ray count, so the shards add.",
+    "position_window": [
+      6668,
+      10002
+    ],
+    "positions_in_the_normalization": 40000,
+    "positions_in_this_shard": 3334,
+    "positions_traced": 40000,
+    "rays_in_the_normalization": 1600000000,
+    "rays_in_this_shard": 133360000
+  },
+  "environment": {
+    "commit": "41f8a1e1225069082d9099a5c0dddd089090f4d9",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "cuda:0"
+    ],
+    "working_tree_dirty": true,
+    "x64_enabled": false,
+    "x64_requested": false
+  },
+  "issue": "CHE-102",
+  "mode": "shard",
+  "probe": "demo3_enumerated_reference",
+  "route": "full_field",
+  "run": {
+    "actual": {
+      "field_device": "cuda:0",
+      "field_dtype": "complex64"
+    },
+    "batches": 66,
+    "device_memory": {
+      "available": true,
+      "bytes_limit": 38275448832,
+      "device": "cuda:0",
+      "peak_bytes_in_use": 965110528,
+      "peak_gb": 0.965
+    },
+    "energy": {
+      "captured_by_sensor_fraction": 0.10030849616783248,
+      "clipped_with_power": 0,
+      "clipped_with_power_fraction": 0.0,
+      "empty_draw_note": "patch centres are drawn over the aperture DILATED by half a patch, so a centre near the rim yields a patch that is partly or wholly outside the DOE. Those rays carry zero amplitude by construction and are not a loss -- the coverage factor A_draw / A_patch is exactly the correction for them. They are counted here because Optiland's intensity > 0 test cannot tell them from a clip, and reporting the sum as 'clipped' would invent an energy loss.",
+      "invalidated_rays": 0,
+      "launched_sum_abs_amplitude_squared": 4189237679999.9995,
+      "launched_with_zero_amplitude": 0,
+      "note": "sum |a|^2 over the emitted rays, before and after the trace. Optiland clips by zeroing intensity rather than by removing rows, and trace_ray_batch zeroes the matching amplitude, so the difference is exactly the power that left through an aperture. A clipped ray keeps its place in N_total: it was drawn, and the operator being estimated includes the vignetting.",
+      "sensor_half_extent_m": 0.0008819999999999999,
+      "survived_sum_abs_amplitude_squared": 4189238693888.0,
+      "transmitted_fraction": 1.0000002420220762
+    },
+    "first_chunk_trace": {
+      "amplitude_handling": "the complex amplitude is a sidecar: it is never passed to Optiland, never reconstructed from RealRays.i, and is re-associated after the trace by ray id",
+      "emitter": {
+        "amplitude_convention": "importance-weighted spectral amplitude U~[m]/p[m]; no per-ray correspondence to the incident amplitudes survives the accumulation",
+        "collapsed_to_mean_wavevector": false,
+        "count_growth": 2040000.0,
+        "density_kind": "p_uni",
+        "energy_preservation_factor": null,
+        "enumerated": true,
+        "evanescent_power_fraction": 0.0,
+        "incident_discrete_power": 1.5876e-06,
+        "incident_ray_count": 1,
+        "launch_count": 51,
+        "launch_source": "caller",
+        "opl_convention": "reset to 0 at this plane; the incident path is already in the accumulated field's phase and carrying it forward would double-count it",
+        "outgoing_ray_count": 2040000,
+        "pad_width": 0,
+        "propagating_modes": 40000,
+        "secondary_count": 40000,
+        "transmitted_discrete_power": 1.2467819699999999e-06
+      },
+      "invalid_rays": 0,
+      "optiland_backend": "torch",
+      "optiland_intensity_handling": "RealRays.i is initialised from |a|^2 for Optiland's own bookkeeping and is read back only to detect clipped rays; it is never read as an amplitude",
+      "ray_count": 2040000,
+      "residency": {
+        "bookkeeping": {
+          "ray_id": {
+            "device": "cpu",
+            "dtype": "int64",
+            "namespace": "numpy"
+          },
+          "valid": {
+            "device": "cuda:0",
+            "dtype": "bool",
+            "namespace": "jax"
+          }
+        },
+        "scientific": {
+          "amplitude": {
+            "device": "cuda:0",
+            "dtype": "complex64",
+            "namespace": "jax"
+          },
+          "directions": {
+            "device": "cuda:0",
+            "dtype": "float32",
+            "namespace": "jax"
+          },
+          "optical_path_length_m": {
+            "device": "cuda:0",
+            "dtype": "float32",
+            "namespace": "jax"
+          },
+          "positions_m": {
+            "device": "cuda:0",
+            "dtype": "float32",
+            "namespace": "jax"
+          }
+        }
+      }
+    },
+    "patch_groups": 66,
+    "plan": {
+      "emitter": "C_PLANAR_DOE_STEP -- one global spectrum",
+      "launch_positions": 3334,
+      "pad_width": 0
+    },
+    "rays_emitted_here": 133360000,
+    "rays_per_second": 493061.6989323637,
+    "reconstruction": {
+      "kspace_oversample": 8.0,
+      "measured": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          3360,
+          3360
+        ],
+        "on_node_fraction": 0.0,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 2040000
+      },
+      "route": "kspace_splat"
+    },
+    "route_kind": "full_field",
+    "secondary_chunks_per_group": 1,
+    "secondary_per_patch": 40000,
+    "stage_wall_clock_s": {
+      "emit_patch_spectra": 13.191,
+      "host_to_device": 7.583,
+      "note": "Sums to slightly less than wall_clock_s: finalize and the plan setup are outside the loop. `power_bookkeeping` is this probe's own accounting -- three host round-trips per chunk -- not part of the physics, and is separated so it cannot be mistaken for one.",
+      "optiland_trace": 239.313,
+      "power_bookkeeping": 2.089,
+      "reconstruct": 8.147
+    },
+    "streaming": {
+      "chunk_count": 66,
+      "distinct_chunk_sizes": [
+        2000000,
+        2040000
+      ],
+      "first_chunk_reconstruction": {
+        "grid_nyquist_direction_limit": 0.08333333333333334,
+        "grid_nyquist_satisfied": true,
+        "grid_shape": [
+          420,
+          420
+        ],
+        "incident_amplitude_power_sum": 64082518016.0,
+        "kspace": {
+          "dropped_fraction": 0.0,
+          "kspace_grid_shape": [
+            3360,
+            3360
+          ],
+          "on_node_fraction": 0.0,
+          "rays_dropped_out_of_band": 0,
+          "rays_splatted": 2040000
+        },
+        "max_adjacent_ray_phase_rad": null,
+        "max_projection_factor": 1.0000003576278687,
+        "max_transverse_direction": 0.06451871991157532,
+        "min_projection_factor": 0.995926022529602,
+        "normalization": "none",
+        "perturbation": "none",
+        "projection": "asm_consistent",
+        "ray_count": 2040000,
+        "ray_density_status": "not_computed_above_scan_limit",
+        "ray_spacing_estimate_m": null,
+        "reconstructed_discrete_power": 196386.09375,
+        "reconstruction": "kspace_splat",
+        "sample_pitch_m": [
+          4.2e-06,
+          4.2e-06
+        ],
+        "wavelength_m": 7e-07
+      },
+      "residency": {
+        "sensor_accumulator": {
+          "device": "cuda:0",
+          "dtype": "complex64",
+          "namespace": "jax"
+        }
+      },
+      "total_rays": 1600000000,
+      "valid_rays": 133360000
+    },
+    "total_rays": 1600000000,
+    "wall_clock_s": 270.4732496739598
+  },
+  "shard": 2,
+  "shards": 12,
+  "wall_clock_s": 271.5671832609805
+}

@@ -198,6 +198,8 @@ def run_route(
     route: str = "patch",
     reconstruction_route: str = "ramp_sum",
     kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
+    emitters_override: np.ndarray | None = None,
+    total_rays_override: int | None = None,
 ) -> dict[str, Any]:
     """Rays from the DOE, an Optiland trace, and one coherent sensor field.
 
@@ -235,7 +237,13 @@ def run_route(
             patch_count=patch_count,
             rng=rng,
         )
-        emitters = np.asarray(plan.centers_xy_m)
+        emitters = (
+            np.asarray(emitters_override, dtype=np.float64)
+            if emitters_override is not None
+            else np.asarray(plan.centers_xy_m)
+        )
+    elif emitters_override is not None:
+        emitters = np.asarray(emitters_override, dtype=np.float64)
     else:
         # RW-F's "incident rays" are LAUNCH POSITIONS on one global spectrum,
         # not patch centres. Drawn uniformly on the DOE's own sample grid over
@@ -307,7 +315,10 @@ def run_route(
         del probe
     else:
         per_patch = int(secondary_count)
-    total_rays = n_patches * per_patch
+    # A shard emits a slice of the emitter list but must divide by the WHOLE
+    # run's ray count, or its partial field is scaled by 1/shard and the shards
+    # cannot be summed. Same reason a clipped ray keeps its place in N_total.
+    total_rays = int(total_rays_override) if total_rays_override else n_patches * per_patch
 
     reconstruction = StreamingReconstruction(
         grid_shape=sensor_shape,
@@ -317,6 +328,9 @@ def run_route(
         namespace=namespace,
         complex_dtype=DType.COMPLEX128 if precision == "fp64" else DType.COMPLEX64,
         total_rays=total_rays,
+        # A shard emits fewer rays than the estimator normalizes for, and says
+        # so, so the finalize guard still checks what this process actually fed.
+        shard_rays=(n_patches * per_patch) if total_rays_override else None,
         projection=Projection.ASM_CONSISTENT,
         # No matched k-grid is available here, and saying so is the point: the
         # rays reaching this plane have been refracted by the singlet, so their
@@ -465,12 +479,16 @@ def run_route(
             "measured": (reconstruction._first_diagnostics or {}).get("kspace"),
         },
         "total_rays": total_rays,
+        # What this process actually traced. Equal to total_rays unless it is one
+        # shard of a larger enumeration, and reported separately so a per-second
+        # rate is never computed against rays another process carried.
+        "rays_emitted_here": n_patches * per_patch,
         "secondary_per_patch": per_patch,
         "batches": chunk_count,
         "patch_groups": len(groups),
         "secondary_chunks_per_group": len(secondary_parts),
         "wall_clock_s": wall_clock_s,
-        "rays_per_second": total_rays / wall_clock_s,
+        "rays_per_second": (n_patches * per_patch) / wall_clock_s,
         "energy": {
             "note": (
                 "sum |a|^2 over the emitted rays, before and after the trace. "
@@ -674,6 +692,17 @@ def main() -> int:
     parser.add_argument("--sensor-pitch-um", type=float, default=None)
     parser.add_argument("--patch-count", type=int, default=None)
     parser.add_argument("--secondary-count", type=int, default=None)
+    parser.add_argument(
+        "--enumerate-modes",
+        action="store_true",
+        help=(
+            "emit EVERY propagating mode of each patch's padded spectrum instead "
+            "of importance-sampling `--secondary-count` of them. The mode sum then "
+            "carries no Monte Carlo variance at all and only the patch-centre draw "
+            "remains stochastic, which is the cheaper half of the noise to buy "
+            "down. Costs `pad_px^2` rays per patch, so it fixes the ray budget."
+        ),
+    )
     parser.add_argument("--batches", type=int, default=None, help="patch groups")
     parser.add_argument(
         "--rays-per-chunk",
@@ -814,11 +843,20 @@ def main() -> int:
     fields: dict[str, list[np.ndarray]] = {}
     for name in routes:
         settings = dict(preset[name])
+        if args.enumerate_modes:
+            if settings["route"] != "patch":
+                raise SystemExit(
+                    "--enumerate-modes is a property of the patch emitter; the "
+                    "full-aperture route already enumerates one global spectrum"
+                )
+            settings["secondary_count"] = None
         for key, value in (
             ("patch_count", args.patch_count),
             ("secondary_count", args.secondary_count),
             ("batches", args.batches),
         ):
+            if key == "secondary_count" and args.enumerate_modes:
+                continue
             if value is not None and not (key == "patch_count" and settings[key] is None):
                 settings[key] = value
         per_seed = []

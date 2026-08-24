@@ -538,6 +538,17 @@ class StreamingReconstruction:
     A clipped ray is *not* removed from ``N_total``. It was drawn, and the
     operator being estimated includes whatever vignetting clipped it; dropping it
     from the denominator would rescale the field by the survival fraction.
+
+    ``shard_rays`` extends that same reasoning across *processes*. An estimator
+    whose ray budget does not fit in one run can be split into shards that each
+    accumulate a disjoint slice and are summed afterwards, but only if every
+    shard divides by the whole estimator's ``N_total`` rather than by its own
+    count -- otherwise each part is scaled by ``1/shard`` and the sum is wrong by
+    the number of shards. Declaring ``shard_rays`` keeps the finalize guard doing
+    its job (the chunks must still add up to exactly what this shard promised)
+    while separating the two counts that a single ``total_rays`` conflates. It
+    does not make the split legitimate on its own: that requires the population
+    to be partitioned rather than resampled, which is the caller's to guarantee.
     """
 
     def __init__(
@@ -550,6 +561,7 @@ class StreamingReconstruction:
         namespace: Any,
         complex_dtype: Any,
         total_rays: int,
+        shard_rays: int | None = None,
         projection: Projection = Projection.ASM_CONSISTENT,
         reconstruction: Reconstruction = Reconstruction.RAMP_SUM,
         kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
@@ -560,6 +572,14 @@ class StreamingReconstruction:
         self.plane = plane
         self.wavelength_m = wavelength_m
         self.total_rays = int(total_rays)
+        self.shard_rays = None if shard_rays is None else int(shard_rays)
+        if self.shard_rays is not None and not 0 < self.shard_rays <= self.total_rays:
+            raise ContractError(
+                ContractCode.SHAPE_MISMATCH,
+                f"shard_rays={self.shard_rays} must be positive and no larger "
+                f"than total_rays={self.total_rays}",
+                declaration="shard_rays",
+            )
         self.projection = projection
         # Chunking and the reconstruction algorithm are independent: the 1/N is
         # still applied once at finalize, so a chunk boundary cannot change the
@@ -606,15 +626,21 @@ class StreamingReconstruction:
                 declaration="chunks",
             )
         summed = sum(self.chunk_sizes)
-        if summed != self.total_rays:
+        expected = self.total_rays if self.shard_rays is None else self.shard_rays
+        if summed != expected:
+            shard_note = (
+                ""
+                if self.shard_rays is None
+                else f" (this shard of a {self.total_rays}-ray estimator)"
+            )
             raise ContractError(
                 ContractCode.SHAPE_MISMATCH,
                 (
                     f"the chunks carried {summed} rays but the estimator was "
-                    f"normalized for {self.total_rays}; a 1/N mismatch rescales "
-                    "the whole field"
+                    f"normalized for {expected}{shard_note}; a 1/N mismatch "
+                    "rescales the whole field"
                 ),
-                declaration="total_rays",
+                declaration="total_rays" if self.shard_rays is None else "shard_rays",
             )
         u = self._accumulator / self.total_rays
         field_ = ComplexField(
@@ -626,8 +652,14 @@ class StreamingReconstruction:
             normalization=(
                 "u is complex amplitude; discrete power = sum(|u|^2) * dy * dx; "
                 f"ray-sum normalization = one_over_n applied once over "
-                f"N_total = {self.total_rays} after chunked accumulation; "
-                f"projection = {self.projection}"
+                f"N_total = {self.total_rays} after chunked accumulation"
+                + (
+                    ""
+                    if self.shard_rays is None
+                    else f"; PARTIAL SUM over {self.shard_rays} of those rays, "
+                    "to be added to the other shards"
+                )
+                + f"; projection = {self.projection}"
             ),
             provenance={
                 "coupler": "C_RAY_TO_WAVE",
@@ -638,6 +670,13 @@ class StreamingReconstruction:
                         "each chunk reconstructed with normalization='none'; the "
                         "single 1/N_total applied at finalize, so chunk size cannot "
                         "change the estimator"
+                    ),
+                    "shard_rays": self.shard_rays,
+                    "shard_rule": (
+                        None
+                        if self.shard_rays is None
+                        else "a disjoint slice of the estimator, divided by the "
+                        "whole N_total so the shards sum to the full field"
                     ),
                     "clipped_ray_policy": (
                         "clipped rays keep their place in N_total and contribute "

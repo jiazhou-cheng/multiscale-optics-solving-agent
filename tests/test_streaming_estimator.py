@@ -402,6 +402,136 @@ class TestChunkEquivalence:
         assert raised.value.code == "EMPTY_ENSEMBLE"
 
 
+class TestShardedAccumulation:
+    """An estimator split across *processes*, not just across chunks (CHE-102).
+
+    A ray budget too large for one command has to be summed from partial runs,
+    and the whole risk is one number: each shard must divide by the estimator's
+    ``N_total`` and not by its own count, or the sum is wrong by the number of
+    shards -- a plausible field, uniformly too bright. `shard_rays` makes that
+    two declared quantities instead of one overloaded one, and these tests hold
+    the split to the same standard `TestChunkEquivalence` holds chunking to:
+    only summation order may differ.
+
+    This is *not* a licence to split a stochastic population. It is exact when
+    the shards partition an enumerated set, which is the caller's to guarantee;
+    `demo3_enumerated_reference` is the case it was built for.
+    """
+
+    @staticmethod
+    def _shard(spectrum, *, launches, samples, shard, shards):
+        density = sampling_density(spectrum, SamplingDensity.MAGNITUDE)
+        sampler, _ = PositionalAngularSampler.build(
+            spectrum,
+            density_kind=SamplingDensity.MAGNITUDE,
+            seed=21,
+            samples_per_launch=samples,
+        )
+        launch = nested_aperture_launch_positions(
+            launches, aperture_radius_m=AIR_CONFIG.aperture_radius_m
+        )
+        total = launches * samples
+        per = launches // shards
+        mine = range(shard * per, (shard + 1) * per)
+        reconstruction = StreamingReconstruction(
+            grid_shape=AIR_CONFIG.grid_shape,
+            sample_pitch_m=AIR_CONFIG.pitch_pair,
+            plane=ReferencePlane(name="p0", z_m=0.0),
+            wavelength_m=AIR_CONFIG.wavelength_m,
+            namespace=spectrum.namespace,
+            complex_dtype=spectrum.dtype,
+            total_rays=total,
+            shard_rays=None if shards == 1 else per * samples,
+        )
+        # The launch positions are fixed and the sampler is positional, so a
+        # shard of the launch list is a disjoint slice of one fixed population.
+        for items in chunk_plan(
+            launch_count=launches, samples_per_launch=samples, chunk_size=samples
+        ):
+            if items[0].launch_index not in mine:
+                continue
+            bundle, ids = build_chunk_bundle(spectrum, density, sampler, items, launch)
+            reconstruction.add_chunk(
+                CoherentRayBatch(
+                    bundle=bundle, ray_id=ids, valid=np.ones(bundle.count, dtype=bool)
+                )
+            )
+        return reconstruction.finalize()
+
+    def test_the_shards_sum_to_the_unsharded_field(self, spectrum):
+        launches, samples = 8, 256
+        whole = np.asarray(
+            self._shard(spectrum, launches=launches, samples=samples, shard=0, shards=1)
+            .field.u
+        )
+        for shards in (2, 4, 8):
+            parts = [
+                np.asarray(
+                    self._shard(
+                        spectrum,
+                        launches=launches,
+                        samples=samples,
+                        shard=index,
+                        shards=shards,
+                    ).field.u
+                )
+                for index in range(shards)
+            ]
+            error = float(np.linalg.norm(sum(parts) - whole)) / float(
+                np.linalg.norm(whole)
+            )
+            assert error < 1.0e-13, (
+                f"{shards} shards summed to a field {error:.3e} from the unsharded "
+                "one; only summation order may differ"
+            )
+
+    def test_a_shard_is_not_normalized_by_its_own_count(self, spectrum):
+        """The failure this exists to catch: a field too bright by the shard count."""
+        launches, samples = 8, 256
+        one = self._shard(
+            spectrum, launches=launches, samples=samples, shard=0, shards=4
+        )
+        assert one.total_rays == launches * samples
+        record = one.field.provenance["streaming"]
+        assert record["shard_rays"] == (launches // 4) * samples
+        assert "shards sum" in record["shard_rule"]
+        assert "PARTIAL SUM" in one.field.normalization
+
+    def test_chunks_that_do_not_add_up_to_the_shard_are_still_refused(self, spectrum):
+        """The guard is narrowed to the shard, not removed."""
+        reconstruction = StreamingReconstruction(
+            grid_shape=AIR_CONFIG.grid_shape,
+            sample_pitch_m=AIR_CONFIG.pitch_pair,
+            plane=ReferencePlane(name="p", z_m=0.0),
+            wavelength_m=AIR_CONFIG.wavelength_m,
+            namespace=spectrum.namespace,
+            complex_dtype=spectrum.dtype,
+            total_rays=1024,
+            shard_rays=256,
+        )
+        reconstruction.chunk_sizes.append(128)
+        reconstruction.valid_rays = 128
+        with pytest.raises(ContractError) as raised:
+            reconstruction.finalize()
+        assert raised.value.code == "SHAPE_MISMATCH"
+        assert "this shard of a 1024-ray estimator" in str(raised.value)
+
+    @pytest.mark.parametrize("shard_rays", [0, -4, 2048])
+    def test_a_shard_larger_than_the_estimator_is_refused(self, spectrum, shard_rays):
+        with pytest.raises(ContractError) as raised:
+            StreamingReconstruction(
+                grid_shape=AIR_CONFIG.grid_shape,
+                sample_pitch_m=AIR_CONFIG.pitch_pair,
+                plane=ReferencePlane(name="p", z_m=0.0),
+                wavelength_m=AIR_CONFIG.wavelength_m,
+                namespace=spectrum.namespace,
+                complex_dtype=spectrum.dtype,
+                total_rays=1024,
+                shard_rays=shard_rays,
+            )
+        assert raised.value.code == "SHAPE_MISMATCH"
+
+
 class TestClippedRays:
     """A clipped ray keeps its place in N_total and contributes nothing."""
 
