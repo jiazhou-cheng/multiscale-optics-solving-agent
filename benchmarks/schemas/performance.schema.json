@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://multiscale-optics-agent.local/schemas/performance.schema.json",
+  "title": "Performance baseline record (CHE-105 / M0.4)",
+  "description": "One measured workload. `environment` is what decides whether two of these may be compared at all; `workload.unit` and `workload.route` are what decide whether the comparison means anything, because cost per ray is a different quantity on an O(rays x pixels) route than on an O(rays) + FFT route.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "label",
+    "workload",
+    "measurement",
+    "cost_per_unit",
+    "cost_per_unit_name",
+    "environment",
+    "isolation",
+    "stages",
+    "peak_host_rss_bytes",
+    "cuda",
+    "swap_growth_bytes",
+    "memory_report",
+    "notes"
+  ],
+  "properties": {
+    "label": {"type": "string", "minLength": 1},
+
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "unit", "route", "detail"],
+      "properties": {
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "How much work, in its natural unit. Never 'one run'."
+        },
+        "unit": {"type": "string", "minLength": 1},
+        "route": {
+          "type": ["string", "null"],
+          "description": "Anything that changes the asymptotic cost model. Two records with the same unit and different routes are not comparable."
+        },
+        "detail": {"type": "object"}
+      }
+    },
+
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repeats", "warmup", "median_s", "min_s", "p95_s", "all_s"],
+      "properties": {
+        "repeats": {"type": "integer", "minimum": 1},
+        "warmup": {"type": "integer", "minimum": 0},
+        "median_s": {"type": "number", "exclusiveMinimum": 0},
+        "min_s": {"type": "number", "exclusiveMinimum": 0},
+        "p95_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "At repeats <= 20 this is the slowest observed run, not an interpolated percentile."
+        },
+        "all_s": {"type": "array", "minItems": 1, "items": {"type": "number"}}
+      }
+    },
+
+    "cost_per_unit": {"type": ["number", "null"]},
+    "cost_per_unit_name": {"type": "string"},
+
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "python_version",
+        "platform",
+        "cpu_model",
+        "logical_cpus",
+        "thread_env",
+        "container_image",
+        "gpu_name",
+        "gpu_driver",
+        "gpu_count",
+        "visible_devices",
+        "packages",
+        "sha256"
+      ],
+      "properties": {
+        "python_version": {"type": "string"},
+        "platform": {"type": "string"},
+        "cpu_model": {"type": ["string", "null"]},
+        "logical_cpus": {"type": ["integer", "null"]},
+        "thread_env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "container_image": {"type": "string"},
+        "gpu_name": {"type": ["string", "null"]},
+        "gpu_driver": {"type": ["string", "null"]},
+        "gpu_count": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Visible CUDA devices. AGENTS.md requires GPU measurements to be single-GPU; a count of 1 read from the runtime is what makes that checkable."
+        },
+        "visible_devices": {"type": ["string", "null"]},
+        "packages": {"type": "object", "additionalProperties": {"type": "string"}},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applied", "cpu_affinity", "thread_env", "logical_cpus"],
+      "properties": {
+        "applied": {
+          "type": "boolean",
+          "description": "False unless something actually pinned threads or affinity. Recording an affinity mask does not make a run isolated."
+        },
+        "cpu_affinity": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "thread_env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "logical_cpus": {"type": ["integer", "null"]}
+      }
+    },
+
+    "stages": {
+      "type": ["object", "null"],
+      "description": "Per-stage wall clock and each stage's share of the total. The share is the number CHE-101 needed: a 9.6x speedup on a stage worth 7% of the run moves the run by 7%.",
+      "additionalProperties": true,
+      "properties": {
+        "seconds": {"type": "object", "additionalProperties": {"type": "number"}},
+        "accounted_s": {"type": "number"},
+        "fraction_of_total": {"type": "object", "additionalProperties": {"type": "number"}},
+        "unaccounted_s": {"type": "number"}
+      }
+    },
+
+    "peak_host_rss_bytes": {"type": ["integer", "null"], "minimum": 0},
+
+    "cuda": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "required": ["available"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "device": {"type": ["string", "null"]},
+        "peak_allocated_bytes": {"type": ["integer", "null"]},
+        "peak_reserved_bytes": {"type": ["integer", "null"]}
+      }
+    },
+
+    "swap_growth_bytes": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Growth in the container cgroup's swap over the measurement. Nonzero means the run was aborted: swap as working memory is a stop condition, not a footnote. `null` means the cgroup file could not be read, which is reported rather than treated as zero."
+    },
+
+    "memory_report": {"type": ["object", "null"], "additionalProperties": true},
+
+    "notes": {"type": "array", "items": {"type": "string"}},
+
+    "subprocess": {
+      "type": "object",
+      "description": "Present when the measured thing was a whole command rather than an in-process callable. The argv is part of the record because 'the test suite' is not a fixed workload -- it is whatever that command selects on the day.",
+      "additionalProperties": false,
+      "required": ["argv", "returncode", "tail", "stderr_tail"],
+      "properties": {
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "returncode": {
+          "const": 0,
+          "description": "Zero, always. A nonzero exit is refused by the runner rather than recorded: timing how long something took to crash and committing it as a baseline is worse than having no baseline."
+        },
+        "tail": {"type": "array", "items": {"type": "string"}},
+        "stderr_tail": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

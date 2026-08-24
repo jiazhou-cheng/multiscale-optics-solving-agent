@@ -90,8 +90,15 @@ PROTOCOL_ID = "M3-SLICE-CPU-V1"
 GRAPH = ["M_RAY_OPTILAND", "C_RAY_TO_WAVE", "M_WAVE_CHROMATIX"]
 TERMINAL_MEASUREMENT = "psf"
 
-SENSOR_PROBE_PATH = ROOT / "benchmarks" / "probes" / "m3r_sensor_handoff.py"
-QUADRATURE_PROBE_PATH = ROOT / "benchmarks" / "probes" / "m3_quadrature_weight.py"
+# CHE-105: these two pointed at `m3r_sensor_handoff.py` and
+# `m3_quadrature_weight.py`, the names these probes had before the CHE-93
+# reorganization renamed them. This bundle has therefore been unable to run at
+# all since that commit -- it dies in `_load_module` with FileNotFoundError
+# before any physics -- and nothing noticed, because no test invokes it and the
+# manifest records its verdict rather than re-deriving it. The module docstring
+# above names the correct paths; only these two constants were left behind.
+SENSOR_PROBE_PATH = ROOT / "benchmarks" / "probes" / "sensor_handoff_convergence.py"
+QUADRATURE_PROBE_PATH = ROOT / "benchmarks" / "probes" / "quadrature_weight.py"
 
 #: Ray count for the two cheap negative controls below. 256 rings is CHE-38's
 #: own "Experiments C and D" ray count -- large enough that ray-sampling error

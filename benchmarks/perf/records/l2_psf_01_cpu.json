@@ -1,0 +1,213 @@
+{
+ "cost_per_unit": 167.09673807799118,
+ "cost_per_unit_name": "seconds_per_bundle_run [M3-SLICE-CPU-V1]",
+ "cuda": {
+  "allocated_bytes": null,
+  "available": false,
+  "device": null,
+  "free_bytes": null,
+  "peak_allocated_bytes": null,
+  "peak_reserved_bytes": null,
+  "reserved_bytes": null,
+  "total_bytes": null
+ },
+ "environment": {
+  "container_image": "agent_solver",
+  "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+  "gpu_count": null,
+  "gpu_driver": null,
+  "gpu_name": null,
+  "logical_cpus": 80,
+  "packages": {
+   "chromatix": "0.6.0",
+   "jax": "0.6.2",
+   "jaxlib": "0.6.2",
+   "numpy": "2.2.6",
+   "optiland": "0.6.0",
+   "scipy": "1.15.3",
+   "torch": "2.13.0+cpu"
+  },
+  "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+  "python_version": "3.12.14",
+  "sha256": "8a536c6653510329b7cd2da8eb9da82cb94e8a2a420ab4765315dbd8684313ad",
+  "thread_env": {},
+  "visible_devices": null
+ },
+ "isolation": {
+  "applied": false,
+  "cpu_affinity": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19,
+   20,
+   21,
+   22,
+   23,
+   24,
+   25,
+   26,
+   27,
+   28,
+   29,
+   30,
+   31,
+   32,
+   33,
+   34,
+   35,
+   36,
+   37,
+   38,
+   39,
+   40,
+   41,
+   42,
+   43,
+   44,
+   45,
+   46,
+   47,
+   48,
+   49,
+   50,
+   51,
+   52,
+   53,
+   54,
+   55,
+   56,
+   57,
+   58,
+   59,
+   60,
+   61,
+   62,
+   63,
+   64,
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71,
+   72,
+   73,
+   74,
+   75,
+   76,
+   77,
+   78,
+   79
+  ],
+  "logical_cpus": 80,
+  "thread_env": {}
+ },
+ "label": "L2-PSF-01 bundle",
+ "measurement": {
+  "all_s": [
+   167.09673807799118
+  ],
+  "median_s": 167.09673807799118,
+  "min_s": 167.09673807799118,
+  "p95_s": 167.09673807799118,
+  "repeats": 1,
+  "warmup": 0
+ },
+ "memory_report": {
+  "after": {
+   "cgroup_memory_bytes": 227762176,
+   "cgroup_swap_bytes": 0,
+   "host_swap_total_bytes": 2002545270784,
+   "host_swap_used_bytes": 0,
+   "mem_available_bytes": 390365245440,
+   "mem_total_bytes": 405342146560,
+   "monotonic_s": 94584.533061509,
+   "rss_bytes": 319930368
+  },
+  "before": {
+   "cgroup_memory_bytes": 162578432,
+   "cgroup_swap_bytes": 0,
+   "host_swap_total_bytes": 2002545270784,
+   "host_swap_used_bytes": 0,
+   "mem_available_bytes": 390666743808,
+   "mem_total_bytes": 405342146560,
+   "monotonic_s": 94417.086540645,
+   "rss_bytes": 228429824
+  },
+  "cgroup_swap_after_bytes": 0,
+  "cgroup_swap_before_bytes": 0,
+  "host_reserve_bytes": 60801321984,
+  "interval_s": 0.25,
+  "min_mem_available_bytes": 378300399616,
+  "peak_cgroup_swap_bytes": 0,
+  "peak_rss_bytes": 319930368,
+  "process_rss_budget_bytes": null,
+  "samples": 669,
+  "signal": "/sys/fs/cgroup/memory.swap.current",
+  "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+  "swap_delta_peak_bytes": 0,
+  "verdict": {
+   "breached": false,
+   "detail": null,
+   "limit_bytes": null,
+   "observed_bytes": null,
+   "reason": null
+  }
+ },
+ "notes": [
+  "One timed run, no warmup, for the same reason as the suite baseline."
+ ],
+ "peak_host_rss_bytes": 319930368,
+ "stages": {
+  "accounted_s": 167.0967,
+  "fraction_of_total": {
+   "subprocess": 1.0
+  },
+  "seconds": {
+   "subprocess": 167.0967
+  },
+  "unaccounted_s": 0.0001
+ },
+ "subprocess": {
+  "argv": [
+   "/usr/local/bin/python",
+   "/workspace/benchmarks/physics/L2-PSF-01/run_benchmark.py"
+  ],
+  "returncode": 0,
+  "stderr_tail": [],
+  "tail": [
+   "{",
+   "  \"status\": \"complete\",",
+   "  \"physical_correctness\": \"characterized_gate_not_met\",",
+   "  \"gate_met_on_production_configuration\": false,",
+   "  \"negative_controls_pass\": false,",
+   "  \"scientific_fingerprint\": \"411181d022378772bb6b0ab8ea31923a22f045669dc004cc597dd1f51c03ae54\"",
+   "}"
+  ]
+ },
+ "swap_growth_bytes": 0,
+ "workload": {
+  "detail": {},
+  "route": "M3-SLICE-CPU-V1",
+  "size": 1.0,
+  "unit": "bundle_run"
+ }
+}

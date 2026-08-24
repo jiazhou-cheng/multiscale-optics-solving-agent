@@ -1,0 +1,253 @@
+{
+ "environment": {
+  "container_image": "agent_solver",
+  "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+  "gpu_count": null,
+  "gpu_driver": null,
+  "gpu_name": null,
+  "logical_cpus": 80,
+  "packages": {
+   "chromatix": "0.6.0",
+   "jax": "0.6.2",
+   "jaxlib": "0.6.2",
+   "numpy": "2.2.6",
+   "optiland": "0.6.0",
+   "scipy": "1.15.3",
+   "torch": "2.13.0+cpu"
+  },
+  "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+  "python_version": "3.12.14",
+  "sha256": "8a536c6653510329b7cd2da8eb9da82cb94e8a2a420ab4765315dbd8684313ad",
+  "thread_env": {},
+  "visible_devices": null
+ },
+ "issue": "CHE-105 (M0.4)",
+ "probe": "perf_estimate_accuracy",
+ "rows": [
+  {
+   "component": "M_RAY_OPTILAND",
+   "confidence": "low",
+   "measured_median_s": 0.019991751003544778,
+   "notes": [
+    "Heuristic only -- optiland is not imported for this estimate.",
+    "Registry cost_model: O(number_of_surfaces * number_of_rays); this estimator does not read the actual surface count.",
+    "requested num_rays=32; the traced ray count returned by Optic.trace() is typically much larger due to pupil sampling (see knowledge/solvers/optiland/failure_guide.md) and is not known until after the solver call."
+   ],
+   "predicted_wall_time_s": null,
+   "ratio_predicted_over_measured": null,
+   "verdict": "NO PREDICTION. estimate() returns wall_time_s=None with confidence='low' and says why: it does not import optiland and does not know the surface count or the traced ray count. That is an honest refusal, and it means a planner cannot use this estimator to order work by cost."
+  },
+  {
+   "component": "C_RAY_TO_WAVE",
+   "confidence": "medium",
+   "measured_median_s": 0.46258707100059837,
+   "measured_peak_host_rss_bytes": 973578240,
+   "measured_reconstruction_only_s": 0.055317617996479385,
+   "notes": [
+    "cost driver = rays x grid points = 3169 x 35344 = 1.12e+08 ray-pixel products at a measured ~5.5e+08/s (shared unpinned machine, M3.2; an ordering figure, not a regression envelope)"
+   ],
+   "predicted_peak_memory_bytes": 19630208,
+   "predicted_wall_time_s": 0.2036457018181818,
+   "ratio_predicted_over_measured": 0.44023215213880973,
+   "ratio_predicted_over_reconstruction": 3.681389567987952,
+   "reconstruction_record": {
+    "cost_per_unit": 1.7455859260485763e-05,
+    "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+    "cuda": {
+     "allocated_bytes": null,
+     "available": false,
+     "device": null,
+     "free_bytes": null,
+     "peak_allocated_bytes": null,
+     "peak_reserved_bytes": null,
+     "reserved_bytes": null,
+     "total_bytes": null
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": null,
+     "gpu_driver": null,
+     "gpu_name": null,
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cpu"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "8a536c6653510329b7cd2da8eb9da82cb94e8a2a420ab4765315dbd8684313ad",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "C_RAY_TO_WAVE reconstruction only",
+    "measurement": {
+     "all_s": [
+      0.055659948993707076,
+      0.055075743002817035,
+      0.055317617996479385
+     ],
+     "median_s": 0.055317617996479385,
+     "min_s": 0.055075743002817035,
+     "p95_s": 0.055659948993707076,
+     "repeats": 3,
+     "warmup": 1
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 357265408,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 390674042880,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 93759.673279469,
+      "rss_bytes": 538935296
+     },
+     "before": {
+      "cgroup_memory_bytes": 357294080,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 390652325888,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 93759.449237293,
+      "rss_bytes": 538927104
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 390652325888,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 538935296,
+     "process_rss_budget_bytes": null,
+     "samples": 2,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [],
+    "peak_host_rss_bytes": 538935296,
+    "stages": {
+     "accounted_s": 0.0553,
+     "fraction_of_total": {
+      "transform": 0.9993
+     },
+     "seconds": {
+      "transform": 0.0553
+     },
+     "unaccounted_s": 0.0
+    },
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {},
+     "route": "ramp_sum",
+     "size": 3169.0,
+     "unit": "ray"
+    }
+   },
+   "verdict": "WRONG IN BOTH DIRECTIONS, and the two errors have different causes. Against the shipping call (0.463 s) it under-predicts by 2.3x, because it models the ray x pixel reconstruction and the call is dominated by the O(N^2) ray-density diagnostic. Against the reconstruction alone (0.055 s) it over-predicts by 3.7x, because its _RAY_PIXEL_PRODUCTS_PER_SECOND constant is not calibrated to this host. A planner ordering work by this number would be wrong about which node is expensive, which is the failure that matters."
+  }
+ ],
+ "why_this_matters": "M3's executor and M6's planner both order work by CostEstimate. An estimator that has never been scored against a measurement is a guess, and one that returns None is at least a guess that says so."
+}
