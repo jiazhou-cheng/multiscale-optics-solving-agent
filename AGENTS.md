@@ -38,13 +38,14 @@ The currently supported core is the Optiland geometric-ray model, the Chromatix 
 
 The project is now in a **benchmark redesign + codebase hardening + agent integration** phase.
 
-Work should support three increasingly complete levels:
+The benchmark system has two physics benchmark classes:
 
 1. **single-component benchmarks** — one solver or one coupler in isolation,
-2. **composed physics benchmarks** — solver -> coupler -> solver chains,
-3. **agentic benchmarks** — the agent must select the appropriate model(s), load the relevant knowledge, configure the graph, execute it, and interpret the result correctly.
+2. **composed physics benchmarks** — solver -> coupler -> solver chains.
 
-The purpose of the benchmark system is not only to prove that APIs run. It must test model choice, boundary conventions, numerical convergence, physical correctness, failure behavior, and reproducibility.
+These physics benchmarks are the scientific tasks that the agentic benchmark operates on; they are not parallel to it. The **agentic benchmark is the higher-level evaluation framework**: the agent is given benchmark problems drawn from the single-component and composed-physics sets and must select the appropriate model(s), load the relevant knowledge, configure and execute the graph, and interpret and verify the result correctly.
+
+The purpose of the benchmark system is therefore twofold: the underlying physics benchmarks establish numerical and scientific correctness, while the agentic benchmark tests whether an agent can use those verified components correctly. Together they should cover model choice, boundary conventions, numerical convergence, physical correctness, failure behavior, reproducibility, and scientific interpretation.
 
 ## Sources of Truth
 
