@@ -911,6 +911,15 @@ entries:
       approximation does not apply here" from "it ran and the number is wrong".
     destination: >-
       VerificationResult.status (M0.5.3) and BenchmarkFamily.failure_semantics.
+  - path: src/verification/refusals.py
+    bucket: A
+    justification: >-
+      The refusal catalogue: for every ContractCode, what triggers it, what would
+      fix it, and which of the five negative outcomes it is. A test fails if a
+      code has no entry or an entry names a code that no longer exists.
+    destination: >-
+      B0-CONTRACT's oracle, and the structured-refusal half of M3.2's discovery
+      API.
   - path: src/verification/result.py
     bucket: A
     justification: >-
@@ -955,6 +964,14 @@ entries:
       hexapolar ring membership, declared planarity, Fresnel number, paraxial
       field angle.
     destination: Family validity tuples.
+  - path: src/verification/families/b0_contract.py
+    bucket: A
+    justification: >-
+      The four B0 contract-and-recovery families (CHE-108) and their ten canonical
+      instances, one per declared boundary. The five negative outcomes are each
+      produced by a different instance, and B0-UNITS carries the two measured
+      traps whose expected contract status is `ok` while the physics is wrong.
+    destination: The contract layer of the evidence set; feeds M7.3's robustness suite.
   - path: src/verification/families/b1_ray.py
     bucket: A
     justification: >-

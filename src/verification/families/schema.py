@@ -1013,6 +1013,15 @@ class BenchmarkFamily:
         ``dataclasses.replace`` re-runs ``__post_init__``, so the instances are
         checked against the family they claim to belong to.
         """
+        from verification.families.registry import FAMILIES
+
+        if self.family_id in FAMILIES and FAMILIES[self.family_id] is self:
+            raise ValueError(
+                f"{self.family_id} is already registered, so attaching instances now "
+                "would produce a COPY that the registry does not hold -- the registered "
+                "family would silently have no canonical instances. Build the family, "
+                "attach its instances, then register the result."
+            )
         return replace(self, canonical_instances=tuple(instances))
 
     def evaluate_validity(

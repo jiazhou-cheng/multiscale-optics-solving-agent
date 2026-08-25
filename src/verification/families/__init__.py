@@ -11,6 +11,7 @@ that knows which families exist.
 # source of truth that is discovered agrees with itself by construction,
 # including about which entries exist at all.
 from verification.families import (  # noqa: F401
+    b0_contract,
     b1_ray,
     b1_wave,
     b2_transitions,
