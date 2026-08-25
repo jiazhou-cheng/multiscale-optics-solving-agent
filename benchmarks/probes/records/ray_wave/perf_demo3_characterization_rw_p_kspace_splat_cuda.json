@@ -32,7 +32,7 @@
     "reconstruction_normalization": "one_over_n, applied once at finalize"
   },
   "environment": {
-    "commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
+    "commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
     "container_image": "agent_solver",
     "jax_devices": [
       "cuda:0"
@@ -97,7 +97,7 @@
   "probe": "demo3_hologram_lens",
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "6bf486604fbd1df4eefe7f5ad346967284a14faf11adff3bfcc2b8a16a0f24da",
+      "combined_sha256": "95379ba8fda4dbb4c137c90e053efd7237694d2a2df6c98b00b4f945d95a29b4",
       "files": {
         "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
         "benchmarks/probes/ray_wave/demo3_hologram_lens.py": "d25367cac9ec85c9df9c163429167fb1edffe0c52c10c3c1df7bc3147e6bcf95",
@@ -106,7 +106,7 @@
         "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
         "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
         "src/core/bridge.py": "89deacd30cd5e03285c1f187e4745113057ff736bf1694deb9452ca30bd418c6",
-        "src/core/capabilities.py": "54529ebbc079a3c6d7e785bcaceb1ea847ab1daf3c984062e0c6b7d528063ed0",
+        "src/core/capabilities.py": "209975060902708c3279a428dcf4a6057f4ad94892bf60fdcc9c059d8e37140f",
         "src/core/coherent_batch.py": "1651fe93e0486dd96c1aa73a8d47c83e8b2fd8c7bfa995d2aec6df66ac48a262",
         "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
         "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
@@ -122,8 +122,9 @@
         "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
         "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
         "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
-        "src/couplers/patch.py": "4be20aab1d001612df6b934d51cf544651ab530eaf8f76b9fa220b70175ce4b2",
-        "src/couplers/patch_node.py": "952bc9390220006ea2f202b994ad6ad4867701e4df0477980f563b4036be1265",
+        "src/couplers/patch.py": "a0207bd071bb1280585ab46eda7681167a19f67054ce32f40d52ea74a68d2996",
+        "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
+        "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
         "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
         "src/couplers/streaming.py": "4ec1b96ee3ed898382bb322c61aa8ddaed93971f4500f80dfb2085bf94fdb2b7",
         "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
@@ -154,8 +155,8 @@
     },
     "probe": "perf_demo3_characterization_rw_p_kspace_splat_cuda",
     "schema_version": 2,
-    "source_commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
-    "timestamp_utc": "2026-08-25T02:37:17.058119+00:00",
+    "source_commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
+    "timestamp_utc": "2026-08-25T04:19:54.275760+00:00",
     "working_tree_dirty": true
   },
   "routes": {
@@ -181,7 +182,7 @@
             "available": true,
             "bytes_limit": 38275448832,
             "device": "cuda:0",
-            "peak_bytes_in_use": 65204224,
+            "peak_bytes_in_use": 64826880,
             "peak_gb": 0.065
           },
           "energy": {
@@ -266,7 +267,7 @@
             "patch_px": 101
           },
           "rays_emitted_here": 60000000,
-          "rays_per_second": 594815.0531184444,
+          "rays_per_second": 1150077.5670899863,
           "reconstruction": {
             "kspace_oversample": 1.5,
             "measured": {
@@ -286,12 +287,12 @@
           "secondary_per_patch": 20000,
           "seed": 20260822,
           "stage_wall_clock_s": {
-            "emit_patch_spectra": 83.223,
-            "host_to_device": 3.404,
+            "emit_patch_spectra": 34.142,
+            "host_to_device": 3.511,
             "note": "Sums to slightly less than wall_clock_s: finalize and the plan setup are outside the loop. `power_bookkeeping` is this probe's own accounting -- three host round-trips per chunk -- not part of the physics, and is separated so it cannot be mistaken for one.",
-            "optiland_trace": 5.338,
-            "power_bookkeeping": 0.778,
-            "reconstruct": 7.49
+            "optiland_trace": 5.55,
+            "power_bookkeeping": 0.783,
+            "reconstruct": 7.584
           },
           "streaming": {
             "chunk_count": 300,
@@ -345,7 +346,7 @@
             "valid_rays": 54080000
           },
           "total_rays": 60000000,
-          "wall_clock_s": 100.87169059598818
+          "wall_clock_s": 52.17039416899206
         }
       ],
       "seed_reproducibility": {

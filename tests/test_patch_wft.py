@@ -33,9 +33,13 @@ contract refusals only. The expensive convergence sweeps live in
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pytest
 
+import couplers.patch as patch_module
 from core.artifacts import ArtifactRecord
 from core.boundary import ContractError, Frame, RayBundle, ReferencePlane
 from core.execution import RunStatus
@@ -43,14 +47,17 @@ from core.graph import Severity
 from core.specs import ArtifactKind
 from couplers.base import CouplerRunRequest
 from couplers.patch import (
+    EMITTER_THREADS_ENV,
     PatchPlan,
     Substrate,
     advance_bundle_to_plane,
+    emitter_threads,
     extract_patch,
     patch_secondary_rays,
     plan_patches,
     resolve_pad_px,
 )
+from couplers.patch_cost import CPU_COMPLEX128_EMITTER_COST, estimate_emitter_seconds
 from couplers.patch_node import DOE_PORT, PatchWftCoupler
 from couplers.ray_to_wave import Projection, ray_to_wave
 from verification.asm_oracle import angular_spectrum_float64, compare_fields
@@ -81,6 +88,285 @@ def _reconstruct(bundle, plane: ReferencePlane) -> np.ndarray:
         projection=Projection.ASM_CONSISTENT,
     )
     return np.asarray(field.u)
+
+
+# ---------------------------------------------------------------------------
+# CHE-119 — the emitter runs in threads and in blocks, and emits the same rays
+# ---------------------------------------------------------------------------
+
+
+def _emit(
+    doe, *, patches, secondary, seed, pitch=PITCH_M, patch_px=11, grid_n=None
+):
+    """One emission, with everything that could change the answer pinned."""
+    grid = (grid_n or doe.shape[0], grid_n or doe.shape[1])
+    plan = plan_patches(
+        grid_shape=grid,
+        sample_pitch_m=(pitch, pitch),
+        patch_px=patch_px,
+        pad_factor=2,
+        patch_count=patches,
+        rng=np.random.default_rng(5),
+    )
+    bundle, diagnostics = patch_secondary_rays(
+        doe,
+        plan=plan,
+        sample_pitch_m=(pitch, pitch),
+        wavelength_m=WAVELENGTH_M,
+        plane=DOE_PLANE,
+        secondary_count=secondary,
+        rng=None if secondary is None else np.random.default_rng(seed),
+    )
+    return bundle, diagnostics
+
+
+def _identical(left, right) -> bool:
+    return all(
+        np.array_equal(np.asarray(getattr(left, field)), np.asarray(getattr(right, field)))
+        for field in ("positions_m", "directions", "amplitude", "optical_path_length_m")
+    )
+
+
+@pytest.mark.parametrize("secondary", [400, None], ids=["sampled", "enumerated"])
+def test_the_thread_count_does_not_change_a_single_emitted_ray(
+    monkeypatch, secondary
+) -> None:
+    """The whole basis for threading this operator, asserted rather than argued.
+
+    The per-patch transform runs in a worker thread when there is enough work to
+    pay for one, and the parallel path is the *same numpy call on the same
+    input* -- so it must be bitwise, not merely close. If this ever fails, the
+    emitter has stopped being a scheduling change and has become a second
+    estimator, which is a different claim needing a different gate.
+    """
+    doe = _doe()
+    monkeypatch.setenv(EMITTER_THREADS_ENV, "1")
+    reference, _ = _emit(doe, patches=12, secondary=secondary, seed=3)
+    for threads in ("2", "4", "9"):
+        monkeypatch.setenv(EMITTER_THREADS_ENV, threads)
+        assert emitter_threads() == int(threads)
+        candidate, _ = _emit(doe, patches=12, secondary=secondary, seed=3)
+        assert _identical(reference, candidate), f"{threads} threads changed the rays"
+
+
+def test_the_block_size_does_not_change_a_single_emitted_ray(monkeypatch) -> None:
+    """The draw takes a whole block's uniforms in one call, so this could break.
+
+    `rng.random((block, S))` consumes the generator exactly as `block`
+    sequential `random(S)` calls do -- which is why blocking is invisible to the
+    result. It is invisible only because that identity holds, so it is checked
+    here across block sizes that divide the patch count and ones that do not.
+    """
+    doe = _doe()
+    monkeypatch.setattr(patch_module, "PATCH_BATCH_PATCHES", 64)
+    reference, _ = _emit(doe, patches=13, secondary=200, seed=8)
+    for block in (1, 2, 5, 13, 64):
+        monkeypatch.setattr(patch_module, "PATCH_BATCH_PATCHES", block)
+        candidate, _ = _emit(doe, patches=13, secondary=200, seed=8)
+        assert _identical(reference, candidate), f"block {block} changed the rays"
+
+
+def test_the_inlined_draw_is_bitwise_numpys_choice() -> None:
+    """The one place CHE-119 rewrote arithmetic rather than rescheduling it.
+
+    `Generator.choice(p=...)` normalizes a cumulative sum and searches it with
+    `size` uniforms. The emitter now writes that out, which saves numpy's
+    validation passes over a 90601-element vector and -- the actual reason --
+    separates the RNG-ordered part from the part that can run in a thread. The
+    saving is worth nothing if the picks differ, so this is the guard.
+
+    It is also the tripwire for a numpy upgrade. If numpy changes how `choice`
+    consumes the stream, this fails loudly here instead of silently changing
+    every committed demo2 and demo3 field.
+    """
+    rng = np.random.default_rng(0)
+    for size, count in ((97, 40), (4096, 500), (90601, 4000)):
+        weights = np.abs(rng.standard_normal(size))
+        density = weights / weights.sum()
+
+        shipped = np.random.default_rng(21)
+        expected = shipped.choice(size, size=count, p=density)
+
+        inlined = np.random.default_rng(21)
+        cumulative = density.cumsum()
+        cumulative /= cumulative[-1]
+        actual = cumulative.searchsorted(inlined.random(count), side="right")
+
+        assert np.array_equal(actual, expected), f"picks differ at size {size}"
+        # And both generators are left in the same place, so the NEXT patch in
+        # the loop draws what it drew before. Getting the picks right and the
+        # stream position wrong would corrupt every patch after the first.
+        assert np.array_equal(shipped.random(4), inlined.random(4)), (
+            f"stream position diverged at size {size}"
+        )
+
+
+def test_a_boolean_all_true_mask_is_exactly_the_ravel_it_is_replaced_by() -> None:
+    """The other rescheduling: skipping a full-array boolean gather.
+
+    On every demo2 and demo3 grid the Nyquist direction cosine is well below 1,
+    so every mode propagates and `a[propagating]` is a 90601-element gather that
+    returns exactly `np.ravel(a)` for 157 us instead of 0.2 us. The fast path is
+    taken only when the mask is all-true; this asserts the two agree there, and
+    that they do NOT agree when the mask has a false in it -- so the guard is
+    load-bearing rather than decorative.
+    """
+    rng = np.random.default_rng(2)
+    array = rng.standard_normal((17, 23)) + 1j * rng.standard_normal((17, 23))
+    mask = np.ones(array.shape, dtype=bool)
+    assert np.array_equal(array[mask], np.ravel(array))
+    mask[3, 7] = False
+    assert not np.array_equal(array[mask], np.ravel(array))
+
+
+def test_a_grid_with_evanescent_modes_still_takes_the_boolean_path() -> None:
+    """The fast path must not quietly become the only path.
+
+    A pitch below half a wavelength puts modes past the unit circle, and those
+    are refused entry to the ensemble. This is the configuration where the
+    all-propagating shortcut is wrong, so it needs to exist in the suite.
+    """
+    rng = np.random.default_rng(6)
+    doe = rng.normal(size=(32, 32)) + 1j * rng.normal(size=(32, 32))
+    _, diagnostics = _emit(doe, patches=4, secondary=120, seed=1, pitch=0.3e-6)
+    assert diagnostics.evanescent_modes > 0, (
+        "this configuration is supposed to have evanescent modes; without them "
+        "the boolean-mask path is untested"
+    )
+    assert diagnostics.propagating_modes > 0
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "eight", ""])
+def test_a_bad_thread_count_is_refused_rather_than_ignored(monkeypatch, value) -> None:
+    """A run that silently used a different thread count than the one asked for
+    writes a performance record that does not describe its own configuration."""
+    monkeypatch.setenv(EMITTER_THREADS_ENV, value)
+    with pytest.raises(ValueError, match=EMITTER_THREADS_ENV):
+        emitter_threads()
+
+
+# ---------------------------------------------------------------------------
+# CHE-119 — the calibrated cost model, tied to the record it came from
+# ---------------------------------------------------------------------------
+
+_COST_RECORD = (
+    Path(__file__).resolve().parents[1]
+    / "benchmarks"
+    / "perf"
+    / "records"
+    / "patch_emitter_cost_model.json"
+)
+
+
+def test_the_cost_model_constants_are_the_committed_fit() -> None:
+    """A calibrated constant is a number copied out of a measurement, and the
+    copy is where it rots. Re-running the sweep and forgetting to update the
+    constant fails here rather than mispricing a plan for months."""
+    fit = json.loads(_COST_RECORD.read_text())
+    model = CPU_COMPLEX128_EMITTER_COST
+    assert model.fixed_s == fit["fixed_s"]
+    assert model.per_patch_s == fit["per_patch_s"]
+    assert model.per_secondary_ray_s == fit["per_secondary_ray_s"]
+    assert model.pad_px == fit["held_fixed"]["pad_px"]
+    assert model.threads == fit["held_fixed"]["threads"]
+    assert model.max_relative_error_in_domain == fit["max_relative_error_in_domain"]
+    assert model.max_relative_error_excluded == fit["max_relative_error_excluded"]
+    assert model.environment_sha256 == fit["environment"]["sha256"]
+    assert list(model.domain_patches) == fit["domain"]["patches"]
+    assert list(model.domain_secondary) == fit["domain"]["secondary_per_patch"]
+
+
+def test_the_cost_model_reproduces_every_in_domain_measurement() -> None:
+    """The constants in source against the measurements on disk -- which is a
+    different statement from the record's claim about its own fit."""
+    fit = json.loads(_COST_RECORD.read_text())
+    tolerance = CPU_COMPLEX128_EMITTER_COST.max_relative_error_in_domain + 1e-4
+    checked = 0
+    for row in fit["rows"]:
+        if not row["in_domain"]:
+            continue
+        predicted = CPU_COMPLEX128_EMITTER_COST.predict_s(
+            patches=row["patches"], secondary=row["secondary_per_patch"]
+        )
+        assert predicted == pytest.approx(row["seconds"], rel=tolerance), row
+        checked += 1
+    assert checked >= 5, "a two-term fit needs more points than terms"
+
+
+def test_the_excluded_points_are_excluded_because_the_model_fails_there() -> None:
+    """The domain boundary is a measurement too, so it needs its own evidence.
+
+    If the small-patch points ever start fitting, the boundary should move --
+    and this failing is how anyone would find out.
+    """
+    fit = json.loads(_COST_RECORD.read_text())
+    outside = [r for r in fit["rows"] if not r["in_domain"]]
+    assert outside, "an unbounded domain is not a domain"
+    floor = 3 * CPU_COMPLEX128_EMITTER_COST.max_relative_error_in_domain
+    assert max(abs(r["relative_error"]) for r in outside) > floor
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({"patches": 50, "secondary": 4000, "pad_px": 203}, "pad_px"),
+        ({"patches": 4, "secondary": 4000, "pad_px": 301}, "patches is outside"),
+        ({"patches": 50, "secondary": 90601, "pad_px": 301}, "secondary rays a patch"),
+    ],
+)
+def test_the_cost_model_refuses_outside_its_domain(kwargs, expected) -> None:
+    estimate = estimate_emitter_seconds(
+        **kwargs, environment_sha256=CPU_COMPLEX128_EMITTER_COST.environment_sha256
+    )
+    assert estimate.wall_time_s is None
+    joined = " ".join(estimate.notes)
+    assert "NO PREDICTION" in joined
+    assert expected in joined
+
+
+def test_the_cost_model_refuses_a_different_environment() -> None:
+    """A portable-looking number gets planned against. `compare` refuses a ratio
+    across fingerprints; so does this."""
+    estimate = estimate_emitter_seconds(
+        patches=50, secondary=4000, pad_px=301, environment_sha256="0" * 64
+    )
+    assert estimate.wall_time_s is None
+    assert "fingerprint" in " ".join(estimate.notes)
+
+
+def test_the_estimate_resolves_the_real_pad_rather_than_the_requested_floor(
+    tmp_path,
+) -> None:
+    """`patch_px * pad_factor` is a floor and `resolve_pad_px` raises it.
+
+    demo3 asks for 101 x 2 = 202 and runs at 301, so before CHE-119 this
+    estimator described a transform 2.2x smaller than the one that executes --
+    and, under enumeration, a mode count 2.2x too small with it. Checked on the
+    node fixture, where the floor moves too.
+    """
+    source, doe = _node_records(tmp_path)
+    config = _node_config(secondary_count=100, seed=0)
+    floor = int(config["patch_px"]) * int(config["pad_factor"])
+    resolved = resolve_pad_px(
+        grid_n=max(NODE_GRID),
+        patch_px=int(config["patch_px"]),
+        pad_factor=int(config["pad_factor"]),
+        max_center_px=float(max(NODE_GRID) // 2 + int(config["patch_px"]) // 2),
+    )
+    assert resolved > floor, "this fixture is only meaningful if the pad is raised"
+
+    estimate = PatchWftCoupler().estimate(
+        CouplerRunRequest(
+            run_id="estimate",
+            edge_id="patch_step",
+            sources={"source": source, DOE_PORT: doe},
+            config=config,
+        )
+    )
+    joined = " ".join(estimate.notes)
+    assert f"of {resolved}^2" in joined
+    assert f"raised it to {resolved}" in joined
+    assert f"asked for {floor}" in joined
 
 
 # ---------------------------------------------------------------------------

@@ -126,6 +126,8 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -141,16 +143,109 @@ from core.boundary import (
 from couplers.curvature import check_patch
 
 __all__ = [
+    "EMITTER_THREADS_ENV",
+    "PATCH_BATCH_PATCHES",
+    "PATCH_EMITTER_THREADS",
+    "POOL_MIN_PATCHES",
     "CoverageBasis",
     "PatchDiagnostics",
     "PatchPlan",
     "Substrate",
     "advance_bundle_to_plane",
+    "emitter_threads",
     "extract_patch",
     "patch_secondary_rays",
     "plan_patches",
     "resolve_pad_px",
 ]
+
+#: Host threads for the per-patch transform and the per-patch draw (CHE-118's
+#: sibling, CHE-119). Eight, and the number is measured rather than chosen: on
+#: the 50-patch demo3 chunk the FFT stage goes 214 ms -> 42 ms from 1 to 8
+#: threads and then *back up* to 78 ms at 24, and the draw goes 61 ms -> 19 ms
+#: with the same shape. Past eight this workload is bandwidth-bound, not
+#: compute-bound, so more threads buy nothing and cost a shared machine.
+#:
+#: ``AGENTS.md`` puts system stability above throughput on this box, so this is
+#: deliberately a small fraction of its 80 cores rather than ``os.cpu_count()``.
+PATCH_EMITTER_THREADS = 8
+
+#: Environment override for :data:`PATCH_EMITTER_THREADS`. Registered in
+#: ``core.performance._THREAD_VARS`` so it lands in the performance
+#: fingerprint: a thread count changes speed without changing the answer, which
+#: is precisely what that fingerprint is for. ``1`` forces the sequential path.
+EMITTER_THREADS_ENV = "MOA_PATCH_THREADS"
+
+#: Patches whose padded transforms are held in flight at once.
+#:
+#: Not a tuning knob for the *answer* -- it cannot be. The draw takes its
+#: uniforms for a whole block in one ``rng.random((block, S))`` call, which
+#: consumes exactly the stream that ``block`` sequential per-patch draws would,
+#: so the emitted rays are independent of this value. ``tests/test_patch_wft.py``
+#: asserts that rather than trusting it.
+#:
+#: What it does bound is memory: a block holds ``block`` padded patches and
+#: ``block`` spectra, ``2 * block * pad^2 * 16`` bytes. At demo3's ``pad = 301``
+#: that is 3 MB a patch, so 64 is ~190 MB -- large enough that every demo3 and
+#: demo2 chunk is a single block, small enough that a 3000-patch call does not
+#: try to hold 9 GB.
+PATCH_BATCH_PATCHES = 64
+
+#: Patches below which the call runs single-threaded, whatever the thread count.
+#:
+#: Threading a small call is a *loss*, and by a lot: one patch takes 7.9 ms
+#: sequentially and 20.7 ms across a pool, four take 22.7 ms against 30.9 ms, and
+#: the crossover is at eight (43.2 ms against 35.8 ms). The fixed penalty is
+#: ~13 ms per call and does not shrink with the work, which points at numpy's FFT
+#: plan cache: pocketfft caches its twiddle factors per thread, `pad = 301` has a
+#: prime factor of 43 and so needs Bluestein tables, and a fresh worker thread
+#: builds them from scratch. Amortized over 50 patches that is invisible; on one
+#: patch it is the whole call.
+#:
+#: The gate is on the call's total patch count, not on the block's, because the
+#: penalty is per call. Both paths emit the same rays bitwise, so this is purely
+#: a cost decision and can be tuned without re-validating anything.
+POOL_MIN_PATCHES = 8
+
+
+def emitter_threads() -> int:
+    """Threads to use, from the environment or the measured default.
+
+    A bad value is a hard error rather than a silent fallback: an operator who
+    typed ``MOA_PATCH_THREADS=eight`` wants to know, and a run that quietly used
+    a different thread count than the one requested is a performance record that
+    does not describe its own configuration.
+    """
+    raw = os.environ.get(EMITTER_THREADS_ENV)
+    if raw is None:
+        return PATCH_EMITTER_THREADS
+    try:
+        threads = int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"{EMITTER_THREADS_ENV}={raw!r} is not an integer. Set it to a thread "
+            "count, or unset it for the measured default of "
+            f"{PATCH_EMITTER_THREADS}."
+        ) from exc
+    if threads < 1:
+        raise ValueError(
+            f"{EMITTER_THREADS_ENV}={threads} is not a thread count; 1 is the "
+            "sequential path."
+        )
+    return threads
+
+
+def _map_patches(pool: ThreadPoolExecutor | None, work: Any, count: int) -> None:
+    """Run ``work(i)`` for every patch in a block, in the pool or in this thread.
+
+    ``list()`` around ``map`` rather than a bare call, so an exception in a
+    worker is re-raised here instead of being swallowed with the iterator.
+    """
+    if pool is None:
+        for index in range(count):
+            work(index)
+        return
+    list(pool.map(work, range(count)))
 
 
 class Substrate(StrEnum):
@@ -600,6 +695,25 @@ def patch_secondary_rays(
             declaration="pad_px",
         )
 
+    # Flattening the mode grid. When every mode propagates -- which is the case
+    # for any grid whose Nyquist direction cosine is below 1, including every
+    # demo3 and demo2 configuration -- `a[propagating]` is a full-array gather
+    # returning exactly `np.ravel(a)`, and the gather costs 157 us per patch
+    # against 0.2 us for the ravel. The boolean path is kept for the grids where
+    # it means something, and `np.ravel` rather than `.ravel()` so a
+    # non-contiguous input copies in C order, which is the order the boolean
+    # index would have produced.
+    all_propagating = bool(propagating.all())
+
+    def flatten_modes(array: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+        return np.ravel(array) if all_propagating else array[propagating]
+
+    # HOISTED out of the patch loop. These are functions of the padded grid and
+    # the wavelength alone, and recomputing them per patch cost 207 us a patch --
+    # 3.3 s of demo3 -- for two arrays that never change.
+    du = flatten_modes(dir_x)
+    dv = flatten_modes(dir_y)
+
     positions: list[np.ndarray[Any, Any]] = []
     directions: list[np.ndarray[Any, Any]] = []
     amplitudes: list[np.ndarray[Any, Any]] = []
@@ -612,68 +726,155 @@ def patch_secondary_rays(
             declaration="rng",
         )
 
-    for center in np.asarray(plan.centers_xy_m, dtype=np.float64):
+    centers = np.asarray(plan.centers_xy_m, dtype=np.float64)
+    off = (pad - plan.patch_px) // 2
+    threads = emitter_threads()
+    uniform_density = np.full(n_propagating, 1.0 / n_propagating)
+    enumerated_picks = np.arange(n_propagating) if enumerated else None
+
+    def transform(padded: np.ndarray[Any, Any], center: np.ndarray[Any, Any]) -> None:
+        """One patch's spectrum, into its slot of the block's buffer.
+
+        Into a shared buffer rather than returning a fresh array, and that is
+        measured rather than aesthetic: writing the result back costs a 1.45 MB
+        copy per patch at demo3's pad, and returning fifty separately allocated
+        spectra instead costs more than the copy saves -- 122 ms a chunk against
+        106 ms. One contiguous allocation with better locality wins.
+        """
         patch = extract_patch(
             doe_field,
             center_xy_m=(float(center[0]), float(center[1])),
             patch_px=plan.patch_px,
             sample_pitch_m=sample_pitch_m,
         )
-        padded = np.zeros((pad, pad), dtype=np.complex128)
-        off = (pad - plan.patch_px) // 2
         padded[off : off + plan.patch_px, off : off + plan.patch_px] = patch
-
         # Matches wave_to_ray.decompose exactly, including the 1/n_pad^2, so no
         # stray inverse-DFT factor propagates downstream.
-        spectrum = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(padded))) / (pad * pad)
-
-        modal = spectrum[propagating]
-        du = dir_x[propagating]
-        dv = dir_y[propagating]
-
-        if enumerated:
-            # Uniform, NOT 1. Using p = 1 divides the exact sum by the mode
-            # count and silently breaks the exactness relation.
-            density = np.full(n_propagating, 1.0 / n_propagating)
-            picks = np.arange(n_propagating)
-        else:
-            magnitude = np.abs(modal)
-            total = float(magnitude.sum())
-            density = (
-                magnitude / total
-                if total > 0.0
-                else np.full(n_propagating, 1.0 / n_propagating)
-            )
-            picks = rng.choice(n_propagating, size=int(secondary_count), p=density)
-
-        # No launch-position phase here, and the reason is the one thing about
-        # this module most likely to be got wrong.
         #
-        # `wave_to_ray.spectrum_to_rays` DOES apply `exp(i k (d_u x_p + d_v y_p))`,
-        # because there the spectrum belongs to a field whose origin is the
-        # plane's origin while the ray launches somewhere else, so the phase
-        # between the two has to be carried. Here the padded patch is centred on
-        # the patch centre, so the spectrum's own origin IS the launch point,
-        # and `ray_to_wave` already references its ramp to each ray's position:
-        # `dr_i(x, y) = d_x (x - x0_i) + d_y (y - y0_i)`. Adding the phase again
-        # double-counts it.
-        #
-        # It is invisible on the full-aperture anchor, where the single centre
-        # is at the origin and the extra factor is exactly 1 -- which is how it
-        # survived until the sub-aperture relation was measured.
-        amplitudes.append(plan.coverage * modal[picks] / density[picks])
+        # Run in a worker thread when `threads > 1`. numpy's pocketfft releases
+        # the GIL, so this parallelizes -- and it is the *same call on the same
+        # input*, so the result is bitwise what the sequential loop produced.
+        # That is why this is an optimization and not a second route: there is no
+        # reformulation to validate, only a scheduling change.
+        padded[...] = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(padded))) / (pad * pad)
 
-        normal = np.sqrt(np.clip(1.0 - (du[picks] ** 2 + dv[picks] ** 2), 0.0, None))
-        directions.append(np.column_stack([du[picks], dv[picks], normal]))
-        positions.append(
-            np.column_stack(
-                [
-                    np.full(picks.size, center[0]),
-                    np.full(picks.size, center[1]),
-                    np.full(picks.size, plane.z_m),
-                ]
+    def draw(spectrum: np.ndarray[Any, Any], uniforms: np.ndarray[Any, Any] | None) -> Any:
+        """One patch's density and picks, from uniforms drawn by the caller.
+
+        Split this way because the two halves have opposite constraints: the
+        uniforms must come off the generator in patch order and cannot be
+        parallelized, while the cumulative sum and the search are pure functions
+        of one patch and can be. So the caller draws the whole block's uniforms
+        in one call -- which consumes exactly the stream that `block` sequential
+        per-patch draws would -- and this part runs in the pool.
+
+        The cumulative-sum-and-search *is* `Generator.choice(p=...)`: that is
+        what numpy does internally, and `tests/test_patch_wft.py` asserts the
+        picks are bitwise identical to it. Writing it out here rather than
+        calling it saves the validation passes over a 90601-element vector
+        (1203 us -> 696 us a patch) and, more importantly, separates the
+        RNG-ordered part from the parallelizable part.
+        """
+        modal = flatten_modes(spectrum)
+        if uniforms is None:
+            return modal, uniform_density, enumerated_picks
+        magnitude = np.abs(modal)
+        total = float(magnitude.sum())
+        if total <= 0.0:
+            return modal, uniform_density, uniform_density.cumsum().searchsorted(
+                uniforms, side="right"
             )
-        )
+        density = magnitude / total
+        cumulative = density.cumsum()
+        cumulative /= cumulative[-1]
+        return modal, density, cumulative.searchsorted(uniforms, side="right")
+
+    pool = (
+        ThreadPoolExecutor(max_workers=threads)
+        if threads > 1 and len(centers) >= POOL_MIN_PATCHES
+        else None
+    )
+    try:
+        for first in range(0, len(centers), PATCH_BATCH_PATCHES):
+            block = centers[first : first + PATCH_BATCH_PATCHES]
+            # One buffer for the block, transformed in place: the padded patch
+            # and its spectrum are the same shape and the patch is not needed
+            # after the transform, so this holds `block` arrays rather than two
+            # sets of them.
+            # One buffer for the whole block, transformed in place: the padded
+            # patch and its spectrum are the same shape and the patch is not
+            # wanted afterwards.
+            buffers = np.zeros((len(block), pad, pad), dtype=np.complex128)
+
+            def transform_slot(
+                index: int, block: Any = block, buffers: Any = buffers
+            ) -> None:
+                transform(buffers[index], block[index])
+
+            _map_patches(pool, transform_slot, len(block))
+
+            # The whole block's uniforms in ONE call. `random((B, S))` consumes
+            # the generator exactly as B sequential `random(S)` calls do, and
+            # `Generator.choice(p=...)` consumes S uniforms per patch, so the
+            # emitted rays do not depend on PATCH_BATCH_PATCHES. Asserted in
+            # tests/test_patch_wft.py rather than assumed.
+            uniforms = (
+                None
+                if enumerated
+                else rng.random((len(block), int(secondary_count)))
+            )
+
+            drawn: list[Any] = [None] * len(block)
+
+            def draw_slot(
+                index: int,
+                buffers: Any = buffers,
+                uniforms: Any = uniforms,
+                drawn: Any = drawn,
+            ) -> None:
+                drawn[index] = draw(
+                    buffers[index], None if uniforms is None else uniforms[index]
+                )
+
+            _map_patches(pool, draw_slot, len(block))
+
+            for center, (modal, density, picks) in zip(block, drawn, strict=True):
+                # No launch-position phase here, and the reason is the one thing
+                # about this module most likely to be got wrong.
+                #
+                # `wave_to_ray.spectrum_to_rays` DOES apply
+                # `exp(i k (d_u x_p + d_v y_p))`, because there the spectrum
+                # belongs to a field whose origin is the plane's origin while the
+                # ray launches somewhere else, so the phase between the two has
+                # to be carried. Here the padded patch is centred on the patch
+                # centre, so the spectrum's own origin IS the launch point, and
+                # `ray_to_wave` already references its ramp to each ray's
+                # position: `dr_i(x, y) = d_x (x - x0_i) + d_y (y - y0_i)`.
+                # Adding the phase again double-counts it.
+                #
+                # It is invisible on the full-aperture anchor, where the single
+                # centre is at the origin and the extra factor is exactly 1 --
+                # which is how it survived until the sub-aperture relation was
+                # measured.
+                amplitudes.append(plan.coverage * modal[picks] / density[picks])
+
+                normal = np.sqrt(
+                    np.clip(1.0 - (du[picks] ** 2 + dv[picks] ** 2), 0.0, None)
+                )
+                directions.append(np.column_stack([du[picks], dv[picks], normal]))
+                positions.append(
+                    np.column_stack(
+                        [
+                            np.full(picks.size, center[0]),
+                            np.full(picks.size, center[1]),
+                            np.full(picks.size, plane.z_m),
+                        ]
+                    )
+                )
+            del buffers, drawn
+    finally:
+        if pool is not None:
+            pool.shutdown()
 
     bundle = RayBundle(
         positions_m=np.concatenate(positions),

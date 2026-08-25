@@ -51,7 +51,9 @@ from couplers.patch import (
     Substrate,
     patch_secondary_rays,
     plan_patches,
+    resolve_pad_px,
 )
+from couplers.patch_cost import estimate_emitter_seconds
 
 __all__ = ["COUPLER_ID", "DOE_PORT", "PatchWftCoupler", "get_coupler"]
 
@@ -339,21 +341,46 @@ class PatchWftCoupler:
         else:
             patches = int(record.shape[0]) if record is not None and record.shape else 0
 
-        pad = int(patch_px) * int(config.get("pad_factor", 2))
+        # `patch_px * pad_factor` is a FLOOR, not the pad. `resolve_pad_px` raises
+        # it until clearance, centring and oddness all hold -- demo3 asks for
+        # 101 x 2 = 202 and runs at 301, so this estimator was reporting a
+        # transform 2.2x smaller than the one that executes, and an enumerated
+        # mode count 2.2x too small with it.
+        pad = resolve_pad_px(
+            grid_n=max(int(grid[0]), int(grid[1])),
+            patch_px=int(patch_px),
+            pad_factor=int(config.get("pad_factor", 2)),
+            # The same rule `plan_patches` applies: zero for the single
+            # full-aperture patch, which is exempt from clearance, and the
+            # dilated half-width for every other placement. Computable from the
+            # grid and the patch size alone, so the estimate does not need the
+            # centres to get the pad right.
+            max_center_px=(
+                0.0
+                if placement == "full_aperture"
+                else float(max(int(grid[0]), int(grid[1])) // 2 + int(patch_px) // 2)
+            ),
+        )
         secondary = config.get("secondary_count")
         per_patch = int(secondary) if secondary is not None else pad * pad
         emitted = patches * per_patch
         notes.append(
-            f"{patches} patch transforms of {pad}^2; {emitted} secondary rays emitted. "
+            f"{patches} patch transforms of {pad}^2 (pad_factor asked for "
+            f"{int(patch_px) * int(config.get('pad_factor', 2))}; resolve_pad_px "
+            f"raised it to {pad}); {emitted} secondary rays emitted. "
             "The dominant cost is DOWNSTREAM: reconstruction is O(rays x pixels), so "
             f"{emitted} rays against a 1e4-pixel sensor is {emitted * 10000:.2e} "
             "ray-pixel products. Batch accordingly."
         )
+        timing = estimate_emitter_seconds(
+            patches=max(patches, 1), secondary=per_patch, pad_px=pad
+        )
         return CostEstimate(
+            wall_time_s=timing.wall_time_s,
             peak_memory_bytes=16 * (pad * pad + 4 * emitted),
             solver_calls=1,
-            confidence="low",
-            notes=notes,
+            confidence=timing.confidence if timing.wall_time_s is not None else "low",
+            notes=[*notes, *timing.notes],
         )
 
     # ------------------------------------------------------------------

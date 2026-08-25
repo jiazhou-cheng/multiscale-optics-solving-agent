@@ -92,6 +92,10 @@ __all__ = [
 #: because they change speed by large factors and change no answer, which is the
 #: definition of what belongs in this fingerprint.
 _THREAD_VARS = (
+    # This repository's own: the patch emitter's host thread count (CHE-119).
+    # Same reason as the rest -- it changes the emitter's wall clock by 2.7x and
+    # the emitted rays not at all, which is the definition of what belongs here.
+    "MOA_PATCH_THREADS",
     "OMP_NUM_THREADS",
     "MKL_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",

@@ -1,0 +1,574 @@
+{
+ "chunking_match": true,
+ "demo_records": {
+  "after": "perf_demo3_characterization_rw_p_ramp_sum_cuda",
+  "before": "perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda"
+ },
+ "energy_ledger": {
+  "captured_by_sensor_fraction": {
+   "after": 0.09903421954874955,
+   "before": 0.09903421954874955,
+   "identical": true
+  },
+  "clipped_with_power": {
+   "after": 0,
+   "before": 0,
+   "identical": true
+  },
+  "clipped_with_power_fraction": {
+   "after": 0.0,
+   "before": 0.0,
+   "identical": true
+  },
+  "invalidated_rays": {
+   "after": 5920000,
+   "before": 5920000,
+   "identical": true
+  },
+  "launched_sum_abs_amplitude_squared": {
+   "after": 11618690217864.3,
+   "before": 11618690217864.3,
+   "identical": true
+  },
+  "launched_with_zero_amplitude": {
+   "after": 5920000,
+   "before": 5920000,
+   "identical": true
+  },
+  "sensor_half_extent_m": {
+   "after": 0.0008819999999999999,
+   "before": 0.0008819999999999999,
+   "identical": true
+  },
+  "survived_sum_abs_amplitude_squared": {
+   "after": 11618690260992.0,
+   "before": 11618690260992.0,
+   "identical": true
+  },
+  "transmitted_fraction": {
+   "after": 1.0000000037119243,
+   "before": 1.0000000037119243,
+   "identical": true
+  }
+ },
+ "fields": {
+  "rw_p_seed20260822": {
+   "bitwise_identical": true,
+   "dtype": "complex64",
+   "max_abs_difference": 0.0,
+   "shape": [
+    420,
+    420
+   ]
+  }
+ },
+ "issue": "CHE-118 (M5.1); reused by CHE-119 (M5.2)",
+ "peak_device_bytes": {
+  "after": 2377016832,
+  "before": 2377415680,
+  "note": "the only figure here that is allowed to move, and it moves by allocator bookkeeping rather than by the workload: the size-1 wavelength array is smaller than the per-ray one, so a larger peak is caching granularity in JAX's allocator, not more memory held."
+ },
+ "prescription_match": true,
+ "probe": "perf_patch_emitter_demo3_equivalence",
+ "record_provenance_of_each_arm": {
+  "after": {
+   "code_fingerprint": "08f8ec4255e7244dbf87714fac3ebd60946247285a2362edd85d8d3810feff34",
+   "source_commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
+   "working_tree_dirty": true
+  },
+  "before": {
+   "code_fingerprint": "6bf486604fbd1df4eefe7f5ad346967284a14faf11adff3bfcc2b8a16a0f24da",
+   "source_commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
+   "working_tree_dirty": true
+  },
+  "note": "the commit and code fingerprint each arm was produced under. The BEFORE arm's demo record cannot stay in the tree: `tests/test_provenance_fingerprint.py` requires every stamped record to describe the current code, and the whole point of this issue is that the code changed. So the pre-fix record was regenerated under CHE-118 like the other stale records, and the before arm is reproducible by checking out the commit named here and re-running the demo. What is preserved in the tree instead is stronger and cheaper to check: `timing_records` below embeds the pre-fix measurement verbatim, and `tests/test_coherent_bridge.py::TestMonochromaticWavelengthHandoff` asserts the bitwise equality this artifact confirmed at 60 M rays on every test run, per chunk, against a reference trace built the old way."
+ },
+ "seeds_match": true,
+ "speedup": {
+  "baseline": "demo3_characterization_rw_p_ramp_sum_che118_after_cuda",
+  "candidate": "demo3_characterization_rw_p_ramp_sum_cuda",
+  "cost_per_unit": {
+   "baseline": 2.006057569649905e-06,
+   "candidate": 1.1132655165832451e-06,
+   "route": "ramp_sum",
+   "unit": "ray"
+  },
+  "detail_differences_ignored": [
+   "label_suffix",
+   "rays_read_from"
+  ],
+  "environment_sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+  "median_s": {
+   "baseline": 120.36345417899429,
+   "candidate": 66.7959309949947
+  },
+  "speedup": 1.8019578795602627
+ },
+ "timing_records": {
+  "after": {
+   "cost_per_unit": 1.1132655165832451e-06,
+   "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+   "cuda": null,
+   "environment": {
+    "container_image": "agent_solver",
+    "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+    "gpu_count": 1,
+    "gpu_driver": "550.163.01",
+    "gpu_name": "NVIDIA RTX A6000",
+    "logical_cpus": 80,
+    "packages": {
+     "chromatix": "0.6.0",
+     "jax": "0.6.2",
+     "jaxlib": "0.6.2",
+     "numpy": "2.2.6",
+     "optiland": "0.6.0",
+     "scipy": "1.15.3",
+     "torch": "2.13.0+cu126"
+    },
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+    "thread_env": {},
+    "visible_devices": null
+   },
+   "isolation": {
+    "applied": false,
+    "cpu_affinity": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39,
+     40,
+     41,
+     42,
+     43,
+     44,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     51,
+     52,
+     53,
+     54,
+     55,
+     56,
+     57,
+     58,
+     59,
+     60,
+     61,
+     62,
+     63,
+     64,
+     65,
+     66,
+     67,
+     68,
+     69,
+     70,
+     71,
+     72,
+     73,
+     74,
+     75,
+     76,
+     77,
+     78,
+     79
+    ],
+    "logical_cpus": 80,
+    "thread_env": {}
+   },
+   "label": "demo3_characterization_rw_p_ramp_sum_cuda",
+   "measurement": {
+    "all_s": [
+     66.7959309949947
+    ],
+    "median_s": 66.7959309949947,
+    "min_s": 66.7959309949947,
+    "p95_s": 66.7959309949947,
+    "repeats": 1,
+    "tail_rule": "max_of_1",
+    "warmup": 0
+   },
+   "memory_report": {
+    "after": {
+     "cgroup_memory_bytes": 36933632,
+     "cgroup_swap_bytes": 0,
+     "host_swap_total_bytes": 2002545270784,
+     "host_swap_used_bytes": 0,
+     "mem_available_bytes": 390114451456,
+     "mem_total_bytes": 405342146560,
+     "monotonic_s": 114374.274162282,
+     "rss_bytes": 30928896
+    },
+    "before": {
+     "cgroup_memory_bytes": 20582400,
+     "cgroup_swap_bytes": 0,
+     "host_swap_total_bytes": 2002545270784,
+     "host_swap_used_bytes": 0,
+     "mem_available_bytes": 390280445952,
+     "mem_total_bytes": 405342146560,
+     "monotonic_s": 114307.476384922,
+     "rss_bytes": 30273536
+    },
+    "cgroup_swap_after_bytes": 0,
+    "cgroup_swap_before_bytes": 0,
+    "host_reserve_bytes": 60801321984,
+    "interval_s": 0.25,
+    "min_mem_available_bytes": 387175690240,
+    "peak_cgroup_swap_bytes": 0,
+    "peak_rss_bytes": 30928896,
+    "process_rss_budget_bytes": null,
+    "samples": 268,
+    "signal": "/sys/fs/cgroup/memory.swap.current",
+    "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+    "swap_delta_peak_bytes": 0,
+    "verdict": {
+     "breached": false,
+     "detail": null,
+     "limit_bytes": null,
+     "observed_bytes": null,
+     "reason": null
+    }
+   },
+   "notes": [
+    "One timed run, no warmup. Three repeats of this configuration is minutes of a shared GPU to improve a number that varies by a few percent.",
+    "seconds_per_ray is route-specific: ramp_sum is O(rays x pixels) and kspace_splat is O(rays) + one FFT, so the two are not one number. core.performance.compare refuses to divide them.",
+    "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
+    "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
+   ],
+   "peak_host_rss_bytes": 30928896,
+   "stages": {
+    "accounted_s": 59.022,
+    "fraction_of_total": {
+     "emit_patch_spectra": 0.5201,
+     "host_to_device": 0.053,
+     "optiland_trace": 0.0834,
+     "power_bookkeeping": 0.0122,
+     "reconstruct": 0.2149
+    },
+    "seconds": {
+     "emit_patch_spectra": 34.738,
+     "host_to_device": 3.543,
+     "optiland_trace": 5.571,
+     "power_bookkeeping": 0.818,
+     "reconstruct": 14.352
+    },
+    "source": "perf_demo3_characterization_rw_p_ramp_sum_cuda.json stage_wall_clock_s -- the demo's own per-stage timers, summed over chunks. The denominator is the whole command, which includes interpreter start, JAX compilation, the plan setup and the record write, so the unaccounted remainder is real and named rather than hidden.",
+    "total_s": 66.7959,
+    "unaccounted_s": 7.7739
+   },
+   "subprocess": {
+    "argv": [
+     "/usr/local/bin/python",
+     "/workspace/benchmarks/probes/ray_wave/demo3_hologram_lens.py",
+     "--preset",
+     "characterization",
+     "--routes",
+     "rw_p",
+     "--reconstruction",
+     "ramp_sum",
+     "--backend",
+     "jax",
+     "--output-name",
+     "perf_demo3_characterization_rw_p_ramp_sum_cuda"
+    ],
+    "peak_child_rss_bytes": 2936713216,
+    "returncode": 0,
+    "stderr_tail": [],
+    "tail": [
+     "rw_p seed 20260822: 60,000,000 rays  60.11 s  empty 5,920,000  clipped 0",
+     "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_cuda.json",
+     "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_cuda_fields.npz"
+    ]
+   },
+   "swap_growth_bytes": 0,
+   "workload": {
+    "detail": {
+     "backend": "jax",
+     "declared_rays": 60000000.0,
+     "preset": "characterization",
+     "rays_read_from": "perf_demo3_characterization_rw_p_ramp_sum_cuda.json",
+     "routes": "rw_p"
+    },
+    "route": "ramp_sum",
+    "size": 60000000.0,
+    "unit": "ray"
+   }
+  },
+  "before": {
+   "cost_per_unit": 2.006057569649905e-06,
+   "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+   "cuda": null,
+   "environment": {
+    "container_image": "agent_solver",
+    "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+    "gpu_count": 1,
+    "gpu_driver": "550.163.01",
+    "gpu_name": "NVIDIA RTX A6000",
+    "logical_cpus": 80,
+    "packages": {
+     "chromatix": "0.6.0",
+     "jax": "0.6.2",
+     "jaxlib": "0.6.2",
+     "numpy": "2.2.6",
+     "optiland": "0.6.0",
+     "scipy": "1.15.3",
+     "torch": "2.13.0+cu126"
+    },
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+    "thread_env": {},
+    "visible_devices": null
+   },
+   "isolation": {
+    "applied": false,
+    "cpu_affinity": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39,
+     40,
+     41,
+     42,
+     43,
+     44,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     51,
+     52,
+     53,
+     54,
+     55,
+     56,
+     57,
+     58,
+     59,
+     60,
+     61,
+     62,
+     63,
+     64,
+     65,
+     66,
+     67,
+     68,
+     69,
+     70,
+     71,
+     72,
+     73,
+     74,
+     75,
+     76,
+     77,
+     78,
+     79
+    ],
+    "logical_cpus": 80,
+    "thread_env": {}
+   },
+   "label": "demo3_characterization_rw_p_ramp_sum_che118_after_cuda",
+   "measurement": {
+    "all_s": [
+     120.36345417899429
+    ],
+    "median_s": 120.36345417899429,
+    "min_s": 120.36345417899429,
+    "p95_s": 120.36345417899429,
+    "repeats": 1,
+    "tail_rule": "max_of_1",
+    "warmup": 0
+   },
+   "memory_report": {
+    "after": {
+     "cgroup_memory_bytes": 37433344,
+     "cgroup_swap_bytes": 0,
+     "host_swap_total_bytes": 2002545270784,
+     "host_swap_used_bytes": 0,
+     "mem_available_bytes": 390582431744,
+     "mem_total_bytes": 405342146560,
+     "monotonic_s": 107052.425016172,
+     "rss_bytes": 29757440
+    },
+    "before": {
+     "cgroup_memory_bytes": 19566592,
+     "cgroup_swap_bytes": 0,
+     "host_swap_total_bytes": 2002545270784,
+     "host_swap_used_bytes": 0,
+     "mem_available_bytes": 390216667136,
+     "mem_total_bytes": 405342146560,
+     "monotonic_s": 106932.05965539,
+     "rss_bytes": 29757440
+    },
+    "cgroup_swap_after_bytes": 0,
+    "cgroup_swap_before_bytes": 0,
+    "host_reserve_bytes": 60801321984,
+    "interval_s": 0.25,
+    "min_mem_available_bytes": 387572432896,
+    "peak_cgroup_swap_bytes": 0,
+    "peak_rss_bytes": 29757440,
+    "process_rss_budget_bytes": null,
+    "samples": 481,
+    "signal": "/sys/fs/cgroup/memory.swap.current",
+    "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+    "swap_delta_peak_bytes": 0,
+    "verdict": {
+     "breached": false,
+     "detail": null,
+     "limit_bytes": null,
+     "observed_bytes": null,
+     "reason": null
+    }
+   },
+   "notes": [
+    "One timed run, no warmup. Three repeats of this configuration is minutes of a shared GPU to improve a number that varies by a few percent.",
+    "seconds_per_ray is route-specific: ramp_sum is O(rays x pixels) and kspace_splat is O(rays) + one FFT, so the two are not one number. core.performance.compare refuses to divide them.",
+    "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
+    "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
+   ],
+   "peak_host_rss_bytes": 29757440,
+   "stages": {
+    "accounted_s": 112.211,
+    "fraction_of_total": {
+     "emit_patch_spectra": 0.7218,
+     "host_to_device": 0.0304,
+     "optiland_trace": 0.0536,
+     "power_bookkeeping": 0.0066,
+     "reconstruct": 0.1199
+    },
+    "seconds": {
+     "emit_patch_spectra": 86.879,
+     "host_to_device": 3.657,
+     "optiland_trace": 6.448,
+     "power_bookkeeping": 0.794,
+     "reconstruct": 14.433
+    },
+    "source": "perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda.json stage_wall_clock_s -- the demo's own per-stage timers, summed over chunks. The denominator is the whole command, which includes interpreter start, JAX compilation, the plan setup and the record write, so the unaccounted remainder is real and named rather than hidden.",
+    "total_s": 120.3635,
+    "unaccounted_s": 8.1525
+   },
+   "subprocess": {
+    "argv": [
+     "/usr/local/bin/python",
+     "/workspace/benchmarks/probes/ray_wave/demo3_hologram_lens.py",
+     "--preset",
+     "characterization",
+     "--routes",
+     "rw_p",
+     "--reconstruction",
+     "ramp_sum",
+     "--backend",
+     "jax",
+     "--output-name",
+     "perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda"
+    ],
+    "peak_child_rss_bytes": 2818199552,
+    "returncode": 0,
+    "stderr_tail": [],
+    "tail": [
+     "rw_p seed 20260822: 60,000,000 rays  113.56 s  empty 5,920,000  clipped 0",
+     "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda.json",
+     "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda_fields.npz"
+    ]
+   },
+   "swap_growth_bytes": 0,
+   "workload": {
+    "detail": {
+     "backend": "jax",
+     "declared_rays": 60000000.0,
+     "label_suffix": "che118_after",
+     "preset": "characterization",
+     "rays_read_from": "perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda.json",
+     "routes": "rw_p"
+    },
+    "route": "ramp_sum",
+    "size": 60000000.0,
+    "unit": "ray"
+   }
+  }
+ },
+ "verdict": "1.802x faster end to end, and the result is unchanged: same field, bit for bit, and an identical energy ledger. The optimization changed the cost and nothing else.",
+ "why_bitwise_and_not_a_tolerance": "the two runs differ only in the SHAPE of the wavelength array handed to optiland, and optiland's materials return the same index either way, so every subsequent floating-point operation is the same operation on the same bits. A tolerance would hide a real change; exact equality is the claim and it is the one asserted."
+}

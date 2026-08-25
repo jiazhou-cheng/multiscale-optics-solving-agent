@@ -356,6 +356,29 @@ couplers:
     cost_model:
       scaling: O(patches * pad^2 * log(pad) + patches * S * pixels)
       memory_scaling: O(pad^2 + patches * S)
+      estimator: couplers.patch_cost.estimate_emitter_seconds
+      notes: >-
+        CHE-119 (M5.2) added a measured estimator for the EMITTER half of the
+        scaling above -- the `patches * pad^2 log pad` term. It is affine in two
+        axes rather than a scaling string, because the decomposition says so: a
+        per-patch term for the transform, the density and the cumulative sum,
+        which do not depend on the draw size, and a per-secondary-ray term for
+        the search and the assembly, which do. Calibrated in
+        benchmarks/perf/records/patch_emitter_cost_model.json and holding to
+        6.2% for 16-50 patches at pad 301. Outside that -- a different pad, a
+        different environment fingerprint, or few enough patches that the thread
+        pool has not amortized -- it returns no prediction rather than
+        extrapolating, which is the rule core.performance.compare applies to a
+        ratio.
+        The `patches * S * pixels` reconstruction term is NOT estimated here and
+        is usually the larger of the two; the estimate says so in its notes.
+        Memory is not calibrated at all, so memory_scaling above remains an
+        asymptote.
+        The emitter now runs on host threads (8 by default,
+        couplers.patch.PATCH_EMITTER_THREADS), which changes the constant and
+        not the asymptote -- and changes no emitted ray: the parallel path is
+        the same numpy call on the same input, asserted bitwise in
+        tests/test_patch_wft.py.
     lossy: true
     invariants:
       [evanescent_power_accounted, importance_weight_applied, unit_direction_norm, patch_coverage_corrected]

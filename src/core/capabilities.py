@@ -250,11 +250,22 @@ C_PATCH_WFT_CAPABILITIES = ComponentCapabilities(
     ),
     notes=(
         "CPU-only is a statement about THIS step, not about the route. The "
-        "expensive half of a patch run is the O(rays x pixels) reconstruction "
-        "in C_RAY_TO_WAVE, which is xp-parameterized and does execute on CUDA "
-        "under JAX; the patch transform is O(patches x pad^2 log pad) and is "
-        "not where the time goes. Declaring CUDA here would claim a device this "
-        "operator has never run on."
+        "declaration is unchanged and still correct -- no CUDA or JAX path has "
+        "executed, so none is declared -- but the COST ARGUMENT that used to "
+        "sit here has been overtaken twice and is corrected rather than left. "
+        "It read: the expensive half of a patch run is the O(rays x pixels) "
+        "reconstruction, and the patch transform 'is not where the time goes'. "
+        "CHE-101 made the reconstruction 9.6x faster (7% of demo3), and CHE-119 "
+        "measured the transform and its draw at 42% -- so for a while this note "
+        "said the opposite of the truth. "
+        "CHE-119's response was NOT a device port: the per-patch transform and "
+        "draw are independent per patch and numpy releases the GIL in both, so "
+        "eight host threads took the stage 2.5x faster with every emitted ray "
+        "bitwise unchanged. That is why this declaration still does not widen. "
+        "A CUDA or float32 emitter would be a different operator with a "
+        "different claim -- the exactness relation is measured at 1.4e-12, below "
+        "float32 epsilon -- and would need its own entry, its own evidence and "
+        "its own gate."
     ),
 )
 

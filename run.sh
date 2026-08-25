@@ -204,12 +204,31 @@ if [[ -t 0 ]]; then
     docker_args+=(-t)
 fi
 
+# Forward the performance knobs the container cannot otherwise see.
+#
+# These change speed and not the answer, which is exactly what
+# `core.performance`'s environment fingerprint records -- and a variable set on
+# the host but never passed to `docker run` is worse than one that does not
+# exist, because the operator sees no error and the record honestly reports the
+# default. CHE-119 set MOA_PATCH_THREADS on the host for four runs and got four
+# identical default-threaded runs before noticing.
+#
+# Only forwarded when actually set, so an unset variable does not become the
+# empty string inside the container.
+env_args=()
+for var in MOA_PATCH_THREADS OMP_NUM_THREADS MKL_NUM_THREADS OPENBLAS_NUM_THREADS; do
+    if [[ -n "${!var:-}" ]]; then
+        env_args+=(-e "$var=${!var}")
+    fi
+done
+
 # Mount the repo so edits to source/knowledge files are visible immediately
 # inside the container (the project is installed with `pip install -e .`).
 # ${gpu_args[@]+...} guards the expansion so `set -u` tolerates the empty array
 # on the CPU path (bash < 4.4 treats an empty array as unset).
 docker "${docker_args[@]}" \
     ${gpu_args[@]+"${gpu_args[@]}"} \
+    ${env_args[@]+"${env_args[@]}"} \
     --user "$(id -u):$(id -g)" \
     -e HOME=/tmp \
     -v "$(pwd)":/workspace \

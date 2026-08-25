@@ -1,0 +1,1767 @@
+{
+ "consequence": "Two constants. Eight threads is chosen from the plateau rather than read off an argmax -- 8 and 16 are not separable here and 8 is the smaller footprint, which is the tie-break AGENTS.md asks for on a shared box. And a pool only above 8 patches. The gate matters for correctness of the *cost* claim rather than of the result -- both paths emit the same rays bitwise -- but without it the exactness tests and any single-patch caller would run 2.6x slower than before, which is a regression paid for by a stage they do not use. Eight is also a deliberately small fraction of this shared box's 80 cores, per AGENTS.md.",
+ "environment": {
+  "container_image": "agent_solver",
+  "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+  "gpu_count": 1,
+  "gpu_driver": "550.163.01",
+  "gpu_name": "NVIDIA RTX A6000",
+  "logical_cpus": 80,
+  "packages": {
+   "chromatix": "0.6.0",
+   "jax": "0.6.2",
+   "jaxlib": "0.6.2",
+   "numpy": "2.2.6",
+   "optiland": "0.6.0",
+   "scipy": "1.15.3",
+   "torch": "2.13.0+cu126"
+  },
+  "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+  "python_version": "3.12.14",
+  "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+  "thread_env": {},
+  "visible_devices": null
+ },
+ "finding": "At demo3's 50-patch chunk the speedup plateaus at 2.88x, and the thread counts indistinguishable from the best one are [8, 16] -- so the argmax is not a measurement, the plateau is. Past the plateau more threads make it worse: this workload becomes memory-bandwidth-bound before it runs out of cores. Below 8 patches a FORCED pool is a LOSS -- the penalty is roughly fixed per call and does not shrink with the work, which points at numpy's per-thread FFT plan cache (pad 301 has a prime factor of 43, so a fresh worker thread builds its Bluestein tables from scratch). That is what POOL_MIN_PATCHES avoids, and `gate_saves_s` per row is what it saves.",
+ "held_fixed": {
+  "device": "cpu",
+  "pad_px": 301,
+  "patch_px": 101,
+  "precision": "complex128",
+  "secondary_per_patch": 4000
+ },
+ "issue": "CHE-119 (M5.2)",
+ "measured_crossover_patches": 8,
+ "probe": "perf_patch_emitter_thread_sweep",
+ "rows": [
+  {
+   "best_speedup_over_serial": 1.0,
+   "best_threads": 1,
+   "forced_over_serial": 2.635,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.2938,
+    "repeats": 31,
+    "seconds": 0.022727
+   },
+   "gate_is_active": true,
+   "gate_saves_s": 0.014103,
+   "ms_per_patch_at_best": 8.624,
+   "patches": 1,
+   "record": {
+    "cost_per_unit": 0.00043693537899889634,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_1patches",
+    "measurement": {
+     "all_s": [
+      1.7477415159955854
+     ],
+     "median_s": 1.7477415159955854,
+     "min_s": 1.7477415159955854,
+     "p95_s": 1.7477415159955854,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1596973056,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388265897984,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116218.616501545,
+      "rss_bytes": 2020675584
+     },
+     "before": {
+      "cgroup_memory_bytes": 288956416,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 389442899968,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116215.847638726,
+      "rss_bytes": 516206592
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 388045185024,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2029182976,
+     "process_rss_budget_bytes": null,
+     "samples": 12,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2029182976,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 1,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 4000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.0865,
+     "repeats": 31,
+     "seconds": 0.008624
+    },
+    "16": {
+     "relative_spread": 0.2,
+     "repeats": 31,
+     "seconds": 0.008674
+    },
+    "2": {
+     "relative_spread": 0.4667,
+     "repeats": 31,
+     "seconds": 0.008725
+    },
+    "24": {
+     "relative_spread": 0.0939,
+     "repeats": 31,
+     "seconds": 0.008906
+    },
+    "4": {
+     "relative_spread": 0.2327,
+     "repeats": 31,
+     "seconds": 0.008671
+    },
+    "8": {
+     "relative_spread": 0.1122,
+     "repeats": 31,
+     "seconds": 0.008677
+    }
+   },
+   "threads_within_noise_of_best": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    24
+   ]
+  },
+  {
+   "best_speedup_over_serial": 1.003,
+   "best_threads": 24,
+   "forced_over_serial": 1.833,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.1184,
+    "repeats": 31,
+    "seconds": 0.023769
+   },
+   "gate_is_active": true,
+   "gate_saves_s": 0.010802,
+   "ms_per_patch_at_best": 6.462,
+   "patches": 2,
+   "record": {
+    "cost_per_unit": 0.0003252231611240859,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_2patches",
+    "measurement": {
+     "all_s": [
+      2.601785288992687
+     ],
+     "median_s": 2.601785288992687,
+     "min_s": 2.601785288992687,
+     "p95_s": 2.601785288992687,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1599496192,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388062515200,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116222.115242907,
+      "rss_bytes": 2021404672
+     },
+     "before": {
+      "cgroup_memory_bytes": 1603891200,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388039372800,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116219.509505485,
+      "rss_bytes": 2025455616
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 388039372800,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2032545792,
+     "process_rss_budget_bytes": null,
+     "samples": 12,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2032545792,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 2,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 8000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.0602,
+     "repeats": 31,
+     "seconds": 0.012967
+    },
+    "16": {
+     "relative_spread": 0.065,
+     "repeats": 31,
+     "seconds": 0.013002
+    },
+    "2": {
+     "relative_spread": 0.0857,
+     "repeats": 31,
+     "seconds": 0.01302
+    },
+    "24": {
+     "relative_spread": 0.0594,
+     "repeats": 31,
+     "seconds": 0.012923
+    },
+    "4": {
+     "relative_spread": 0.119,
+     "repeats": 31,
+     "seconds": 0.013018
+    },
+    "8": {
+     "relative_spread": 0.0769,
+     "repeats": 31,
+     "seconds": 0.012958
+    }
+   },
+   "threads_within_noise_of_best": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    24
+   ]
+  },
+  {
+   "best_speedup_over_serial": 1.0,
+   "best_threads": 1,
+   "forced_over_serial": 1.305,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.2142,
+    "repeats": 31,
+    "seconds": 0.029424
+   },
+   "gate_is_active": true,
+   "gate_saves_s": 0.006882,
+   "ms_per_patch_at_best": 5.635,
+   "patches": 4,
+   "record": {
+    "cost_per_unit": 0.0002877572264369519,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_4patches",
+    "measurement": {
+     "all_s": [
+      4.60411562299123
+     ],
+     "median_s": 4.60411562299123,
+     "min_s": 4.60411562299123,
+     "p95_s": 4.60411562299123,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1608425472,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388039884800,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116227.604328727,
+      "rss_bytes": 2028494848
+     },
+     "before": {
+      "cgroup_memory_bytes": 1608855552,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388005908480,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116222.996537859,
+      "rss_bytes": 2028204032
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 388003532800,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2042544128,
+     "process_rss_budget_bytes": null,
+     "samples": 20,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2042544128,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 4,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 16000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.3081,
+     "repeats": 31,
+     "seconds": 0.022542
+    },
+    "16": {
+     "relative_spread": 0.2189,
+     "repeats": 31,
+     "seconds": 0.023003
+    },
+    "2": {
+     "relative_spread": 0.3731,
+     "repeats": 31,
+     "seconds": 0.022977
+    },
+    "24": {
+     "relative_spread": 0.1328,
+     "repeats": 31,
+     "seconds": 0.022913
+    },
+    "4": {
+     "relative_spread": 0.2373,
+     "repeats": 31,
+     "seconds": 0.023115
+    },
+    "8": {
+     "relative_spread": 0.0716,
+     "repeats": 31,
+     "seconds": 0.023108
+    }
+   },
+   "threads_within_noise_of_best": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    24
+   ]
+  },
+  {
+   "best_speedup_over_serial": 1.4,
+   "best_threads": 24,
+   "forced_over_serial": 0.713,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.1859,
+    "repeats": 31,
+    "seconds": 0.030858
+   },
+   "gate_is_active": false,
+   "gate_saves_s": null,
+   "ms_per_patch_at_best": 3.865,
+   "patches": 8,
+   "record": {
+    "cost_per_unit": 0.0002205364130313683,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_8patches",
+    "measurement": {
+     "all_s": [
+      7.057165217003785
+     ],
+     "median_s": 7.057165217003785,
+     "min_s": 7.057165217003785,
+     "p95_s": 7.057165217003785,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1675882496,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388019929088,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116235.731242579,
+      "rss_bytes": 2094505984
+     },
+     "before": {
+      "cgroup_memory_bytes": 1619841024,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388037390336,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116228.669100542,
+      "rss_bytes": 2037276672
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 387990253568,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2094505984,
+     "process_rss_budget_bytes": null,
+     "samples": 30,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2094505984,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 8,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 32000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.0756,
+     "repeats": 31,
+     "seconds": 0.043277
+    },
+    "16": {
+     "relative_spread": 0.0319,
+     "repeats": 31,
+     "seconds": 0.031181
+    },
+    "2": {
+     "relative_spread": 0.2939,
+     "repeats": 31,
+     "seconds": 0.039501
+    },
+    "24": {
+     "relative_spread": 0.1519,
+     "repeats": 31,
+     "seconds": 0.030922
+    },
+    "4": {
+     "relative_spread": 0.1436,
+     "repeats": 31,
+     "seconds": 0.035649
+    },
+    "8": {
+     "relative_spread": 0.0972,
+     "repeats": 31,
+     "seconds": 0.031103
+    }
+   },
+   "threads_within_noise_of_best": [
+    8,
+    16,
+    24
+   ]
+  },
+  {
+   "best_speedup_over_serial": 1.86,
+   "best_threads": 16,
+   "forced_over_serial": 0.557,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.0348,
+    "repeats": 29,
+    "seconds": 0.050733
+   },
+   "gate_is_active": false,
+   "gate_saves_s": null,
+   "ms_per_patch_at_best": 3.059,
+   "patches": 16,
+   "record": {
+    "cost_per_unit": 0.00014840462589063463,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_16patches",
+    "measurement": {
+     "all_s": [
+      9.497896057000617
+     ],
+     "median_s": 9.497896057000617,
+     "min_s": 9.497896057000617,
+     "p95_s": 9.497896057000617,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1741008896,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 387983314944,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116246.361934345,
+      "rss_bytes": 2163576832
+     },
+     "before": {
+      "cgroup_memory_bytes": 1674944512,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 387986665472,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116236.859467739,
+      "rss_bytes": 2095816704
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 387932246016,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2163576832,
+     "process_rss_budget_bytes": null,
+     "samples": 39,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2163576832,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 16,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 64000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.1814,
+     "repeats": 16,
+     "seconds": 0.091039
+    },
+    "16": {
+     "relative_spread": 0.1928,
+     "repeats": 30,
+     "seconds": 0.048951
+    },
+    "2": {
+     "relative_spread": 0.178,
+     "repeats": 21,
+     "seconds": 0.066693
+    },
+    "24": {
+     "relative_spread": 0.0725,
+     "repeats": 30,
+     "seconds": 0.048982
+    },
+    "4": {
+     "relative_spread": 0.1692,
+     "repeats": 26,
+     "seconds": 0.055937
+    },
+    "8": {
+     "relative_spread": 0.0486,
+     "repeats": 29,
+     "seconds": 0.05068
+    }
+   },
+   "threads_within_noise_of_best": [
+    4,
+    8,
+    16,
+    24
+   ]
+  },
+  {
+   "best_speedup_over_serial": 2.423,
+   "best_threads": 16,
+   "forced_over_serial": 0.409,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.1216,
+    "repeats": 19,
+    "seconds": 0.074106
+   },
+   "gate_is_active": false,
+   "gate_saves_s": null,
+   "ms_per_patch_at_best": 2.336,
+   "patches": 32,
+   "record": {
+    "cost_per_unit": 7.706248554688955e-05,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 10936582144,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_32patches",
+    "measurement": {
+     "all_s": [
+      9.863998150001862
+     ],
+     "median_s": 9.863998150001862,
+     "min_s": 9.863998150001862,
+     "p95_s": 9.863998150001862,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1798901760,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 387994501120,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116257.910542208,
+      "rss_bytes": 2219044864
+     },
+     "before": {
+      "cgroup_memory_bytes": 1742700544,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 387962826752,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116248.042689395,
+      "rss_bytes": 2166198272
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 387875172352,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2266411008,
+     "process_rss_budget_bytes": null,
+     "samples": 40,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2266411008,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 32,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 128000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.021,
+     "repeats": 7,
+     "seconds": 0.18114
+    },
+    "16": {
+     "relative_spread": 0.1041,
+     "repeats": 19,
+     "seconds": 0.074752
+    },
+    "2": {
+     "relative_spread": 0.079,
+     "repeats": 12,
+     "seconds": 0.121018
+    },
+    "24": {
+     "relative_spread": 0.1465,
+     "repeats": 16,
+     "seconds": 0.08943
+    },
+    "4": {
+     "relative_spread": 1.2833,
+     "repeats": 16,
+     "seconds": 0.086647
+    },
+    "8": {
+     "relative_spread": 0.1319,
+     "repeats": 20,
+     "seconds": 0.075268
+    }
+   },
+   "threads_within_noise_of_best": [
+    8,
+    16
+   ]
+  },
+  {
+   "best_speedup_over_serial": 2.876,
+   "best_threads": 16,
+   "forced_over_serial": 0.363,
+   "forced_pool_at_default_threads": {
+    "relative_spread": 0.1454,
+    "repeats": 14,
+    "seconds": 0.10094
+   },
+   "gate_is_active": false,
+   "gate_saves_s": null,
+   "ms_per_patch_at_best": 1.932,
+   "patches": 50,
+   "record": {
+    "cost_per_unit": 5.283125016001577e-05,
+    "cost_per_unit_name": "seconds_per_secondary_ray [patch_wft_emitter]",
+    "cuda": {
+     "allocated_bytes": 0,
+     "available": true,
+     "device": "0",
+     "free_bytes": 1335820288,
+     "peak_allocated_bytes": 0,
+     "peak_reserved_bytes": 0,
+     "reserved_bytes": 0,
+     "total_bytes": 51033931776
+    },
+    "environment": {
+     "container_image": "agent_solver",
+     "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+     "gpu_count": 1,
+     "gpu_driver": "550.163.01",
+     "gpu_name": "NVIDIA RTX A6000",
+     "logical_cpus": 80,
+     "packages": {
+      "chromatix": "0.6.0",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "numpy": "2.2.6",
+      "optiland": "0.6.0",
+      "scipy": "1.15.3",
+      "torch": "2.13.0+cu126"
+     },
+     "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+     "python_version": "3.12.14",
+     "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
+     "thread_env": {},
+     "visible_devices": null
+    },
+    "isolation": {
+     "applied": false,
+     "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+     ],
+     "logical_cpus": 80,
+     "thread_env": {}
+    },
+    "label": "patch_emitter_threads_50patches",
+    "measurement": {
+     "all_s": [
+      10.566250032003154
+     ],
+     "median_s": 10.566250032003154,
+     "min_s": 10.566250032003154,
+     "p95_s": 10.566250032003154,
+     "repeats": 1,
+     "tail_rule": "max_of_1",
+     "warmup": 0
+    },
+    "memory_report": {
+     "after": {
+      "cgroup_memory_bytes": 1861935104,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 387826106368,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116270.141388702,
+      "rss_bytes": 2281046016
+     },
+     "before": {
+      "cgroup_memory_bytes": 1798623232,
+      "cgroup_swap_bytes": 0,
+      "host_swap_total_bytes": 2002545270784,
+      "host_swap_used_bytes": 0,
+      "mem_available_bytes": 388017827840,
+      "mem_total_bytes": 405342146560,
+      "monotonic_s": 116259.571774266,
+      "rss_bytes": 2218487808
+     },
+     "cgroup_swap_after_bytes": 0,
+     "cgroup_swap_before_bytes": 0,
+     "host_reserve_bytes": 60801321984,
+     "interval_s": 0.25,
+     "min_mem_available_bytes": 387734421504,
+     "peak_cgroup_swap_bytes": 0,
+     "peak_rss_bytes": 2354089984,
+     "process_rss_budget_bytes": null,
+     "samples": 43,
+     "signal": "/sys/fs/cgroup/memory.swap.current",
+     "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
+     "swap_delta_peak_bytes": 0,
+     "verdict": {
+      "breached": false,
+      "detail": null,
+      "limit_bytes": null,
+      "observed_bytes": null,
+      "reason": null
+     }
+    },
+    "notes": [
+     "One patch count, every thread count.",
+     "Each arm inside this record is a median of repeats chosen from a 1.5 s budget (5-31). `measurement` times the whole arm group and is not the figure to quote -- read the per-arm seconds in the payload."
+    ],
+    "peak_host_rss_bytes": 2354089984,
+    "stages": null,
+    "swap_growth_bytes": 0,
+    "workload": {
+     "detail": {
+      "arms": "thread counts 1, 2, 4, 8, 16, 24",
+      "pad_px": 301,
+      "patches": 50,
+      "secondary_per_patch": 4000
+     },
+     "route": "patch_wft_emitter",
+     "size": 200000,
+     "unit": "secondary_ray"
+    }
+   },
+   "seconds_by_threads": {
+    "1": {
+     "relative_spread": 0.0116,
+     "repeats": 5,
+     "seconds": 0.277879
+    },
+    "16": {
+     "relative_spread": 0.1482,
+     "repeats": 16,
+     "seconds": 0.096624
+    },
+    "2": {
+     "relative_spread": 0.0502,
+     "repeats": 8,
+     "seconds": 0.178504
+    },
+    "24": {
+     "relative_spread": 0.0802,
+     "repeats": 13,
+     "seconds": 0.115919
+    },
+    "4": {
+     "relative_spread": 0.0937,
+     "repeats": 12,
+     "seconds": 0.12317
+    },
+    "8": {
+     "relative_spread": 0.1103,
+     "repeats": 14,
+     "seconds": 0.098691
+    }
+   },
+   "threads_within_noise_of_best": [
+    8,
+    16
+   ]
+  }
+ ],
+ "shipped_constants": {
+  "PATCH_EMITTER_THREADS": 8,
+  "POOL_MIN_PATCHES": 8,
+  "logical_cpus": 80,
+  "note": "the thread count is a code constant rather than a runtime choice, so it lands in the code fingerprint; MOA_PATCH_THREADS overrides it and is registered in core.performance's thread variables so an override lands in the performance fingerprint too."
+ }
+}

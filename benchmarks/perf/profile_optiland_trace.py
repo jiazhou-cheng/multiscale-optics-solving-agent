@@ -1347,7 +1347,7 @@ def profile_precision() -> None:
 DEMO_RECORDS = ROOT / "benchmarks" / "probes" / "records" / "ray_wave"
 
 
-def verify_demo3(before: str, after: str) -> None:
+def verify_demo3(before: str, after: str, output: str = "optiland_trace_demo3_equivalence") -> None:
     """Assert two demo3 runs got faster and produced the same physics, in one artifact.
 
     An optimization that changes the answer is a different route, not a faster
@@ -1444,8 +1444,8 @@ def verify_demo3(before: str, after: str) -> None:
         raise SystemExit(f"REFUSED TO COMPARE: {refusal}") from None
 
     payload = {
-        "probe": "perf_optiland_trace_demo3_equivalence",
-        "issue": "CHE-118 (M5.1)",
+        "probe": f"perf_{output}",
+        "issue": "CHE-118 (M5.1); reused by CHE-119 (M5.2)",
         "demo_records": {"before": before, "after": after},
         "speedup": speed,
         "timing_records": timing,
@@ -1462,19 +1462,21 @@ def verify_demo3(before: str, after: str) -> None:
             **provenance,
             "note": (
                 "the commit and code fingerprint each arm was produced under. The "
-                "BEFORE arm's demo record cannot stay in the tree: "
+                "BEFORE arm's demo record does not remain in the tree, and cannot: "
                 "`tests/test_provenance_fingerprint.py` requires every stamped "
-                "record to describe the current code, and the whole point of this "
-                "issue is that the code changed. So the pre-fix record was "
-                "regenerated under CHE-118 like the other stale records, and the "
-                "before arm is reproducible by checking out the commit named here "
-                "and re-running the demo. What is preserved in the tree instead is "
-                "stronger and cheaper to check: `timing_records` below embeds the "
-                "pre-fix measurement verbatim, and "
-                "`tests/test_coherent_bridge.py::TestMonochromaticWavelengthHandoff` "
-                "asserts the bitwise equality this artifact confirmed at 60 M rays "
-                "on every test run, per chunk, against a reference trace built the "
-                "old way."
+                "record to describe the current code, and the whole point of an "
+                "optimization issue is that the code changed. So a pre-fix record is "
+                "either regenerated with the rest of the stale ones or removed, and "
+                "the before arm is reproducible by checking out the commit named "
+                "here and re-running the demo -- the field arrays are gitignored, so "
+                "'reproducible by checkout' means checkout AND re-run. What is "
+                "preserved in the tree instead is cheaper to check and does not "
+                "depend on this file: `timing_records` below embeds the pre-fix "
+                "measurement verbatim, and the unit suites re-derive the bitwise "
+                "claim from committed code on every run -- "
+                "`TestMonochromaticWavelengthHandoff` in test_coherent_bridge.py for "
+                "CHE-118, and the thread- and block-invariance tests in "
+                "test_patch_wft.py for CHE-119."
             ),
         },
         "fields": field_report,
@@ -1505,7 +1507,7 @@ def verify_demo3(before: str, after: str) -> None:
             "exact equality is the claim and it is the one asserted."
         ),
     }
-    _write("optiland_trace_demo3_equivalence", payload)
+    _write(output, payload)
     print(payload["verdict"])
     print(f"  {before} -> {after}")
     if not unchanged:
@@ -1523,9 +1525,14 @@ def main() -> int:
     )
     verify.add_argument("before", help="demo3 record name under benchmarks/probes/records/ray_wave")
     verify.add_argument("after")
+    verify.add_argument(
+        "--output",
+        default="optiland_trace_demo3_equivalence",
+        help="record name to write under benchmarks/perf/records/",
+    )
     args = parser.parse_args()
     if args.command == "verify-demo3":
-        verify_demo3(args.before, args.after)
+        verify_demo3(args.before, args.after, args.output)
         return 0
     {"decompose": profile_decompose, "chunks": profile_chunks, "precision": profile_precision}[
         args.command
