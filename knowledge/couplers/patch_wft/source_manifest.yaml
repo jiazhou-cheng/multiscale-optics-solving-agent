@@ -1,0 +1,87 @@
+# Per-source provenance for the C_PATCH_WFT knowledge pack.
+# Provenance follows AGENTS.md "Sources of Truth".
+#
+# This pack is deliberately thin on external sources, because the coupler is
+# COMPOSED. The accumulation kernel's provenance is
+# knowledge/couplers/ray_to_wave/source_manifest.yaml, the resampling
+# estimator's is knowledge/couplers/wave_to_ray/source_manifest.yaml, and the
+# cascade's is knowledge/couplers/planar_doe_step/source_manifest.yaml. All three
+# bind here unchanged and are not duplicated. What is recorded below is only what
+# the WINDOWING itself is taken from.
+
+sources:
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: supporting_information
+    citation: >
+      Cheng, J.; Gao, M.; Shao, Y.; Mao, C.; Milster, T. D.; Fan, J. A.
+      A Differentiable Ray-Wave Framework for Hybrid Refractive-Diffractive
+      System Modeling and Optimization. ACS Photonics 2026.
+    retrieved_at: "2026-08-12"
+    usage_note: >
+      S10 states the relation this whole pack rests on -- the patch-based local
+      windowed Fourier transform is the DIRECT implementation and the global
+      single-plane aggregation is the SHORTCUT, so the global step is a special
+      case of this coupler rather than a peer of it. S4 (Algorithm S1) is the
+      per-patch cascade. The equations for the two halves come from the paper's
+      main text eq 2 and SI S2 respectively and are recorded in those packs' own
+      manifests. The paper is retrievable from the DOI;
+      knowledge/papers/raywave_tracing/README.md records why no PDF is stored.
+
+  - url: https://github.com/jiazhou-cheng/raywave-tracing
+    source_type: reference_implementation
+    vendored: false
+    pinned: false
+    executed_by_this_repository: false
+    read_at: "2026-08-14"
+    read_scope:
+      - patch_window_and_pad_option_inventory
+      - primary_position_sampling_option_inventory
+    read_files:
+      - deeplens/raywave.py
+    usage_note: >
+      This implementation is never executed and never vendored here. Read only
+      for the option inventory -- that patch windows, a pad preference and a
+      uniform-on-grid primary sampling exist as choices. Each was then
+      implemented from its physical description, which is what makes the two
+      implementations agreeing on a convention corroboration rather than copying.
+      The equations come from the paper. Upstream's own patch sizes (40, 50, 100)
+      are all EVEN and this repository refuses an even patch_px rather than
+      rounding it, so the two do not agree on that point and the divergence is
+      deliberate -- see knowledge/couplers/patch_wft/conventions.md P1.
+
+  - url: src/registry/couplers.yaml
+    source_type: internal_declaration
+    usage_note: >
+      The registry is the source of truth for this coupler's capability, its
+      special-case relation to C_PLANAR_DOE_STEP, and the status of the
+      centre-density choice. This pack was deliberately deferred until CHE-120
+      landed, because that ticket rewrote the estimator contract -- the centre
+      density, the unbiasedness weights and the measured variance reduction --
+      and a pack written before it would have been wrong on landing. It has
+      landed, the registry records the settled outcome, and the card carries it.
+      Read the registry rather than this pack for whether the alternative density
+      is reachable through the graph node.
+
+# Evidence produced by this repository, not by any source above.
+internal_evidence:
+  - tests/test_patch_wft.py
+  - tests/test_b2_equiv_instances.py
+  - benchmarks/instances/b2_equiv.py
+  - src/verification/families/b2_transitions.py
+  - benchmarks/probes/records/ray_wave/demo2_paper_kspace_jax.json
+  - benchmarks/probes/records/ray_wave/demo3_route_agreement.json
+
+# Numbers in this pack that came from a recorded probe rather than from a gate,
+# stated so a reader cannot mistake one for the other.
+recorded_probe_numbers:
+  - claim: demo2 cross-route NCC 0.99941808 and the independent-oracle 0.99941823
+    record: benchmarks/probes/records/ray_wave/demo2_paper_kspace_jax.json
+    why_not_a_gate: >
+      a 60M-ray CUDA run cannot execute in the default gate, and the cross-route
+      half could not gate in any case: a CROSS_ROUTE oracle forces category B4.
+  - claim: the noise-limited relation on demo3, ratio 1.1367
+    record: benchmarks/probes/records/ray_wave/demo3_route_agreement.json
+    why_not_a_gate: >
+      there is no oracle in the relation at all. What IS executed in the gate is
+      the instrument itself, on that record's own self- and cross-NCCs, by
+      tests/test_b2_equiv_instances.py::test_the_noise_limited_relation_reproduces_the_demo3_ratio.

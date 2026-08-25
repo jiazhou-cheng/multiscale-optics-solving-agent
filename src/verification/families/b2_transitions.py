@@ -148,8 +148,7 @@ DETERMINISTIC = StochasticPolicy(
 # B2-R2W-EXACT
 # ---------------------------------------------------------------------------
 
-B2_R2W_EXACT = register(
-    BenchmarkFamily(
+_B2_R2W_EXACT = BenchmarkFamily(
         family_id="B2-R2W-EXACT",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
@@ -211,15 +210,23 @@ B2_R2W_EXACT = register(
             ),
         ),
         oracle=FamilyOracle(
-            kind=Oracle.DETERMINISTIC_LIMIT,
+            kind=Oracle.ANALYTIC,
             independence=OracleIndependence.INDEPENDENT,
             description=(
-                "the enumerated reference: the same sum with nothing sampled away. "
-                "Independent of the SAMPLING and not of the kernel, which is the exact "
-                "scope of what an exactness limit establishes"
+                "the CLOSED-FORM plane wave N exp(i k d.r) on the reconstruction grid, "
+                "which shares no code with the coupler. This is stronger than the "
+                "enumerated-reference framing the family carried before it was "
+                "executed, and the difference is the whole gate: an enumerated "
+                "reference is the same arithmetic without the sampling, so a wrong "
+                "kernel is wrong in both and cancels, and it can only establish the "
+                "sampling. The analytic field pins the KERNEL -- once each ray's OPL "
+                "compensates its launch position every ray of a collimated bundle "
+                "contributes the same plane wave, so one comparison decides four "
+                "conventions at once (OPL-and-ramp, phasor sign, axis order, "
+                "projection factor) and each single-term removal breaks it"
             ),
-            callable=None,
-            reference="benchmarks/probes/ray_wave/demo3_enumerated_reference.py",
+            callable="benchmarks/instances/b2_transitions.py::_plane_wave_on_grid",
+            reference="benchmarks/instances/b2_transitions.py",
         ),
         metrics=(
             Metric(
@@ -231,10 +238,14 @@ B2_R2W_EXACT = register(
                 unit=None,
                 definition="relative_l2_field",
                 blind_to=(
-                    "any error the kernel and the enumeration share. The enumeration is "
-                    "the same arithmetic without the sampling, so a wrong kernel is "
-                    "wrong in both and cancels -- this establishes the sampling, not the "
-                    "physics",
+                    "a global phase common to the whole field, which the relative L2 on "
+                    "the complex field DOES see but which a reader comparing this to an "
+                    "intensity residual would not -- stated so the two are not confused",
+                    "any convention error that is inert on THIS bundle. A collimated "
+                    "on-axis bundle has projection factor exactly 1 and no oblique "
+                    "ramp, so the four terms this comparison pins are pinned in the "
+                    "configuration run and not in general -- B2-W2R-STOCH measures "
+                    "those three blind spots explicitly",
                 ),
             ),
             Metric(
@@ -328,18 +339,31 @@ B2_R2W_EXACT = register(
         execution_policy=COUPLER_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="exactness_relative_l2_field",
-            observed=7.1e-13,
+            observed=1.47949e-15,
             evidence=(
-                "benchmarks/reports/2026-08/coupler_characterization.md",
-                "benchmarks/probes/records/ray_wave/demo3_enumerated_reference_rwf_ramp.json",
+                "benchmarks/instances/b2_transitions.py",
+                "tests/test_b2_transition_instances.py::test_the_exact_route_pins_four_conventions_at_once",
+                "tests/test_b2_transition_instances.py::test_the_exactness_tolerance_is_derived_from_the_dtype",
             ),
             note=(
-                "the full-aperture patch against an independent float64 ASM reads "
-                "7.1e-13 and the wave-rays-wave round trip at the enumeration limit "
-                "reads 1.32e-15. On record; nothing in the required gate re-runs the "
-                "enumerated reference, which is the expensive half."
+                "Executed. 1.48e-15 against a 1e-12 gate, on a collimated bundle of 64 "
+                "rays that share a direction and differ only in launch position, "
+                "compared to the analytic plane wave every one of them implies.\n\n"
+                "The tolerance is DERIVED rather than chosen, which is what CHE-109 asked "
+                "for: sqrt(N) eps64 for an N-term unit-modulus sum plus eps64 per radian "
+                "of the largest phase argument. On this instance that is 3.6e-15, and the "
+                "declared 1e-12 gate is the looser of the two -- so the measurement is "
+                "reported against the derivation as well as against the gate.\n\n"
+                "Four conventions, one comparison. Removing the Delta-r ramp reads "
+                "1.4e+0, the phasor sign 2.0e+0, the axis transpose 1.4e+0, and the "
+                "projection factor 1.3e-2 -- each through the shipping Perturbation with "
+                "one term altered, and the weakest of the four is what the control "
+                "reports. The static-shape guarantee is declared NOT_IMPLEMENTED as a "
+                "run-time control on purpose: it is structural, asserted by making "
+                "xp.outer and xp.einsum raise, and that survives a host change where a "
+                "wall-clock comparison would not."
             ),
         ),
         sampler=None,
@@ -359,7 +383,6 @@ B2_R2W_EXACT = register(
             "family that read this number as 'the coupler is correct' would be claiming "
             "something the instrument cannot say."
         ),
-    )
 )
 
 
@@ -367,8 +390,51 @@ B2_R2W_EXACT = register(
 # B2-R2W-ROUTE
 # ---------------------------------------------------------------------------
 
-B2_R2W_ROUTE = register(
-    BenchmarkFamily(
+#: The repository's primary correctness instrument, as one instance.
+#:
+#: A collimated bundle whose rays share a direction and differ only in launch
+#: position, reconstructed against the analytic plane wave that every one of them
+#: implies. SI Figure S1c is why one comparison is enough to pin four
+#: conventions at once: once each ray's OPL compensates its launch position,
+#: every ray contributes the SAME plane wave, so the sum is N exp(i k d.r) with
+#: no residual position dependence. Remove the OPL compensation, the Delta-r
+#: ramp, the phasor sign or the projection factor and that identity breaks.
+#:
+#: ``sample_alignment = on_node`` means the mode's transverse wavevector is an
+#: exact bin of the reconstruction grid, so the k-space route is a RELABELLING
+#: rather than an interpolation and both routes are exact. That is the condition
+#: under which the two routes may be compared at round-off, and it is declared
+#: rather than assumed.
+B2_R2W_EXACT = register(
+    _B2_R2W_EXACT.with_instances(
+        _B2_R2W_EXACT.instantiate(
+            "B2-R2W-EXACT-01",
+            {
+                "wavelength_m": 5.5e-7,
+                "handoff_plane_z_m": 6.814345991561234e-05,
+                "grid_n": 64,
+                "target_sample_pitch_m": 2.6587352810843895e-06,
+                "sample_alignment": "on_node",
+                "dtype": "complex128",
+            },
+            expected={
+                "why": (
+                    "the enumeration IS the oracle here: zero sampling error means a "
+                    "failure is a transform defect rather than a budget problem. The "
+                    "family is declared non-generative for that reason -- a generator "
+                    "that also chose the enumeration would be grading its own homework."
+                ),
+                "four_conventions": (
+                    "OPL compensation, the Delta-r ramp, the phasor sign and the "
+                    "projection factor. Each is removed individually and each must fail."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B2_R2W_ROUTE = BenchmarkFamily(
         family_id="B2-R2W-ROUTE",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
@@ -442,7 +508,15 @@ B2_R2W_ROUTE = register(
                 description="relative L2 of the fast route's field against the exact route's",
                 unit=None,
                 definition="relative_l2_field",
-                blind_to=("absolute power, which the ratio below is for",),
+                blind_to=(
+                    "absolute power, which the ratio below is for",
+                    "where the error is. A norm over the whole grid cannot distinguish "
+                    "a large localized error from a small diffuse one, and the splat "
+                    "kernel's residual is NOT uniform -- measured 3.8x larger over the "
+                    "whole grid than over a centred window. That is CHE-44's concern in "
+                    "this coordinate: a metric reported on axis understates this route's "
+                    "error where the kernel is worst",
+                ),
             ),
             Metric(
                 name="route_power_ratio",
@@ -524,16 +598,34 @@ B2_R2W_ROUTE = register(
         execution_policy=COUPLER_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="route_power_ratio",
-            observed=0.9832,
-            evidence=("benchmarks/reports/2026-08/kspace_ray_to_wave.md",),
+            observed=1.21609e-3,
+            evidence=(
+                "benchmarks/instances/b2_transitions.py",
+                "tests/test_b2_transition_instances.py::test_the_route_budget_is_measured_on_both_systems",
+                "tests/test_b2_transition_instances.py::test_ncc_cannot_see_the_power_the_route_loses",
+            ),
             note=(
-                "the asymmetry is the finding: 7.1e-13 agreement on demo2 and a 1.7% "
-                "power loss on demo3 at 8x oversampling, from the same route. The fast "
-                "route is 9.6x faster on its kernel and it is NOT interchangeable with "
-                "the exact one, which is why this family exists separately from "
-                "B2-R2W-EXACT."
+                "The budget, measured over four oversampling values on each of two "
+                "systems, and the ASYMMETRY is the finding rather than either number.\n\n"
+                "ON-NODE: exact at every oversampling -- 9.0e-16 field error, power ratio "
+                "1.000000000, on_node_fraction 1.0 -- because every ray's transverse "
+                "wavevector is an exact bin and the bilinear splat weights collapse to "
+                "(1, 0). The splat is a relabelling there, not an approximation.\n\n"
+                "OFF-NODE: 2.20e-1 -> 4.26e-2 -> 1.14e-2 -> 1.81e-3 as oversampling goes "
+                "1x -> 8x, with the power ratio 0.9492 -> 0.9804 -> 0.9946 -> 0.9988. "
+                "on_node_fraction 0.0 throughout. At 1x -- upstream's default region -- "
+                "the route loses 5.1% of the power and NCC still reads 0.9989, which is "
+                "the whole reason both are reported: NCC is normalized and cannot see "
+                "absolute scale by construction.\n\n"
+                "The residual GROWS off axis by 3.8x, whole-grid against centred window. "
+                "That is the splat kernel's signature rather than a ray-count effect, and "
+                "a centred metric cannot see it -- CHE-44's concern, in this coordinate.\n\n"
+                "These are NOT the paper-scale demo3 numbers and do not claim to be: the "
+                "recorded 1.07e-2 field error and 1.7% power loss at 8x come from a 60M-ray "
+                "run that stays a probe (B4-DEMO3). What is reproduced here is the SHAPE "
+                "of the budget on a tractable off-node system."
             ),
         ),
         sampler=None,
@@ -546,7 +638,6 @@ B2_R2W_ROUTE = register(
             "benchmarks/reports/2026-08/kspace_ray_to_wave.md",
             "benchmarks/probes/ray_wave/demo3_reconstruction_equivalence.py",
         ),
-    )
 )
 
 
@@ -554,8 +645,46 @@ B2_R2W_ROUTE = register(
 # B2-W2R-STOCH
 # ---------------------------------------------------------------------------
 
-B2_W2R_STOCH = register(
-    BenchmarkFamily(
+#: Two systems and four oversampling values each, because one system cannot
+#: state this budget.
+#:
+#: On an ON-NODE system the k-space route is exact at every oversampling, so a
+#: budget measured there would read zero and say nothing. On an OFF-NODE system
+#: it interpolates. Averaging the two would report a number that describes
+#: neither, which is why the family declares ``system`` as a PHYSICAL parameter
+#: -- a different system is a different correct answer, not a different way of
+#: representing one.
+B2_R2W_ROUTE = register(
+    _B2_R2W_ROUTE.with_instances(
+        *[
+            _B2_R2W_ROUTE.instantiate(
+                f"B2-R2W-ROUTE-{system_tag}-{oversampling:02d}",
+                {
+                    "system": system,
+                    "wavelength_m": 5.32e-7,
+                    "oversampling": oversampling,
+                    "ray_count": 10000,
+                    "route": "kspace_splat",
+                },
+                expected={
+                    "budget": (
+                        "exact on the on-node system at every oversampling, because the "
+                        "splat is a relabelling there; interpolating on the off-node "
+                        "one, where 8x oversampling still loses 1.7% of the power"
+                    ),
+                },
+            )
+            for system, system_tag in (
+                ("demo2_paper", "ONNODE"),
+                ("demo3_characterization", "OFFNODE"),
+            )
+            for oversampling in (1, 2, 4, 8)
+        ]
+    )
+)
+
+
+_B2_W2R_STOCH = BenchmarkFamily(
         family_id="B2-W2R-STOCH",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
@@ -744,6 +873,58 @@ B2_W2R_STOCH = register(
                 mutation="sample without reweighting by 1/p",
                 target_metric="ensemble_mean_bias",
             ),
+            # CHE-110 added four. M2.2 asks for at least five controls, each
+            # through the SHIPPING implementation with one term removed and each
+            # with a passing unperturbed arm, and the family declared two. Every
+            # one of these is a real switch on `SamplingPerturbation` or
+            # `Perturbation` rather than a hand-written variant, and two of them
+            # need their own CONFIGURATION to be observable at all -- which is the
+            # blind-spot lesson applied to the battery rather than an exception
+            # to it.
+            NegativeControl(
+                control_id="launch-phase",
+                description=(
+                    "drop the launch-position phase exp(i k (d_u x_p + d_v y_p)). "
+                    "Invisible for a single centred launch point, so the control is run "
+                    "over sixteen scattered ones"
+                ),
+                mutation="SamplingPerturbation(apply_launch_phase=False)",
+                target_metric="ensemble_mean_bias",
+            ),
+            NegativeControl(
+                control_id="axis-transpose",
+                description=(
+                    "transpose the reconstruction grid. Invisible on any rotationally "
+                    "symmetric field, which is why the probe is deliberately elliptical "
+                    "and offset"
+                ),
+                mutation="Perturbation(transpose_axes=True) on the reconstruction leg",
+                target_metric="ensemble_mean_bias",
+            ),
+            NegativeControl(
+                control_id="kn-sign",
+                description=(
+                    "take the negative root for k_n. Reverses propagation, and is "
+                    "EXACTLY INERT at z = 0 -- so the control is run on a bundle advanced "
+                    "to an observation plane 20 um away, where the shipping code refuses "
+                    "to advance it at all rather than dropping the rays"
+                ),
+                mutation="SamplingPerturbation(normal_sign=-1), measured off the source plane",
+                target_metric="ensemble_mean_bias",
+            ),
+            NegativeControl(
+                control_id="evanescent-cut",
+                description=(
+                    "keep the evanescent modes, whose k_n is imaginary so their "
+                    "direction is not a direction. Inert on a grid that HAS no "
+                    "evanescent content -- at the family's own pitch the fraction is "
+                    "exactly zero -- so the control is run at a sub-wavelength pitch"
+                ),
+                mutation=(
+                    "SamplingPerturbation(discard_evanescent=False) at pitch = lambda/3"
+                ),
+                target_metric="ensemble_mean_bias",
+            ),
             NegativeControl(
                 control_id="one-seed-accuracy-claim",
                 description=(
@@ -772,14 +953,45 @@ B2_W2R_STOCH = register(
             minimum_seeds=8,
         ),
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="ensemble_mean_bias",
+            observed=0.95292,
+            evidence=(
+                "benchmarks/instances/b2_transitions.py",
+                "tests/test_b2_transition_instances.py::test_the_four_evidence_kinds_are_present_in_order",
+                "tests/test_b2_transition_instances.py::test_the_negative_control_battery_is_five_deep",
+                "tests/test_b2_transition_instances.py::test_the_three_blind_spots_are_measured",
+            ),
             note=(
-                "The four evidence kinds exist separately in the repository -- the "
-                "enumeration limit and the round trip are established, the variance "
-                "characterization is CHE-120's -- and nothing has run them as one family "
-                "over a declared ensemble. NO GRADIENT IS CLAIMED: "
-                "derivative.verified is false for this coupler and the surrogate's bias "
-                "is characterized rather than validated."
+                "All four kinds run as one family over eight declared seeds.\n\n"
+                "1. Exactness limit 5.31e-16 against a 1e-12 gate, over every propagating "
+                "mode. FIRST, because an estimator wrong here has a transform defect and "
+                "tuning N would be beside the point.\n"
+                "2. Unbiasedness 0.95 sigma against a 3 sigma gate, on the SIGNED overlap "
+                "functional <W, U_hat> against a fixed independent probe vector.\n"
+                "3. Fitted exponent -0.5217 over six sample counts, against -0.5 +/- 0.1.\n"
+                "4. Variance advantage 6.28x on a concentrated spectrum against 1.4x on a "
+                "multilobed one -- the SIZE is the reported property.\n\n"
+                "Two constructions had to be corrected to get here, and both had produced "
+                "a plausible number. (a) The reconstruction owes the 1/N of SI eq S5 for a "
+                "sampled bundle; without it the field is scaled by the mode count and the "
+                "round trip read 0.995 for a correct round trip. (b) Unbiasedness must be "
+                "measured on a signed LINEAR functional, and not against the field itself: "
+                "<U, U> is real and positive by construction, so its imaginary part is "
+                "identically zero and comparing it to its own round-off spread read 5 to "
+                "23 sigma for an estimator that is exactly unbiased. Measured across three "
+                "sample counts and two ensemble sizes.\n\n"
+                "Six controls, all fired, each one term removed from the shipping "
+                "implementation: importance weight 1288 sigma, axis transpose 91 sigma, "
+                "launch phase 77 sigma, k_n sign REFUSED by the shipping advance rather "
+                "than measured, evanescent cut at a sub-wavelength pitch, and the "
+                "one-seed accuracy claim refused at StochasticReport construction. Two of "
+                "them needed their own CONFIGURATION to be observable -- k_n sign is "
+                "exactly inert at z = 0 and the evanescent cut is inert on a grid with no "
+                "evanescent content -- which is the blind-spot lesson applied to the "
+                "battery rather than an exception to it.\n\n"
+                "NO GRADIENT IS CLAIMED. derivative.verified stays false and the "
+                "surrogate's bias is measured and recorded, which is the deliverable."
             ),
         ),
         sampler=None,
@@ -805,7 +1017,6 @@ B2_W2R_STOCH = register(
             "not composable as an edge, and a graph that tries says so instead of dying "
             "in a resolver."
         ),
-    )
 )
 
 
@@ -813,8 +1024,43 @@ B2_W2R_STOCH = register(
 # B2-EQUIV
 # ---------------------------------------------------------------------------
 
-B2_EQUIV = register(
-    BenchmarkFamily(
+#: Eight seeds at the declared sample count, plus the convergence ladder.
+#:
+#: The seed count is the family's own declared minimum and it is not a
+#: convention: a bias gated in measured standard errors needs enough
+#: realizations for the standard error itself to be a measurement, and the
+#: schema refuses fewer.
+B2_W2R_STOCH = register(
+    _B2_W2R_STOCH.with_instances(
+        *[
+            _B2_W2R_STOCH.instantiate(
+                f"B2-W2R-STOCH-{seed:02d}",
+                {
+                    "wavelength_m": 5.32e-7,
+                    "numerical_aperture": 0.5,
+                    "sample_count": 20000,
+                    "seed": seed,
+                },
+                seed=seed,
+                expected={
+                    "why": (
+                        "four kinds of evidence in a mandated order: exactness limit "
+                        "first, because an estimator that is wrong in the enumeration "
+                        "limit has a transform defect and tuning N would be beside the "
+                        "point; then unbiasedness against the MEASURED standard error; "
+                        "then a fitted exponent over at least six sample counts; then "
+                        "variance by sampling density, reported as a size rather than a "
+                        "pass."
+                    ),
+                },
+            )
+            for seed in range(1, 9)
+        ]
+    )
+)
+
+
+_B2_EQUIV = BenchmarkFamily(
         family_id="B2-EQUIV",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
@@ -961,11 +1207,23 @@ B2_EQUIV = register(
                 metric="patch_vs_global_relative_l2",
                 threshold=1e-9,
                 basis=(
-                    "the full-aperture (one-patch) case agrees with an independent "
-                    "float64 ASM at 7.1e-13, so at patch_count = 1 the admissible error "
-                    "is round-off. 1e-9 leaves three orders of headroom for the "
-                    "sub-aperture cases the family sweeps, and still refuses a "
-                    "decomposition that has lost the overlap"
+                    "the full-aperture case measures 1.4e-12 against an independent "
+                    "float64 ASM and the enumerated sub-aperture case 1.7e-15, so 1e-9 "
+                    "is three orders above the looser of the two exact relations.\n\n"
+                    "CHE-111 completed this basis after executing the family, and the "
+                    "completion decides how the results read. This is an EXACTNESS gate "
+                    "and it belongs to the two instances that have an exact relation to "
+                    "gate: the full-aperture limit, where one patch IS the window, and "
+                    "the enumerated sub-aperture case, where every draw position is "
+                    "evaluated exactly once and the estimator's EXPECTATION is computed "
+                    "rather than sampled.\n\n"
+                    "The DRAWN sub-aperture instances are Monte Carlo estimates and "
+                    "cannot meet it: they measure 1.57, 0.81, 0.43 and 0.19 at 4, 16, 64 "
+                    "and 225 patches, which is a clean P^-1/2 rate and not a defect. "
+                    "Their claim is the convergence trend and their four negative "
+                    "controls, and they report this metric UNMET against a gate that "
+                    "belongs to the exact instances rather than being quietly exempted. "
+                    "`patch_count` is a RepresentationParameter for exactly this reason."
                 ),
                 basis_kind=ToleranceBasis.INDEPENDENT_DERIVATION,
                 may_gate=True,
@@ -1010,19 +1268,65 @@ B2_EQUIV = register(
         execution_policy=COUPLER_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="patch_vs_global_relative_l2",
-            observed=7.1e-13,
+            observed=1.44474e-12,
             evidence=(
+                "benchmarks/instances/b2_equiv.py",
+                "tests/test_b2_equiv_instances.py::test_the_full_aperture_limit_is_exact",
+                "tests/test_b2_equiv_instances.py::test_the_enumerated_sub_aperture_estimator_is_unbiased",
+                "tests/test_b2_equiv_instances.py::test_the_sub_aperture_sweep_converges",
                 "tests/test_patch_wft.py",
-                "benchmarks/reports/2026-08/coupler_characterization.md",
             ),
             note=(
-                "the full-aperture case against the independent float64 ASM reads "
-                "7.1e-13. What is NOT measured as one family is the granularity sweep -- "
-                "the whole point of making patch_count a RepresentationParameter -- and "
-                "the sub-aperture convergence that would show the decomposition is "
-                "consistent at every granularity rather than only at one."
+                "Both directions executed. The full-aperture limit reads 1.44e-12 "
+                "against the independent float64 ASM at pad 0, reproducing the recorded "
+                "1.4e-12; the ENUMERATED sub-aperture case reads 1.74e-15; and the drawn "
+                "sweep converges 1.57 -> 0.81 -> 0.43 -> 0.19 over 4, 16, 64 and 225 "
+                "patches at a clean P^-1/2 rate. The granularity sweep is the whole "
+                "point of making patch_count a RepresentationParameter and it now "
+                "exists.\n\n"
+                "The enumerated case is what makes the sub-aperture direction GATEABLE. "
+                "Drawing centres is a Monte Carlo estimate of a finite sum over draw "
+                "positions; evaluating that sum exactly separates 'is the estimator "
+                "unbiased' from 'how fast does it converge', and only the first is a "
+                "gate. A biased estimator converges to the wrong answer, which a rate "
+                "measurement cannot distinguish from slow convergence.\n\n"
+                "It is also where the two blind spots are gated, and the blindness is "
+                "measured rather than asserted: at full aperture the coverage correction "
+                "and the launch phase are both exactly 1, so inverting the correction and "
+                "double-counting the phase change the anchor by nothing. On the "
+                "enumerated sub-aperture case the same mutations read 9.95e-1 and "
+                "1.00e+0 against 1.7e-15. That is how an inverted coverage correction "
+                "(A_patch/A_draw for A_draw/A_patch) survived once. The 9.95e-1 is "
+                "|1/coverage^2 - 1| exactly, which is the check that the mutation is "
+                "the inversion: the shipping correction A_draw/A_patch multiplies the "
+                "emitted amplitude once, so inverting it is a factor coverage^-2. An "
+                "earlier version of this control used coverage^+2 -- it SQUARED the "
+                "correction instead of inverting it, read 2.2e+2, and still reported "
+                "FIRED. A control that fires is not thereby a control that ran the "
+                "mutation it claims, and this one could be wrong by a power because it "
+                "mutates amplitudes from outside the emitter rather than flipping a "
+                "switch inside the shipping path.\n\n"
+                "The two exactness instances establish DIFFERENT things and the "
+                "difference is load-bearing. The full-aperture anchor is scored at "
+                "z = 1.26 mm against the independent ASM, so it pins the transfer "
+                "function as well as the decomposition. The enumerated sub-aperture "
+                "instance is scored AT z = 0, where the ASM degenerates to the identity "
+                "for this configuration -- so it establishes the DECOMPOSITION identity "
+                "and the two corrections, and NOT a propagation equivalence. No "
+                "sub-aperture propagation claim rests on this family.\n\n"
+                "One measured finding worth carrying: the equivalence holds AT THE PLANE "
+                "and stops being a well-posed comparison at a large propagation distance "
+                "on a finite window. The enumerated sum reproduces the field at the DOE "
+                "plane to 1.7e-15 and disagrees with the ASM at z = 1.26 mm at 0.84, "
+                "because a sub-aperture patch's modes live on its own pad-21 grid, which "
+                "is not commensurate with the 15-px reconstruction grid -- so the ray sum "
+                "is the non-periodic propagated field and the ASM is the periodic one. At "
+                "full aperture with pad_factor 1 the two mode sets coincide, which is why "
+                "the anchor can be compared there and this cannot. The clearance "
+                "exemption on the anchor is preserved for the same family of reasons and "
+                "is measured: padding it to factor 3 moves the score off 1e-12."
             ),
         ),
         sampler=None,
@@ -1042,7 +1346,6 @@ B2_EQUIV = register(
             "knowledge pack (benchmarks/validation/knowledge_pack_audit.md). Authoring "
             "them is M2.3's other half and is not done here."
         ),
-    )
 )
 
 
@@ -1050,8 +1353,106 @@ B2_EQUIV = register(
 # B2-ROUNDTRIP
 # ---------------------------------------------------------------------------
 
-B2_ROUNDTRIP = register(
-    BenchmarkFamily(
+#: The full-aperture anchor, then a sub-aperture ladder.
+#:
+#: ``patch_count = 1`` with ``patch_width_m = aperture_width_m`` is the
+#: full-aperture limit, where one patch IS the window and the two routes
+#: coincide. It is the exactness anchor and it is also BLIND to two defects that
+#: are exactly 1 there -- the coverage correction and the launch phase -- which
+#: is how an inverted coverage correction once survived. The ladder instances are
+#: what see them.
+#:
+#: ``pad_width`` is the declared refinement axis and the clearance exemption on
+#: the full-aperture instance is legitimate: padding a full-aperture single patch
+#: moves the mode grid off the unpadded oracle's, and the exactness anchor reads
+#: 0.57 instead of 1.4e-12. That is not a defect to pad away.
+B2_EQUIV = register(
+    _B2_EQUIV.with_instances(
+        _B2_EQUIV.instantiate(
+            "B2-EQUIV-FULL-01",
+            {
+                "aperture_width_m": 33 * 6.3e-6,
+                "substrate_radius_m": float("inf"),
+                "wavelength_m": 0.7e-6,
+                "patch_count": 1,
+                "patch_width_m": 33 * 6.3e-6,
+                "tangent_plane_error_rad": 0.0,
+                "grid_snapping": "snapped",
+                "pad_width": 0,
+            },
+            expected={
+                "relative_l2": 1.4e-12,
+                "why": (
+                    "one patch covering the whole aperture IS the window, so the patch "
+                    "route and the global route coincide and the residual is float64 "
+                    "round-off against the independent float64 ASM. The clearance "
+                    "exemption is legitimate and must be preserved."
+                ),
+                "blind_to": (
+                    "the coverage correction and the launch phase, both exactly 1 here"
+                ),
+            },
+        ),
+        *[
+            _B2_EQUIV.instantiate(
+                f"B2-EQUIV-SUB-{patches:03d}",
+                {
+                    "aperture_width_m": 15 * 6.3e-6,
+                    "substrate_radius_m": float("inf"),
+                    "wavelength_m": 0.7e-6,
+                    "patch_count": patches,
+                    "patch_width_m": 5 * 6.3e-6,
+                    "tangent_plane_error_rad": 0.0,
+                    "grid_snapping": "snapped",
+                    "pad_width": 0,
+                },
+                expected={
+                    "why": (
+                        "many patches coherently summed must converge to the full-DOE "
+                        "response, and the partition-of-unity argument behind that "
+                        "convergence is exactly what an apodization taper breaks. Every "
+                        "score names its oracle's pad, because an oracle is not well "
+                        "defined until its padding is."
+                    ),
+                },
+            )
+            for patches in (4, 16, 64, 225)
+        ],
+        _B2_EQUIV.instantiate(
+            "B2-EQUIV-SUB-ENUMERATED",
+            {
+                "aperture_width_m": 15 * 6.3e-6,
+                "substrate_radius_m": float("inf"),
+                "wavelength_m": 0.7e-6,
+                # 361 = (15 + 5 - 1)^2, every draw position of the dilated
+                # aperture exactly once. At exactly that count the driver
+                # ENUMERATES rather than draws, which computes the estimator's
+                # expectation instead of sampling it.
+                "patch_count": 361,
+                "patch_width_m": 5 * 6.3e-6,
+                "tangent_plane_error_rad": 0.0,
+                "grid_snapping": "snapped",
+                "pad_width": 0,
+            },
+            expected={
+                "relative_l2": 1.7e-15,
+                "why": (
+                    "drawing centres is a Monte Carlo estimate of a finite sum over "
+                    "draw positions, and evaluating that sum exactly separates 'is the "
+                    "estimator unbiased' from 'how fast does it converge'. Only the "
+                    "first is a gate: a biased estimator converges to the WRONG answer, "
+                    "which a rate measurement alone cannot distinguish from slow "
+                    "convergence. This is the sub-aperture instance the 1e-9 tolerance "
+                    "decides, and it is where the coverage correction and the launch "
+                    "phase are gated -- neither is 1 here."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B2_ROUNDTRIP = BenchmarkFamily(
         family_id="B2-ROUNDTRIP",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
@@ -1196,8 +1597,21 @@ B2_ROUNDTRIP = register(
                 metric="round_trip_relative_rms",
                 threshold=1e-12,
                 basis=(
-                    "the enumeration-limit round trip reads 1.32e-15. 1e-12 admits "
-                    "float64 accumulation over a larger grid and nothing else"
+                    "float64 round-off over the enumerated round trip: measured at "
+                    "1.32e-15 with the deliberately mismatched twin at 1.40, a "
+                    "separation of fifteen orders.\n\n"
+                    "CHE-112 completed this basis after executing the family, and the "
+                    "completion matters for reading the results. The floor is the "
+                    "ENUMERATED arm's -- zero sampling error, so the only admissible "
+                    "residual is arithmetic. A MONTE CARLO arm cannot meet it and is "
+                    "not expected to: at 20,000 samples over 1024 modes it measures "
+                    "3.1e-2 to 3.7e-2, which is sampling error and not a defect. The "
+                    "sampled arm's accuracy claim is its ensemble statistics and its "
+                    "broken twin, and its instances therefore report this metric UNMET "
+                    "against a gate that belongs to the other arm rather than being "
+                    "quietly exempted from it. `arm` is a RepresentationParameter for "
+                    "exactly this reason: the two arms answer the same question with "
+                    "different evidence."
                 ),
                 basis_kind=ToleranceBasis.NUMERICAL_PRECISION_FLOOR,
                 may_gate=True,
@@ -1207,15 +1621,32 @@ B2_ROUNDTRIP = register(
                 metric="detection_margin",
                 threshold=1e3,
                 basis=(
-                    "the measured margin is 1e15. A margin below 1e3 would mean the "
-                    "control and the signal are within three orders of each other, which "
-                    "is close enough that a change in either could swap them. This gates "
-                    "the CONTROL, not the physics -- an under-powered control is a "
-                    "finding about the benchmark"
+                    "the measured margin is 1e15, and a margin below 1e3 would mean the "
+                    "control and the signal are within three orders of each other -- "
+                    "close enough that a change in either could swap them. That is the "
+                    "claim, and it is NOT GATEABLE by this schema, which is why "
+                    "may_gate is false here.\n\n"
+                    "CHE-112 found the reason while executing the family. "
+                    "``MetricResult.met`` is ``measured <= threshold`` everywhere, so a "
+                    "quantity where LARGER IS BETTER cannot be expressed as a gating "
+                    "tolerance: gating a detection margin at <= 1e3 asserts the opposite "
+                    "of the claim, and a run whose control barely separated would report "
+                    "green. Reporting the margin and refusing to gate it is the honest "
+                    "state; inverting the number to fit the schema would hide the "
+                    "limitation in a metric name.\n\n"
+                    "What carries the under-powered-control finding instead is the "
+                    "negative-control machinery itself: a control that did not fire sets "
+                    "``undermines_the_gate`` on the result, which is exactly 'an "
+                    "under-powered control is a finding about the benchmark' with the "
+                    "direction the right way round. A two-sided or minimum-bound "
+                    "tolerance kind is follow-up work on the schema."
                 ),
                 basis_kind=ToleranceBasis.ANALYTIC_DERIVATION,
-                may_gate=True,
-                rejects="a broken twin that barely fails, which is a twin that proves little",
+                may_gate=False,
+                rejects=(
+                    "nothing, by construction -- see the basis. The claim it would make "
+                    "is carried by the control outcomes instead."
+                ),
             ),
         ),
         negative_controls=(
@@ -1262,19 +1693,36 @@ B2_ROUNDTRIP = register(
             minimum_seeds=3,
         ),
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="round_trip_relative_rms",
-            observed=1.32e-15,
+            observed=5.31117e-16,
             evidence=(
+                "benchmarks/instances/b2_transitions.py",
+                "tests/test_b2_transition_instances.py::test_both_round_trip_directions_return_the_input",
+                "tests/test_b2_transition_instances.py::test_no_round_trip_is_accepted_without_a_failing_twin",
                 "tests/test_coupler_round_trip.py",
-                "benchmarks/reports/2026-08/coupler_characterization.md",
             ),
             note=(
-                "wave -> rays -> wave at the enumeration limit reads 1.32e-15, and the "
-                "same round trip with a mismatched phase sign reads 1.40 -- detected. "
-                "That PAIRING is the whole point: a round trip that cannot be made to "
-                "fail proves nothing, because a shared convention error cancels between "
-                "the two directions."
+                "Executed in BOTH directions and BOTH arms. wave -> rays -> wave at the "
+                "enumeration limit reads 5.31e-16 and ray -> wave -> ray reads 5.26e-16, "
+                "each with its mismatched-phase twin at 1.414 -- a detection margin of "
+                "2.7e15. That PAIRING is the whole point: a round trip that cannot be "
+                "made to fail proves nothing, because a shared convention error cancels "
+                "between the two directions.\n\n"
+                "MET refers to the ENUMERATED arm. The Monte Carlo arms measure 3.1e-2 to "
+                "3.7e-2 and report the same metric UNMET, which is sampling error rather "
+                "than a defect -- see the tolerance's basis. Their claim is the ensemble "
+                "and the twin, and their detection margins are 38x to 46x rather than "
+                "1e15 because the correct arm has real variance.\n\n"
+                "One construction had to be corrected and it is the reason the family is "
+                "worth running rather than declaring. The probe field was a centred REAL "
+                "Gaussian, whose spectrum is real and Hermitian-symmetric -- so "
+                "conjugating it is a no-op and transposing it is a no-op, and BOTH broken "
+                "twins read identically to the correct arm at 5.4e-16. A round trip that "
+                "cannot be made to fail proves nothing, and a probe that cannot see a "
+                "sign flip is exactly how that happens. The probe is now offset, "
+                "elliptical and phase-ramped, which is CHE-44's centre-dependent "
+                "blindness concern answered by construction rather than audited after."
             ),
         ),
         sampler=None,
@@ -1297,5 +1745,44 @@ B2_ROUNDTRIP = register(
             "to know which quantities it may still ask about downstream, and 'the round "
             "trip closed' does not answer that."
         ),
+)
+
+
+
+#: Both directions, both arms, and a broken twin for each.
+#:
+#: The schema rule this family exists to make mechanical: a successful round trip
+#: is not accepted unless a deliberately broken twin demonstrably failed. A shared
+#: convention error cancels between the two directions, so a round trip that
+#: cannot be made to fail proves nothing -- and the ``BROKEN_TWIN_RAN`` predicate
+#: is what stops one being reported alone.
+B2_ROUNDTRIP = register(
+    _B2_ROUNDTRIP.with_instances(
+        *[
+            _B2_ROUNDTRIP.instantiate(
+                f"B2-ROUNDTRIP-{direction.replace('_', '').upper()}-{arm.upper()}-{seed:02d}",
+                {
+                    "wavelength_m": 5.32e-7,
+                    "numerical_aperture": 0.3,
+                    "grid_n": 32,
+                    "sample_count": 20000,
+                    "direction": direction,
+                    "arm": arm,
+                    "seed": seed,
+                    "broken_twin_ran": True,
+                },
+                seed=seed,
+                expected={
+                    "why": (
+                        "the enumerated arm is exact and gates; the Monte Carlo arm is "
+                        "an ensemble and reports statistics. Neither is accepted without "
+                        "its broken twin."
+                    ),
+                },
+            )
+            for direction in ("wave_ray_wave", "ray_wave_ray")
+            for arm, seeds in (("enumerated", (0,)), ("monte_carlo", (1, 2, 3)))
+            for seed in seeds
+        ]
     )
 )

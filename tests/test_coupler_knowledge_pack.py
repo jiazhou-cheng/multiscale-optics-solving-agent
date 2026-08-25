@@ -474,3 +474,252 @@ def test_the_near_grazing_cancellation_hazard_is_recorded_with_its_numbers() -> 
     assert "eps * k * Z / d_n" in streaming, (
         "the derivation belongs next to the code that applies it, not only in a report"
     )
+
+
+# --------------------------------------------------------------------------- #
+# CHE-111 — the two COMPOSED couplers' packs
+# --------------------------------------------------------------------------- #
+# C_PLANAR_DOE_STEP and C_PATCH_WFT are the two couplers that have graph nodes,
+# so they are precisely the ones an agent has to configure -- and their
+# configuration was documented only as YAML comments. The parametrized tests
+# above deliberately do not cover them: those assert properties of the two
+# PRIMITIVE packs (a vendored reference-data entry, a specific gradient claim)
+# that a composed pack has no reason to carry.
+#
+# What a composed pack owes instead is different and is asserted here: it must
+# name what it composes, must not restate or contradict it, must not widen the
+# capability it inherits, and must key its traps by SYMPTOM -- because the
+# failure mode these packs exist for is a plausible wrong answer, and the reader
+# arrives holding a symptom rather than a cause.
+
+COMPOSED = ("planar_doe_step", "patch_wft")
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+@pytest.mark.parametrize("filename", PACK_FILES)
+def test_composed_pack_file_exists_and_is_non_trivial(pack: str, filename: str) -> None:
+    path = COUPLERS / pack / filename
+    assert path.is_file(), path
+    assert len(path.read_text().strip()) > 500, path
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_composed_pack_pins_the_doi_and_names_its_equations(pack: str) -> None:
+    source = _card(pack)["scientific_source"]
+    assert source["doi"] == DOI
+    assert source["equations"], "a coupler card must name the equations it implements"
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_pack_names_what_it_composes_and_points_at_real_packs(pack: str) -> None:
+    """A composed pack that restates its halves goes stale in three places at once.
+
+    So the rule is: name the component, name its pack, say what it supplies, and
+    say nothing else about it. This asserts the pointers resolve -- a pack
+    reference to a directory that no longer exists is worse than no reference,
+    because it reads as a citation.
+    """
+    card = _card(pack)
+    registry = Registry.from_package()
+    components = card["composed_from"]
+    assert len(components) >= 2, f"{pack} claims to be composed of fewer than two things"
+    for entry in components:
+        assert entry["component"] in registry.couplers, entry["component"]
+        assert (ROOT / entry["pack"] / "card.yaml").is_file(), entry["pack"]
+        assert entry["supplies"].strip(), f"{pack}: a component with no stated role"
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_pack_defers_to_capabilities_rather_than_widening_them(pack: str) -> None:
+    """The capability is the INTERSECTION of what it composes, and the card must
+    say so in a form that cannot be read as a claim of its own.
+
+    C_PATCH_WFT is declared CPU/FP64-only because no CUDA or JAX path through it
+    has ever executed. That is a measurement gap, and a well-written card is
+    exactly the artifact that could quietly widen it.
+    """
+    card = _card(pack)
+    rule = card["capability_rule"]
+    assert "core/capabilities.py" in rule, f"{pack} must name the authoritative module"
+    assert "authoritative" in rule
+    assert "not be read as widening" in rule
+
+    declared = card["role"]
+    assert declared in Registry.from_package().couplers
+    from core import capabilities
+
+    assert hasattr(capabilities, f"{declared}_CAPABILITIES"), (
+        f"{pack} points at {declared}_CAPABILITIES, which does not exist"
+    )
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_pack_forbids_importing_either_engine(pack: str) -> None:
+    forbidden: set[str] = set()
+    for entry in _card(pack)["frameworks_deliberately_avoided"]:
+        forbidden.update(entry["forbidden_imports"])
+    assert forbidden == {"optiland", "chromatix"}
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_packs_validation_status_matches_its_evidence(pack: str) -> None:
+    """Same ladder rule as the primitive packs: a card cannot claim a rung it has
+    no evidence for, and every path it names must resolve."""
+    card = _card(pack)
+    assert card["validation_status"] in ("unvalidated", "characterized", "validated")
+    probes = card["validated_probe_ids"]
+    if card["validation_status"] == "unvalidated":
+        assert probes == []
+        assert card["devices_tested"] == []
+    else:
+        assert probes, f"{pack} claims {card['validation_status']!r} with no evidence"
+        assert card["devices_tested"]
+        assert (ROOT / card["implementation_location"]).is_file()
+        assert (ROOT / card["test_location"]).is_file()
+        assert (ROOT / card["graph_node"]).is_file()
+    for reference in probes:
+        path = reference.split("::")[0]
+        assert (ROOT / path).exists(), f"{pack} cites {path}, which is not there"
+
+    assert card["not_yet_probed"], "an unprobed regime left unlisted is the whole risk"
+    assert card["derivative"]["verified"] is False
+    assert card["maturity_basis"].strip(), "a maturity rung with no basis is a label"
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_pack_records_the_reference_implementation_as_read_only(
+    pack: str,
+) -> None:
+    """Not vendored, not executed, read at a recorded scope.
+
+    Same three-state distinction the primitive packs carry: a read with no
+    recorded scope is indistinguishable from a copy, and the equations still
+    coming from the published text is the claim the entry exists to protect.
+    """
+    status = _card(pack)["scientific_source"]["reference_implementation_status"]
+    assert "NOT vendored" in status
+    assert "NOT executed" in status
+
+    entries = [
+        entry
+        for entry in _manifest(pack)["sources"]
+        if entry.get("source_type") == "reference_implementation"
+    ]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["vendored"] is False
+    assert entry["pinned"] is False
+    assert entry["executed_by_this_repository"] is False
+    assert entry.get("read_at")
+    assert entry.get("read_scope")
+    note = entry["usage_note"]
+    assert "never executed" in note and "never vendored" in note
+    assert "come from the paper" in note
+
+
+@pytest.mark.parametrize("pack", COMPOSED)
+def test_a_composed_packs_internal_evidence_all_exists(pack: str) -> None:
+    for reference in _manifest(pack)["internal_evidence"]:
+        assert (ROOT / reference.split("::")[0]).exists(), reference
+
+
+def test_the_patch_pack_keys_every_trap_by_symptom() -> None:
+    """CHE-111's actual requirement, and the reason for it.
+
+    An agent debugging a convergence sweep that stops at 0.28 does not yet know
+    it is looking at a sub-sample linear phase from unsnapped patch centres. A
+    guide organized by cause is unreachable from where the reader is standing, so
+    the index is keyed by what you SEE and every entry leads with the symptom.
+    """
+    guide = (COUPLERS / "patch_wft" / "failure_guide.md").read_text()
+    assert "## Symptom index" in guide
+    assert "| What you see |" in guide
+
+    # Each of CHE-111's seven configuration traps, reachable from a symptom.
+    for symptom in (
+        "plateaus",
+        "reads O(1) instead of ~1e-12",
+        "8.8e-3 one way and 0.33 the other",
+        "off by a constant factor",
+        "will not fire",
+        "is not the pad you asked for",
+        "swapping",
+    ):
+        assert symptom in guide, f"no symptom-keyed entry for {symptom!r}"
+
+    # Every anchor the index points at must exist, or the index is decoration.
+    import re
+
+    targets = set(re.findall(r"\{#([a-z0-9]+)\}", guide))
+    referenced = set(re.findall(r"\]\(#([a-z0-9]+)\)", guide))
+    assert referenced <= targets, f"dangling index links: {sorted(referenced - targets)}"
+
+
+def test_the_patch_pack_states_where_the_equivalence_stops() -> None:
+    """The measured finding this pack exists to carry, and the one an agent will
+    otherwise rediscover as a bug report.
+
+    1.7e-15 at the DOE plane against 0.84 at z = 1.26 mm, with neither route
+    wrong: a sub-aperture patch's pad grid is not commensurate with the
+    reconstruction grid, so one side is the non-periodic propagated field and the
+    other is the periodic one. A pack that recorded only the exact number would
+    be setting the reader up for the 0.84.
+    """
+    card = _card("patch_wft")
+    section = card["equivalence_with_the_global_step"]["where_it_holds_and_where_it_stops"]
+    assert "COINCIDE" in section["statement"]
+    assert "1.7e-15" in section["measured"] and "0.84" in section["measured"]
+    assert "not commensurate" in section["why_neither_is_wrong"]
+    assert section["consequence_for_a_caller"].strip()
+
+    for document in ("conventions.md", "theory.md", "failure_guide.md"):
+        text = (COUPLERS / "patch_wft" / document).read_text()
+        assert "0.84" in text, f"{document} omits the number the caller will hit"
+
+
+def test_the_patch_pack_refuses_to_let_route_agreement_become_a_gate() -> None:
+    """The pack is where an agent learns which comparison may decide something.
+
+    RW-F against RW-P is a CROSS_ROUTE oracle, which forces B4, and a B4 family
+    may not gate. A pack that presented 0.9994 as validation would be teaching
+    exactly the promotion the substrate exists to prevent -- so it states the
+    rule, and puts the independent-oracle number beside it.
+    """
+    section = _card("patch_wft")["equivalence_with_the_global_step"][
+        "route_agreement_is_characterization_not_a_gate"
+    ]
+    assert "CROSS_ROUTE" in section["statement"]
+    assert "B4" in section["statement"]
+    assert "0.99941823" in section["demo2_what_carries_the_claim"]
+    assert "1.1367" in section["demo3_instrument"]
+
+    instrument = section["implementation"]
+    path, _, symbol = instrument.partition("::")
+    assert (ROOT / path).is_file(), instrument
+    assert symbol in (ROOT / path).read_text(), f"{instrument} names a missing symbol"
+
+    theory = (COUPLERS / "patch_wft" / "theory.md").read_text()
+    assert "May it gate?" in theory, (
+        "the theory document owes an explicit table of what may decide this coupler"
+    )
+
+
+def test_the_patch_pack_does_not_restate_its_halves() -> None:
+    """A composed pack that duplicates a convention creates a second place to
+    update, and the two drift. The rule is: point, do not copy.
+
+    Asserted on the three conventions that would be the tempting ones to repeat
+    -- the OPL rebasing, the spectral-amplitude outgoing convention, and the
+    importance division -- all of which belong to packs this one composes.
+    """
+    conventions = (COUPLERS / "patch_wft" / "conventions.md").read_text()
+    assert "planar_doe_step/conventions.md" in conventions
+    assert "ray_to_wave/conventions.md" in conventions
+    assert "wave_to_ray/conventions.md" in conventions
+    assert "bind here unchanged" in conventions
+
+    # The headings that would indicate a copy rather than a pointer.
+    for restated in ("## D1", "## D2", "## D3"):
+        assert restated not in conventions, (
+            f"{restated} belongs to the cascade's pack; this one must point at it"
+        )

@@ -1,0 +1,360 @@
+# Routing-critical facts for C_PATCH_WFT (M2.3, CHE-111).
+#
+# This coupler is the DIRECT implementation and C_PLANAR_DOE_STEP is its
+# shortcut: SI S10 is explicit about which is which, and the registry states the
+# relation plainly -- the global single-plane step is a SPECIAL CASE of this
+# coupler at one full-aperture patch, not a peer of it. So anything true of the
+# step is true here, and anything true of C_RAY_TO_WAVE or C_WAVE_TO_RAY is true
+# of both. None of it is restated. Load those packs when the question is about
+# the accumulation kernel, the resampling estimator, or the cascade.
+#
+# What this card carries is only what PATCHING creates: the window, the pad, the
+# centres, the coverage correction, and the launch phase -- five things that do
+# not exist at one full-aperture patch and are exactly where this coupler is
+# configured wrongly.
+#
+# Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
+# SI S10 and SI Algorithm S1.
+
+id: patch_wft
+role: C_PATCH_WFT
+direction: ray_bundle -> ray_bundle
+transformation: >
+  a local windowed Fourier transform per patch: each patch is windowed out of the
+  DOE, padded, transformed, and resampled into secondary rays, and the patches
+  are summed coherently. The wave representation exists only inside a patch.
+
+composed_from:
+  - component: C_RAY_TO_WAVE
+    pack: knowledge/couplers/ray_to_wave
+    supplies: >
+      the accumulation onto the patch plane and every convention in its card.
+      This is also the EXPENSIVE half -- O(rays x pixels) -- which is why the
+      device story below is about that coupler and not about this one.
+  - component: C_WAVE_TO_RAY
+    pack: knowledge/couplers/wave_to_ray
+    supplies: the spectral resampling estimator, and its known bias
+  - component: C_PLANAR_DOE_STEP
+    pack: knowledge/couplers/planar_doe_step
+    supplies: >
+      the accumulate-transmit-transform-resample cascade. It is this coupler at
+      one full-aperture patch, so its OPL rebasing, its energy policy and its
+      budget invariant all hold here unchanged.
+capability_rule: >
+  The capability is the INTERSECTION of what it composes, not an independent
+  claim. core/capabilities.py::C_PATCH_WFT_CAPABILITIES is authoritative and
+  declares CPU and FP64 only. This card must not be read as widening it.
+
+scientific_source:
+  doi: 10.1021/acsphotonics.6c00818
+  equations: [SI_S10, SI_Algorithm_S1]
+  reference_implementation: https://github.com/jiazhou-cheng/raywave-tracing
+  reference_implementation_status: >
+    NOT vendored, NOT pinned, NOT executed by this repository. Read at recorded
+    scope (see source_manifest.yaml); the mathematics is the paper's and every
+    number in this pack is produced by this repository's own probes and
+    benchmark instances.
+
+framework: numpy
+frameworks_deliberately_avoided:
+  - reason: >
+      Same rule as everything else under couplers/: the coupler core is the
+      physics under test, so it imports neither engine. A defect here must not be
+      attributable to engine behaviour.
+    forbidden_imports: [optiland, chromatix]
+
+implementation_location: src/couplers/patch.py
+graph_node: src/couplers/patch_node.py
+test_location: tests/test_patch_wft.py
+
+# --------------------------------------------------------------------------- #
+# The equivalence relation this coupler is half of
+# --------------------------------------------------------------------------- #
+# This is the clearest cross-representation cross-validation in the repository,
+# and the reason is structural rather than empirical: one route is the LIMIT of
+# the other, so their agreement is an equivalence relation and not a
+# self-comparison. Both directions are testable.
+equivalence_with_the_global_step:
+  full_aperture_limit:
+    statement: >
+      One patch covering the whole aperture IS the window, so the two routes
+      coincide and the residual is float64 round-off.
+    measured: 1.44474e-12 relative field error, 33x33 grid, all 1089 modes enumerated
+    oracle: verification/asm_oracle.angular_spectrum_float64 at pad 0
+    instance: B2-EQUIV-FULL-01
+  sub_aperture_direction:
+    statement: >
+      Many patches coherently summed must converge to the full-DOE response. The
+      partition-of-unity argument behind that convergence is what an apodization
+      taper breaks, which is why this coupler carries NO apodization.
+    measured_drawn_ladder: 4 -> 1.57, 16 -> 0.806, 64 -> 0.427, 225 -> 0.193
+    measured_enumerated: 1.739e-15 over all 361 draw positions
+    instances: [B2-EQUIV-SUB-004, -016, -064, -225, B2-EQUIV-SUB-ENUMERATED]
+  where_it_holds_and_where_it_stops:
+    statement: >
+      The equivalence is exact where the patch mode grid and the oracle mode grid
+      COINCIDE, and only there. This is the single most useful thing in this pack.
+    measured: >
+      the enumerated sub-aperture sum reproduces the field AT THE DOE PLANE to
+      1.7e-15 and disagrees with the independent ASM AT z = 1.26 mm by 0.84.
+    why_neither_is_wrong: >
+      a sub-aperture patch's modes live on its own pad-21 grid, which is not
+      commensurate with the 15-px reconstruction grid, so the ray sum is the
+      NON-periodic propagated field while the ASM is the periodic one. They
+      differ by the wrapped contributions. At full aperture with pad_factor 1 the
+      two mode sets coincide exactly, which is why the anchor can read 1.4e-12
+      and this comparison cannot.
+    consequence_for_a_caller: >
+      choose the comparison plane, not just the oracle. A sub-aperture score at
+      large z against a periodic oracle is measuring commensurability, not the
+      coupler.
+  route_agreement_is_characterization_not_a_gate:
+    statement: >
+      RW-F against RW-P is a CROSS_ROUTE oracle, which forces category B4, and a
+      B4 family may not carry a gating tolerance. Two of our own routes agreeing
+      is not evidence either is right -- a shared convention error makes them
+      agree perfectly.
+    demo2_measured: cross-route NCC 0.99941808
+    demo2_what_carries_the_claim: >
+      the sub-aperture route against the INDEPENDENT float64 ASM reads 0.99941823,
+      numerically indistinguishable from the cross-route number. The routes agree
+      at exactly the level at which each independently matches an oracle, which is
+      the evidence their agreement is not hiding a shared error.
+    demo3_instrument: >
+      NCC(A,B) ~= sqrt(NCC(A,A') NCC(B,B')). Predicted 0.012943, measured
+      0.014713, ratio 1.1367. demo3 has no independent oracle at all -- the paper
+      states no conventional reference exists -- so this relation is the whole
+      instrument, and a ratio near 1 says the disagreement is the Monte Carlo
+      noise each route carries rather than a systematic difference.
+    implementation: benchmarks/instances/b2_equiv.py::noise_limited_relation
+
+# --------------------------------------------------------------------------- #
+# The five things patching creates, each of which is a trap
+# --------------------------------------------------------------------------- #
+# Every one of these is a case where the code runs and the answer is wrong. Read
+# failure_guide.md for the SYMPTOM; this section is the rule.
+what_patching_creates:
+  patch_px_must_be_odd:
+    statement: >
+      An even patch has no centre sample, so "centred on a ray" is undefined and
+      the odd-pad and even-(pad - patch) rules become jointly unsatisfiable.
+    refused_not_rounded: >
+      The paper's own sizes are 40, 50 and 100 -- all even -- so an even request
+      is the LIKELY one. Rounding it would silently hand back a different
+      operator than the caller asked for, so it is refused with SHAPE_MISMATCH
+      and the remedy names the nearest odd sizes.
+    history: an earlier resolve_pad_px looped forever on an even request.
+    measured_refusal: B2-EQUIV declared_refusals()['even_patch_px'], code SHAPE_MISMATCH
+  pad_px_is_derived_not_taken:
+    statement: >
+      pad_factor is a PREFERENCE. The step raises the pad until clearance,
+      centring and oddness all hold, then reports what it actually used.
+    consequence: >
+      A caller that assumes its factor was honoured is reasoning about a grid
+      that does not exist. Read plan.pad_px, not your own request.
+    measured: pad_factor 1, 2 and 3 all derive pad_px 21 at patch_px 5 on a 15-px grid
+    if_violated: a pad violating clearance produces a plausible field wrong by 100%.
+  centres_must_be_snapped_to_the_sample_grid:
+    statement: >
+      Patch centres are snapped to the sample grid, over the aperture DILATED by
+      half a patch.
+    why: >
+      Continuous centres inject a sub-sample linear phase that no patch corrects,
+      so the convergence sweep PLATEAUS instead of converging. An UNDILATED draw
+      is unbiased in the interior and biased at the rim, which reads as a soft
+      edge rather than as a defect.
+    measured: >
+      declared as the negative control grid-snapping-is-not-free on B2-EQUIV and
+      FIRED on B2-EQUIV-SUB-ENUMERATED; the historical plateau was ~0.28.
+  the_centre_density_is_a_choice_and_uniform_is_not_the_optimum:
+    statement: >
+      "Uniformly covers" in SI S2 constrains the SUPPORT, not the density. The
+      default centre density is uniform and that is a deliberate choice, not a
+      requirement of the convergence relation.
+    what_the_optimum_is: >
+      CHE-120 derived it: the same Cauchy-Schwarz argument that makes
+      p ~ |U~| optimal on the DIRECTION axis applies to the POSITION axis and
+      gives q_c ~ f_c with f_c = ||U~_c||_1, the L1 norm of that patch's own
+      spectrum. The asymmetry -- magnitude sampling on one axis and uniform on
+      the other -- was inherited from the reference implementation, not reasoned.
+    measured_on_demo3: >
+      exactly-computed ceiling 1.4413x at matched ray count over all 90,601
+      candidates; the integral-image proxy q ~ sqrt(window energy) captures
+      1.4412x of it at correlation 0.99995; measured end to end 1.4523x i.i.d.
+      and 1.4685x with equal-mass CDF strata.
+    why_only_1_44x_here: >
+      demo3's amplitude is FLAT inside its aperture, so the only spatial
+      structure is the rim taper. predicted_variance_ratio computes the ceiling
+      per configuration from the mask alone -- a STRUCTURED mask will not get
+      this number, and demo2's is 4.96x. Do not carry 1.44x to another system.
+    what_keeps_it_unbiased: >
+      PatchPlan.center_weights carries lambda_c = P / (D pi_c) -- 1/(D q_c) for
+      the i.i.d. and CDF draws, the stratum's own mass for the equal-area
+      tiling. Unbiasedness is gated against the ENUMERATED exact field in
+      tests/test_patch_positions.py, not inferred from the noise level: an
+      estimator can keep its noise and shift its mean.
+    two_negative_results_worth_knowing: >
+      q ~ energy instead of q ~ sqrt(energy) gets only 1.096x, and equal-AREA
+      strata cancel importance sampling almost entirely -- one draw per
+      equal-area cell makes the between-cell allocation uniform whatever the
+      density.
+    availability: >
+      couplers.patch_positions.plan_positions supplies the alternative. The
+      DEFAULT stays uniform so every committed record remains the estimator that
+      produced it, and it is NOT yet reachable through the graph node -- library
+      only. src/registry/couplers.yaml is the source of truth for that status.
+  coverage_correction:
+    statement: >
+      Drawn patches cover a fraction of the aperture, and the sum is corrected by
+      A_draw / A_patch -- plan.coverage, which is draw_positions / patch_px**2.
+      patch_secondary_rays applies it exactly once, on the emitted amplitude. It
+      is only unbiased for centres drawn uniformly over the DILATED aperture,
+      which is why coverage_basis is a required declaration for caller-supplied
+      centres rather than something plan_patches infers from the positions.
+    why_it_is_dangerous: >
+      It is EXACTLY 1 at full aperture. An inverted correction (A_patch/A_draw
+      for A_draw/A_patch) therefore survives every full-aperture test, and did.
+    where_it_is_gated: >
+      the sub-aperture instances, where coverage is not 1. The anchor reports the
+      inverted value as a measured blindness rather than as a control.
+  launch_phase_is_per_patch:
+    statement: >
+      Each patch's window offset carries its own linear phase, applied once -- and
+      NOT by this coupler. couplers/patch.py applies no launch phase; the
+      inter-patch phase relationship is carried by C_RAY_TO_WAVE's per-ray
+      Delta-r ramp, because each emitted ray already knows where it launched
+      from. An explicit exp(i k . c_j) added in the emitter is not a missing term,
+      it IS the double-count.
+    why_it_is_dangerous: >
+      It is EXACTLY 0 for a single patch centred on the origin, so a
+      double-counted launch phase is a no-op at full aperture. Same failure class
+      as the coverage correction, same remedy: gate it sub-aperture.
+
+# --------------------------------------------------------------------------- #
+# Validity
+# --------------------------------------------------------------------------- #
+validity_conditions:
+  - id: planarity
+    statement: >
+      Each patch must be PLANAR. A conformal substrate has position-dependent
+      tangent frames and normals, so there is no common plane to accumulate onto
+      and the operator is undefined rather than approximate.
+    refused: MISSING_DECLARATION, measured by B2-EQUIV declared_refusals()
+    sizing_a_planar_patch: >
+      couplers/curvature.py's eps_curv <= arcsin(D/2R) bound is how a patch size
+      is chosen on a curved surface. It is independent of the DOE phase profile.
+  - id: no_apodization
+    statement: >
+      There is no window taper, and adding one is not a refinement.
+    why: >
+      Any window below 1 removes field that no other patch replaces, so the
+      partition-of-unity argument behind the convergence relation is exactly what
+      a taper breaks.
+    measured: >
+      the apodized ladder does not reach the correct ladder's finest rung; the
+      full comparison is in B2-EQUIV's APODIZATION_BREAKS_THE_CONVERGENCE
+      diagnostic.
+  - id: the_oracle_needs_its_padding_named
+    statement: >
+      A score against a discrete ASM is undefined until the oracle's padding is
+      stated, because a discrete ASM is periodic.
+    measured: >
+      the same route reads 8.8e-3 against a pad-200 oracle and 0.33 against a
+      pad-101 one. Neither is an error in either implementation; both are
+      wraparound between two periods.
+  - id: the_full_aperture_clearance_exemption_is_legitimate
+    statement: >
+      At one full-aperture patch, pad_factor 1 is the condition under which the
+      patch mode set and the unpadded oracle's mode set are the SAME set.
+    consequence: >
+      Padding it to satisfy the general clearance rule moves the modes off the
+      oracle's grid and the anchor reads O(1) instead of 1e-12. The exemption is
+      a property of the limit, not a relaxation, and "fixing" it changes the
+      operator being compared.
+
+# --------------------------------------------------------------------------- #
+# Evidence
+# --------------------------------------------------------------------------- #
+validation_status: characterized
+validated_probe_ids:
+  - tests/test_patch_wft.py
+  - tests/test_b2_equiv_instances.py::test_the_full_aperture_limit_is_exact
+  - tests/test_b2_equiv_instances.py::test_the_enumerated_sub_aperture_estimator_is_unbiased
+  - tests/test_b2_equiv_instances.py::test_the_sub_aperture_sweep_converges
+  - tests/test_b2_equiv_instances.py::test_all_three_controls_fire_on_the_enumerated_instance
+devices_tested: [cpu]
+invariants:
+  - patch_coverage_corrected
+  - outgoing_count_is_the_budget
+  - evanescent_power_accounted
+  - unit_direction_norm
+
+not_yet_probed:
+  - >
+    Any device other than CPU and any dtype other than FP64. The declaration is
+    CPU/FP64-only because no CUDA or JAX path through this coupler has ever
+    executed, and it must not be widened before one is measured. The expensive
+    half is the O(rays x pixels) reconstruction in C_RAY_TO_WAVE, which IS
+    xp-parameterized and does run on CUDA; the patch transform is
+    O(patches x pad^2 log pad) and is not where the time goes. Device work is M5.
+  - >
+    The sub-aperture equivalence at a large propagation distance on a finite
+    window. Measured at 0.84 and ATTRIBUTED to commensurability (see
+    where_it_holds_and_where_it_stops); the attribution is physically reasoned and
+    is NOT itself executed -- nothing here demonstrates that the 0.84 is
+    wraparound rather than a defect in the sub-aperture route's propagation. The
+    smallest experiment that would settle it: repeat the enumerated sub-aperture
+    comparison on a window padded until the propagated field no longer wraps, and
+    show the residual falling toward round-off. Until that runs, the sub-aperture
+    arm's evidence is the DECOMPOSITION identity at z = 0 only, and no
+    sub-aperture propagation claim may rest on this family.
+  - >
+    Three of the four stochastic evidence kinds for a DRAWN patch decomposition:
+    the exactness limit is established by enumeration, and the drawn ladder's
+    convergence is fitted without a declared expected exponent because the rate
+    in the number of drawn centres is a Monte Carlo rate over a finite population.
+  - >
+    Any certified gradient. See derivative below.
+
+derivative:
+  mode: surrogate
+  verified: false
+  known_biased: true
+  inherited_from: C_WAVE_TO_RAY
+  statement: >
+    Secondary directions are held fixed and only amplitudes carry a derivative,
+    so the gradient is a deliberately biased surrogate. NO gradient across this
+    coupler is certified, and registering it did not change that.
+
+maturity: characterized
+maturity_basis: >
+  `characterized`, and the two exactness limits establish DIFFERENT things, which
+  matters more than the two numbers:
+
+  (1) the full-aperture patch at 1.44474e-12 is a PROPAGATION equivalence -- it is
+  scored at z = 1.26 mm against the independent float64 ASM, so it pins the
+  transfer function as well as the decomposition;
+
+  (2) the enumerated sub-aperture sum at 1.739e-15 is scored AT THE DOE PLANE
+  (z = 0), where the ASM degenerates to the identity for this configuration. So
+  it establishes the DECOMPOSITION identity -- that summing every drawn patch
+  reproduces the windowed field, and that the coverage correction and launch-phase
+  handling are right -- and NOT a propagation equivalence. It is deliberately
+  measured there because at z = 1.26 mm the comparison is ill-posed for
+  commensurability reasons (see where_it_holds_and_where_it_stops), and a score
+  against a periodic oracle on an incommensurate grid measures the grids.
+
+  All three negative controls fire on (2), where the estimator's own sampling
+  error is zero, so their separation is the mutation's.
+
+  NOT `validated`, because there is no certified gradient, no device coverage
+  beyond CPU/FP64, the drawn ladder has no declared convergence exponent, and no
+  sub-aperture PROPAGATION equivalence is established at all -- see not_yet_probed.
+
+cost_model:
+  scaling: O(patches * (incident_rays * pixels + pad^2 * log(pad) + secondary))
+  memory_scaling: O(pad^2 + patches * secondary)
+  measured_note: >
+    tests/test_patch_wft.py runs on a 15-px grid (159 k rays, ~76 MB) rather than
+    the 33-px grid it started on (3.7 M rays, ~4 GB), which caused a swap event on
+    this shared machine. Cost curves belong in a probe, not in the default gate.

@@ -451,3 +451,137 @@ def test_a_docstring_edit_does_not_invalidate_a_record() -> None:
 
         target.write_text(body.replace("x + 1", "x + 2"))
         assert source_fingerprint([target], root=root)["combined_sha256"] != original
+
+
+# --------------------------------------------------------------------------- #
+# The instance records — the same guarantee, for the benchmark substrate
+# --------------------------------------------------------------------------- #
+# `benchmarks/probes/records/` is stamped above. The instance records written by
+# the B0–B2 drivers are a second population and they carry the *gate* numbers, so
+# leaving them unswept would put the checked set on the wrong side of the
+# important artifacts.
+#
+# Two distinct things are checked, and they are not substitutes:
+#
+#   1. the provenance stamp still describes this tree -- cheap, and it says the
+#      driver re-run WOULD produce the same thing;
+#   2. the scientific fingerprint actually reproduces when the driver IS re-run
+#      -- expensive, so it is done on the two cheapest families rather than all
+#      of them, and which ones were skipped is stated rather than implied.
+
+INSTANCE_RECORDS_DIR = ROOT / "benchmarks" / "instances" / "records"
+
+
+def _instance_records() -> list[Path]:
+    return sorted(INSTANCE_RECORDS_DIR.glob("*.json"))
+
+
+def test_there_are_instance_records_to_check() -> None:
+    """A sweep over an empty directory passes and means nothing."""
+    records = _instance_records()
+    assert len(records) >= 25, f"only {len(records)} instance records"
+
+
+@pytest.mark.parametrize(
+    "name", [path.name for path in _instance_records()], ids=lambda n: n[:-5]
+)
+def test_every_instance_record_is_stamped_and_still_describes_this_tree(name: str) -> None:
+    """No unenrolled register for these, on purpose.
+
+    A probe record can legitimately predate the mechanism -- some are minutes of
+    GPU compute and were written before provenance existed. An instance record
+    cannot: every one of them is produced by a driver that already calls
+    ``write_instance_record``, so an unstamped one means somebody hand-wrote it,
+    and a drifted one means the driver was not re-run after the code moved.
+    Neither has a legitimate exemption, so there is no way to declare one.
+    """
+    payload = json.loads((INSTANCE_RECORDS_DIR / name).read_text())
+    assert RECORD_PROVENANCE_KEY in payload, (
+        f"{name} carries no provenance block. Instance records are always written "
+        "by a driver; regenerate it with `--write` rather than declaring it."
+    )
+    verdict = verify_record_provenance(payload, root=ROOT, name=name)
+    assert verdict.reproduces, f"{name}: {verdict.detail}"
+
+
+@pytest.mark.parametrize(
+    "name", [path.name for path in _instance_records()], ids=lambda n: n[:-5]
+)
+def test_every_instance_record_carries_its_two_fingerprints(name: str) -> None:
+    """The instance fingerprint and the scientific fingerprint answer different
+    questions and a record needs both.
+
+    The instance fingerprint identifies *which point in the parameter space* was
+    run, so two records cannot be compared until it matches. The scientific
+    fingerprint identifies *what the verifier concluded*, so it is what moves
+    when a measurement moves. A record with only the first cannot detect a
+    changed result; with only the second it cannot tell you what was measured.
+    """
+    payload = json.loads((INSTANCE_RECORDS_DIR / name).read_text())
+    assert payload["instance_id"] == name[: -len(".json")]
+    for key in ("instance_fingerprint", "scientific_fingerprint"):
+        value = payload[key]
+        assert isinstance(value, str) and len(value) == 64, f"{name}/{key}: {value!r}"
+    assert payload["family_id"]
+    assert payload["runner_version"]
+
+
+@pytest.mark.parametrize(
+    ("driver", "instance_id"),
+    [
+        ("b2_equiv", "B2-EQUIV-FULL-01"),
+        ("b2_equiv", "B2-EQUIV-SUB-ENUMERATED"),
+        ("b2_transitions", "B2-R2W-EXACT-01"),
+    ],
+)
+def test_the_scientific_fingerprint_reproduces_when_the_driver_is_re_run(
+    driver: str, instance_id: str
+) -> None:
+    """The half a provenance stamp cannot give you.
+
+    A stamp says the *inputs* have not changed. This says the *output* has not:
+    the driver is executed again in this process and the fingerprint recomputed
+    from the fresh ``VerificationResult``, then compared with the committed one.
+    That is what makes a committed gate number re-checkable rather than merely
+    attributed.
+
+    Three instances, not thirty-one: the round-trip and stochastic families are
+    ~60 s of compute and the equivalence ladder re-runs its whole sweep per
+    instance, so the sweep is deliberately narrow. **What is skipped is skipped
+    on cost, not on confidence** -- the other twenty-eight are covered by the
+    provenance stamp above, and by their own test files which re-execute them.
+
+    This also demonstrates that ``resource_cost`` is genuinely excluded from the
+    fingerprint: a second run of the same instance takes a different amount of
+    wall time and allocates a different peak, and if those were hashed this test
+    could never pass.
+    """
+    import importlib.util
+    import sys
+
+    module_name = f"{driver}_fingerprint_check"
+    if module_name in sys.modules:
+        module = sys.modules[module_name]
+    else:
+        path = ROOT / "benchmarks" / "instances" / f"{driver}.py"
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+
+    from verification.evidence import result_fingerprint
+
+    committed = json.loads((INSTANCE_RECORDS_DIR / f"{instance_id}.json").read_text())
+    run = module.run_instance(instance_id)
+
+    assert run.instance.fingerprint == committed["instance_fingerprint"], (
+        f"{instance_id} is no longer the same point in the parameter space; the "
+        "committed record describes a different instance"
+    )
+    assert result_fingerprint(run.result) == committed["scientific_fingerprint"], (
+        f"{instance_id} re-ran to a different scientific fingerprint. Identify why "
+        "the measurement moved -- bug fix, metric definition, precision, device, "
+        "stochastic variation or an intended configuration change -- and regenerate "
+        "the record through the driver rather than editing it."
+    )

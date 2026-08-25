@@ -1,0 +1,295 @@
+{
+  "execution": {
+    "nodes": [
+      {
+        "component": "M_RAY_OPTILAND",
+        "node_id": "thick_singlet",
+        "outcome": "executed",
+        "refusal": null
+      }
+    ],
+    "observed_parameters": {
+      "pupil_rings": 64
+    },
+    "seeds": [],
+    "status": "succeeded"
+  },
+  "expected": {
+    "bfl_mm": 94.1120952045042,
+    "efl_mm": 96.74922600619196,
+    "refinement": "measured in the h -> 0 limit from a rings ladder; a single ring count is an aberrated focal length, not a paraxial one",
+    "why": "R/(n-1) is exact for a plano-convex singlet in air and EFL - t/n is exact for a plano rear surface. The two differ by 2.64 mm here, so an implementation that reports the same number twice fails the BFL check and only the BFL check."
+  },
+  "family_id": "B1-RAY-EFL",
+  "family_version": "1.0.0",
+  "instance_fingerprint": "5afd748efcdcffd85cebdec70d023ce8ba17501689b6ae35a828c0e6c86cc7cc",
+  "instance_id": "B1-RAY-EFL-01",
+  "parameters": {
+    "index": 1.5168,
+    "marginal_ray_angle_rad": 0.0517,
+    "pupil_rings": 64,
+    "radius_mm": 50.0,
+    "thickness_mm": 4.0,
+    "wavelength_um": 0.5876
+  },
+  "record_provenance": {
+    "code_fingerprint": {
+      "combined_sha256": "ae2f076b30369be0a8a66bbb46af8a33e0ae2d2a9ed2d1b77dd597906a36503b",
+      "files": {
+        "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+        "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+        "src/core/boundary.py": "4bde197aefff2072f822a672cbff39b8d591b6b1b4a8677e8362e3b36779a22e",
+        "src/core/capabilities.py": "209975060902708c3279a428dcf4a6057f4ad94892bf60fdcc9c059d8e37140f",
+        "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+        "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+        "src/core/execution_record.py": "e7c4d934d978addb6eb94056f932bfcc52f8b56cc5cd5579e3178d8dbabdd9a1",
+        "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+        "src/core/optical_system.py": "a469d554531dd3d4550a8d3fadc7bd0c0fbae303e6295c37e50266d37f73dfa1",
+        "src/core/paths.py": "99a400531c4fdc68bf2567d834be75e896c62af0bf0046f7afa82ce49a519b82",
+        "src/core/performance.py": "0ba833c00705e3cfa8e36c209af3dce4a737462fc4c02668a8bda7b9f628becb",
+        "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+        "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+        "src/core/resources.py": "b17120b6e59c89ce15df90cb5e643be459743a5a826d80e8631428f9a6ad946c",
+        "src/core/specs.py": "2de6b0421e75013dcec221570d1129dc2ff09aceef22c02dc19c6fa2543f702a",
+        "src/couplers/__init__.py": "36e91bb9ee450658c7575477d7c976e49ce964e7829af877617bd4044d6dc6d1",
+        "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+        "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+        "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+        "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+        "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
+        "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+        "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
+        "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
+        "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
+        "src/couplers/quadrature.py": "6c56cb1fa0b8eb3d0a68ce14f7bd0fa4a9fbcd95acfd592fbcffa030b080f3a9",
+        "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+        "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+        "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+        "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+        "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
+        "src/runtime/__init__.py": "181d1e8f9755456d0b479093a7ab0c5ecbf8f62e1eb854a8c566a95fc8ebd10d",
+        "src/runtime/executor.py": "434be27f14c266155f2b92a9123e8ffcac0d0b1f191fe08f0e0b19c1463de228",
+        "src/runtime/instance_runner.py": "ea2aae347e10b0770800a2afb038bf09d7733943c80ae50718edbc3b24288815",
+        "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/base.py": "b7510f0f6c1d96dd51ba71f543744409a1c381961ed45057c65cae8f57a4733e",
+        "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/optiland/adapter.py": "ef379a7f3dd23bd764c094e628281177211fa4f91ac532ecbfcef482b28d68b5",
+        "src/solvers/optiland/artifacts.py": "82c029dd0426ca15b93446dd067d0617f9b446ceae6d81107b55ad20d98240f5",
+        "src/solvers/optiland/baseline.py": "8aff7f2aad97ede8c4990bd81492e66cccc8486ae032f7fdc50557f5938e844d",
+        "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
+        "src/solvers/optiland/capability.py": "ab26e2f3e41a50480ab90aa8ae8ca221715e7eaf48dbb8c92accdc55c763a353",
+        "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
+        "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7",
+        "src/solvers/optiland/provenance.py": "12b2e864c102093494369e894eba7d97e3c6e75a65309478d6d3573b026111d8",
+        "src/solvers/optiland/pupil.py": "9fa15d5cdbb6125ab695456c7794b5bd72aa74bd1033897d3cea8cc1848cb38f",
+        "src/solvers/optiland/requests.py": "061e6831139364a9e92c284055df9845076a285666977722e019cae3221442ed",
+        "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
+        "src/verification/claim_ledger.py": "a4e656ed2fc52982d2016cbf3154b91adc466c321b87a85aa88c408c374fc28e",
+        "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
+        "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
+        "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
+        "src/verification/families/b1_ray.py": "d9959ae2e34cd293b398a2081ace8ebf63274bcebdd1e1a99a30edfaf3a95c3a",
+        "src/verification/families/b1_wave.py": "900d1997af63aaaa2e734f23a144c3a96a578366a06582d5d7c0c178421dcd7b",
+        "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
+        "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
+        "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
+        "src/verification/families/predicates.py": "072f21001dff481a9337a44c57d09688deeb39db8f937718ca4c07150c07eb8d",
+        "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
+        "src/verification/families/schema.py": "3d4e5871edb646df6243bffa4add9989b9e0e2a9bf8701b2e07e908c8a462e71",
+        "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
+        "src/verification/refusals.py": "a05366d0549470b6d02424ac110149ba7a69f9bcdb85eb53b1dd5b02e0f72d46",
+        "src/verification/result.py": "2a41d860f9d4bd4dea16e2c3552d2b47bf44fd040a05aadf42fbcc14519d178a",
+        "src/verification/status.py": "2cc3bc5c1bd6ae75a6941ecff169955f4bc1f958280ac0be0b4a3bbaf9051c2c",
+        "src/verification/verifier.py": "8227cb41a7ebc83a94a160bac0142ed9bd2f5ad5df221726f3243906091cb928"
+      }
+    },
+    "data_fingerprint": {},
+    "environment_fingerprint": {
+      "combined_sha256": "54118fbb8522613f91b8543412783ee46054fa0c904f95ba448e86880b41e12c",
+      "packages": {
+        "chromatix": "0.6.0",
+        "jax": "0.6.2",
+        "jaxlib": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "scipy": "1.15.3",
+        "torch": "2.13.0+cpu"
+      },
+      "python_version": "3.12.14"
+    },
+    "probe": "instances/b1_ray",
+    "schema_version": 2,
+    "source_commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
+    "timestamp_utc": "2026-08-25T23:01:42.233548+00:00",
+    "working_tree_dirty": true
+  },
+  "runner_version": "1.0.0",
+  "scientific_fingerprint": "65a8239f4b4193a242fb7b23d7aa32c08260dd5b91361b48dd81d5d29139cabd",
+  "verification": {
+    "category": "B1",
+    "contract_status": {
+      "capability_intersection_empty": false,
+      "codes": [],
+      "refusal_detail": null,
+      "refusal_kind": null,
+      "silent_hazard_ids": []
+    },
+    "convergence": {
+      "converged": true,
+      "dimension": "pupil_rings",
+      "expected_exponent": -2.0,
+      "fitted_exponent": {
+        "note": "log-log least squares over 4 rungs; r^2=1.000000",
+        "uncertainty": 6.545732665745241e-06,
+        "uncertainty_basis": "fit_standard_error",
+        "unit": null,
+        "value": -2.000017859009539
+      },
+      "ladder": [
+        8.0,
+        16.0,
+        32.0,
+        64.0
+      ],
+      "note": "the innermost ring's relative EFL error against R/(n-1), over four ring counts. The exponent is a prediction rather than a fit target: spherical aberration is quadratic in the aperture and the innermost ring's height halves with each doubling of the ring count, so -2 is what the physics requires. The gated value is the h -> 0 Richardson limit of the same ladder, not its finest rung.",
+      "values": [
+        {
+          "note": "pupil_rings=8",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 7.237511364119472e-05
+        },
+        {
+          "note": "pupil_rings=16",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 1.8093243523328508e-05
+        },
+        {
+          "note": "pupil_rings=32",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 4.523277453586615e-06
+        },
+        {
+          "note": "pupil_rings=64",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 1.1308172743842987e-06
+        }
+      ]
+    },
+    "device_precision_observation": null,
+    "diagnostics": [],
+    "family_id": "B1-RAY-EFL",
+    "family_version": "1.0.0",
+    "instance_id": "B1-RAY-EFL-01",
+    "invariant_results": [],
+    "negative_control_results": [
+      {
+        "baseline": {
+          "note": "traced 94.1120952047 mm from the rear vertex against EFL - t/n = 94.1120952045 mm. Graded separately from the EFL on purpose: the two differ by 2.64 mm here, so reporting the same number twice fails this check and only this check.",
+          "uncertainty": 3.14104086076143e-11,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 2.093604442639651e-12
+        },
+        "control_id": "thin-lens-bfl",
+        "mutated": {
+          "note": "the traced EFL reported as the BFL: the thick-lens correction omitted",
+          "uncertainty": 4.2955055391748054e-11,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 0.028021167696105465
+        },
+        "note": "omitting t/n on this prescription is a 2.64 mm error. baseline 2.0936e-12 -> mutated 0.0280212 against a gate of 1e-06; detection margin 1.33842e+10x",
+        "outcome": "fired",
+        "target_metric": "bfl_relative_error"
+      }
+    ],
+    "physics_accuracy": [
+      {
+        "blind_to": [
+          "the sign convention of the focal length: it is a magnitude ratio, so a system that focuses on the wrong side passes it"
+        ],
+        "measured": {
+          "note": "traced 96.7492260065 mm against R/(n-1) = 96.7492260062 mm, in the h -> 0 limit of a four-rung ring ladder. The error bar is what dropping the finest rung does to the extrapolation.",
+          "uncertainty": 4.178421295364387e-11,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 2.7854966901941223e-12
+        },
+        "met": true,
+        "metric": "efl_relative_error",
+        "oracle": "analytic_closed_form",
+        "oracle_independence": "independent",
+        "tolerance": 1e-06,
+        "tolerance_basis": "R/(n-1) is exact for a single refracting surface in air; the pinned solver reproduces it to 1e-13 relative (measured)",
+        "tolerance_may_gate": true
+      },
+      {
+        "blind_to": [
+          "which of the two terms is wrong -- an EFL error and a t/n error of the same size are indistinguishable here, which is why the EFL is graded separately"
+        ],
+        "measured": {
+          "note": "traced 94.1120952047 mm from the rear vertex against EFL - t/n = 94.1120952045 mm. Graded separately from the EFL on purpose: the two differ by 2.64 mm here, so reporting the same number twice fails this check and only this check.",
+          "uncertainty": 3.14104086076143e-11,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 2.093604442639651e-12
+        },
+        "met": true,
+        "metric": "bfl_relative_error",
+        "oracle": "analytic_closed_form",
+        "oracle_independence": "independent",
+        "tolerance": 1e-06,
+        "tolerance_basis": "exact for a plano rear surface; no residual to record",
+        "tolerance_may_gate": true
+      }
+    ],
+    "provenance": {
+      "family_version": "1.0.0",
+      "fingerprint_matched": true,
+      "instance_fingerprint": "5afd748efcdcffd85cebdec70d023ce8ba17501689b6ae35a828c0e6c86cc7cc",
+      "package_versions": {},
+      "run_id": "probe-3dcf2fc013f0",
+      "source_commit": null,
+      "verifier_version": "1.0.0"
+    },
+    "resource_cost": null,
+    "run_id": "probe-3dcf2fc013f0",
+    "status": "ok",
+    "stochastic_evidence": {
+      "ensemble_mean": null,
+      "ensemble_standard_error": null,
+      "exactness_limit": null,
+      "fitted_convergence_rate": null,
+      "seeds": [],
+      "trials": 0,
+      "unbiasedness": null,
+      "variance_by_sampling_density": {}
+    },
+    "validity": {
+      "declared": "inside",
+      "drifted_parameters": {},
+      "margins": [
+        {
+          "basis": "paraxial_approximation",
+          "blind_to": [
+            "aperture -- a paraxial field angle with a fast cone is still outside the paraxial regime, and this predicate does not see the cone"
+          ],
+          "margin": 0.40756163983472876,
+          "predicate_id": "PARAXIAL_FIELD_ANGLE",
+          "state": "inside"
+        }
+      ],
+      "observed": "inside"
+    }
+  }
+}

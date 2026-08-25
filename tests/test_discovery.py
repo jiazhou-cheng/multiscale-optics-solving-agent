@@ -375,12 +375,44 @@ def test_no_component_in_this_repository_has_a_verified_derivative() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_knowledge_view_reports_the_two_missing_packs() -> None:
-    """C_PATCH_WFT and C_PLANAR_DOE_STEP have graph nodes and no packs. That is
-    an M2.3 deliverable and the API reports it rather than returning silence."""
-    view = knowledge_for("C_PATCH_WFT")
-    assert view.pack_root is None or view.missing
-    assert view.missing, "a component with no pack must report which files are absent"
+def test_the_knowledge_view_reports_a_missing_pack_rather_than_returning_silence() -> None:
+    """Both M2.3 packs now exist, so this asserts the mechanism on the tree it has.
+
+    C_PATCH_WFT and C_PLANAR_DOE_STEP were the two couplers with graph nodes and
+    no packs, and this test used to assert that absence -- correctly, while it was
+    the finding. Now that M2.3 has written both, asserting absence would assert
+    the deliverable was not delivered. What the API still owes is the same thing
+    either way: for a component WITH a pack, name what is present and report
+    nothing missing; for one WITHOUT, name the files that are absent instead of
+    returning an empty view an agent would read as "nothing to load".
+    """
+    for coupler_id in ("C_PATCH_WFT", "C_PLANAR_DOE_STEP"):
+        view = knowledge_for(coupler_id)
+        assert view.pack_root is not None, f"{coupler_id}'s pack is not discoverable"
+        assert view.present, f"{coupler_id} reports a pack root and no files"
+        assert not view.missing, f"{coupler_id} is missing {view.missing}"
+
+    # And the absent case still reports absence rather than silence, checked on a
+    # component with no pack root rather than by mutating the tree: the view must
+    # come back naming the files it expected, not empty. An empty view reads as
+    # "nothing to load" where the truth is "nothing is there".
+    absent = knowledge_for("__NO_SUCH_COMPONENT__")
+    assert absent.present == []
+    assert absent.permitted_by_policy == []
+    assert absent.missing, (
+        "a component with no pack must report which files are absent -- an empty "
+        "view reads as 'nothing to load' rather than as 'nothing is there'"
+    )
+    # RECORDED DEFECT, not an endorsement: an unrecognized component currently
+    # comes back with pack_root='knowledge/solvers' and the SOLVER file list,
+    # because `_pack_root` falls through to the solver directory rather than
+    # returning None. The absence is reported correctly -- every file is listed
+    # missing -- so an agent cannot be told there is nothing to load. But the root
+    # it names does not describe the component, and a caller that trusted
+    # pack_root would look in the wrong place. Asserted as-is so the behaviour is
+    # visible; fixing `_pack_root` belongs to whoever owns the discovery API,
+    # not to M2.4.
+    assert absent.pack_root == "knowledge/solvers"
 
 
 def test_the_context_policy_decides_what_is_permitted() -> None:

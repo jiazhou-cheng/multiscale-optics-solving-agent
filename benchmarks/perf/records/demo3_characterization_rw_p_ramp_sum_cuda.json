@@ -1,5 +1,5 @@
 {
- "cost_per_unit": 1.1249146245500015e-06,
+ "cost_per_unit": 1.1199786770497061e-06,
  "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
  "cuda": null,
  "environment": {
@@ -114,45 +114,45 @@
  "label": "demo3_characterization_rw_p_ramp_sum_cuda",
  "measurement": {
   "all_s": [
-   67.49487747300009
+   67.19872062298236
   ],
-  "median_s": 67.49487747300009,
-  "min_s": 67.49487747300009,
-  "p95_s": 67.49487747300009,
+  "median_s": 67.19872062298236,
+  "min_s": 67.19872062298236,
+  "p95_s": 67.19872062298236,
   "repeats": 1,
   "tail_rule": "max_of_1",
   "warmup": 0
  },
  "memory_report": {
   "after": {
-   "cgroup_memory_bytes": 37392384,
+   "cgroup_memory_bytes": 37015552,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 388403552256,
+   "mem_available_bytes": 388262178816,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 126073.103633614,
-   "rss_bytes": 30842880
+   "monotonic_s": 177654.753774192,
+   "rss_bytes": 30187520
   },
   "before": {
-   "cgroup_memory_bytes": 20885504,
+   "cgroup_memory_bytes": 19767296,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 389060694016,
+   "mem_available_bytes": 389279961088,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 126005.60682131,
-   "rss_bytes": 30842880
+   "monotonic_s": 177587.55318068,
+   "rss_bytes": 30187520
   },
   "cgroup_swap_after_bytes": 0,
   "cgroup_swap_before_bytes": 0,
   "host_reserve_bytes": 60801321984,
   "interval_s": 0.25,
-  "min_mem_available_bytes": 385874075648,
+  "min_mem_available_bytes": 385517424640,
   "peak_cgroup_swap_bytes": 0,
-  "peak_rss_bytes": 30842880,
+  "peak_rss_bytes": 30187520,
   "process_rss_budget_bytes": null,
-  "samples": 271,
+  "samples": 269,
   "signal": "/sys/fs/cgroup/memory.swap.current",
   "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
   "swap_delta_peak_bytes": 0,
@@ -170,26 +170,26 @@
   "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
   "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
  ],
- "peak_host_rss_bytes": 30842880,
+ "peak_host_rss_bytes": 30187520,
  "stages": {
-  "accounted_s": 59.641,
+  "accounted_s": 59.493,
   "fraction_of_total": {
-   "emit_patch_spectra": 0.5212,
-   "host_to_device": 0.0576,
-   "optiland_trace": 0.0837,
-   "power_bookkeeping": 0.0137,
-   "reconstruct": 0.2076
+   "emit_patch_spectra": 0.5192,
+   "host_to_device": 0.0532,
+   "optiland_trace": 0.0853,
+   "power_bookkeeping": 0.0118,
+   "reconstruct": 0.216
   },
   "seconds": {
-   "emit_patch_spectra": 35.175,
-   "host_to_device": 3.885,
-   "optiland_trace": 5.649,
-   "power_bookkeeping": 0.923,
-   "reconstruct": 14.009
+   "emit_patch_spectra": 34.887,
+   "host_to_device": 3.572,
+   "optiland_trace": 5.731,
+   "power_bookkeeping": 0.791,
+   "reconstruct": 14.512
   },
   "source": "perf_demo3_characterization_rw_p_ramp_sum_cuda.json stage_wall_clock_s -- the demo's own per-stage timers, summed over chunks. The denominator is the whole command, which includes interpreter start, JAX compilation, the plan setup and the record write, so the unaccounted remainder is real and named rather than hidden.",
-  "total_s": 67.4949,
-  "unaccounted_s": 7.8539
+  "total_s": 67.1987,
+  "unaccounted_s": 7.7057
  },
  "subprocess": {
   "argv": [
@@ -206,7 +206,7 @@
    "--output-name",
    "perf_demo3_characterization_rw_p_ramp_sum_cuda"
   ],
-  "peak_child_rss_bytes": 2931994624,
+  "peak_child_rss_bytes": 2941247488,
   "returncode": 0,
   "stderr_tail": [],
   "tail": [

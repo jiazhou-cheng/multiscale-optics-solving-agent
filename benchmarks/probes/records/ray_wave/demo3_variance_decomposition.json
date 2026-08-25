@@ -2,21 +2,21 @@
   "arms": [
     {
       "decomposition": {
-        "direction_share_at_shipped_S": 0.7458794688674624,
-        "direction_term_B": 22019174862.550198,
+        "direction_share_at_shipped_S": 0.7475477398408421,
+        "direction_term_B": 22147930385.418224,
         "model": "P * V = A + B / S, V the absolute field variance sum",
-        "position_term_A": 375095.7523785766,
+        "position_term_A": 373975.7868064014,
         "reading": "A is the part of the variance that falls only with P; B is the part that falls with P*S. Their ratio, with the cost model's per-patch and per-ray constants, is what sets the optimal S -- that is what this split is FOR. It is not a split into reducible and irreducible: a position density scales BOTH terms, because the per-ray weight modulus ||U~_c||_1 is a per-patch quantity and the importance weight multiplies the whole patch. Read the share as 'how V responds to P versus S', never as a cap on what reweighting can achieve -- run this stage per arm to get each arm's own A and B.",
-        "relative_rms_residual": 0.0013559755174135796
+        "relative_rms_residual": 0.0014718242718375347
       },
       "label": "uniform_iid",
       "rungs": [
         {
-          "field_variance_sum": 9178.741875698637,
-          "jackknife_relative_error": 0.010626127464296847,
-          "jackknife_standard_error": 97.53448113305284,
+          "field_variance_sum": 9228.58143243405,
+          "jackknife_relative_error": 0.008438475866401847,
+          "jackknife_standard_error": 77.87516169871891,
           "label": "uniform_iid S=2500",
-          "mean_field_power": 2343.3235800120156,
+          "mean_field_power": 1595.063117809991,
           "patches": 1000,
           "positions": {
             "density_kind": "uniform",
@@ -24,29 +24,31 @@
             "path": "plan_patches internal draw (shipped)"
           },
           "realized_patches": 1000,
-          "replicates": 4,
+          "replicates": 6,
           "secondary_per_patch": 2500,
-          "seed_to_seed_ncc_max": 0.07510752670825345,
-          "seed_to_seed_ncc_mean": 0.07060078619685105,
-          "seed_to_seed_ncc_min": 0.06365931228612666,
+          "seed_to_seed_ncc_max": 0.07510752781943018,
+          "seed_to_seed_ncc_mean": 0.0702577385449779,
+          "seed_to_seed_ncc_min": 0.06365931264281072,
           "total_rays_realized": 2500000,
           "total_rays_requested": 2500000,
-          "variance_times_rays": 22946854689.246593,
+          "variance_times_rays": 23071453581.085125,
           "wall_clock_s_all": [
-            6.900628139002947,
-            2.8406215290015098,
-            2.809849311990547,
-            2.809743035992142
+            6.642470255988883,
+            2.776290489011444,
+            2.8156564090168104,
+            2.7420564650092274,
+            2.736016834009206,
+            2.7809731460001785
           ],
-          "wall_clock_s_first_realization": 6.900628139002947,
-          "wall_clock_s_per_realization": 2.8252354204960284
+          "wall_clock_s_first_realization": 6.642470255988883,
+          "wall_clock_s_per_realization": 2.7786318175058113
         },
         {
-          "field_variance_sum": 4787.340472486098,
-          "jackknife_relative_error": 0.008798813229548364,
-          "jackknife_standard_error": 42.122914683663,
+          "field_variance_sum": 4813.656849621326,
+          "jackknife_relative_error": 0.007087384883951862,
+          "jackknife_standard_error": 34.11623879253752,
           "label": "uniform_iid S=5000",
-          "mean_field_power": 1235.1886589198427,
+          "mean_field_power": 853.2417041096552,
           "patches": 1000,
           "positions": {
             "density_kind": "uniform",
@@ -54,29 +56,31 @@
             "path": "plan_patches internal draw (shipped)"
           },
           "realized_patches": 1000,
-          "replicates": 4,
+          "replicates": 6,
           "secondary_per_patch": 5000,
-          "seed_to_seed_ncc_max": 0.0745849622516328,
-          "seed_to_seed_ncc_mean": 0.07216732426392926,
-          "seed_to_seed_ncc_min": 0.06951219954956002,
+          "seed_to_seed_ncc_max": 0.07458496147470947,
+          "seed_to_seed_ncc_mean": 0.07030431642727725,
+          "seed_to_seed_ncc_min": 0.064004216928281,
           "total_rays_realized": 5000000,
           "total_rays_requested": 5000000,
-          "variance_times_rays": 23936702362.430492,
+          "variance_times_rays": 24068284248.10663,
           "wall_clock_s_all": [
-            7.337533544996404,
-            3.2069945920084137,
-            3.2084381230088184,
-            3.190521914002602
+            7.165895006997744,
+            3.0110695420007687,
+            3.0138965220248792,
+            3.0148082180239726,
+            2.9838626389973797,
+            3.0097403340041637
           ],
-          "wall_clock_s_first_realization": 7.337533544996404,
-          "wall_clock_s_per_realization": 3.207716357508616
+          "wall_clock_s_first_realization": 7.165895006997744,
+          "wall_clock_s_per_realization": 3.012483032012824
         },
         {
-          "field_variance_sum": 2579.9507477412726,
-          "jackknife_relative_error": 0.011138356324550647,
-          "jackknife_standard_error": 28.736410728133176,
+          "field_variance_sum": 2590.449427931864,
+          "jackknife_relative_error": 0.008756828750702371,
+          "jackknife_standard_error": 22.68412202775426,
           "label": "uniform_iid S=10000",
-          "mean_field_power": 691.3790205957861,
+          "mean_field_power": 486.9789936152225,
           "patches": 1000,
           "positions": {
             "density_kind": "uniform",
@@ -84,29 +88,31 @@
             "path": "plan_patches internal draw (shipped)"
           },
           "realized_patches": 1000,
-          "replicates": 4,
+          "replicates": 6,
           "secondary_per_patch": 10000,
-          "seed_to_seed_ncc_max": 0.07899833870319327,
-          "seed_to_seed_ncc_mean": 0.07560636559881163,
-          "seed_to_seed_ncc_min": 0.07104910998079,
+          "seed_to_seed_ncc_max": 0.07927506287567261,
+          "seed_to_seed_ncc_mean": 0.07529179179986147,
+          "seed_to_seed_ncc_min": 0.07104910946601678,
           "total_rays_realized": 10000000,
           "total_rays_requested": 10000000,
-          "variance_times_rays": 25799507477.412727,
+          "variance_times_rays": 25904494279.31864,
           "wall_clock_s_all": [
-            8.570376978997956,
-            4.391745512999478,
-            4.398547927004984,
-            4.350256560996058
+            8.198929033998866,
+            4.144196095992811,
+            4.211144886998227,
+            4.162065860989969,
+            4.176455450011417,
+            4.174706165009411
           ],
-          "wall_clock_s_first_realization": 8.570376978997956,
-          "wall_clock_s_per_realization": 4.395146720002231
+          "wall_clock_s_first_realization": 8.198929033998866,
+          "wall_clock_s_per_realization": 4.175580807510414
         },
         {
-          "field_variance_sum": 1468.731060500946,
-          "jackknife_relative_error": 0.009164514868253698,
-          "jackknife_standard_error": 13.46020764142694,
+          "field_variance_sum": 1474.1632263020313,
+          "jackknife_relative_error": 0.007731165397482255,
+          "jackknife_standard_error": 11.396999725427067,
           "label": "uniform_iid S=20000",
-          "mean_field_power": 417.59435057967085,
+          "mean_field_power": 301.74457694044526,
           "patches": 1000,
           "positions": {
             "density_kind": "uniform",
@@ -114,187 +120,24 @@
             "path": "plan_patches internal draw (shipped)"
           },
           "realized_patches": 1000,
-          "replicates": 4,
+          "replicates": 6,
           "secondary_per_patch": 20000,
-          "seed_to_seed_ncc_max": 0.08317064618254608,
-          "seed_to_seed_ncc_mean": 0.0800587852160022,
-          "seed_to_seed_ncc_min": 0.07702214804571852,
+          "seed_to_seed_ncc_max": 0.08473470596178138,
+          "seed_to_seed_ncc_mean": 0.08107422792295942,
+          "seed_to_seed_ncc_min": 0.07208663134678894,
           "total_rays_realized": 20000000,
           "total_rays_requested": 20000000,
-          "variance_times_rays": 29374621210.018917,
+          "variance_times_rays": 29483264526.040623,
           "wall_clock_s_all": [
-            10.548564794007689,
-            6.769012916003703,
-            6.854924364000908,
-            6.665760991003481
+            10.658158070000354,
+            6.695550896023633,
+            6.914169471012428,
+            6.694657893007388,
+            6.632827371999156,
+            6.480385527975159
           ],
-          "wall_clock_s_first_realization": 10.548564794007689,
-          "wall_clock_s_per_realization": 6.811968640002306
-        }
-      ]
-    },
-    {
-      "decomposition": {
-        "direction_share_at_shipped_S": 0.7637336048955853,
-        "direction_term_B": 15300724491.1554,
-        "model": "P * V = A + B / S, V the absolute field variance sum",
-        "position_term_A": 236669.3697146763,
-        "reading": "A is the part of the variance that falls only with P; B is the part that falls with P*S. Their ratio, with the cost model's per-patch and per-ray constants, is what sets the optimal S -- that is what this split is FOR. It is not a split into reducible and irreducible: a position density scales BOTH terms, because the per-ray weight modulus ||U~_c||_1 is a per-patch quantity and the importance weight multiplies the whole patch. Read the share as 'how V responds to P versus S', never as a cap on what reweighting can achieve -- run this stage per arm to get each arm's own A and B.",
-        "relative_rms_residual": 0.0013328038618062195
-      },
-      "label": "sqrt_energy_stratified_cdf",
-      "rungs": [
-        {
-          "field_variance_sum": 6359.17005267066,
-          "jackknife_relative_error": 0.0028715625554759138,
-          "jackknife_standard_error": 18.26075460715286,
-          "label": "sqrt_energy_stratified_cdf S=2500",
-          "mean_field_power": 1636.3118799940441,
-          "patches": 1000,
-          "positions": {
-            "density_kind": "sqrt_window_energy",
-            "draw_kind": "stratified_cdf",
-            "draw_positions": 90601,
-            "empty_positions": 9388,
-            "mean_center_weight": 0.957653871462037,
-            "patch_count": 1000,
-            "path": "patch_positions.plan_positions",
-            "predicted_variance_ratio": 1.4475084333686425,
-            "support_positions": 81213,
-            "support_power_fraction": 1.0,
-            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
-          },
-          "realized_patches": 1000,
-          "replicates": 4,
-          "secondary_per_patch": 2500,
-          "seed_to_seed_ncc_max": 0.07596586263008213,
-          "seed_to_seed_ncc_mean": 0.07033763832271632,
-          "seed_to_seed_ncc_min": 0.06610671990734708,
-          "total_rays_realized": 2500000,
-          "total_rays_requested": 2500000,
-          "variance_times_rays": 15897925131.676651,
-          "wall_clock_s_all": [
-            2.6008063519984717,
-            2.5579364799923496,
-            2.5939754959981656,
-            2.586812302994076
-          ],
-          "wall_clock_s_first_realization": 2.6008063519984717,
-          "wall_clock_s_per_realization": 2.590393899496121
-        },
-        {
-          "field_variance_sum": 3290.1791933143145,
-          "jackknife_relative_error": 0.0015045715595216889,
-          "jackknife_standard_error": 4.950310039990731,
-          "label": "sqrt_energy_stratified_cdf S=5000",
-          "mean_field_power": 874.6632153849157,
-          "patches": 1000,
-          "positions": {
-            "density_kind": "sqrt_window_energy",
-            "draw_kind": "stratified_cdf",
-            "draw_positions": 90601,
-            "empty_positions": 9388,
-            "mean_center_weight": 0.957653871462037,
-            "patch_count": 1000,
-            "path": "patch_positions.plan_positions",
-            "predicted_variance_ratio": 1.4475084333686425,
-            "support_positions": 81213,
-            "support_power_fraction": 1.0,
-            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
-          },
-          "realized_patches": 1000,
-          "replicates": 4,
-          "secondary_per_patch": 5000,
-          "seed_to_seed_ncc_max": 0.07532738237815945,
-          "seed_to_seed_ncc_mean": 0.07122076323021992,
-          "seed_to_seed_ncc_min": 0.06823248847680939,
-          "total_rays_realized": 5000000,
-          "total_rays_requested": 5000000,
-          "variance_times_rays": 16450895966.571571,
-          "wall_clock_s_all": [
-            3.039641028997721,
-            3.037466983005288,
-            3.0394213760009734,
-            3.018322199000977
-          ],
-          "wall_clock_s_first_realization": 3.039641028997721,
-          "wall_clock_s_per_realization": 3.0384441795031307
-        },
-        {
-          "field_variance_sum": 1771.1708372677303,
-          "jackknife_relative_error": 0.003145511533981054,
-          "jackknife_standard_error": 5.571238297276526,
-          "label": "sqrt_energy_stratified_cdf S=10000",
-          "mean_field_power": 497.24891522665035,
-          "patches": 1000,
-          "positions": {
-            "density_kind": "sqrt_window_energy",
-            "draw_kind": "stratified_cdf",
-            "draw_positions": 90601,
-            "empty_positions": 9388,
-            "mean_center_weight": 0.957653871462037,
-            "patch_count": 1000,
-            "path": "patch_positions.plan_positions",
-            "predicted_variance_ratio": 1.4475084333686425,
-            "support_positions": 81213,
-            "support_power_fraction": 1.0,
-            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
-          },
-          "realized_patches": 1000,
-          "replicates": 4,
-          "secondary_per_patch": 10000,
-          "seed_to_seed_ncc_max": 0.08055426840084458,
-          "seed_to_seed_ncc_mean": 0.07695827122042738,
-          "seed_to_seed_ncc_min": 0.07107721315969626,
-          "total_rays_realized": 10000000,
-          "total_rays_requested": 10000000,
-          "variance_times_rays": 17711708372.677303,
-          "wall_clock_s_all": [
-            4.189470732992049,
-            4.226665213005617,
-            4.185412743987399,
-            4.248186999000609
-          ],
-          "wall_clock_s_first_realization": 4.189470732992049,
-          "wall_clock_s_per_realization": 4.208067972998833
-        },
-        {
-          "field_variance_sum": 1001.7007639725421,
-          "jackknife_relative_error": 0.005791538288749633,
-          "jackknife_standard_error": 5.801388328416737,
-          "label": "sqrt_energy_stratified_cdf S=20000",
-          "mean_field_power": 303.067998980432,
-          "patches": 1000,
-          "positions": {
-            "density_kind": "sqrt_window_energy",
-            "draw_kind": "stratified_cdf",
-            "draw_positions": 90601,
-            "empty_positions": 9388,
-            "mean_center_weight": 0.957653871462037,
-            "patch_count": 1000,
-            "path": "patch_positions.plan_positions",
-            "predicted_variance_ratio": 1.4475084333686425,
-            "support_positions": 81213,
-            "support_power_fraction": 1.0,
-            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
-          },
-          "realized_patches": 1000,
-          "replicates": 4,
-          "secondary_per_patch": 20000,
-          "seed_to_seed_ncc_max": 0.0884581207313651,
-          "seed_to_seed_ncc_mean": 0.08504487372523,
-          "seed_to_seed_ncc_min": 0.08165059645909371,
-          "total_rays_realized": 20000000,
-          "total_rays_requested": 20000000,
-          "variance_times_rays": 20034015279.45084,
-          "wall_clock_s_all": [
-            6.608087746004458,
-            6.611913318003644,
-            6.613934608001728,
-            6.818412310996791
-          ],
-          "wall_clock_s_first_realization": 6.608087746004458,
-          "wall_clock_s_per_realization": 6.612923963002686
+          "wall_clock_s_first_realization": 10.658158070000354,
+          "wall_clock_s_per_realization": 6.695104394515511
         }
       ]
     }
@@ -305,12 +148,14 @@
     "patch_px": 101,
     "precision": "fp32",
     "reconstruction": "kspace_splat",
-    "replicates": 4,
+    "replicates": 6,
     "seeds": [
       20260824,
       20260825,
       20260826,
-      20260827
+      20260827,
+      20260828,
+      20260829
     ],
     "sensor_grid": [
       420,
@@ -326,7 +171,7 @@
     "peak_gb": 0.294
   },
   "environment": {
-    "commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
     "container_image": "agent_solver",
     "jax_devices": [
       "cuda:0"
@@ -341,7 +186,7 @@
   "probe": "demo3_variance",
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "c689992a27f31a5f0ad26f0a44e5c12ebcdc6d66eeb12580c3be767d56d43edb",
+      "combined_sha256": "74109afacc354d15800c54f340be9cb879a4d2a217f2d6f71a6658e46564b86d",
       "files": {
         "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
         "benchmarks/probes/ray_wave/demo3_hologram_lens.py": "9e56980436b0c099a388ef5ad1037c75f6c4e511d9e6210847cbc55b78efc9cc",
@@ -349,7 +194,7 @@
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
         "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
-        "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
+        "src/core/boundary.py": "4bde197aefff2072f822a672cbff39b8d591b6b1b4a8677e8362e3b36779a22e",
         "src/core/bridge.py": "89deacd30cd5e03285c1f187e4745113057ff736bf1694deb9452ca30bd418c6",
         "src/core/capabilities.py": "209975060902708c3279a428dcf4a6057f4ad94892bf60fdcc9c059d8e37140f",
         "src/core/coherent_batch.py": "1651fe93e0486dd96c1aa73a8d47c83e8b2fd8c7bfa995d2aec6df66ac48a262",
@@ -365,7 +210,7 @@
         "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
         "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
         "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
-        "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
+        "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
         "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
         "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
         "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
@@ -401,20 +246,12 @@
     },
     "probe": "demo3_variance_decomposition",
     "schema_version": 2,
-    "source_commit": "195f23c399b782ffe5e745945c1afe876c57119f",
-    "timestamp_utc": "2026-08-25T06:39:45.304725+00:00",
+    "source_commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
+    "timestamp_utc": "2026-08-25T21:38:29.329053+00:00",
     "working_tree_dirty": true
   },
   "reference_power_note": "Every `field_variance_sum` is absolute, in the units of `mean_field_power` on the same rows. Divide by a `mean_field_power` to read a variance as a fraction -- but the fits and the ratios use the absolute values, because a signal-power denominator is not measurable at these budgets. See `variance_statistics`.",
   "route": "rw_p",
   "stage": "decomposition",
-  "status_of_this_evidence": "CHARACTERIZATION, not validation. demo3 has no conventional reference; every number here is a property of the estimator, measured against itself across seeds or against another arm of the same probe. The unbiasedness of each arm is gated against an enumerated oracle in tests/test_patch_positions.py, at the size where such an oracle exists.",
-  "term_by_term_ratio_vs_first_arm": [
-    {
-      "direction_term_B_ratio": 1.4390936112390238,
-      "label": "sqrt_energy_stratified_cdf",
-      "position_term_A_ratio": 1.5848935281772387,
-      "reading": "A position density scales both terms. These two ratios are the measurement of that, and they are what makes the total reduction larger than the direction share would allow if B were fixed."
-    }
-  ]
+  "status_of_this_evidence": "CHARACTERIZATION, not validation. demo3 has no conventional reference; every number here is a property of the estimator, measured against itself across seeds or against another arm of the same probe. The unbiasedness of each arm is gated against an enumerated oracle in tests/test_patch_positions.py, at the size where such an oracle exists."
 }

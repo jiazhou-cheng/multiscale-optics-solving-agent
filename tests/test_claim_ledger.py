@@ -362,16 +362,19 @@ def test_every_open_gate_has_a_gap_that_owns_it() -> None:
 # 6. Knowledge-pack completeness
 # ---------------------------------------------------------------------------
 
-#: Which pack directory each component's knowledge lives in. `None` means the
-#: pack does not exist, which is the audit's actual finding rather than an
-#: omission -- both couplers below have graph nodes and no agent-facing docs.
+#: Which pack directory each component's knowledge lives in. `None` used to mean
+#: the pack did not exist, which was the audit's actual finding rather than an
+#: omission -- the two couplers that HAVE graph nodes had no agent-facing docs.
+#: Both are now written, so no entry is `None` and the completeness check applies
+#: to every component. The `None` branch is kept because the next component
+#: registered without a pack should land in it rather than in a passing test.
 PACK_PATHS = {
     "M_RAY_OPTILAND": ("solver", "knowledge/solvers/optiland"),
     "M_WAVE_CHROMATIX": ("solver", "knowledge/solvers/chromatix"),
     "C_RAY_TO_WAVE": ("coupler", "knowledge/couplers/ray_to_wave"),
     "C_WAVE_TO_RAY": ("coupler", "knowledge/couplers/wave_to_ray"),
     "C_PLANAR_DOE_STEP": ("coupler", "knowledge/couplers/planar_doe_step"),
-    "C_PATCH_WFT": ("coupler", None),
+    "C_PATCH_WFT": ("coupler", "knowledge/couplers/patch_wft"),
 }
 
 
@@ -397,12 +400,15 @@ def test_a_missing_knowledge_pack_is_filed_as_a_gap(component: str) -> None:
 
     `C_PLANAR_DOE_STEP` and `C_PATCH_WFT` were the two couplers that HAVE graph
     nodes and had no card, conventions, failure guide or theory. M2.3 wrote the
-    first and deliberately deferred the second: C_PATCH_WFT's estimator contract
-    is being rewritten by CHE-120, so a pack written now would be wrong on
-    landing.
+    first, and deliberately deferred the second: that coupler's estimator
+    contract -- the centre density, the unbiasedness weights, the measured
+    variance reduction -- was being rewritten by CHE-120, so a pack written
+    before it landed would have been wrong on landing.
 
-    This test fails when the remaining pack appears, which is the prompt to move
-    it into the completeness check above and close its gap-list entry.
+    CHE-120 has landed and the pack is written, so this parameterization is now
+    EMPTY and the completeness check above covers every component. It is kept
+    rather than deleted because it is where the next component registered without
+    a pack should land -- deleting it would make that arrive as a passing test.
     """
     _, relative = PACK_PATHS[component]
     assert relative is None
@@ -411,12 +417,31 @@ def test_a_missing_knowledge_pack_is_filed_as_a_gap(component: str) -> None:
         f"{component} has no knowledge pack and no gap entry saying so"
     )
 
-    directory = ROOT / "knowledge" / "couplers" / "patch_wft"
-    assert not directory.exists(), (
-        f"{directory.relative_to(ROOT)} now exists. Move {component} into "
-        "PACK_PATHS with its real path so the completeness check applies to it, "
-        "and close the gap-list entry."
-    )
+
+def test_every_coupler_with_a_graph_node_now_has_a_pack() -> None:
+    """The closed finding, asserted forwards.
+
+    The audit's point was never "two directories are absent" -- it was that the
+    two couplers an agent has to CONFIGURE were the two with nothing to read, and
+    their configuration is where a coupler gets got wrong. So the standing
+    assertion is over graph nodes, not over a list of names: registering a new
+    graph node without a pack fails here.
+    """
+    from registry.loader import Registry
+
+    registry = Registry.from_package()
+    for coupler_id, coupler in registry.couplers.items():
+        if not getattr(coupler, "graph_node", None):
+            continue
+        entry = PACK_PATHS.get(coupler_id)
+        assert entry is not None, f"{coupler_id} has a graph node and no PACK_PATHS entry"
+        _, relative = entry
+        assert relative is not None, (
+            f"{coupler_id} has a graph node and no knowledge pack. An agent asked to "
+            "build a graph through this node has nothing to read about its "
+            "conventions, and the conventions are what a coupler gets wrong."
+        )
+        assert (ROOT / relative).is_dir(), relative
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import pytest
 
+from core.paths import repository_root
+
 from verification.families import (
     BenchmarkCategory,
     BenchmarkFamily,
@@ -32,7 +34,12 @@ from verification.families.b2_transitions import (
     B2_W2R_STOCH,
     WHAT_DOES_NOT_SURVIVE,
 )
-from verification.families.schema import GateStatus, Oracle, ToleranceBasis
+from verification.families.schema import (
+    GateStatus,
+    Oracle,
+    OracleIndependence,
+    ToleranceBasis,
+)
 from verification.metrics import METRICS
 
 B2 = (B2_R2W_EXACT, B2_R2W_ROUTE, B2_W2R_STOCH, B2_EQUIV, B2_ROUNDTRIP)
@@ -75,7 +82,13 @@ def test_every_b2_metric_resolves_to_a_central_definition_or_says_why_not(
 def test_the_exact_and_fast_routes_are_separate_families() -> None:
     """One family covering both would let the fast route inherit the exact one's
     evidence, and they answer different questions: a limit and a budget."""
-    assert B2_R2W_EXACT.oracle.kind is Oracle.DETERMINISTIC_LIMIT
+    # The exactness family's oracle is ANALYTIC, not a deterministic limit. It was
+    # declared DETERMINISTIC_LIMIT before it ran, and executing it showed the
+    # instance actually compares against the closed-form plane wave -- which is
+    # the stronger oracle and the one the gate needs, because an enumerated
+    # reference shares the kernel and can only establish the sampling.
+    assert B2_R2W_EXACT.oracle.kind is Oracle.ANALYTIC
+    assert B2_R2W_EXACT.oracle.independence is OracleIndependence.INDEPENDENT
     assert B2_R2W_ROUTE.oracle.kind is Oracle.DETERMINISTIC_LIMIT
     assert B2_R2W_ROUTE.oracle.reference == "B2-R2W-EXACT", (
         "the fast route is measured AGAINST the exact one, not beside it"
@@ -93,14 +106,42 @@ def test_the_exact_and_fast_routes_are_separate_families() -> None:
 
 
 def test_the_exactness_family_says_what_its_oracle_does_not_establish() -> None:
-    """An exactness limit is independent of the SAMPLING, not of the kernel.
+    """The scope statement, updated to the oracle the instance actually uses.
 
-    Reading the number as "the coupler is correct" would claim something the
-    instrument cannot say, and the metric's blind spot says so.
+    This test used to assert "independent of the SAMPLING and not of the kernel",
+    which was the correct scope for the enumerated-reference framing the family
+    carried before it was executed. The executed instance compares against a
+    closed-form plane wave, so the kernel IS pinned and asserting otherwise would
+    understate the gate.
+
+    What still has to be said is what an analytic comparison on THIS bundle
+    cannot say: a collimated on-axis bundle has projection factor exactly 1 and
+    no oblique ramp, so two of the four conventions this gate is credited with are
+    pinned in the configuration run rather than in general. B2-W2R-STOCH measures
+    those blind spots as numbers.
     """
     metric = B2_R2W_EXACT.metric("exactness_relative_l2_field")
-    assert any("kernel" in blind for blind in metric.blind_to)
-    assert "not of the kernel" in B2_R2W_EXACT.oracle.description
+    assert any("inert on THIS bundle" in blind for blind in metric.blind_to), metric.blind_to
+    description = B2_R2W_EXACT.oracle.description
+    assert "CLOSED-FORM" in description
+    assert "shares no code with the coupler" in description
+    # And it must still say why the weaker framing was not enough, so the change
+    # reads as a correction rather than as a promotion.
+    assert "can only establish the sampling" in description
+
+
+def test_the_exactness_oracle_names_a_callable_that_exists() -> None:
+    """An oracle whose callable is a string nobody resolves is a citation.
+
+    The family declares `benchmarks/instances/b2_transitions.py::_plane_wave_on_grid`,
+    and this checks both halves: the file is there and the symbol is in it.
+    """
+    reference = B2_R2W_EXACT.oracle.callable
+    assert reference, "an ANALYTIC oracle owes its closed form"
+    path, _, symbol = reference.partition("::")
+    source = repository_root() / path
+    assert source.is_file(), reference
+    assert f"def {symbol}(" in source.read_text(), f"{reference} names a missing symbol"
 
 
 def test_on_node_and_off_node_are_a_declared_representation_choice() -> None:
@@ -113,15 +154,22 @@ def test_on_node_and_off_node_are_a_declared_representation_choice() -> None:
 
 
 def test_the_route_family_records_the_asymmetry_rather_than_an_average() -> None:
-    """7.1e-13 on demo2 and a 1.7% power loss on demo3, from the same route.
+    """Exact on an on-node system and O(1e-1) on an off-node one, same route.
 
     Averaging those would produce a number describing neither system, which is
-    why the system is a PhysicalParameter and the note carries both.
+    why ``system`` is a PhysicalParameter and the note carries both. The
+    assertion used to pin the inherited 7.1e-13 / 1.7% pair from a 60M-ray demo3
+    probe; those are still cited, but as a B4 characterization rather than as
+    this family's measurement, and the note now has to say which is which.
     """
     system = next(p for p in B2_R2W_ROUTE.parameters if p.name == "system")
     assert system.kind is ParameterKind.PHYSICAL
     note = B2_R2W_ROUTE.gate_disposition.note  # type: ignore[union-attr]
-    assert "7.1e-13" in note and "1.7%" in note
+    assert "ON-NODE:" in note and "OFF-NODE:" in note
+    assert "B4-DEMO3" in note, (
+        "the paper-scale numbers are a probe and must be attributed to one"
+    )
+    assert "NOT the paper-scale demo3 numbers" in note
 
 
 def test_ncc_alone_would_have_certified_the_lossy_route() -> None:
@@ -312,26 +360,47 @@ def test_a_round_trip_without_its_broken_twin_is_outside_its_own_validity() -> N
 
 
 def test_the_measured_pairing_is_recorded_with_both_numbers() -> None:
-    """1.32e-15 correct against 1.40 broken. The pairing is the point, and
-    either number alone says nothing."""
+    """5.31e-16 correct against 1.414 broken. The pairing is the point, and
+    either number alone says nothing.
+
+    Both numbers moved when the round trip was actually executed: the correct arm
+    from an inherited 1.32e-15 to a freshly measured 5.31e-16 (a different probe
+    field and the SI eq S5 1/N the reconstruction was owed), and the twin from
+    1.40 to 1.414 -- which is sqrt(2), the exact distance between a field and its
+    conjugate for a probe whose spectrum is not Hermitian-symmetric. The first
+    probe was a centred real Gaussian, for which both twins were no-ops.
+    """
     disposition = B2_ROUNDTRIP.gate_disposition
     assert disposition is not None
-    assert disposition.observed == pytest.approx(1.32e-15)
-    assert "1.40" in disposition.note
+    assert disposition.observed == pytest.approx(5.31117e-16, rel=1e-3)
+    assert "1.414" in disposition.note
     assert "cancels between the two directions" in disposition.note
 
 
-def test_the_detection_margin_is_a_number_and_is_itself_gated() -> None:
+def test_the_detection_margin_is_a_number_and_cannot_be_gated_by_this_schema() -> None:
     """A control that fires by 1.1x and one that fires by 1e15 are different
-    evidence, and a bare boolean cannot tell them apart. Gating the margin gates
-    the CONTROL rather than the physics -- an under-powered control is a finding
-    about the benchmark.
+    evidence, and a bare boolean cannot tell them apart -- so the margin is
+    reported. What it cannot be is *gated*, and that is a schema limitation
+    named here rather than worked around.
+
+    ``MetricResult.met`` is ``measured <= tolerance`` everywhere in the verifier.
+    For a quantity where LARGER IS BETTER that comparison asserts the opposite of
+    the claim: gating a detection margin at ``<= 1e3`` would mark a control that
+    separates by 1e15 as failing and a barely-firing one as passing. Inverting
+    the number to fit the schema would hide the limitation inside a metric name,
+    so ``may_gate`` is false and the under-powered-control finding is carried by
+    the negative-control outcomes, where the direction is the right way round.
+
+    The threshold is kept as the documented expectation, and a two-sided
+    tolerance kind is recorded as schema follow-up rather than improvised here.
     """
     tolerance = B2_ROUNDTRIP.tolerance_for("detection_margin")
     assert tolerance is not None
-    assert tolerance.may_gate
+    assert tolerance.may_gate is False
     assert tolerance.threshold == 1e3
-    assert "gates the CONTROL, not the physics" in tolerance.basis
+    assert "LARGER IS BETTER" in tolerance.basis
+    assert "undermines_the_gate" in tolerance.basis
+    assert tolerance.rejects
 
 
 def test_the_round_trip_metric_declares_the_error_it_cannot_see() -> None:
@@ -390,8 +459,58 @@ def test_per_ray_correspondence_is_named_as_lost() -> None:
 
 @pytest.mark.parametrize("family", B2, ids=lambda f: f.family_id)
 def test_no_b2_family_claims_a_gate_it_has_not_measured(family: BenchmarkFamily) -> None:
-    assert family.gate_disposition is not None
-    assert family.gate_disposition.status in (
-        GateStatus.MEASURED_OFF_GATE,
-        GateStatus.NOT_MEASURED,
+    """A gate is decided by a run, and the run has to be re-runnable.
+
+    This assertion used to read "the status must be MEASURED_OFF_GATE or
+    NOT_MEASURED", which was correct while nothing had executed and became the
+    wrong assertion the moment the instances did. What it was protecting is the
+    rule underneath: a declared benchmark is not a measured benchmark, so a MET
+    or NOT_MET verdict owes an observed number and an executable reference that
+    reproduces it -- and a NOT_MEASURED one must not quietly carry a number.
+    """
+    disposition = family.gate_disposition
+    assert disposition is not None
+
+    if disposition.status is GateStatus.NOT_MEASURED:
+        assert disposition.observed is None, (
+            f"{family.family_id} says NOT_MEASURED and reports {disposition.observed}"
+        )
+        assert disposition.note, "an unmeasured gate owes the reason it is unmeasured"
+        return
+
+    assert disposition.observed is not None, family.family_id
+    assert disposition.metric in {metric.name for metric in family.metrics}, (
+        f"{family.family_id} gates on {disposition.metric!r}, which it does not declare"
     )
+    node_ids = [ref for ref in disposition.evidence if "::" in ref]
+    assert node_ids, (
+        f"{family.family_id} claims {disposition.status.value} with no test that re-runs it: "
+        f"{disposition.evidence}"
+    )
+    for ref in node_ids:
+        path, _, node = ref.partition("::")
+        assert (repository_root() / path).exists(), f"{family.family_id} cites a missing {path}"
+        assert node.startswith("test_"), ref
+
+
+@pytest.mark.parametrize("family", B2, ids=lambda f: f.family_id)
+def test_a_gated_tolerance_exists_for_every_decided_b2_gate(family: BenchmarkFamily) -> None:
+    """And it is one the family is allowed to gate on.
+
+    A CROSS_ROUTE or SHARES_CODE oracle forces B4 and a B4 family cannot gate;
+    conversely a B2 family that has decided MET must be pointing at a tolerance
+    whose basis permits gating, or the verdict is resting on a number that was
+    only ever meant to be reported.
+    """
+    disposition = family.gate_disposition
+    assert disposition is not None
+    if disposition.status is GateStatus.NOT_MEASURED:
+        pytest.skip("nothing decided")
+    tolerance = family.tolerance_for(disposition.metric)
+    assert tolerance is not None, f"{family.family_id} gates on an undeclared tolerance"
+    assert tolerance.basis.strip(), f"{family.family_id}: a tolerance with no basis is a number"
+    if disposition.status in (GateStatus.MET, GateStatus.NOT_MET):
+        assert tolerance.may_gate, (
+            f"{family.family_id} decided {disposition.status.value} on "
+            f"{disposition.metric!r}, whose basis says it may not gate"
+        )

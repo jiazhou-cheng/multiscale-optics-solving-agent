@@ -21,10 +21,10 @@ Components x claim kinds. What each cell means:
 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
 | `M_RAY_OPTILAND` | **ind** / **ind** / self / **ind** | **ind** / **ind** / **ind** / **ind** | **FAIL** / declared | -- | -- | **ind** / n/a | -- | n/a | n/a |
 | `M_WAVE_CHROMATIX` | **ind** / **ind** / **ind** / self | **ind** / **ind** / **ind** / n/a | -- | **ind** | **ind** | **ind** / n/a | -- | **ind** | n/a |
-| `C_RAY_TO_WAVE` | off-gate / off-gate / **FAIL** / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | off-gate / n/a / char | off-gate / self | **ind** / n/a | declared | off-gate | n/a |
-| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | declared | off-gate / **ind** | n/a | char | -- | -- |
-| `C_PLANAR_DOE_STEP` | off-gate / **ind** | -- | -- | -- | -- | n/a | -- | self | -- |
-| `C_PATCH_WFT` | off-gate / off-gate / **ind** | **ind** | -- | n/a | -- | **ind** / **ind** / n/a | -- | -- | n/a |
+| `C_RAY_TO_WAVE` | **ind** / off-gate / **FAIL** / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | **ind** / n/a / char | **ind** / self | **ind** / n/a | declared | off-gate | n/a |
+| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | **ind** | **ind** / **ind** | n/a | char | -- | -- |
+| `C_PLANAR_DOE_STEP` | **ind** / **ind** | -- | -- | -- | -- | n/a | -- | self | -- |
+| `C_PATCH_WFT` | **ind** / off-gate / **ind** | **ind** | -- | n/a | -- | **ind** / **ind** / n/a | -- | -- | n/a |
 
 68 claims over 6 components.
 

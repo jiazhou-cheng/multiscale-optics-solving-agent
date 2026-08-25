@@ -1303,32 +1303,16 @@ GAPS: tuple[Gap, ...] = (
             "nothing checks the estimator anyone would actually run."
         ),
     ),
-    # C_PLANAR_DOE_STEP's pack gap is CLOSED: knowledge/couplers/planar_doe_step
-    # exists with all four required files, is registered in knowledge/README.md,
-    # and is held to the standard by tests/test_planar_doe_step_pack.py. The
-    # C_PATCH_WFT half of M2.3 is still open, below.
-    Gap(
-        component="C_PATCH_WFT",
-        kind=ClaimKind.CONVENTION,
-        gap=(
-            "No knowledge pack at all: no card, no conventions, no failure guide, no "
-            "theory. It is now the ONLY coupler with a graph node and no pack -- "
-            "C_PLANAR_DOE_STEP's was written and this one was deliberately not."
-        ),
-        blocks=("agent use of this coupler", "M6's planner", "M3.2's discovery API"),
-        severity="medium",
-        owner="M2.3 (CHE-111)",
-        rationale=(
-            "A usability gap, not a correctness one: nothing here makes a number "
-            "wrong. It does mean an agent asked to build a graph through this node "
-            "has nothing to read about its conventions, and the conventions are "
-            "exactly what a coupler gets wrong. Deferred rather than forgotten: this "
-            "coupler's estimator contract -- the centre density, the unbiasedness "
-            "weights, the measured variance reduction -- is being rewritten by "
-            "CHE-120, so a pack written against the current state would be wrong on "
-            "landing. Write it once that lands."
-        ),
-    ),
+    # BOTH coupler pack gaps are now CLOSED. C_PLANAR_DOE_STEP's was written by
+    # M2.3's first half; C_PATCH_WFT's was deliberately deferred because CHE-120
+    # was rewriting that coupler's estimator contract -- the centre density, the
+    # unbiasedness weights, the measured variance reduction -- so a pack written
+    # before it landed would have been wrong on landing. CHE-120 landed, the
+    # registry records the settled outcome (q ~ sqrt(window energy), 1.4685x with
+    # equal-mass CDF strata, default still uniform), and
+    # knowledge/couplers/patch_wft/ carries it. Every coupler with a graph node
+    # now has a pack. Held to the standard by
+    # tests/test_coupler_knowledge_pack.py's COMPOSED parameterization.
     Gap(
         component="M_WAVE_CHROMATIX",
         kind=ClaimKind.FORWARD_ACCURACY,
