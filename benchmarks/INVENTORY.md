@@ -6,7 +6,7 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
-| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 101 |
+| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 103 |
 | **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 3 |
 | **C** | does this exist only to serve the old evaluation design? | delete | 8 |
 
@@ -117,6 +117,8 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `src/verification/families/predicates.py` | The already-measured validity bounds made executable: SI S3 curvature, per-axis Nyquist, ASM transfer-function sampling, capability intersection, hexapolar ring membership, declared planarity, Fresnel number, paraxial field angle. | Family validity tuples. |
 | `src/verification/families/b1_ray.py` | The five B1 ray-primitive families (CHE-106): EFL/BFL, plane-parallel plate, Snell with the TIR boundary as a validity predicate, the Lagrange invariant, and the off-axis pupil OPL whose omitted n_object * (d0 . r_launch) term recovered only 0.13% of the required tilt. | The ray half of the B1 evidence layer. |
 | `src/verification/families/b1_wave.py` | The seven B1 wave-primitive families (CHE-107), including B1-WAVE-ASM-VALIDITY, whose entire subject is behaviour near the sampling boundary and which is what forces the validity margin to be signed and normalized. | The wave half of the B1 evidence layer. |
+| `src/verification/families/b3_composed.py` | The three B3 composed families (CHE-116). B3-PSF-SINGLET carries the unmet 1.0e-3 gate at 2.2072e-3 with every tolerance basis migrated verbatim from tolerances.yaml; B3-DEMO2 is the one composed case graded against an external published reference; B3-DUALROUTE gates on an intermediate invariant because no independent PSF route exists for the Cooke triplet. | The composed half of the validated evidence layer. |
+| `src/verification/families/b4_characterization.py` | The B4 characterization families (CHE-134). Carries the DEMO3-RW-P why_not migrated unreworded from manifest.yaml, the cost model, and the attributed cross-route discrepancy on the Cooke triplet. None of them can gate, and the schema refuses the promotion rather than relying on the label. | The characterization layer; B4 never joins a required gate. |
 | `src/verification/families/projection.py` | Projects registered families into claim_ledger Claims, so the coverage ledger is derived rather than typed twice. | Unchanged; the projection grows as families land. |
 | `src/verification/__init__.py` | Package marker. | Unchanged. |
 

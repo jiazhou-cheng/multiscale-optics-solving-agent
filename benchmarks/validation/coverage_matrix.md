@@ -17,16 +17,16 @@ Components x claim kinds. What each cell means:
 | `n/a` | no oracle applies (structured-failure and convention-plumbing claims) |
 | `--` | nobody has asked |
 
-| Component | forward_accuracy | convention | conservation | convergence | round_trip | structured_failure | gradient | device_parity |
-| -- | -- | -- | -- | -- | -- | -- | -- | -- |
-| `M_RAY_OPTILAND` | off-gate / off-gate / **ind** | declared / declared / **ind** | declared | -- | -- | n/a | -- | n/a |
-| `M_WAVE_CHROMATIX` | off-gate / off-gate / declared / self | declared / off-gate / n/a | -- | declared | declared | n/a | -- | -- |
-| `C_RAY_TO_WAVE` | **ind** / **FAIL** | **FAIL** / **ind** | **ind** | char | self | n/a | declared | off-gate |
-| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | -- | **ind** | n/a | char | -- |
-| `C_PLANAR_DOE_STEP` | **ind** | -- | -- | -- | -- | n/a | -- | self |
-| `C_PATCH_WFT` | **ind** | **ind** | -- | -- | -- | n/a | -- | -- |
+| Component | forward_accuracy | convention | conservation | convergence | round_trip | structured_failure | gradient | device_parity | cost |
+| -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
+| `M_RAY_OPTILAND` | off-gate / off-gate / self / **ind** | declared / declared / **ind** | declared / declared | -- | -- | n/a | -- | n/a | n/a |
+| `M_WAVE_CHROMATIX` | off-gate / off-gate / declared / self | declared / off-gate / n/a | -- | declared | declared | n/a | -- | -- | n/a |
+| `C_RAY_TO_WAVE` | off-gate / **FAIL** / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | n/a / char | self | n/a | declared | off-gate | n/a |
+| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | -- | **ind** | n/a | char | -- | -- |
+| `C_PLANAR_DOE_STEP` | **ind** | -- | -- | -- | -- | n/a | -- | self | -- |
+| `C_PATCH_WFT` | off-gate / **ind** | **ind** | -- | n/a | -- | n/a | -- | -- | n/a |
 
-40 claims over 6 components.
+53 claims over 6 components.
 
 ## The cells that should be read first
 

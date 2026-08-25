@@ -116,6 +116,10 @@ ALLOWED: dict[str, str] = {
     ),
     "tests/test_claim_ledger.py": "cross-checks the singlet workload's open gate",
     "tests/test_benchmark_inventory.py": "documents the L2-PSF-01 split-row case",
+    "tests/test_b3_b4_families.py": (
+        "reads the singlet workload's tolerances.yaml to check the migrated bases "
+        "verbatim, which is the one thing that would notice a reworded one"
+    ),
     "tests/test_family_schema.py": "docstrings naming the incident each rule came from",
     "tests/test_verifier.py": "docstrings naming the incident each rule came from",
     "tests/test_optiland_adapter.py": "the singlet prescription's adapter tests",

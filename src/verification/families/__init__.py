@@ -10,7 +10,12 @@ that knows which families exist.
 # discovered, for the reason core/capabilities.py gives about its own table: a
 # source of truth that is discovered agrees with itself by construction,
 # including about which entries exist at all.
-from verification.families import b1_ray, b1_wave  # noqa: F401
+from verification.families import (  # noqa: F401
+    b1_ray,
+    b1_wave,
+    b3_composed,
+    b4_characterization,
+)
 from verification.families.registry import (
     FAMILIES,
     families_for_category,

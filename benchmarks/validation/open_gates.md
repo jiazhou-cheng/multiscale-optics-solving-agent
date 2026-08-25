@@ -11,6 +11,23 @@ prose as the queryable form; the prose remains as the narrative.
 No gate here has been widened. That is the rule the repository operates under,
 and a register of unmet gates is what makes it checkable rather than aspirational.
 
+## `C_RAY_TO_WAVE` -- fft_oracle_intensity_relative_l2
+
+* **observed** `0.0022072391812867093` against a gate of `0.001` -- 2.21x over a ceiling
+* **claim** on the diffraction-limited M3-SINGLET-REF system, does M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX reproduce the analytic Airy pattern at the sensor plane?
+* **oracle** analytic_closed_form, independent
+* **measured in** cpu+cuda / complex64
+* **tolerance basis** benchmarks/protocols/slice_protocol.yaml tolerance_budget.gates, unchanged since M3.2 (CHE-31). CHE-38's synthetic aberration-free diagnostic reaches 4.07e-4 (inside gate); CHE-47's real-traced-system measurement of the production (weighted) configuration reaches 2.21e-3 vs O1 (outside gate, by ~2.2x). Against O1 only, the uniform (pre-CHE-47) configuration reaches 9.21e-4 and clears the gate -- the opposite ordering from what the O2 oracle measured, which is itself evidence that O2's own pupil-fit resolution should not be trusted to decide correctness here. Open item, not closed by this bundle: why the production quadrature weight, which fixes the unrelated absolute-power N^2 divergence (see accuracy.production. absolute_power), does not also improve relative-L2 agreement with O1 on this aberrated system.
+* **evidence**
+  * `benchmarks/physics/L2-PSF-01/tolerances.yaml`
+  * `benchmarks/probes/records/m3_quadrature_weight.json`
+  * `benchmarks/reports/2026-08/ray_to_wave_slice_exit.md`
+* **notes**
+  * Carried forward unwidened. The 1.0e-3 gate has been frozen since M3.2 and re-affirmed through M3.8 and M3.9R; the production configuration measures 2.21e-3 at 787,969 rays. CHE-117 attributes the residual. This gate must NOT be closed against another Optiland PSF route: FFTPSF and HuygensPSF share one Wavefront/OPD front end and are one oracle, not two (PB7/CHE-58 finding F2).
+  * negative control inverted-quadrature-weight: known_fires_backwards -- benchmarks/probes/records/m3_quadrature_weight.json finest_configuration. improvement_factor_vs_o1 = 0.42 at 787,969 rays (uniform is CLOSER to O1 than weighted is: 9.21e-4 vs 2.21e-3) -- below the 1.2 floor, so this control currently reads detected=false. The previous basis for this floor (improvement_factor_vs_o2_asm = 1.575) used O2, our own custom ASM/RS propagator, as the decisive oracle; that was circular validation and has been retired as the gate input, though the O2 number is still reported in result.json for characterization.
+  * negative control axis-transpose: not_implemented -- declared and not run. On a rotationally symmetric on-axis Airy pattern a transpose is the IDENTITY, so this control can only say anything at the off-axis instance -- which is itself the finding, and is why it is declared rather than quietly dropped
+  * negative control launch-phase-error: not_implemented -- declared and not run here. On axis the term is a constant and cancels, so this control is only meaningful off axis; B1-RAY-OFFAXIS-OPL owns it at the node level, where it can be isolated from the propagation
+
 ## `C_RAY_TO_WAVE` -- fft_oracle_intensity_relative_l2 vs O1 over the 5-Airy-radius disc
 
 * **observed** `0.0022072391812867093` against a gate of `0.001` -- 2.21x over a ceiling

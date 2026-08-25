@@ -528,8 +528,14 @@ def test_an_unmeasured_family_does_not_project_a_tolerance_it_has_not_met() -> N
     )
 
 
-def test_the_registry_holds_no_family_outside_the_categories_m1_owns_yet() -> None:
-    """A guard on scope creep: M1 authors B1. B0, B2, B3 and B4 are other
-    milestones, and a family appearing here early would mean one of them landed
-    without its evidence."""
-    assert {f.category for f in FAMILIES} == {BenchmarkCategory.B1}
+def test_b0_and_b2_have_not_landed_without_their_evidence() -> None:
+    """A guard on scope creep, narrowed as milestones land.
+
+    M1 authors B1; M4.1 and M4.3 authored B3 and B4. B0 (contract and recovery)
+    and B2 (representation transitions) are still owed, and a family appearing
+    in either category would mean one of those milestones landed without the
+    measurements this file is the pattern for.
+    """
+    categories = {f.category for f in FAMILIES}
+    assert BenchmarkCategory.B1 in categories
+    assert not categories & {BenchmarkCategory.B0, BenchmarkCategory.B2}

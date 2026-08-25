@@ -938,6 +938,23 @@ entries:
       whose entire subject is behaviour near the sampling boundary and which is what
       forces the validity margin to be signed and normalized.
     destination: The wave half of the B1 evidence layer.
+  - path: src/verification/families/b3_composed.py
+    bucket: A
+    justification: >-
+      The three B3 composed families (CHE-116). B3-PSF-SINGLET carries the unmet
+      1.0e-3 gate at 2.2072e-3 with every tolerance basis migrated verbatim from
+      tolerances.yaml; B3-DEMO2 is the one composed case graded against an
+      external published reference; B3-DUALROUTE gates on an intermediate
+      invariant because no independent PSF route exists for the Cooke triplet.
+    destination: The composed half of the validated evidence layer.
+  - path: src/verification/families/b4_characterization.py
+    bucket: A
+    justification: >-
+      The B4 characterization families (CHE-134). Carries the DEMO3-RW-P why_not
+      migrated unreworded from manifest.yaml, the cost model, and the attributed
+      cross-route discrepancy on the Cooke triplet. None of them can gate, and
+      the schema refuses the promotion rather than relying on the label.
+    destination: The characterization layer; B4 never joins a required gate.
   - path: src/verification/families/projection.py
     bucket: A
     justification: >-

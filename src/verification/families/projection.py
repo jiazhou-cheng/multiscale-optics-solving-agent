@@ -50,10 +50,13 @@ def _stochastic(fam: BenchmarkFamily) -> StochasticEvidence | None:
     policy = fam.stochastic_policy
     if not policy.is_stochastic:
         return None
-    filled = {
-        _EVIDENCE_FIELD[kind]: f"required by {fam.family_id}" for kind in policy.required_evidence
-    }
-    return StochasticEvidence(**filled)
+    # Deliberately empty. A family declares which kinds it REQUIRES; this field
+    # records which are ESTABLISHED, and filling it from the requirement would
+    # turn an obligation into a citation -- the ledger would then report evidence
+    # that does not exist, which is the one thing it must never do. What the
+    # family owes stays on the family, and StochasticEvidence.missing reports all
+    # four until something measures them.
+    return StochasticEvidence()
 
 
 def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
@@ -86,10 +89,20 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
     tol = gating[0] if (gating and observed is not None) else None
     # The metric NAME is what the family measures and is known whether or not a
     # number exists yet; only the threshold waits for a measurement.
-    metric_name = (
-        gating[0].metric
-        if gating
-        else (disposition.metric if disposition is not None else None)
+    metric_name = next(
+        (
+            name
+            for name in (
+                gating[0].metric if gating else None,
+                disposition.metric if disposition is not None else None,
+                # A B4 family has no gating tolerance by construction, and a cell
+                # with no metric name is a cell nothing can be looked up by. Its
+                # first declared metric is the headline one.
+                fam.metrics[0].name if fam.metrics else None,
+            )
+            if name is not None
+        ),
+        None,
     )
 
     devices = sorted(str(d) for d in fam.execution_policy.devices)
@@ -112,6 +125,13 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
             f"gating tolerance declared and nothing measured against it yet: {thresholds}. "
             f"The threshold and its basis live on {fam.family_id}."
         )
+    if disposition is not None and disposition.note.strip():
+        # The disposition note is where a family records WHY its gate stands
+        # where it does -- including, for B3-PSF-SINGLET, the rule that it must
+        # not be closed against another Optiland PSF route. Dropping it in the
+        # projection would leave the coverage view with the verdict and not the
+        # constraint on how the verdict may change.
+        caveats.append(disposition.note)
     for control in fam.negative_controls:
         if control.expectation.value != "must_fail":
             caveats.append(

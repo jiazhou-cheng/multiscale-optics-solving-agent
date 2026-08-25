@@ -140,6 +140,11 @@ class ClaimKind(StrEnum):
     STRUCTURED_FAILURE = "structured_failure"
     GRADIENT = "gradient"
     DEVICE_PARITY = "device_parity"
+    #: What it costs to run. Added by CHE-134: route choice is a scientific
+    #: decision with a measurable cost, and an agent cannot reason about it from
+    #: a number nobody recorded. Never gate-deciding -- there is no correct
+    #: number of seconds -- which is why it only ever appears on a B4 family.
+    COST = "cost"
 
 
 @dataclass(frozen=True)
