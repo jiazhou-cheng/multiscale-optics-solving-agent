@@ -32,6 +32,10 @@ knowledge/
     theory.md            the mathematics, from the paper
     failure_guide.md
     source_manifest.yaml
+  couplers/planar_doe_step/    a COMPOSED coupler: the same five files, but
+                               deliberately thin. It carries only what the
+                               composition adds and points at the two packs
+                               above for everything they already own.
   papers/raywave_tracing/README.md
 ```
 

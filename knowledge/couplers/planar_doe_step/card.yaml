@@ -1,0 +1,220 @@
+# Routing-critical facts for C_PLANAR_DOE_STEP (M2.3).
+#
+# This coupler is COMPOSED from C_RAY_TO_WAVE and C_WAVE_TO_RAY. Anything true of
+# those two is true here and is NOT restated: load their packs when the question
+# is about the accumulation kernel or the resampling estimator. This card carries
+# only what is new at the composition -- what the two halves being adjacent
+# creates, forbids, or hides.
+#
+# Grounded in: knowledge/papers/raywave_tracing/ (DOI 10.1021/acsphotonics.6c00818),
+# SI Algorithm S1.
+
+id: planar_doe_step
+role: C_PLANAR_DOE_STEP
+direction: ray_bundle -> ray_bundle
+transformation: >
+  coherent accumulation onto one common plane, one complex transmission, one
+  transform, and a fixed P x S resample. The wave representation exists only
+  inside the step.
+
+composed_from:
+  - component: C_RAY_TO_WAVE
+    pack: knowledge/couplers/ray_to_wave
+    supplies: the accumulation onto the plane, and every convention in its card
+  - component: C_WAVE_TO_RAY
+    pack: knowledge/couplers/wave_to_ray
+    supplies: the spectral resampling estimator, and its known bias
+capability_rule: >
+  The capability is the INTERSECTION of the two, not an independent claim. Any
+  device or dtype either half refuses is refused here.
+  core/capabilities.py::C_PLANAR_DOE_STEP_CAPABILITIES is authoritative; this
+  card must not be read as widening it.
+
+scientific_source:
+  doi: 10.1021/acsphotonics.6c00818
+  equations: [SI_Algorithm_S1]
+  reference_implementation: https://github.com/jiazhou-cheng/raywave-tracing
+  reference_implementation_status: >
+    NOT vendored, NOT pinned, NOT executed by this repository. Read at recorded
+    scope (see knowledge/couplers/ray_to_wave/source_manifest.yaml); the
+    mathematics is the paper's and every number here is produced by this
+    repository's own probes.
+
+framework: numpy
+frameworks_deliberately_avoided:
+  - reason: >
+      Same rule as the two halves: the coupler core is the physics under test, so
+      it imports neither engine. A defect here must not be attributable to
+      engine behaviour.
+    forbidden_imports: [optiland, chromatix]
+
+implementation_location: src/couplers/cascade.py
+graph_node: src/couplers/doe_node.py
+test_location: tests/test_planar_doe_step.py
+
+# --------------------------------------------------------------------------- #
+# The three things that change across the step and are invisible in an intensity
+# --------------------------------------------------------------------------- #
+# A caller who reads only the shapes will get all three wrong. They are emitted
+# in the diagnostics on every run, not only here, because a consumer reads the
+# record rather than the card.
+what_changes_across_the_step:
+  optical_path_length_is_reset_to_zero:
+    statement: >
+      Outgoing rays carry OPL = 0. The incident path is already inside the
+      accumulated field's phase, so carrying it forward would double-count it.
+    consequence: >
+      The phase reference is REBASED to this plane. An OPL measured anywhere
+      downstream is measured from here, not from the original source. Two
+      stacked steps therefore each rebase, and a caller comparing an OPL across
+      a step is comparing two different references.
+    how_to_detect_getting_it_wrong: >
+      A doubled or cancelled phase that scales with the incident path length,
+      which looks like a defocus that moves when the source moves.
+  amplitude_becomes_a_spectral_amplitude:
+    statement: >
+      The outgoing amplitude is U~[m]/p[m] -- a spectral amplitude divided by
+      its sampling probability -- not a transformed incident weight.
+    consequence: >
+      NO per-ray correspondence survives the accumulation. Incident ray i does
+      not become outgoing ray i, and there are deliberately different numbers of
+      them. Any code that indexes outgoing rays by incident identity is wrong
+      even when the shapes happen to match.
+  power_is_not_conserved_by_default:
+    statement: >
+      preserve_energy is FALSE by default and should stay false.
+    reason: >
+      A lossy DOE legitimately loses power. Renormalizing to the incident power
+      hides exactly the case a conservation check exists to catch. This is a
+      policy switch, not physics.
+    when_on: the applied factor sqrt(P_in / P_out) is reported in diagnostics.
+
+# --------------------------------------------------------------------------- #
+# The property the step exists for
+# --------------------------------------------------------------------------- #
+why_this_operator_exists:
+  statement: >
+    The outgoing ray count is the CALLER'S BUDGET (P x S), not a function of the
+    incident count. That is what bounds ray count across stacked DOEs, where a
+    naive per-ray treatment multiplies.
+  evidence:
+    - tests/test_planar_doe_step.py::test_the_outgoing_count_does_not_depend_on_the_incident_count
+    - tests/test_planar_doe_step.py::test_two_stacked_does_keep_the_outgoing_count_at_the_budget
+  invariant_id: outgoing_count_is_the_budget
+
+# --------------------------------------------------------------------------- #
+# Validity
+# --------------------------------------------------------------------------- #
+validity_conditions:
+  - id: planarity
+    statement: >
+      The surface must be PLANAR. Every incident ray crosses one common
+      Cartesian plane, and that is what makes a single accumulation valid.
+    why_it_is_not_a_soft_limit: >
+      A conformal substrate has position-dependent tangent frames and normals.
+      There is no common plane to accumulate onto, so the step is not a worse
+      approximation there -- it is undefined. Use the curvature bound in
+      couplers/curvature.py to size a planar patch instead, and see
+      C_PATCH_WFT for the patched route.
+    predicate: src/verification/families/predicates.py::declared_planarity
+  - id: the_plane_is_where_the_transmission_lives
+    statement: >
+      The step does NOT propagate the incident bundle to the declared plane. It
+      accumulates the bundle as given.
+    consequence: >
+      Supplying a bundle referenced to a different plane silently measures the
+      transmission at the wrong place. Advance the ray state first -- positions
+      along each direction, optical path by n * arc length -- exactly as
+      C_RAY_TO_WAVE's card describes.
+
+# --------------------------------------------------------------------------- #
+# Sampling
+# --------------------------------------------------------------------------- #
+sampling:
+  secondary_directions:
+    enumerated: >
+      secondary_count=None enumerates every propagating bin. This is the
+      deterministic limit with NO sampling error, it is the coupler protocol's
+      mandatory first gate, and it is the only oracle this composition has.
+    sampled: >
+      Any value >= 2 draws from rng, which must then be supplied. The estimator
+      and its known bias belong to C_WAVE_TO_RAY -- read that card, not this one.
+    collapsed: >
+      A value <= 1 selects the COLLAPSED mode: one outgoing ray along the
+      power-weighted mean wavevector carrying the whole spectrum's amplitude.
+      This is a cheap preview, NOT an approximation with a stated error, and it
+      is reported as collapsed_to_mean_wavevector so a record cannot be read as
+      a converged result.
+  primary_positions:
+    committed_position: >
+      Primary launch positions are sampled UNIFORMLY while secondary directions
+      are sampled by spectrum magnitude. src/registry/couplers.yaml is the source
+      of truth for the status of that asymmetry and should be read directly;
+      as of this card it is recorded there as taken from the reference
+      implementation and offered as an option rather than adopted as the
+      estimator, and CHE-120 is actively revising that entry. Do not treat this
+      line as the current justification -- read the registry.
+    both_sources_is_a_conflict: >
+      launch_positions_xy_m and primary_sampling both specify where rays launch.
+      Supplying both is refused as a CONFLICT, not resolved by precedence.
+  padding:
+    statement: >
+      pad_width zero-pads the accumulated field before the transform, giving a
+      flat computational aperture around the DOE.
+    what_it_changes: >
+      The spectral sampling, not the physics: it interpolates the angular
+      spectrum onto a finer grid. A result that moves with pad_width beyond
+      interpolation is a defect, not a convergence knob.
+
+# --------------------------------------------------------------------------- #
+# Evidence
+# --------------------------------------------------------------------------- #
+validation_status: characterized
+validated_probe_ids:
+  - tests/test_planar_doe_step.py::test_full_enumeration_still_reproduces_the_transmitted_field
+  - tests/test_planar_doe_step.py::test_the_outgoing_count_does_not_depend_on_the_incident_count
+  - tests/test_planar_doe_step.py::test_two_stacked_does_keep_the_outgoing_count_at_the_budget
+  - benchmarks/probes/records/planar_doe_step_device.json
+devices_tested: [cpu]
+invariants:
+  - evanescent_power_accounted
+  - importance_weight_applied
+  - unit_direction_norm
+  - outgoing_count_is_the_budget
+
+not_yet_probed:
+  - >
+    Three of the four stochastic evidence kinds for the SAMPLED step:
+    unbiasedness, convergence exponent, and variance. Only the exactness limit
+    (full enumeration) is established. A sampled run therefore has no stated
+    error, and reporting one from a single realization would be inventing it.
+  - >
+    CUDA execution. benchmarks/probes/records/planar_doe_step_device.json is a
+    device-parity characterization whose oracle is CROSS_ROUTE / SHARES_CODE, so
+    it cannot gate, and no CUDA run of this coupler is covered by the default
+    gate.
+  - >
+    Any analytic oracle beyond the enumeration limit. The composition has none
+    of its own, which is why its maturity is `characterized` and not
+    `validated`.
+
+derivative:
+  mode: surrogate
+  verified: false
+  known_biased: true
+  inherited_from: C_WAVE_TO_RAY
+  statement: >
+    Secondary directions are held fixed and only amplitudes carry a derivative,
+    so the gradient is a deliberately biased surrogate. NO gradient across this
+    step is certified, and registering the step did not change that.
+
+maturity: characterized
+maturity_basis: >
+  `characterized`, because the full-enumeration limit reproduces the transmitted
+  field to dtype round-off and the budget-independence property is asserted
+  directly. NOT `validated`, because there is no certified gradient and no
+  analytic oracle of its own beyond that limit.
+
+cost_model:
+  scaling: O(incident_rays * pixels + pixels * log(pixels) + P * S)
+  memory_scaling: O(pixels + P * S)
