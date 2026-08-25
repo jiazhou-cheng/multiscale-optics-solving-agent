@@ -183,6 +183,7 @@ B4_DEMO3 = register(
         metrics=(
             Metric(
                 name="seed_to_seed_ncc",
+                definition="ncc",
                 description=(
                     "normalized cross-correlation between two independent realizations "
                     "at the same budget. An estimator-variance instrument, not an "
@@ -210,6 +211,7 @@ B4_DEMO3 = register(
             ),
             Metric(
                 name="stage_power_ratio",
+                definition="power_ratio",
                 description=(
                     "power out over power in, at EVERY representation change, so a loss "
                     "is attributable to a stage rather than to the run"
@@ -219,6 +221,7 @@ B4_DEMO3 = register(
             ),
             Metric(
                 name="route_agreement_ncc",
+                definition="ncc",
                 description=(
                     "RAMP_SUM against the k-space splat on the same instance. CROSS_ROUTE "
                     "and reported as characterization"
@@ -574,6 +577,7 @@ B4_DUALROUTE_AGREEMENT = register(
         metrics=(
             Metric(
                 name="route_pair_relative_l2",
+                definition="relative_l2_intensity",
                 description="relative L2 between the two routes' PSF intensities",
                 unit=None,
                 blind_to=(

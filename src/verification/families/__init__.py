@@ -13,6 +13,7 @@ that knows which families exist.
 from verification.families import (  # noqa: F401
     b1_ray,
     b1_wave,
+    b2_transitions,
     b3_composed,
     b4_characterization,
 )

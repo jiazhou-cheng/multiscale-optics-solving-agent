@@ -411,6 +411,14 @@ class Metric:
     description: str
     unit: str | None
     blind_to: tuple[str, ...]
+    #: Which entry of ``verification/metrics.py`` computes this, when one does.
+    #: A family's metric NAME is domain-specific -- ``fft_oracle_intensity_
+    #: relative_l2`` says what is being compared to what -- while the arithmetic
+    #: is shared, and naming the shared definition is what stops two benchmarks
+    #: computing "relative L2" differently. ``None`` means the quantity is a
+    #: measurement of one array rather than a comparison of two, which is a
+    #: different kind of thing and lives in ``psf_measurement.py``.
+    definition: str | None = None
 
     def __post_init__(self) -> None:
         if not self.blind_to:

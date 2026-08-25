@@ -21,12 +21,12 @@ Components x claim kinds. What each cell means:
 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
 | `M_RAY_OPTILAND` | off-gate / off-gate / self / **ind** | declared / declared / **ind** | declared / declared | -- | -- | n/a | -- | n/a | n/a |
 | `M_WAVE_CHROMATIX` | off-gate / off-gate / declared / self | declared / off-gate / n/a | -- | declared | declared | n/a | -- | -- | n/a |
-| `C_RAY_TO_WAVE` | off-gate / **FAIL** / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | n/a / char | self | n/a | declared | off-gate | n/a |
-| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | -- | **ind** | n/a | char | -- | -- |
-| `C_PLANAR_DOE_STEP` | **ind** | -- | -- | -- | -- | n/a | -- | self | -- |
-| `C_PATCH_WFT` | off-gate / **ind** | **ind** | -- | n/a | -- | n/a | -- | -- | n/a |
+| `C_RAY_TO_WAVE` | off-gate / off-gate / **FAIL** / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | off-gate / n/a / char | off-gate / self | n/a | declared | off-gate | n/a |
+| `C_WAVE_TO_RAY` | **ind** | **ind** | -- | declared | off-gate / **ind** | n/a | char | -- | -- |
+| `C_PLANAR_DOE_STEP` | off-gate / **ind** | -- | -- | -- | -- | n/a | -- | self | -- |
+| `C_PATCH_WFT` | off-gate / off-gate / **ind** | **ind** | -- | n/a | -- | n/a | -- | -- | n/a |
 
-53 claims over 6 components.
+60 claims over 6 components.
 
 ## The cells that should be read first
 

@@ -838,6 +838,18 @@ entries:
       The independent analytic PSF oracles. Expensive to derive and the only
       independent deciders the composed families have.
     destination: B3-PSF-SINGLET oracle callables.
+  - path: src/verification/metrics.py
+    bucket: A
+    justification: >-
+      The centralized metric definitions (CHE-112), promoted from an M2
+      deliverable to a substrate one. NCC, relative L2 on field, relative L2 on
+      intensity, power ratio and MSE-unit-sum each had more than one
+      implementation, so a benchmark and its own probe could disagree about what
+      a number means. Every definition states what it is blind to, and
+      tests/test_metrics.py demonstrates each blind spot rather than asserting it.
+    destination: >-
+      Referenced by Metric.definition on every family; the single source for
+      what a metric name means.
   - path: src/verification/psf_measurement.py
     bucket: A
     justification: PSF metric measurement -- Strehl, first null, encircled energy, residual L2.
@@ -938,6 +950,15 @@ entries:
       whose entire subject is behaviour near the sampling boundary and which is what
       forces the validity margin to be signed and normalized.
     destination: The wave half of the B1 evidence layer.
+  - path: src/verification/families/b2_transitions.py
+    bucket: A
+    justification: >-
+      The five B2 representation-transition families (CHE-109..CHE-112), and the
+      WHAT_DOES_NOT_SURVIVE table naming what each coupler provably discards.
+      B2-ROUNDTRIP makes "the deliberately broken twin ran" a validity predicate,
+      so a round trip that cannot be made to fail reports OUT_OF_VALIDITY rather
+      than a passing number.
+    destination: The transition layer of the evidence set.
   - path: src/verification/families/b3_composed.py
     bucket: A
     justification: >-

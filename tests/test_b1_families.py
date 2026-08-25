@@ -528,14 +528,18 @@ def test_an_unmeasured_family_does_not_project_a_tolerance_it_has_not_met() -> N
     )
 
 
-def test_b0_and_b2_have_not_landed_without_their_evidence() -> None:
+def test_b0_has_not_landed_without_its_evidence() -> None:
     """A guard on scope creep, narrowed as milestones land.
 
-    M1 authors B1; M4.1 and M4.3 authored B3 and B4. B0 (contract and recovery)
-    and B2 (representation transitions) are still owed, and a family appearing
-    in either category would mean one of those milestones landed without the
+    M1.1/M1.2 authored B1, M2 authored B2, M4.1 and M4.3 authored B3 and B4. B0
+    -- contract and recovery, including the two measured traps where the
+    contract reads ``ok`` and the physics is wrong -- is still owed by M1.3, and
+    a B0 family appearing before it would mean that milestone landed without the
     measurements this file is the pattern for.
     """
     categories = {f.category for f in FAMILIES}
     assert BenchmarkCategory.B1 in categories
-    assert not categories & {BenchmarkCategory.B0, BenchmarkCategory.B2}
+    assert BenchmarkCategory.B0 not in categories, (
+        "M1.3 owes B0-UNITS-01 and B0-UNITS-02, whose numbers are preserved in "
+        "src/verification/hazards.py and covered by tests/test_preserved_evidence.py"
+    )

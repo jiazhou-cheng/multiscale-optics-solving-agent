@@ -246,6 +246,7 @@ B3_PSF_SINGLET = register(
         metrics=(
             Metric(
                 name="fft_oracle_intensity_relative_l2",
+                definition="central_relative_l2_intensity",
                 description=(
                     "relative L2 of the reconstructed sensor-plane intensity against O1 "
                     "over the 5-Airy-radius gate disc"
@@ -260,6 +261,7 @@ B3_PSF_SINGLET = register(
             ),
             Metric(
                 name="o2_asm_intensity_relative_l2",
+                definition="central_relative_l2_intensity",
                 description=(
                     "the same comparison against O2, our own float64 ASM/RS propagator. "
                     "CHARACTERIZATION ONLY"
@@ -272,6 +274,7 @@ B3_PSF_SINGLET = register(
             ),
             Metric(
                 name="handoff_power_ratio",
+                definition="power_ratio",
                 description=(
                     "power crossing the handoff plane, over power in the traced bundle"
                 ),
@@ -502,6 +505,7 @@ B3_DEMO2 = register(
         metrics=(
             Metric(
                 name="demo2_ncc",
+                definition="ncc",
                 description="normalized cross-correlation against the published intensity",
                 unit=None,
                 blind_to=(
@@ -513,12 +517,14 @@ B3_DEMO2 = register(
             ),
             Metric(
                 name="demo2_relative_l2",
+                definition="relative_l2_intensity",
                 description="relative L2 against the published intensity",
                 unit=None,
                 blind_to=("phase; this is an intensity comparison",),
             ),
             Metric(
                 name="patch_handoff_power_ratio",
+                definition="power_ratio",
                 description=(
                     "power leaving the patch decomposition over power entering it, at "
                     "the C_PATCH_WFT -> trace boundary"
@@ -742,6 +748,7 @@ B3_DUALROUTE = register(
         metrics=(
             Metric(
                 name="route_power_ratio",
+                definition="power_ratio",
                 description="power in the route's output PSF over power in the traced bundle",
                 unit=None,
                 blind_to=(

@@ -372,6 +372,24 @@ class GraphExecutor:
                     declaration="node.config.jax_enable_x64",
                     remedy="drop the request, or run the workload in its own process",
                 )
+        for edge in spec.edges:
+            if edge.coupler not in _COUPLER_MODULES:
+                return Refusal(
+                    kind=RefusalKind.UNSUPPORTED_CAPABILITY,
+                    detail=(
+                        f"edge {edge.id!r} names coupler {edge.coupler}, which is "
+                        "declared in the registry and has no executable graph node. "
+                        "C_WAVE_TO_RAY is the live case: it is a library component the "
+                        "patch and DOE couplers wrap, and it is not itself composable as "
+                        "an edge. Refused here rather than at the call site, so a graph "
+                        "that cannot run says so before anything is executed."
+                    ),
+                    declaration=f"edge.coupler = {edge.coupler}",
+                    remedy=(
+                        "use a coupler with a graph node "
+                        f"({sorted(_COUPLER_MODULES)}), or drive this one directly"
+                    ),
+                )
         if spec.require_verified_gradients:
             unverified = [
                 node.id

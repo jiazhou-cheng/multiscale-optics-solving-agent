@@ -248,6 +248,7 @@ B1_WAVE_GAUSS = register(
                 name="gaussian_radius_relative_error",
                 description="relative error of the measured 1/e^2 radius",
                 unit=None,
+                definition=None,  # a measurement of one image against a scalar
                 blind_to=(
                     "beam quality: a beam that has grown wings while keeping its second "
                     "moment passes",
@@ -786,6 +787,7 @@ B1_WAVE_FWDBWD = register(
         metrics=(
             Metric(
                 name="round_trip_relative_l2",
+                definition="relative_rms",
                 description=(
                     "||U_returned - U_input||_2 / ||U_input||_2 over the whole grid"
                 ),
@@ -941,6 +943,7 @@ B1_WAVE_TALBOT = register(
         metrics=(
             Metric(
                 name="talbot_revival_relative_l2",
+                definition="relative_l2_intensity",
                 description=(
                     "||U(z_T) - U(0)||_2 / ||U(0)||_2 over the central periods, edges "
                     "excluded"
@@ -1085,6 +1088,7 @@ B1_WAVE_ASM_VALIDITY = register(
         metrics=(
             Metric(
                 name="asm_radius_relative_error_vs_closed_form",
+                definition=None,  # a radius measurement against a closed form
                 description=(
                     "relative error of the measured 1/e^2 radius against the Gaussian "
                     "closed form, reported at every point of the sweep"
@@ -1099,6 +1103,7 @@ B1_WAVE_ASM_VALIDITY = register(
             ),
             Metric(
                 name="wrapped_power_fraction",
+                definition="power_ratio",
                 description=(
                     "fraction of the total power within one pitch of the window edge -- "
                     "the direct evidence that energy has folded back in"

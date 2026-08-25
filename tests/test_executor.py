@@ -790,3 +790,37 @@ def test_an_upstream_output_wins_over_a_declared_source(parts) -> None:
     _executor(parts).run(_graph(), inputs={"wave.input_field": field})
     (request,) = sink.requests
     assert request.inputs["input_field"].id == "bridged-field"
+
+
+def test_a_coupler_with_no_graph_node_is_refused_before_anything_runs(parts) -> None:
+    """C_WAVE_TO_RAY is the live case, and the answer to M2.2's question.
+
+    It is declared in ``registry/couplers.yaml`` -- which per AGENTS.md is a
+    statement that a graph may address it -- and it has no ``get_coupler()``
+    module: it is a library component that the patch and DOE couplers wrap
+    internally, not something composable as an edge. Before this, a graph
+    declaring it validated and then died with a resolver traceback partway
+    through. Now it is a structured refusal naming what will work instead.
+    """
+    _source, _sink, _coupler = parts
+    registry = _Registry()
+    registry.couplers = {**registry.couplers, "C_WAVE_TO_RAY": BRIDGE.model_copy(
+        update={"id": "C_WAVE_TO_RAY"}
+    )}
+    spec = _graph(
+        edges=[
+            {
+                "id": "bridge",
+                "coupler": "C_WAVE_TO_RAY",
+                "source": {"node": "lens", "port": "rays"},
+                "target": {"node": "wave", "port": "input_field"},
+            }
+        ]
+    )
+    record = _executor(parts, registry=registry).run(spec)
+
+    assert record.refusal is not None
+    assert record.refusal.kind is RefusalKind.UNSUPPORTED_CAPABILITY
+    assert "C_WAVE_TO_RAY" in record.refusal.declaration
+    assert record.refusal.remedy and "C_RAY_TO_WAVE" in record.refusal.remedy
+    assert parts[0].calls == 0
