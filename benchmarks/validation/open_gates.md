@@ -11,6 +11,26 @@ prose as the queryable form; the prose remains as the narrative.
 No gate here has been widened. That is the rule the repository operates under,
 and a register of unmet gates is what makes it checkable rather than aspirational.
 
+## `M_RAY_OPTILAND` -- lagrange_invariant_relative_drift
+
+* **observed** `1.32863e-07` against a gate of `1e-10` -- 1328.63x over a ceiling
+* **claim** is the Lagrange invariant H = n(u y_bar - u_bar y) conserved surface by surface through a multi-element system?
+* **oracle** conservation_law, independent
+* **measured in** cpu+cuda / float64
+* **tolerance basis** conservation to float64 round-off accumulated over at most twelve surfaces. Each surface contributes a few operations on quantities of order 1, so 1e-10 is several orders above the floor and far below any real transfer-matrix error
+* **evidence**
+  * `benchmarks/instances/b1_ray.py`
+  * `tests/test_b1_ray_instances.py::test_the_lagrange_gate_is_unmet_and_says_why`
+  * `tests/test_b1_ray_instances.py::test_the_lagrange_drift_vanishes_with_the_field`
+* **notes**
+  * MEASURED AND NOT MET, and the tolerance is left exactly where it is. 1.33e-7 relative drift at a 0.25-degree field and a 1/64 pupil fraction, against a 1e-10 gate.
+
+The reason is structural rather than numerical, and it is a finding about the tolerance rather than about the solver. The Lagrange invariant's two-ray bilinear form p_a.q_b - p_b.q_a is preserved by a LINEAR symplectic map. Ray refraction at a curved surface is symplectic and not linear, so only the DIFFERENTIAL form is exactly conserved, and any finite-real-ray evaluation carries an aberration residual. Measured directly while authoring this: the differential ratio between two rays of one fan converges to 1 + 7.1e-3 at a 5-degree field and does NOT approach 1 as their separation shrinks -- the signature of a finite-form residual rather than a numerical one.
+
+What the family CAN support is measured and reported: the drift vanishes with the field angle over five halvings, with a fitted exponent near 2.5. That is the conservation statement -- the invariant holds paraxially -- and it is why the drift is 1e-7 rather than 1e-2. It was the cheapest unmeasured whole-system check on the ray model and it is no longer unmeasured.
+
+The tolerance's declared basis is CONSERVATION_LAW, and the conservation law it names is paraxial while the measurement is of real rays. Re-deriving that basis against the aberration it cannot see is follow-up work; widening it to make this green would be exactly what AGENTS.md forbids.
+
 ## `C_RAY_TO_WAVE` -- fft_oracle_intensity_relative_l2
 
 * **observed** `0.0022072391812867093` against a gate of `0.001` -- 2.21x over a ceiling

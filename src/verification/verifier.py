@@ -37,6 +37,7 @@ from verification.families.schema import (
     BenchmarkInstance,
     NegativeControlExpectation,
 )
+from verification.refusals import REFUSAL_CATALOGUE
 from verification.result import (
     ContractStatus,
     ConvergenceReport,
@@ -72,6 +73,36 @@ _REFUSAL_TO_STATUS = {
     RefusalKind.UNVERIFIED_DERIVATIVE: VerificationStatus.BLOCKED,
     RefusalKind.MISSING_EDGE_DECLARATION: VerificationStatus.INVALID_CONFIGURATION,
 }
+
+
+def _refusal_status(record: ExecutionRecord, refusal: Any) -> VerificationStatus:
+    """Which of the five negative outcomes a refusal is.
+
+    The **contract code decides when there is one**, and the refusal kind decides
+    only when there is not. CHE-108 found the two paths disagreeing: the
+    catalogue classifies ``OPL_REFERENCE_UNVERIFIED`` as ``blocked`` -- nothing
+    about the request is malformed, the component could have proceeded and
+    refuses to until a declaration arrives -- while the executor maps it to
+    ``MISSING_EDGE_DECLARATION``, which lands on ``invalid_configuration`` here.
+    So the same code produced ``blocked`` when read from ``refusals.py`` and
+    ``invalid_configuration`` when read from a record, and ``B0-HANDOFF-01``
+    could not have been shown reachable through the substrate at the status it
+    declares.
+
+    Resolving it towards the catalogue rather than towards the executor is the
+    right direction because the catalogue is where the *caller-facing* meaning
+    of a code lives -- it is the thing that carries the remedy and the
+    ``could_have_proceeded`` flag, and M1.3's whole requirement is that the five
+    outcomes stay distinguishable from the diagnostic alone. A ``RefusalKind`` is
+    coarser by design: ``_refusal_kind_for`` in the executor says outright that a
+    code with no entry becomes ``INVALID_CONFIGURATION`` rather than being
+    guessed into something specific.
+    """
+    for code in record.contract_codes:
+        entry = REFUSAL_CATALOGUE.get(code)
+        if entry is not None:
+            return entry.status
+    return _REFUSAL_TO_STATUS[refusal.kind]
 
 
 def _first_refusal(record: ExecutionRecord):  # type: ignore[no-untyped-def]
@@ -304,7 +335,7 @@ def _status(
     """
     refusal = _first_refusal(record)
     if refusal is not None:
-        return _REFUSAL_TO_STATUS[refusal.kind]
+        return _refusal_status(record, refusal)
 
     if record.status is RunStatus.FAILED and not record.nodes:
         return VerificationStatus.INVALID_CONFIGURATION

@@ -880,6 +880,16 @@ def declare_coherent_bundle(
         "weight_sum": float(np.sum(bundle.weight)) if bundle.weight is not None else None,
         "quadrature_weight_applied": quadrature["applied"],
         "quadrature_weight_status": quadrature["status"],
+        # CHE-108: the REASON, not only the status. `_ray_quadrature_weight`
+        # computes a specific reason for every non-applied case -- and for a
+        # non-hexapolar bundle that reason carries the NON_HEXAPOLAR_SAMPLING
+        # code it caught -- and it was being discarded here. Without it
+        # "unavailable" means both "this record predates CHE-47 and carries no
+        # pupil coordinates" and "your sampling is not a hexapolar fan, so the
+        # weight would have meant nothing", which are a missing declaration and
+        # an out-of-validity request respectively. An agent that cannot tell them
+        # apart cannot act on either.
+        "quadrature_weight_reason": quadrature.get("reason"),
         "quadrature_weight_sum_m2": (
             float(np.sum(quadrature["weight_m2"])) if quadrature["weight_m2"] is not None else None
         ),

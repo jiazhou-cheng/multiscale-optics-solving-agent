@@ -132,8 +132,7 @@ PARAXIAL_MARGINAL = paraxial_field_angle(
 # B1-RAY-EFL
 # ---------------------------------------------------------------------------
 
-B1_RAY_EFL = register(
-    BenchmarkFamily(
+_B1_RAY_EFL = BenchmarkFamily(
         family_id="B1-RAY-EFL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -250,15 +249,32 @@ B1_RAY_EFL = register(
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="efl_relative_error",
-            observed=1e-13,
-            evidence=("src/verification/analytic.py",),
+            observed=2.7855e-12,
+            evidence=(
+                "benchmarks/instances/b1_ray.py",
+                "tests/test_b1_ray_instances.py::test_the_thick_singlet_reproduces_both_closed_forms",
+                "tests/test_b1_ray_instances.py::test_convergence_is_a_fitted_exponent_over_four_rungs",
+            ),
             note=(
-                "verified against the pinned solver to 1e-13 relative before the "
-                "retired A1 task set shipped. Nothing in the required gate re-runs it, "
-                "which is what MEASURED_OFF_GATE says and why CHE-113/CHE-115 are the "
-                "tickets that change it."
+                "Executed, not inherited. 2.79e-12 relative on the EFL and 2.09e-12 on "
+                "the BFL against a 1e-6 gate, from a real trace of a parameterized "
+                "plano-convex singlet.\n\n"
+                "The measurement is the h -> 0 limit of a four-rung ring ladder, and "
+                "that is the substantive part rather than a refinement of it. A traced "
+                "focal length is NOT a paraxial focal length: a real marginal ray at "
+                "height h focuses short by an amount quadratic in h, so the innermost "
+                "ring of a 64-ring fan reads 1.13e-6 and of an 8-ring fan 7.24e-5 -- a "
+                "clean factor of four per doubling, which is the fitted exponent of "
+                "-2.0000 the family now carries. Gating the finest RUNG instead of the "
+                "limit would have made the 1e-6 tolerance a statement about the ray "
+                "count: 1.13e-6 sits inside it by a hair and only because the ladder is "
+                "deep.\n\n"
+                "The inherited 1e-13 figure came from the retired A1 set and is not "
+                "what this measures: that number was Optiland's paraxial solver against "
+                "the closed form, and this is Optiland's TRACE against it, which is a "
+                "different and harder claim. Both are correct; only one is a gate."
             ),
         ),
         sampler=None,
@@ -278,7 +294,6 @@ B1_RAY_EFL = register(
             "on the reference prescription, so an implementation that reports the same "
             "number twice fails the second check and only the second check."
         ),
-    )
 )
 
 
@@ -286,8 +301,52 @@ B1_RAY_EFL = register(
 # B1-RAY-PLATE
 # ---------------------------------------------------------------------------
 
-B1_RAY_PLATE = register(
-    BenchmarkFamily(
+#: The canonical instance, and the ladder it is measured on.
+#:
+#: A plano-convex singlet whose closed forms are exact rather than paraxial: the
+#: rear surface is plano, so it has no power and ``R/(n-1)`` is the whole focal
+#: length. What IS paraxial is the traced measurement -- a real marginal ray at
+#: height ``h`` focuses short of the paraxial focus by an amount quadratic in
+#: ``h`` -- so the traced value is extracted in the ``h -> 0`` limit from a
+#: refinement ladder in the ring count, which is also what CHE-106's
+#: fitted-exponent criterion asks for. The exponent is a prediction, not a
+#: fitted convenience: spherical aberration is quadratic in aperture, so the
+#: error must fall as ``rings^-2``.
+B1_RAY_EFL = register(
+    _B1_RAY_EFL.with_instances(
+        _B1_RAY_EFL.instantiate(
+            "B1-RAY-EFL-01",
+            {
+                "radius_mm": 50.0,
+                "index": 1.5168,
+                "thickness_mm": 4.0,
+                "wavelength_um": 0.5876,
+                # The largest marginal angle on the ladder's finest rung, which is
+                # what the paraxial validity predicate is about. Well inside the
+                # 5-degree bound.
+                "marginal_ray_angle_rad": 0.0517,
+                "pupil_rings": 64,
+            },
+            expected={
+                "efl_mm": 50.0 / (1.5168 - 1.0),
+                "bfl_mm": 50.0 / (1.5168 - 1.0) - 4.0 / 1.5168,
+                "why": (
+                    "R/(n-1) is exact for a plano-convex singlet in air and "
+                    "EFL - t/n is exact for a plano rear surface. The two differ by "
+                    "2.64 mm here, so an implementation that reports the same number "
+                    "twice fails the BFL check and only the BFL check."
+                ),
+                "refinement": (
+                    "measured in the h -> 0 limit from a rings ladder; a single ring "
+                    "count is an aberrated focal length, not a paraxial one"
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_RAY_PLATE = BenchmarkFamily(
         family_id="B1-RAY-PLATE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -375,14 +434,26 @@ B1_RAY_PLATE = register(
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="plate_focal_shift_signed_relative_error",
-            observed=1.3e-5,
-            evidence=("src/verification/analytic.py",),
+            observed=2.42781e-12,
+            evidence=(
+                "benchmarks/instances/b1_ray.py",
+                "tests/test_b1_ray_instances.py::test_the_plate_shift_carries_its_sign",
+                "tests/test_b1_ray_instances.py::test_convergence_is_a_fitted_exponent_over_four_rungs",
+            ),
             note=(
-                "a real trace at h = 0.5 mm into f = 100 mm gave 3.750048 mm against "
-                "3.75 analytic before the A1 task shipped. On record, re-checked by "
-                "nothing in the required gate."
+                "Executed. 2.43e-12 relative against a 1e-3 gate, from the h -> 0 limit "
+                "of a four-rung ladder with a fitted exponent of -2.0001.\n\n"
+                "Each rung is a DIFFERENCE of two traces of the same system with and "
+                "without the plate, so the lens, the sampling and the axial-crossing "
+                "extraction cancel and what is left is the plate. That is why the "
+                "residual is nine orders below the inherited 1.3e-5 single-point "
+                "figure: the inherited number was one ray at h = 0.5 mm, where the "
+                "quadratic aperture term dominates everything else.\n\n"
+                "The metric stays SIGNED and both controls fire: the shift reported "
+                "toward the plate instead of away from it, and t/n reported in place of "
+                "t(1 - 1/n) -- 6.25 mm where the answer is 3.75."
             ),
         ),
         sampler=None,
@@ -396,7 +467,6 @@ B1_RAY_PLATE = register(
             "The metric is SIGNED. A magnitude-only comparison would pass a run that "
             "moved the focus the wrong way, which is the whole content of the claim."
         ),
-    )
 )
 
 
@@ -458,8 +528,39 @@ TIR_BOUNDARY = ValidityPredicate(
 )
 
 
-B1_RAY_SNELL = register(
-    BenchmarkFamily(
+#: A 10 mm plate of index 1.6 in an f/10 converging beam. The shift is measured
+#: as the DIFFERENCE between two traces of the same system with and without the
+#: plate, so every common-mode property of the trace -- the lens, the sampling,
+#: the axial-crossing extraction -- cancels, and what is left is the plate.
+B1_RAY_PLATE = register(
+    _B1_RAY_PLATE.with_instances(
+        _B1_RAY_PLATE.instantiate(
+            "B1-RAY-PLATE-01",
+            {
+                "thickness_mm": 10.0,
+                "index": 1.6,
+                "focal_length_mm": 100.0,
+                "marginal_ray_angle_rad": 0.05,
+                "axis_crossing_samples": 64,
+            },
+            expected={
+                "shift_mm": 10.0 * (1.0 - 1.0 / 1.6),
+                "sign": (
+                    "positive means AWAY from the plate, i.e. the axial crossing moves "
+                    "to larger z. A sign error returns -3.75 mm and is rejected"
+                ),
+                "why": (
+                    "t(1 - 1/n) is the paraxial result and the trace approaches it "
+                    "quadratically in ray height, so the shift is extracted in the "
+                    "h -> 0 limit from the same rings ladder the EFL family uses"
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_RAY_SNELL = BenchmarkFamily(
         family_id="B1-RAY-SNELL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -570,11 +671,35 @@ B1_RAY_SNELL = register(
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="refraction_angle_absolute_error_rad",
+            observed=1.66533e-16,
+            evidence=(
+                "benchmarks/instances/b1_ray.py",
+                "tests/test_b1_ray_instances.py::test_snell_holds_to_the_floating_point_floor",
+                "tests/test_b1_ray_instances.py::test_snell_is_measured_across_a_range_of_incidence_angles",
+            ),
             note=(
-                "declared here and never executed through the substrate. The repository "
-                "has plenty of traces that would fail if Snell were wrong, and none of "
-                "them is a gate on Snell."
+                "Measured at four incidence angles from 0.075 to 0.467 rad, worst "
+                "1.67e-16 rad against a 1e-12 gate -- one float64 epsilon, which is the "
+                "only admissible residual because there is no approximation anywhere in "
+                "the comparison. The repository had plenty of traces that would fail if "
+                "Snell were wrong and none of them was a gate on Snell; this is.\n\n"
+                "Two conventions had to be pinned first, and each had a wrong reading "
+                "that produced a plausible number. (1) A collimated on-axis ray does not "
+                "move transversely before the first surface, so sin(i) = rho/R exactly "
+                "from the record's exported LAUNCH coordinate -- no intersection "
+                "reconstruction, and no assumption about where the vertex sits in the "
+                "traced frame. (2) The image plane REFRACTS: the medium after the last "
+                "surface is what the ray is in when it arrives, and the image surface "
+                "itself is air, so a system whose last surface carries glass applies a "
+                "second refraction there. Reading the exported angle as an in-glass "
+                "angle gave 22.3 degrees where the geometry requires 12.9. The oracle "
+                "applies Snell twice because the geometry does.\n\n"
+                "The angular RANGE is what does the work: small-angle substitution "
+                "agrees with Snell to first order, so a paraxial-only suite would pass "
+                "an implementation that had replaced sin with its argument. That control "
+                "fires at the steep end."
             ),
         ),
         sampler=None,
@@ -595,7 +720,6 @@ B1_RAY_SNELL = register(
             "approximation does not apply, invalid_configuration means the request is "
             "malformed."
         ),
-    )
 )
 
 
@@ -619,8 +743,50 @@ def _lagrange_invariant(params: Mapping[str, Any]) -> float:
     return n * (u * y_bar - u_bar * y)
 
 
-B1_RAY_LAGRANGE = register(
-    BenchmarkFamily(
+#: Four incidence angles on one spherical interface, from paraxial to 27 degrees.
+#:
+#: The measurement needs no approximation anywhere. A collimated on-axis ray
+#: travels parallel to z, so its transverse position where it meets the sphere is
+#: exactly its launch position -- which the record exports -- and therefore
+#: ``sin(i) = rho / R`` exactly. The traced direction at the image plane is then
+#: compared against Snell applied twice: once at the sphere, once at the plane
+#: exit face the last surface's air medium creates. Both applications are exact,
+#: so the only admissible residual is float64 round-off, which is why the
+#: tolerance is 1e-12 rather than something derived from a sampling argument.
+#:
+#: Four instances rather than one because "Snell's law at a single surface at
+#: several incidence angles" is the claim, and a single angle cannot make it. The
+#: steepest is chosen to sit just inside the exit face's total-internal-reflection
+#: boundary, which is where the family's TIR predicate lives.
+B1_RAY_SNELL = register(
+    _B1_RAY_SNELL.with_instances(
+        *[
+            _B1_RAY_SNELL.instantiate(
+                f"B1-RAY-SNELL-{index:02d}",
+                {
+                    "index_incident": 1.0,
+                    "index_transmitted": 1.7,
+                    "incidence_angle_rad": angle,
+                    "device": "cpu",
+                },
+                expected={
+                    "refraction_angle_rad": math.asin(math.sin(angle) / 1.7),
+                    "why": (
+                        "exact geometry on both sides: sin(i) = rho/R from the launch "
+                        "coordinate, and Snell with no approximation and no fitted "
+                        "constant"
+                    ),
+                },
+            )
+            for index, angle in enumerate(
+                (0.0750699, 0.2269425, 0.3843967, 0.4667653), start=1
+            )
+        ]
+    )
+)
+
+
+_B1_RAY_LAGRANGE = BenchmarkFamily(
         family_id="B1-RAY-LAGRANGE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -726,10 +892,39 @@ B1_RAY_LAGRANGE = register(
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.NOT_MET,
+            metric="lagrange_invariant_relative_drift",
+            observed=1.32863e-07,
+            evidence=(
+                "benchmarks/instances/b1_ray.py",
+                "tests/test_b1_ray_instances.py::test_the_lagrange_gate_is_unmet_and_says_why",
+                "tests/test_b1_ray_instances.py::test_the_lagrange_drift_vanishes_with_the_field",
+            ),
             note=(
-                "declared and never executed. It is the cheapest possible whole-system "
-                "check on the ray model and the repository has never run it."
+                "MEASURED AND NOT MET, and the tolerance is left exactly where it is. "
+                "1.33e-7 relative drift at a 0.25-degree field and a 1/64 pupil "
+                "fraction, against a 1e-10 gate.\n\n"
+                "The reason is structural rather than numerical, and it is a finding "
+                "about the tolerance rather than about the solver. The Lagrange "
+                "invariant's two-ray bilinear form p_a.q_b - p_b.q_a is preserved by a "
+                "LINEAR symplectic map. Ray refraction at a curved surface is symplectic "
+                "and not linear, so only the DIFFERENTIAL form is exactly conserved, and "
+                "any finite-real-ray evaluation carries an aberration residual. Measured "
+                "directly while authoring this: the differential ratio between two rays "
+                "of one fan converges to 1 + 7.1e-3 at a 5-degree field and does NOT "
+                "approach 1 as their separation shrinks -- the signature of a "
+                "finite-form residual rather than a numerical one.\n\n"
+                "What the family CAN support is measured and reported: the drift "
+                "vanishes with the field angle over five halvings, with a fitted "
+                "exponent near 2.5. That is the conservation statement -- the invariant "
+                "holds paraxially -- and it is why the drift is 1e-7 rather than 1e-2. "
+                "It was the cheapest unmeasured whole-system check on the ray model and "
+                "it is no longer unmeasured.\n\n"
+                "The tolerance's declared basis is CONSERVATION_LAW, and the "
+                "conservation law it names is paraxial while the measurement is of real "
+                "rays. Re-deriving that basis against the aberration it cannot see is "
+                "follow-up work; widening it to make this green would be exactly what "
+                "AGENTS.md forbids."
             ),
         ),
         sampler=None,
@@ -748,7 +943,6 @@ B1_RAY_LAGRANGE = register(
             "system is compared with itself at a different place, not with another "
             "implementation."
         ),
-    )
 )
 
 
@@ -776,8 +970,42 @@ def _required_launch_tilt_waves(params: Mapping[str, Any]) -> float:
     return n * d * math.sin(theta) / lam
 
 
-B1_RAY_OFFAXIS_OPL = register(
-    BenchmarkFamily(
+#: A three-surface stack, and the family whose gate does NOT close.
+#:
+#: The measurement is honest and the tolerance is not achievable, which is a
+#: finding rather than a failure to measure. See the gate disposition: the
+#: Lagrange invariant's finite two-ray form is preserved by a *linear* symplectic
+#: map, and ray refraction at a curved surface is symplectic but not linear, so a
+#: finite-real-ray evaluation carries an aberration residual that no amount of
+#: care removes. The residual is measured, its convergence in the field angle is
+#: fitted, and the tolerance is left exactly where it is.
+B1_RAY_LAGRANGE = register(
+    _B1_RAY_LAGRANGE.with_instances(
+        _B1_RAY_LAGRANGE.instantiate(
+            "B1-RAY-LAGRANGE-01",
+            {
+                "index_object_space": 1.0,
+                "marginal_ray_angle_rad": 0.0013,
+                "marginal_ray_height_mm": 0.125,
+                "chief_ray_angle_rad": 0.0043633,
+                "chief_ray_height_mm": 0.0,
+                "surface_count": 3,
+            },
+            expected={
+                "drift": "0 in the paraxial limit",
+                "known_disposition": (
+                    "NOT_MET. Measured 1.3e-7 relative at 0.25 degrees and a 1/64 "
+                    "pupil fraction, against a 1e-10 gate. The gate's basis is a "
+                    "conservation law that holds paraxially; the measurement is of "
+                    "real rays. Reported rather than accommodated."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_RAY_OFFAXIS_OPL = BenchmarkFamily(
         family_id="B1-RAY-OFFAXIS-OPL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -869,6 +1097,13 @@ B1_RAY_OFFAXIS_OPL = register(
                     "so, because it is unobservable",
                     "higher-order aberration: this is the linear term only, so a "
                     "correctly-tilted wavefront with wrong curvature scores 1.0",
+                    "an ON-AXIS field entirely. At theta = 0 the omitted term is a "
+                    "constant across the pupil and the chief-ray subtraction removes "
+                    "it exactly, so this metric reads 0 with the term and 0 without "
+                    "it. That blindness is why the defect survived CHE-30, CHE-32 and "
+                    "CHE-33, each of which looked on axis, and it is why the family's "
+                    "OFF_AXIS_FIELD_NONZERO predicate puts an on-axis instance outside "
+                    "its own validity rather than letting it report a pass",
                 ),
             ),
         ),
@@ -906,31 +1141,58 @@ B1_RAY_OFFAXIS_OPL = register(
                 ),
                 target_metric="launch_tilt_fraction_recovered",
             ),
-            NegativeControl(
-                control_id="on-axis-cannot-detect-it",
-                description=(
-                    "run the SAME omission at field_angle_rad = 0 and require it NOT to "
-                    "fire. This is the control on the control: it demonstrates that the "
-                    "family's off-axis instance is doing the work, and that an on-axis "
-                    "suite would have reported the defect as absent -- which is exactly "
-                    "what happened three times"
-                ),
-                mutation="omit-object-space-term, evaluated on an on-axis instance",
-                target_metric="launch_tilt_fraction_recovered",
-                expectation=NegativeControlExpectation.MUST_FAIL,
-            ),
+            # CHE-106 removed a second entry here, `on-axis-cannot-detect-it`,
+            # and the reason is worth keeping. It declared
+            # `expectation=MUST_FAIL` while its own description said "require it
+            # NOT to fire", and both cannot be true. More importantly it is not a
+            # negative control at all: a NegativeControl is a deliberately WRONG
+            # twin, and on axis the omitted term is exactly a piston that the
+            # chief-ray subtraction removes -- so omitting it on axis is not
+            # wrong, it is invisible. That is a blindness of the measurement, and
+            # it belongs on the metric's `blind_to` (where it now is) plus an
+            # executable demonstration
+            # (tests/test_b1_ray_instances.py::
+            #  test_the_omission_is_invisible_on_axis_which_is_why_it_survived).
+            # Declaring it as a control that must fail would have made the family
+            # report its own gate as untrustworthy every run.
         ),
         failure_semantics=(VerificationStatus.OUT_OF_VALIDITY,),
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="launch_tilt_fraction_recovered",
+            observed=6.10588e-4,
+            evidence=(
+                "benchmarks/instances/b1_ray.py",
+                "tests/test_b1_ray_instances.py::test_the_off_axis_tilt_is_recovered_and_gated",
+                "tests/test_b1_ray_instances.py::test_omitting_the_object_space_term_fails_through_the_shipping_adapter",
+                "tests/test_b1_ray_instances.py::test_the_omission_is_invisible_on_axis_which_is_why_it_survived",
+            ),
             note=(
-                "CHE-41 measured the defect and CHE-33 declared the fix, but no gate "
-                "re-checks the fixed value: benchmarks/probes/records/"
-                "m3_off_axis_handoff.json is a probe record, and a record is provenance "
-                "rather than a gate. Turning this into MET is the single highest-value "
-                "measurement M1 owes."
+                "The measurement M1 owed. 6.11e-4 against a 1e-3 gate on "
+                "M3-REVERSE-TELEPHOTO at Hy = 0.2, the configuration CHE-41 found the "
+                "defect on, and the control removes the term through the shipping "
+                "adapter's own switch -- HandoffPerturbation("
+                "reference_incoming_wavefront=False) -- so the broken arm runs the same "
+                "code with n_object*(d0.r_launch) left out and nothing else changed. It "
+                "recovers 9.5e-4 of the required tilt, a three-order separation from the "
+                "unperturbed arm.\n\n"
+                "The gated quantity is the OPL's linear SLOPE in the launch coordinate "
+                "against n_object*sin(theta), with sin(theta) read off the record's "
+                "chief direction rather than recomputed from the declared field. That "
+                "choice matters: the peak-to-valley form needs a pupil extent on both "
+                "sides, and getting the extent wrong is how this measurement first read "
+                "0.6556 and looked like a 34% shortfall in a term that is exact. An "
+                "off-axis collimated fan launches OFFSET transversely -- mean launch y "
+                "is -0.173 mm here -- so 2*max|r| is 0.647 mm for a 0.300 mm pupil, and "
+                "the peak-to-valley along the tilt axis is the entrance pupil diameter.\n\n"
+                "The on-axis blindness is demonstrated rather than described: the same "
+                "omission on the on-axis trace changes the tilt by exactly zero, and the "
+                "term's own span is 0.000000000 waves. That is why the defect survived "
+                "CHE-30, CHE-32 and CHE-33 -- every one of them looked on axis -- and it "
+                "is now a declared blindness of the metric rather than a negative "
+                "control that must fail."
             ),
         ),
         sampler=None,
@@ -952,6 +1214,44 @@ B1_RAY_OFFAXIS_OPL = register(
             "the reconstructed wave 209 um from where the rays actually go. Nothing "
             "downstream noticed, and nothing downstream would have: it is the archetype "
             "of a run that succeeds and is wrong."
+        ),
+)
+
+
+#: M3-REVERSE-TELEPHOTO at Hy = 0.2: the configuration CHE-41 found the defect on,
+#: and the one its fix was measured against. Kept exactly rather than sampled
+#: around, because keeping that point stable is what makes the regression
+#: detectable at all.
+#:
+#: ``pupil_diameter_m`` is the LAUNCH (entrance-pupil) extent, not the exit pupil.
+#: The distinction is load-bearing and cost an hour to find: the omitted term is
+#: ``n_object * (d0 . r_launch)``, a function of the launch coordinate, so its
+#: peak-to-valley span is over the launch extent -- 0.300 mm on this system --
+#: while the declared OPL is expressed over the exit pupil, 0.462 mm. Comparing
+#: the tilt measured on one pupil to the span required over the other reads
+#: 0.6556 and looks like a 34% shortfall in a term that is in fact exact.
+B1_RAY_OFFAXIS_OPL = register(
+    _B1_RAY_OFFAXIS_OPL.with_instances(
+        _B1_RAY_OFFAXIS_OPL.instantiate(
+            "B1-RAY-OFFAXIS-OPL-01",
+            {
+                "field_angle_rad": 0.10471975511965978,
+                "pupil_diameter_m": 3.0000000000000004e-4,
+                "wavelength_m": 5.5e-7,
+                "index_object_space": 1.0,
+                "pupil_rings": 16,
+                "prescription": "M3-REVERSE-TELEPHOTO",
+            },
+            expected={
+                "fraction_recovered_with_the_term": 1.0,
+                "fraction_recovered_without_it": 0.0013,
+                "why": (
+                    "CHE-41: only 0.13% of the required convergence tilt survives "
+                    "without n_object * (d0 . r_launch), and the reconstruction "
+                    "converges CLEANLY 209 um from where the rays actually go. The "
+                    "defect is invisible on axis and total off it."
+                ),
+            },
         ),
     )
 )

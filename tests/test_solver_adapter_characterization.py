@@ -100,6 +100,14 @@ OPTILAND_CODES = frozenset({
     "OPTILAND_GRADIENTS_REQUIRE_DESIGN_PARAMETERS",
     "OPTILAND_GRADIENTS_REQUIRE_TORCH_BACKEND",
     "OPTILAND_HANDOFF_PLANE_UNREACHABLE",
+    # CHE-106 (M1.1): float32 on the numpy backend was DECLARED and did
+    # not execute. `set_precision` changes what optiland's own array
+    # constructor builds, and `Optic.trace` still returns float64, so the
+    # trace carried float32-scale error (9.23e-11 measured) inside float64
+    # arrays and died on the artifact boundary's unit-norm check with a
+    # bare ValueError. Now refused eagerly, with the torch backend named as
+    # the path that does honour float32 end to end.
+    "OPTILAND_NUMPY_BACKEND_IS_FLOAT64_ONLY",
     "OPTILAND_INVALID_BASELINE_REQUEST",
     "OPTILAND_INVALID_NUM_RAYS",
     "OPTILAND_INVALID_OR_EMPTY_OUTPUT",

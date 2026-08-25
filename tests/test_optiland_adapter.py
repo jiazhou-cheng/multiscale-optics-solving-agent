@@ -387,6 +387,15 @@ def test_float32_is_now_a_supported_precision_not_a_rejected_one() -> None:
     `set_precision` accepts float32 and float64. Refusing float32 was a project
     limitation, not a package one, and PB4b removes it -- so this asserts
     acceptance where the old test asserted rejection.
+
+    CHE-106 (M1.1) narrowed it to the backend that actually executes it. float32
+    is supported through the TORCH backend, which honours it end to end and
+    returns float32 arrays; on the numpy backend `Optic.trace` still returns
+    float64 whatever `set_precision` says, so the trace carried float32-scale
+    error inside float64 arrays and failed the artifact boundary. That is now a
+    named eager refusal rather than a mid-trace ValueError, and the
+    default-backend half of this test would otherwise have asserted the
+    over-claim.
     """
     adapter = OptilandAdapter()
     for dtype in ("float32", "float64"):
@@ -394,12 +403,29 @@ def test_float32_is_now_a_supported_precision_not_a_rejected_one() -> None:
             run_id="test-run",
             node_id="lens",
             inputs={},
-            config={"dtype": dtype},
+            config={"dtype": dtype, "backend": "torch"},
             design_parameters={},
             require_gradients=False,
         )
         report = adapter.validate_request(request)
         assert report.valid, f"{dtype} should be executable: {report.errors}"
+
+    # And the numpy backend refuses float32 by name, with the working
+    # alternative in the message.
+    refused = adapter.validate_request(
+        ModelRunRequest(
+            run_id="test-run",
+            node_id="lens",
+            inputs={},
+            config={"dtype": "float32", "backend": "numpy"},
+            design_parameters={},
+            require_gradients=False,
+        )
+    )
+    assert not refused.valid
+    codes = {issue.code for issue in refused.errors}
+    assert "OPTILAND_NUMPY_BACKEND_IS_FLOAT64_ONLY" in codes
+    assert "torch" in " ".join(issue.message for issue in refused.errors)
 
 
 def test_float16_is_rejected_because_optiland_has_no_float16_path() -> None:

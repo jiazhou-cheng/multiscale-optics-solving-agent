@@ -156,20 +156,30 @@ def test_every_b1_gate_states_what_it_rejects(family: BenchmarkFamily) -> None:
 def test_an_unrun_family_says_so_rather_than_implying_a_pass(
     family: BenchmarkFamily,
 ) -> None:
-    """MEASURED_OFF_GATE and NOT_MEASURED are the only honest states here.
+    """A decided gate must cite a test that re-runs it.
 
-    None of these families has been executed through the substrate. A family
-    reporting MET would be claiming a measurement that does not exist.
+    This test began as "MEASURED_OFF_GATE and NOT_MEASURED are the only honest
+    states here", because nothing had been executed through the substrate. CHE-106
+    and CHE-107 executed them, so the question changes rather than disappearing:
+    what stops a MET from becoming a claim nobody re-checks?
+
+    The answer, and what is asserted: a decided gate cites a pytest node id in
+    the default suite. A gate whose only evidence is a source file is
+    MEASURED_OFF_GATE by definition -- something ran once and nothing re-checks it.
     """
-    assert family.gate_disposition is not None
-    assert family.gate_disposition.status in (
-        GateStatus.MEASURED_OFF_GATE,
-        GateStatus.NOT_MEASURED,
-    ), (
-        f"{family.family_id} reports {family.gate_disposition.status.value}. Nothing "
-        "has run these through the executor yet; CHE-113 and CHE-115 are what change it."
+    disposition = family.gate_disposition
+    assert disposition is not None
+    assert disposition.note.strip()
+    if disposition.status not in (GateStatus.MET, GateStatus.NOT_MET):
+        assert disposition.status in (
+            GateStatus.MEASURED_OFF_GATE,
+            GateStatus.NOT_MEASURED,
+        ), f"{family.family_id} reports {disposition.status.value}"
+        return
+    assert [reference for reference in disposition.evidence if "::" in reference], (
+        f"{family.family_id} claims {disposition.status.value} and cites no test "
+        f"that re-runs it: {list(disposition.evidence)}"
     )
-    assert family.gate_disposition.note.strip()
 
 
 # --------------------------------------------------------------------------- #
@@ -328,10 +338,34 @@ def test_the_off_axis_family_refuses_an_on_axis_instance_as_out_of_validity() ->
 def test_the_off_axis_family_declares_the_che41_omission_as_a_control() -> None:
     ids = {c.control_id for c in B1_RAY_OFFAXIS_OPL.negative_controls}
     assert "omit-object-space-term" in ids
-    assert "on-axis-cannot-detect-it" in ids, (
-        "the control on the control: an on-axis run of the same omission must be shown "
-        "not to fire, or the family has not established why the off-axis instance is "
-        "the one doing the work"
+
+
+def test_the_on_axis_blindness_is_a_blindness_and_not_a_control() -> None:
+    """CHE-106 moved it, and the move is the point.
+
+    It was declared as a negative control with ``expectation=MUST_FAIL`` and a
+    description saying "require it NOT to fire", and both cannot be true. More
+    importantly a NegativeControl is a deliberately WRONG twin, and on axis the
+    omitted term is exactly a piston that the chief-ray subtraction removes -- so
+    omitting it on axis is not wrong, it is unobservable. Leaving it as a control
+    that must fail would have made the family report its own gate as
+    untrustworthy on every run.
+
+    So it lives on the metric's ``blind_to``, where a blindness belongs, and the
+    demonstration is executable in
+    ``tests/test_b1_ray_instances.py::test_the_omission_is_invisible_on_axis_which_is_why_it_survived``.
+    """
+    ids = {c.control_id for c in B1_RAY_OFFAXIS_OPL.negative_controls}
+    assert "on-axis-cannot-detect-it" not in ids
+
+    metric = next(
+        m for m in B1_RAY_OFFAXIS_OPL.metrics if m.name == "launch_tilt_fraction_recovered"
+    )
+    blindness = next((b for b in metric.blind_to if "ON-AXIS" in b), None)
+    assert blindness is not None, metric.blind_to
+    assert "CHE-30" in blindness, (
+        "the blindness has to name what it cost: three characterizations that all "
+        "looked on axis and all reported the defect as absent"
     )
 
 
@@ -509,23 +543,45 @@ def test_the_b1_families_show_up_in_the_ledger_as_the_states_they_declare() -> N
     from verification.claim_ledger import all_claims
 
     by_metric = {c.metric: c for c in all_claims() if c.metric}
-    assert by_metric["efl_relative_error"].gate_status is GateStatus.MEASURED_OFF_GATE
-    assert by_metric["launch_tilt_fraction_recovered"].gate_status is GateStatus.NOT_MEASURED
+    # CHE-106 executed the ray families, so these are the states they now
+    # declare. The test keeps its point: the ledger is a PROJECTION of the
+    # families, so a disposition that moves has to move here too, and a ledger
+    # that disagreed with a family would be two sources of truth.
+    assert by_metric["efl_relative_error"].gate_status is GateStatus.MET
+    assert by_metric["launch_tilt_fraction_recovered"].gate_status is GateStatus.MET
+    assert by_metric["lagrange_invariant_relative_drift"].gate_status is GateStatus.NOT_MET
     assert by_metric["talbot_revival_relative_l2"].gate_status is GateStatus.NOT_MEASURED
 
 
 def test_an_unmeasured_family_does_not_project_a_tolerance_it_has_not_met() -> None:
     """A declared threshold with nothing measured against it is a claim with no
-    content, so the coverage view carries the threshold as a caveat instead."""
+    content, so the coverage view carries the threshold as a caveat instead.
+
+    B1-RAY-OFFAXIS-OPL used to be the example and is now measured, so the
+    example moves to a family that still is not: B1-WAVE-TALBOT. What is being
+    asserted is the projection rule, not which family happens to be unmeasured.
+    """
+    from verification.families.b1_wave import B1_WAVE_TALBOT
     from verification.families.projection import claims_from_family
 
-    (claim,) = claims_from_family(B1_RAY_OFFAXIS_OPL)
+    (claim,) = claims_from_family(B1_WAVE_TALBOT)
     assert claim.tolerance is None
     assert claim.observed is None
     assert any("nothing measured against it yet" in c for c in claim.caveats)
-    assert claim.metric == "launch_tilt_fraction_recovered", (
+    assert claim.metric == "talbot_revival_relative_l2", (
         "the metric NAME is known even when the number is not"
     )
+
+
+def test_a_measured_family_projects_the_number_it_measured() -> None:
+    """The other direction of the same rule, now that there is something to project."""
+    from verification.families.projection import claims_from_family
+
+    (claim,) = claims_from_family(B1_RAY_OFFAXIS_OPL)
+    assert claim.metric == "launch_tilt_fraction_recovered"
+    assert claim.tolerance == pytest.approx(1e-3)
+    assert claim.observed is not None
+    assert claim.observed < claim.tolerance
 
 
 def test_every_benchmark_category_now_has_at_least_one_family() -> None:

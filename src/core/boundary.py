@@ -51,6 +51,7 @@ from core.artifacts import ArtifactRecord
 from core.precision import (
     ArrayNamespace,
     ArrayState,
+    DeviceKind,
     DevicePlacement,
     DType,
 )
@@ -343,6 +344,64 @@ class _HostView:
             "execution_representation_preserved": True,
             "from": self._state.as_dict(),
         }
+
+
+#: ``ArtifactRecord.device`` is a coarse three-way declaration; ``DeviceKind`` is
+#: what an array's placement is read as. Mapped rather than compared as strings
+#: so ``gpu`` and ``cuda`` are the same claim and ``tpu`` is not silently equated
+#: with either.
+_RECORD_DEVICE_KINDS: dict[str, frozenset[DeviceKind]] = {
+    "cpu": frozenset({DeviceKind.CPU}),
+    "gpu": frozenset({DeviceKind.CUDA}),
+}
+
+
+def _require_declared_device_matches(
+    record: ArtifactRecord, array: Any, *, name: str
+) -> None:
+    """A record's declared device must be where its live array actually is.
+
+    CHE-108. Applies **only on the live path** -- when the caller hands the array
+    in, which is what the graph executor does. Loading from a file deliberately
+    does not check it, and the reason is written into
+    ``ComplexField.from_artifact_record``: a host-loaded artifact *is* host
+    NumPy, and the record's device is then a statement about the producer rather
+    than about the object, so refusing the mismatch would refuse the normal case.
+
+    On the live path the mismatch is a lie with consequences. ``record.device =
+    requested_device`` is the one line that turns a process-global JAX platform
+    pin into a reported CUDA run that happened on the host, with nothing raised
+    -- PB4a measured exactly that. Every device fact in this project is supposed
+    to be read off the buffer, and this is the check that makes a record which
+    says otherwise fail instead of propagate.
+
+    ``external`` and ``tpu`` are not checked: neither names a placement this
+    repository can observe, so an assertion about them would be an assertion
+    about a string.
+    """
+    expected = _RECORD_DEVICE_KINDS.get(str(record.device))
+    if expected is None:
+        return
+    observed = device_of(array)
+    if observed.kind in expected:
+        return
+    raise ContractError(
+        ContractCode.REPRESENTATION_INCONSISTENT,
+        (
+            f"the record declares device {record.device!s} and {name} is actually on "
+            f"{observed}. A declared device is not evidence of an actual one: a "
+            "process-global platform pin, a missing PTX compiler or a silent host "
+            "fallback all produce a successful run on the host for a caller who asked "
+            "for the accelerator, with nothing raised."
+        ),
+        declaration="ArtifactRecord.device",
+        artifact_id=record.id,
+        remedy=(
+            "read the device off the array (core.arrays.array_state) and record what "
+            "was observed, or move the array with an explicit bridge before building "
+            "the record"
+        ),
+    )
 
 
 def _require_same_representation(
@@ -791,6 +850,10 @@ class RayBundle:
                 artifact_id=record.id,
             )
         data = arrays if arrays is not None else dict(np.load(record.uri))
+        if arrays is not None and data:
+            _require_declared_device_matches(
+                record, next(iter(data.values())), name="the ray geometry"
+            )
         metadata = record.metadata
         conventions = metadata.get("conventions", {})
 
@@ -1289,6 +1352,8 @@ class ComplexField:
                 artifact_id=record.id,
             )
         u = array if array is not None else np.load(record.uri)
+        if array is not None:
+            _require_declared_device_matches(record, u, name="the field array")
         metadata = record.metadata
 
         wavelength_m = float(

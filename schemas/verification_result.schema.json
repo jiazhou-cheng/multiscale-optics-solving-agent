@@ -780,6 +780,7 @@
         "ensemble_standard_error",
         "floating_point_floor",
         "grid_convergence",
+        "fit_standard_error",
         "oracle_error_bound",
         "exact",
         "not_estimated"

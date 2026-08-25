@@ -74,6 +74,13 @@ class UncertaintyBasis(StrEnum):
     FLOATING_POINT_FLOOR = "floating_point_floor"
     #: Residual between the two finest rungs of a convergence ladder.
     GRID_CONVERGENCE = "grid_convergence"
+    #: Residual standard error of a fitted parameter -- the error bar on a
+    #: convergence exponent. Distinct from GRID_CONVERGENCE, which is the spread
+    #: of the *measured* quantity across a ladder; this is how well the ladder
+    #: constrains the *slope*. An r^2 near 1 over three tightly clustered rungs
+    #: can sit beside a slope whose standard error is 0.3, so the two are not
+    #: interchangeable and an exponent quoted with the wrong one overstates it.
+    FIT_STANDARD_ERROR = "fit_standard_error"
     #: Propagated from the oracle's own stated error bound.
     ORACLE_ERROR_BOUND = "oracle_error_bound"
     #: Exact by construction -- a count, an integer, a boolean cast to 0/1.

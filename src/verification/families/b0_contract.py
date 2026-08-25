@@ -274,12 +274,32 @@ _B0_CONTRACT = BenchmarkFamily(
         execution_policy=CONTRACT_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="fabricated_output_count",
+            observed=0.0,
+            evidence=(
+                "benchmarks/instances/b0_contract.py",
+                "tests/test_b0_instances.py::test_the_five_negative_outcomes_come_from_five_real_executions",
+                "tests/test_b0_instances.py::test_no_refusal_reports_a_metric_a_convergence_or_a_gate",
+                "tests/test_contract_code_reachability.py",
+            ),
             note=(
-                "the refusals are real and specific and each was tested where it was "
-                "introduced, in whichever file that ticket touched. What has never been "
-                "run is the systematic walk: every component, every declared boundary, "
-                "with the SHAPE of the refusal asserted rather than the fact of it."
+                "MET by execution rather than by declaration. All six canonical "
+                "instances now run through the shipping components, and each of the "
+                "five negative outcomes is produced by a DIFFERENT instance -- so an "
+                "agent can tell them apart, which is the whole claim. No refusal "
+                "carries a metric, an invariant, a convergence verdict, or an output "
+                "of the node that refused; the count is zero and is asserted rather "
+                "than assumed. All nineteen declared ContractCodes are separately "
+                "shown reachable with a reason and a remedy.\n\n"
+                "One defect fixed to get here, and it is the reason the systematic "
+                "walk was worth doing: OPL_REFERENCE_UNVERIFIED is `blocked` in the "
+                "refusal catalogue and was arriving through the record path as "
+                "`invalid_configuration`, because the executor maps it to "
+                "MISSING_EDGE_DECLARATION. The two statuses had therefore collapsed "
+                "for exactly the code whose whole point is that a caller could have "
+                "proceeded and the component chose not to. The catalogue now decides "
+                "when a contract code is present."
             ),
         ),
         sampler=None,
@@ -579,15 +599,33 @@ _B0_DTYPE = BenchmarkFamily(
         execution_policy=CONTRACT_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="measured_precision_loss",
-            observed=2.5e-5,
-            evidence=("benchmarks/probes/carrier_phase_representation.py",),
+            observed=2.82988e-5,
+            evidence=(
+                "benchmarks/instances/b0_contract.py",
+                "tests/test_b0_instances.py::test_the_precision_loss_is_measured_against_an_independent_oracle",
+                "tests/test_b0_instances.py::test_the_measured_loss_sits_under_one_eps32_per_radian",
+            ),
             note=(
-                "2.5e-5 at z = 40 um and 6.3e-2 at z = 47 mm, measured. That second "
-                "number is why the M3 reference singlet was scaled to a tenth: the loss "
-                "is a function of accumulated phase, so a longer system is a less "
-                "accurate one at fixed precision."
+                "Re-measured, not inherited. 2.82988e-5 at z = 40 um against the "
+                "1.0e-4 gate, from a real Chromatix complex64 propagation compared to "
+                "verification/asm_oracle.angular_spectrum_float64 -- an independent "
+                "float64 implementation that shares no code with Chromatix, so what is "
+                "measured is the cost of the REPRESENTATION rather than of the "
+                "implementation. Measuring it with a second Chromatix call would put "
+                "the truncation on both sides of the comparison.\n\n"
+                "The inherited figure was 2.5e-5 and the two agree to 13%, which is "
+                "the useful outcome: the historical number was right and is now "
+                "reproducible from code in the tree. The eps32-per-radian bound at "
+                "this configuration is 5.45e-5, evaluated rather than quoted, and the "
+                "measurement sits under it -- so the residual is the dtype and not the "
+                "propagator.\n\n"
+                "6.3e-2 at z = 47 mm is preserved as the other end of the same "
+                "relation and is why the M3 reference singlet was scaled to a tenth: "
+                "the loss is a function of accumulated phase, so a longer system is a "
+                "less accurate one at fixed precision. This is also CHE-107's WAVE-2 "
+                "measurement; it is made once rather than twice."
             ),
         ),
         sampler=None,
@@ -759,12 +797,31 @@ _B0_VALIDITY = BenchmarkFamily(
         execution_policy=CONTRACT_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="validity_status_is_out_of_validity",
+            observed=0.0,
+            evidence=(
+                "benchmarks/instances/b0_contract.py",
+                "tests/test_b0_instances.py::test_out_of_validity_comes_from_a_run_that_succeeded",
+                "tests/test_b0_instances.py::test_the_curvature_guard_is_live_at_the_instance_parameters",
+            ),
             note=(
-                "tests/test_curvature_bound.py measures the BOUND -- that it sits above "
-                "the direction spread the sag actually produces. What is not measured "
-                "is the reporting: whether crossing it comes back as out_of_validity "
-                "rather than as one of the other four."
+                "The reporting is now measured, which is what NOT_MEASURED referred "
+                "to: crossing arcsin(D/2R) comes back as out_of_validity and not as "
+                "one of the other four. The route matters and is asserted -- the run "
+                "SUCCEEDS, nothing refuses, and the status comes from the verifier "
+                "re-evaluating SI_S3_CURVATURE against the realized parameters. That "
+                "is the correct route for this family: out-of-validity means the code "
+                "ran and the answer is wrong, so a refusal would be the wrong shape "
+                "of evidence for it.\n\n"
+                "Two questions are kept apart, because running only one of them "
+                "produces a validity claim made backwards. `check_patch` asks whether "
+                "the geometry's error is inside the CALLER's tolerance and passes at "
+                "the instance's generous 0.2 rad; the family asks whether the declared "
+                "eps_curv is inside what the GEOMETRY admits, and 0.2 against a "
+                "computed 0.0500 rad is not. The guard is separately shown live at "
+                "these parameters by asking it for half the bound, which it refuses "
+                "with a remedy naming the widest admissible patch."
             ),
         ),
         sampler=None,
@@ -915,16 +972,41 @@ _B0_UNITS = BenchmarkFamily(
         ),
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="relative_error_vs_closed_form",
-            observed=UNITS_MICROMETRE_NANOMETRE.relative_separation,
-            evidence=("src/verification/hazards.py",),
+            observed=2.28205,
+            evidence=(
+                "benchmarks/instances/b0_contract.py",
+                "tests/test_b0_instances.py::test_a_silent_hazard_reports_ok_and_fails_its_gate",
+                "tests/test_b0_instances.py::test_the_coating_is_indistinguishable_from_bare_glass",
+                "tests/test_b0_instances.py::test_the_kykx_sign_inversion_is_located_on_the_propagator",
+                "src/verification/hazards.py",
+            ),
             note=(
-                "both traps are measured on the pinned versions and their numbers are "
-                "preserved. The um/nm slip returns 0.04216384 against bare glass's "
-                "0.04216456 -- they differ in the eighth decimal place, and the SMALL "
-                "separation is the hazard: the coating doing nothing and the coating "
-                "working look like the same reflectance."
+                "Read the direction of this gate carefully: the tolerance exists to "
+                "REJECT these two instances, and MET means it does. Both run clean, "
+                "both report contract status ok, and both are rejected by "
+                "relative_error_vs_closed_form -- 2.282 for the coating and 0.842 for "
+                "the tilt, against a 5e-3 gate. A suite that stopped at the contract "
+                "would call both of them passing runs, and that pairing is the whole "
+                "content of the family.\n\n"
+                "Re-measured on the pinned installs, and the measurement moved two "
+                "things. (1) The coating: the wrong call returns 0.04212655 against "
+                "bare glass's 0.04216456, a separation of 9.0e-4 rather than the "
+                "recorded 1.7e-5. The bare-glass value reproduces exactly and the "
+                "3.285x improvement of the correct coating reproduces to three "
+                "decimals, so the difference is the coating MATERIAL MODEL -- "
+                "IdealMaterial(n=1.38) here -- and not the unit hazard, which is "
+                "identical. Still small; the coating still does nothing. (2) The "
+                "kykx trap is TWO mistakes at two call sites, not one: plane_wave "
+                "handed cycles-per-length is 2*pi too small with the sign PRESERVED, "
+                "and asm_propagate's kykx displaces OPPOSITE to its parameter. The "
+                "recorded magnitude reproduces to 0.5%; its attribution is corrected. "
+                "The recorded 'factor of 2*pi' is also paraxial: at 2*pi too large the "
+                "beam is at 33 degrees and the ratio is 7.45, which "
+                "z*tan(asin(lambda*f)) predicts. hazards.py keeps the historical "
+                "numbers; the instance record carries the fresh ones and the reason "
+                "they differ."
             ),
         ),
         sampler=None,

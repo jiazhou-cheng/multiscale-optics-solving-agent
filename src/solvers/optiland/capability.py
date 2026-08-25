@@ -23,6 +23,7 @@ from core.optical_system import (
 from core.precision import (
     CapabilityError,
     DeviceKind,
+    Precision,
 )
 from solvers.base import (
     ModelRunRequest,
@@ -140,6 +141,41 @@ def capability_problems(request: ModelRunRequest) -> list[tuple[str, str]]:
                             "deliberately no silent fallback to the CPU.",
                         )
                     )
+            # CHE-106: float32 on the NUMPY backend is declared and does not
+            # execute, and the failure it produced was the wrong shape twice
+            # over. Measured: `be.set_precision('float32')` does change what
+            # `be.array` builds, but `Optic.trace` on the numpy backend still
+            # returns float64 arrays, so the trace carries float32-scale
+            # arithmetic error inside a float64 container -- 9.23e-11 on the
+            # reference singlet's direction cosines. The artifact boundary then
+            # scaled its unit-norm tolerance to the CONTAINER's dtype, held a
+            # partly-float32 trace to the float64 bound of 1e-12, and raised a
+            # bare ValueError from inside the trace.
+            #
+            # Both halves of that are defects. The capability over-claim is
+            # closed here rather than by loosening the boundary check, because
+            # the boundary check is right: a float64 artifact whose norms are off
+            # by 9e-11 IS malformed, and the thing that should not have happened
+            # is the request. Refused eagerly, before any solver call, with the
+            # working alternative named -- the torch backend does honour float32
+            # and returns float32 arrays (measured in the same matrix).
+            elif (
+                backend_name == "numpy"
+                and resolved.precision is not Precision.FP64
+            ):
+                problems.append(
+                    (
+                        "OPTILAND_NUMPY_BACKEND_IS_FLOAT64_ONLY",
+                        f"config['dtype']={str(resolved.precision.real_dtype)!r} with "
+                        "config['backend']='numpy' is not executable: optiland's numpy "
+                        "backend honours set_precision for its own array constructor "
+                        "but Optic.trace still returns float64, so the trace would "
+                        "carry float32-scale error (9.23e-11 measured on the reference "
+                        "singlet) inside float64 arrays and fail the artifact "
+                        "boundary's unit-norm check. Use config['backend']='torch', "
+                        "which honours float32 end to end and returns float32 arrays.",
+                    )
+                )
 
     # System construction: either a registered canonical prescription named
     # by config['sample'], or one supplied inline through

@@ -309,10 +309,35 @@ def test_the_no_fabricated_output_rule_is_a_gating_tolerance() -> None:
 
 @pytest.mark.parametrize("family", B0, ids=lambda f: f.family_id)
 def test_no_b0_family_claims_a_gate_it_has_not_measured(family: BenchmarkFamily) -> None:
-    assert family.gate_disposition is not None
-    assert family.gate_disposition.status in (
-        GateStatus.MEASURED_OFF_GATE,
-        GateStatus.NOT_MEASURED,
+    """A decided gate must cite something that RE-RUNS it.
+
+    Until CHE-108 executed the canonical instances, every B0 family was
+    NOT_MEASURED or MEASURED_OFF_GATE and this test enforced that. All four are
+    now MET, so the question changes rather than disappearing: what stops a
+    future MET from being a claim nobody re-checks?
+
+    The answer, and what is asserted here: the cited evidence has to include a
+    pytest node id in the default suite. A gate whose only evidence is a source
+    file is MEASURED_OFF_GATE by definition -- something ran once and nothing
+    re-checks it -- and the schema already refuses a decided gate with no metric,
+    no observed value, or no evidence at all.
+    """
+    disposition = family.gate_disposition
+    assert disposition is not None
+    if disposition.status not in (GateStatus.MET, GateStatus.NOT_MET):
+        assert disposition.status in (
+            GateStatus.MEASURED_OFF_GATE,
+            GateStatus.NOT_MEASURED,
+        )
+        return
+
+    assert disposition.metric is not None
+    assert disposition.observed is not None
+    executable = [reference for reference in disposition.evidence if "::" in reference]
+    assert executable, (
+        f"{family.family_id} claims {disposition.status.value} and cites no test that "
+        f"re-runs it: {list(disposition.evidence)}. A decided gate whose evidence is "
+        "only a source file is MEASURED_OFF_GATE."
     )
 
 
