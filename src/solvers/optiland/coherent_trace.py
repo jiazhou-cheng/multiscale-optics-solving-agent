@@ -40,6 +40,13 @@ the trace. ``|a|^2`` is computed on the wave side and bridged in as an intensity
 so Optiland's clipping bookkeeping is meaningful, and the value that comes back
 is read for exactly one purpose -- deciding which rays were clipped.
 
+One wavelength, not one per ray
+-------------------------------
+The batch declares a single scalar wavelength, and Optiland is handed a size-1
+array rather than N copies of it. That is a performance decision with an exact
+equivalence behind it, and CHE-118 measured what the broadcast cost: 97% of the
+trace stage, 46% of demo3's runtime. See :data:`MONOCHROMATIC_WAVELENGTH_RULE`.
+
 Skipping the object surface
 ---------------------------
 A built ``Optic`` always carries an object surface, and for an object at infinity
@@ -93,6 +100,7 @@ from solvers.optiland.execution import (
 )
 
 __all__ = [
+    "MONOCHROMATIC_WAVELENGTH_RULE",
     "OptilandExecutionState",
     "TracePlans",
     "configure_optiland_execution",
@@ -106,6 +114,38 @@ __all__ = [
 #: *same* plane by construction, so any real difference is a setup error, and a
 #: float32 representation of a 60 um position is good to about 4e-12 m.
 _PLANE_TOLERANCE_M = 1.0e-9
+
+#: Why Optiland is handed *one* wavelength rather than one per ray (CHE-118).
+#:
+#: ``RayBundle.wavelength_m`` is a scalar ``float`` by contract, so a per-ray
+#: wavelength array was always a broadcast of a single number. Optiland 0.6.0
+#: memoizes ``BaseMaterial.n``/``.k`` on the *contents* of whatever it is handed:
+#: ``_create_cache_key`` evaluates ``tuple(np.ravel(be.to_numpy(wavelength)))``,
+#: so a 200 k-ray chunk copied the array to the host, built a 200 000-element
+#: Python tuple and hashed it -- four times per surface, every chunk. Measured at
+#: 19 ms per call, 305 ms of a 313 ms four-surface trace: 97% of the trace stage
+#: and 46% of demo3's entire runtime spent hashing one number repeated 200 000
+#: times, and the cache it feeds then holds a full-length tensor per distinct
+#: chunk content.
+#:
+#: A size-1 array takes Optiland's own documented scalar path -- ``IdealMaterial``
+#: returns ``index[0]`` unchanged for ``size <= 1``, and a dispersive material
+#: evaluates its index once at that wavelength -- and the scalar broadcasts
+#: against the N-ray geometry. The equivalence is exact rather than approximate,
+#: and it holds *because* the batch is monochromatic: with one wavelength there is
+#: nothing for a per-ray array to say that a scalar cannot. Verified bitwise on
+#: the demo3 system in both precisions and asserted in
+#: ``tests/test_coherent_bridge.py``.
+#:
+#: This is not a workaround for a solver defect we are hiding: the redundant
+#: broadcast was ours, built one line above where it was consumed.
+MONOCHROMATIC_WAVELENGTH_RULE = (
+    "the batch carries one scalar wavelength, so Optiland is handed a size-1 "
+    "wavelength array rather than one entry per ray. optiland 0.6.0 keys its "
+    "refractive-index cache on the array's contents, which made a per-ray "
+    "broadcast cost O(rays) of host-side tuple construction per surface; the "
+    "size-1 array takes the solver's scalar path and broadcasts identically"
+)
 
 
 @dataclass(frozen=True)
@@ -440,8 +480,9 @@ def trace_ray_batch(
     directions = inbound["directions"]
     intensity_t = inbound["intensity"]
     wavelength_um = metres_to_micrometres(bundle.wavelength_m)
+    # ONE wavelength, not N copies of it -- see `MONOCHROMATIC_WAVELENGTH_RULE`.
     wavelengths = _solver_module(plans.inbound.target_namespace).full_like(
-        intensity_t, wavelength_um
+        intensity_t[:1], wavelength_um
     )
 
     rays = real_rays_cls(
@@ -525,6 +566,7 @@ def trace_ray_batch(
                 "skip": skip,
                 "surface_positions_m": surfaces_m,
                 "wavelength_um": wavelength_um,
+                "wavelength_handoff": MONOCHROMATIC_WAVELENGTH_RULE,
                 "bridge_plans": plans.as_dict(),
                 "unit_conversions": {
                     "positions": "m -> mm inbound, mm -> m outbound",
@@ -542,5 +584,6 @@ def trace_ray_batch(
         "residency": out_batch.residency(),
         "amplitude_handling": AMPLITUDE_SIDECAR_RULE,
         "optiland_intensity_handling": OPTILAND_INTENSITY_RULE,
+        "wavelength_handling": MONOCHROMATIC_WAVELENGTH_RULE,
     }
     return out_batch, diagnostics

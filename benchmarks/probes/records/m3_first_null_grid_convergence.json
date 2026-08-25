@@ -78,7 +78,7 @@
  },
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "8ccb403e27f8e008cdc21f59eba4280de7c23f1ba22ebd6826fbf82c18e48f3e",
+   "combined_sha256": "b0faa06bd8f5722dfc096fbf47175b1646c6a885a1dfe63c8c733a56d55fb7b3",
    "files": {
     "benchmarks/probes/first_null_grid_convergence.py": "706775ab64fb0393aab8b6b19addff4b2a918729765608051bcb54dd34bf344f",
     "benchmarks/probes/psf_oracle_verification.py": "4387da1df4b0f140096d5dbf071b374e7d92508155e7d375b0b5c3fa4af4c6f0",
@@ -122,7 +122,7 @@
     "src/solvers/chromatix/provenance.py": "0a33fbc9607cc8cfb89c1716c5e5b95e6b04a1f941968cd9916183c128c58c4b",
     "src/solvers/chromatix/requests.py": "317132780ee80c603c479283b46c648df41610df49a52bc66361eab2cdb47528",
     "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
-    "src/solvers/optiland/adapter.py": "ee8a3bae848bbd23e1cf88bbd4b7f69659cdccd7945e5c1d5f9289549e96560a",
+    "src/solvers/optiland/adapter.py": "ef379a7f3dd23bd764c094e628281177211fa4f91ac532ecbfcef482b28d68b5",
     "src/solvers/optiland/artifacts.py": "82c029dd0426ca15b93446dd067d0617f9b446ceae6d81107b55ad20d98240f5",
     "src/solvers/optiland/baseline.py": "8aff7f2aad97ede8c4990bd81492e66cccc8486ae032f7fdc50557f5938e844d",
     "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
@@ -155,8 +155,8 @@
   },
   "probe": "m3_first_null_grid_convergence",
   "schema_version": 2,
-  "source_commit": "95d3c4d475365fcee017545dcb5304903fb411a2",
-  "timestamp_utc": "2026-08-24T21:06:34.503542+00:00",
+  "source_commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
+  "timestamp_utc": "2026-08-25T02:31:54.007094+00:00",
   "working_tree_dirty": true
  },
  "verdict": {

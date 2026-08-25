@@ -32,7 +32,7 @@
     "reconstruction_normalization": "one_over_n, applied once at finalize"
   },
   "environment": {
-    "commit": "6846ec3f775df9fcd52ec69520a0726b1894fd8e",
+    "commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
     "container_image": "agent_solver",
     "jax_devices": [
       "cuda:0"
@@ -97,7 +97,7 @@
   "probe": "demo3_hologram_lens",
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "e1ce635b1be5b63e15ac7bb2c3d36ea1ddfc58650bb0bebb04fb9cc3c85bc96f",
+      "combined_sha256": "6bf486604fbd1df4eefe7f5ad346967284a14faf11adff3bfcc2b8a16a0f24da",
       "files": {
         "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
         "benchmarks/probes/ray_wave/demo3_hologram_lens.py": "d25367cac9ec85c9df9c163429167fb1edffe0c52c10c3c1df7bc3147e6bcf95",
@@ -133,7 +133,7 @@
         "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
-        "src/solvers/optiland/coherent_trace.py": "ee73ef9dc2c02955e5b97dcbff6b3d7456dae30d1a35aeefd035eb48c12b70e8",
+        "src/solvers/optiland/coherent_trace.py": "1e62fa59ca0918bc134816583d8daf3260df31ebe611ccf1ea91841c9eaadaa8",
         "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
         "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7"
       }
@@ -154,8 +154,8 @@
     },
     "probe": "perf_demo3_characterization_rw_p_ramp_sum_cuda",
     "schema_version": 2,
-    "source_commit": "6846ec3f775df9fcd52ec69520a0726b1894fd8e",
-    "timestamp_utc": "2026-08-25T00:09:02.351640+00:00",
+    "source_commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
+    "timestamp_utc": "2026-08-25T02:35:28.710524+00:00",
     "working_tree_dirty": true
   },
   "routes": {
@@ -181,8 +181,8 @@
             "available": true,
             "bytes_limit": 38275448832,
             "device": "cuda:0",
-            "peak_bytes_in_use": 2377016832,
-            "peak_gb": 2.377
+            "peak_bytes_in_use": 2378215680,
+            "peak_gb": 2.378
           },
           "energy": {
             "captured_by_sensor_fraction": 0.09903421954874955,
@@ -253,7 +253,8 @@
                   "namespace": "jax"
                 }
               }
-            }
+            },
+            "wavelength_handling": "the batch carries one scalar wavelength, so Optiland is handed a size-1 wavelength array rather than one entry per ray. optiland 0.6.0 keys its refractive-index cache on the array's contents, which made a per-ray broadcast cost O(rays) of host-side tuple construction per surface; the size-1 array takes the solver's scalar path and broadcasts identically"
           },
           "patch_groups": 60,
           "plan": {
@@ -265,7 +266,7 @@
             "patch_px": 101
           },
           "rays_emitted_here": 60000000,
-          "rays_per_second": 292108.9737677609,
+          "rays_per_second": 528789.9635831491,
           "reconstruction": {
             "kspace_oversample": null,
             "measured": null,
@@ -276,12 +277,12 @@
           "secondary_per_patch": 20000,
           "seed": 20260822,
           "stage_wall_clock_s": {
-            "emit_patch_spectra": 86.778,
-            "host_to_device": 3.476,
+            "emit_patch_spectra": 86.46,
+            "host_to_device": 3.958,
             "note": "Sums to slightly less than wall_clock_s: finalize and the plan setup are outside the loop. `power_bookkeeping` is this probe's own accounting -- three host round-trips per chunk -- not part of the physics, and is separated so it cannot be mistaken for one.",
-            "optiland_trace": 98.956,
-            "power_bookkeeping": 0.832,
-            "reconstruct": 14.2
+            "optiland_trace": 6.323,
+            "power_bookkeeping": 0.876,
+            "reconstruct": 14.46
           },
           "streaming": {
             "chunk_count": 300,
@@ -326,7 +327,7 @@
             "valid_rays": 54080000
           },
           "total_rays": 60000000,
-          "wall_clock_s": 205.40279617600027
+          "wall_clock_s": 113.46660135799902
         }
       ],
       "seed_reproducibility": {

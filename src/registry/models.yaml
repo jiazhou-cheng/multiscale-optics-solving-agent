@@ -103,6 +103,22 @@ models:
     cost_model:
       scaling: O(number_of_surfaces * number_of_rays)
       memory_scaling: O(number_of_rays)
+      estimator: solvers.optiland.cost_model.estimate_trace_seconds
+      notes: >-
+        CHE-118 replaced the scaling string above as the *usable* cost
+        information. It is still correct asymptotically and it was still useless
+        to a planner: M0.4 scored `estimate()` and recorded "NO PREDICTION ... a
+        planner cannot use this estimator to order work by cost". The named
+        estimator is a measured affine fit -- a fixed per-call cost plus seconds
+        per ray per surface -- calibrated in
+        benchmarks/perf/records/optiland_trace_chunk_sweep.json and holding to
+        1.9% over 1e3-1e6 rays a call. It is bound to the environment
+        fingerprint it was measured on and returns no prediction elsewhere,
+        which is the same rule core.performance.compare applies to a ratio.
+        Two gaps it does not close: memory is not calibrated at all, so
+        memory_scaling above is still an asymptote and nothing predicts
+        peak_memory_bytes; and the fit covers propagation of a caller-supplied
+        ray population, not Optiland's own ray generation.
     source:
       package: optiland
       docs_url: https://optiland.readthedocs.io/

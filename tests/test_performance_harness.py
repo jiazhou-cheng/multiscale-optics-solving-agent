@@ -749,6 +749,74 @@ def test_compare_refuses_two_records_that_did_different_work() -> None:
     assert compare(shipped, same)["speedup"] is not None
 
 
+def test_a_before_and_after_of_one_configuration_still_compares() -> None:
+    """The refusal above must not swallow the case it exists to serve (CHE-118).
+
+    A before-and-after on ONE configuration is the reason `compare` exists, and
+    the two records cannot be byte-identical in `detail`: `label_suffix` is what
+    keeps the second measurement from overwriting the first, and `rays_read_from`
+    names the file its ray count came from. Both describe the measurement, not the
+    work. `MEASUREMENT_PROVENANCE_KEYS` is that list, and the keys it looked past
+    come back in the result rather than disappearing.
+    """
+    detail = {"preset": "characterization", "routes": "rw_p", "backend": "jax"}
+    before, _ = measure(
+        lambda timer: None,
+        label="demo3 before",
+        workload=Workload(
+            size=100.0,
+            unit="ray",
+            route="ramp_sum",
+            detail={**detail, "rays_read_from": "perf_demo3_before.json"},
+        ),
+        repeats=1,
+        warmup=0,
+    )
+    after, _ = measure(
+        lambda timer: None,
+        label="demo3 after",
+        workload=Workload(
+            size=100.0,
+            unit="ray",
+            route="ramp_sum",
+            detail={
+                **detail,
+                "rays_read_from": "perf_demo3_after.json",
+                "label_suffix": "che118_after",
+            },
+        ),
+        repeats=1,
+        warmup=0,
+    )
+    verdict = compare(before, after)
+    assert verdict["speedup"] is not None
+    assert verdict["detail_differences_ignored"] == ["label_suffix", "rays_read_from"]
+
+    # And the exclusion is a named list, not a general softening: a substantive
+    # difference alongside an excluded one is still a refusal.
+    with pytest.raises(Incomparable, match=r"detail differs on \['preset'\]"):
+        compare(
+            before,
+            measure(
+                lambda timer: None,
+                label="demo3 elsewhere",
+                workload=Workload(
+                    size=100.0,
+                    unit="ray",
+                    route="ramp_sum",
+                    detail={
+                        **detail,
+                        "preset": "paper",
+                        "rays_read_from": "perf_demo3_other.json",
+                        "label_suffix": "other",
+                    },
+                ),
+                repeats=1,
+                warmup=0,
+            )[0],
+        )
+
+
 def test_no_committed_record_divides_two_different_computations() -> None:
     """The committed artifacts must not be divisible into a wrong answer.
 

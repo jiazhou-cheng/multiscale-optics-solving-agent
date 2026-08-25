@@ -833,6 +833,162 @@ class TestOptilandHandoff:
             assert positions[-1] == pytest.approx(config.sensor_distance_m, rel=1e-12)
 
 
+class TestMonochromaticWavelengthHandoff:
+    """CHE-118: Optiland is handed one wavelength, and it is the same trace.
+
+    `trace_ray_batch` used to broadcast the batch's single scalar wavelength into
+    one entry per ray. optiland 0.6.0 memoizes `BaseMaterial.n`/`.k` on the
+    *contents* of that array -- `_create_cache_key` builds
+    `tuple(np.ravel(be.to_numpy(wavelength)))` -- so the broadcast cost O(rays)
+    of host-side tuple construction and hashing per surface, per chunk: measured
+    at 97% of demo3's trace stage and 46% of its whole runtime.
+
+    The fix is to hand over a size-1 array, and the reason it is an optimization
+    rather than a second route is that the two traces are *bitwise* identical.
+    That is what these tests hold, on both the air and the glass configuration,
+    so the index weighting is exercised and not only the geometric distance.
+    """
+
+    @staticmethod
+    def _batch(config, indices, launch):
+        """A traceable batch for `config`, and the system and sensor to trace it in."""
+        spectrum, _ = band_limit_spectrum(
+            decompose(metalens_field(config)),
+            direction_cosine_floor=FLOOR,
+            max_optical_path_m=config.sensor_distance_m,
+            precision=str(Precision.FP64),
+            phase_budget_rad=1.0e-2,
+        )
+        bundle = spectrum_to_rays(
+            spectrum,
+            indices,
+            sampling_density(spectrum, SamplingDensity.UNIFORM),
+            launch_positions_xy_m=np.asarray(launch),
+        )
+        return (
+            CoherentRayBatch(
+                bundle=bundle,
+                ray_id=np.arange(bundle.count, dtype=np.int64),
+                valid=np.ones(bundle.count, dtype=bool),
+            ),
+            build_optiland_system(optical_system_spec(config)),
+            ReferencePlane(name="sensor", z_m=config.sensor_distance_m),
+        )
+
+    @pytest.mark.parametrize("config", [AIR_CONFIG, SLAB_CONFIG], ids=["air", "slab"])
+    def test_the_shipped_trace_is_bitwise_the_per_ray_wavelength_trace(
+        self, host_optiland, config
+    ):
+        """The equivalence the optimization rests on, asserted rather than assumed.
+
+        The reference arm is built the way `trace_ray_batch` built it before
+        CHE-118: the same inbound arrays, the same solver call, and a wavelength
+        array with one entry per ray. On the host the inbound bridge is
+        numpy -> numpy at float64 and converts nothing, so the two arms differ in
+        exactly one input and `array_equal` is the right comparison -- not
+        `allclose`, which would pass on a real change in the refracted geometry.
+        """
+        from optiland.rays import RealRays
+
+        batch, lens, sensor = self._batch(
+            config, np.arange(0, 7825, 89, dtype=np.int64), [[1e-6, -2e-6]]
+        )
+        plans = plan_trace_bridges(batch, home=C_RAY_TO_WAVE_CAPABILITIES, device=HOST)
+        assert plans.inbound.target_namespace is ArrayNamespace.NUMPY
+        traced, diagnostics = trace_ray_batch(
+            batch, lens, image_plane=sensor, plans=plans
+        )
+        assert bool(np.asarray(traced.valid).all()), (
+            "this configuration must not clip, or the comparison below is between "
+            "the placeholder geometry a clipped ray carries rather than between "
+            "two traces"
+        )
+
+        bundle = batch.bundle
+        positions_mm = metres_to_millimetres(np.asarray(bundle.positions_m))
+        directions = np.asarray(bundle.directions)
+        intensity = np.abs(np.asarray(bundle.amplitude)) ** 2
+        reference = lens.surfaces.trace(
+            RealRays(
+                positions_mm[:, 0],
+                positions_mm[:, 1],
+                positions_mm[:, 2],
+                directions[:, 0],
+                directions[:, 1],
+                directions[:, 2],
+                intensity,
+                # One entry per ray: the pre-CHE-118 handoff.
+                np.full_like(intensity, metres_to_micrometres(bundle.wavelength_m)),
+            ),
+            skip=1,
+        )
+
+        assert np.array_equal(
+            np.asarray(traced.bundle.positions_m),
+            millimetres_to_metres(
+                np.stack(
+                    [
+                        np.asarray(reference.x),
+                        np.asarray(reference.y),
+                        np.asarray(reference.z),
+                    ],
+                    axis=1,
+                )
+            ),
+        )
+        assert np.array_equal(
+            np.asarray(traced.bundle.directions),
+            np.stack(
+                [
+                    np.asarray(reference.L),
+                    np.asarray(reference.M),
+                    np.asarray(reference.N),
+                ],
+                axis=1,
+            ),
+        )
+        assert np.array_equal(
+            np.asarray(traced.bundle.optical_path_length_m),
+            millimetres_to_metres(np.asarray(reference.opd)),
+        )
+        assert "size-1" in diagnostics["wavelength_handling"]
+
+    def test_a_dispersive_material_reads_the_same_index_from_a_size_one_array(self):
+        """The equivalence is monochromatic, not constant-index.
+
+        `IdealMaterialSpec` is what demo3 uses and its index does not depend on
+        wavelength at all, so a test built only on that material would pass for
+        the wrong reason -- it would show that the *material* ignores its input,
+        not that a size-1 array carries the same information as N copies of one
+        number. A material whose index genuinely varies with wavelength settles
+        that: evaluated at one wavelength it returns that wavelength's index, and
+        broadcasting it over the rays is the array the solver would have built.
+        """
+        from optiland.materials.base import BaseMaterial
+
+        class Dispersive(BaseMaterial):
+            """n = 1.5 + 0.01 / lambda_um^2, i.e. a Cauchy first term."""
+
+            def _calculate_n(self, wavelength, **kwargs):
+                return 1.5 + 0.01 / (be.asarray(wavelength) ** 2)
+
+            def _calculate_k(self, wavelength, **kwargs):
+                return be.zeros_like(be.asarray(wavelength))
+
+        material = Dispersive()
+        per_ray = np.full(64, 0.7)
+        assert np.array_equal(
+            np.broadcast_to(
+                np.asarray(material.n(per_ray[:1])), per_ray.shape
+            ),
+            np.asarray(material.n(per_ray)),
+        )
+        # And the cache key is what the size-1 array is really buying: a 1-tuple
+        # instead of a 64-tuple built by copying the array to the host.
+        assert len(material._create_cache_key(per_ray[:1])[0]) == 1
+        assert len(material._create_cache_key(per_ray)[0]) == 64
+
+
 class TestUnitBoundary:
     """One conversion boundary, and it round-trips."""
 

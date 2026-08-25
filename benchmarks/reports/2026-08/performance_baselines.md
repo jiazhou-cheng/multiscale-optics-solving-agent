@@ -29,7 +29,9 @@ diagnostic, not physics.**
 Scoped deliberately, because the demo baselines further down this report measure
 this repository's *largest* workloads at 6e7–1.6e8 rays, where the diagnostic is
 skipped entirely and the target is `optiland_trace + emit_patch_spectra` (87.6%
-of demo3). Both findings are real and they point at different code. An earlier
+of demo3 **as measured here** — CHE-118 has since removed 93.5% of the
+`optiland_trace` term, so on current code the target is the emitter alone at 72.2%
+of a 120.36 s run; see `optiland_trace_profile.md`). Both findings are real and they point at different code. An earlier
 draft stated the 91% as a property of "the ray count this repository actually
 uses", which conflated them.
 
@@ -158,11 +160,12 @@ From `estimate_accuracy.json`:
 
 | component | predicted | measured | verdict |
 | -- | --: | --: | -- |
-| `M_RAY_OPTILAND` | `None` | 20.6 ms | No prediction, and it says why: it does not import optiland and cannot know the surface or traced-ray count. An honest refusal, and it means a planner cannot order work by this estimator. |
+| `M_RAY_OPTILAND` | `None` | 20.6 ms | **Superseded by CHE-118 (M5.1).** This row read "no prediction, and it does not know the surface or traced-ray count". Both gaps are now closed by measurement: `estimate()` reads the surface count from the prescription, converts the ring count to a traced ray count, and calls a calibrated affine cost model. It still returns `None` on a host whose environment fingerprint is not the calibration's, which is a different and narrower refusal. Re-scored in `estimate_accuracy.json`. |
 | `C_RAY_TO_WAVE` | 0.2036 s | 0.4643 s full / 0.0538 s reconstruction | **Wrong in both directions.** Under-predicts the shipping call by 2.28× because it models the reconstruction and the call is dominated by the diagnostic. Over-predicts the reconstruction by 3.78× because `_RAY_PIXEL_PRODUCTS_PER_SECOND` is not calibrated to this host. |
 
 M3's executor and M6's planner both intend to order work by `CostEstimate`. On
-this evidence neither can yet.
+this evidence neither can yet — for `C_RAY_TO_WAVE`. `M_RAY_OPTILAND` was fixed by
+CHE-118; see `optiland_trace_profile.md`.
 
 ## The demo baselines (CHE-129)
 
@@ -172,6 +175,12 @@ single-GPU (`environment.gpu_count == 1`, enforced by
 nothing else of this project's on the card, swap growth zero throughout. They
 were launched with `MOA_GPUS=device=6`; see the note below on which parts of that
 the record can and cannot attest to.
+
+Both demo3 rows are **pre-CHE-118** measurements: that issue cut the trace stage
+from 98.96 s to 6.32 s, so demo3's whole-command figure is now 120.36 s. The rows
+are left as measured rather than edited — they are what the code cost at
+`6846ec3` — and the after-figures are in `optiland_trace_profile.md`. The demo2
+rows are unaffected: demo2 does not trace through Optiland.
 
 | baseline | rays | whole command | demo's own clock | s/ray | peak child RSS | record |
 | -- | --: | --: | --: | --: | --: | -- |

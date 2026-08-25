@@ -79,7 +79,16 @@ def _code_literals(package: Path) -> set[str]:
 #: through it would change with it, and nothing else would notice.
 #: `CARRIER_REMOVED_ASM_ID` and `GLOBAL_PHASE_POLICY` are contract identifiers
 #: for the same reason a code is: something downstream matches on them.
+#: Two more that are not failure codes, enrolled by CHE-118 (M5.1) because the
+#: guard asked for them by name. `MONOCHROMATIC_WAVELENGTH_RULE` is the declared
+#: rule for handing Optiland one wavelength rather than one per ray, and it is
+#: reported in `trace_ray_batch`'s diagnostics and provenance, so it is a contract
+#: string in the same sense the others are. `CUDA_FP32_TRACE_COST` is the trace
+#: cost calibration; both appear here only as `__all__` entries, which is the
+#: shape this scan matches.
 OPTILAND_CODES = frozenset({
+    "CUDA_FP32_TRACE_COST",
+    "MONOCHROMATIC_WAVELENGTH_RULE",
     "M_RAY_OPTILAND",
     "OPTILAND_",
     "OPTILAND_BASELINE_FAILED",

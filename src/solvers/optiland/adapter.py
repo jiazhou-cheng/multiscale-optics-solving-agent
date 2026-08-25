@@ -293,25 +293,56 @@ class OptilandAdapter:
         return _run_standalone(self, request)
 
     def estimate(self, request: ModelRunRequest) -> CostEstimate:
+        """Predicted cost from the CHE-118 calibration, or a refusal that says why.
+
+        This used to return ``wall_time_s=None`` unconditionally, with a note
+        saying it did not know the surface count and could not know the traced
+        ray count until after the call. M0.4 scored that and recorded the
+        consequence in ``estimate_accuracy.json``: a planner could not order work
+        by cost. Both gaps are now closed by measurement rather than by
+        assumption -- the surface count is read from the prescription, and the
+        hexapolar sampler's ray count is verified against every ring count in
+        the committed scaling record.
+
+        Still ``None`` in one honest case, and it is the important one: on an
+        environment the model was not calibrated on. See
+        ``solvers.optiland.cost_model``.
+        """
         problems = capability_problems(request)
         if problems:
             raise UnsupportedCapabilityError("; ".join(message for _, message in problems))
 
-        num_rays = int(request.config.get("num_rays", _DEFAULT_NUM_RAYS))
-        return CostEstimate(
-            wall_time_s=None,
-            peak_memory_bytes=None,
-            solver_calls=1,
-            confidence="low",
-            notes=[
-                "Heuristic only -- optiland is not imported for this estimate.",
-                "Registry cost_model: O(number_of_surfaces * number_of_rays); "
-                "this estimator does not read the actual surface count.",
-                f"requested num_rays={num_rays}; the traced ray count returned "
-                "by Optic.trace() is typically much larger due to pupil "
-                "sampling (see knowledge/solvers/optiland/failure_guide.md) "
-                "and is not known until after the solver call.",
-            ],
+        from solvers.optiland.cost_model import (
+            estimate_trace_seconds,
+            hexapolar_ray_count,
+            traced_surface_count,
+        )
+
+        rings = int(request.config.get("num_rays", _DEFAULT_NUM_RAYS))
+        # Already validated by capability_problems above, so this cannot raise.
+        prescription = _prescription_from_config(request.config)
+        surfaces = traced_surface_count(len(prescription.surfaces))
+        traced_rays = hexapolar_ray_count(rings)
+
+        estimate = estimate_trace_seconds(rays=traced_rays, surfaces=surfaces)
+        return estimate.model_copy(
+            update={
+                "notes": [
+                    *estimate.notes,
+                    f"config['num_rays']={rings} is a RING count, not a ray count: "
+                    f"Optiland's hexapolar sampler produces {traced_rays} rays from "
+                    "it, per field and per wavelength, and that is the number the "
+                    "cost model was given.",
+                    f"{prescription.name} has {len(prescription.surfaces)} "
+                    f"prescription surfaces, so {surfaces} are traced (the object "
+                    "surface is skipped, the image plane is not).",
+                    "The calibration covers ray propagation through the surfaces. "
+                    "This path additionally builds the system, generates its own "
+                    "rays and writes artifacts, none of which is calibrated -- so "
+                    "read the prediction as the trace's share of the call rather "
+                    "than as the call.",
+                ]
+            }
         )
 
     def validate_request(self, request: ModelRunRequest) -> ValidationReport:

@@ -72,6 +72,7 @@ from core.resources import (
 )
 
 __all__ = [
+    "MEASUREMENT_PROVENANCE_KEYS",
     "EnvironmentFingerprint",
     "Incomparable",
     "Isolation",
@@ -708,6 +709,32 @@ def measure(
     return record, result
 
 
+#: Keys in ``workload.detail`` that describe *the measurement* rather than *the
+#: work*, and are therefore excluded from :func:`compare`'s detail check.
+#:
+#: The detail check exists because ``route`` alone let two different computations
+#: divide into an 11x "speedup". It is the right rule and it caught this
+#: repository's first real before-and-after by mistake: CHE-118 measured demo3 at
+#: the same 60 M-ray configuration before and after a trace optimization, and
+#: ``compare`` refused because the two records pointed at different provenance
+#: files and carried different measurement labels. Neither says the work was
+#: different -- one names the file the ray count was read from, the other exists
+#: precisely so a second measurement of the SAME work does not overwrite the
+#: first. A rule that refuses every before-and-after is not protecting anything,
+#: so the exclusions are named here, kept short, and reported in the result rather
+#: than dropped silently.
+MEASUREMENT_PROVENANCE_KEYS = frozenset(
+    {
+        # Which record the emitted ray count was read from, i.e. where the number
+        # came from -- not how much work was done. The count itself is
+        # `workload.size` and is still compared.
+        "rays_read_from",
+        # The operator's tag distinguishing two measurements of one configuration.
+        "label_suffix",
+    }
+)
+
+
 def compare(
     baseline: PerformanceRecord | dict[str, Any],
     candidate: PerformanceRecord | dict[str, Any],
@@ -756,14 +783,16 @@ def compare(
 
     a_detail = a["workload"].get("detail") or {}
     b_detail = b["workload"].get("detail") or {}
-    if a_detail != b_detail:
-        differing = sorted(
-            key
-            for key in set(a_detail) | set(b_detail)
-            if a_detail.get(key) != b_detail.get(key)
-        )
+    differing = sorted(
+        key
+        for key in set(a_detail) | set(b_detail)
+        if a_detail.get(key) != b_detail.get(key)
+    )
+    excluded = [key for key in differing if key in MEASUREMENT_PROVENANCE_KEYS]
+    substantive = [key for key in differing if key not in MEASUREMENT_PROVENANCE_KEYS]
+    if substantive:
         raise Incomparable(
-            f"workload detail differs on {differing}: {a_detail} vs {b_detail}. "
+            f"workload detail differs on {substantive}: {a_detail} vs {b_detail}. "
             "The unit and the route match, so the ratio would print -- but a "
             "record that says it did different work is not a before-and-after. "
             "If these really are two measurements of the same work, make the "
@@ -784,4 +813,8 @@ def compare(
             "unit": a_unit,
             "route": a_route,
         },
+        # Reported, not dropped. These are the differences the comparison chose to
+        # look past, and a reader deciding whether to trust the ratio should be
+        # able to see which ones they were.
+        "detail_differences_ignored": excluded,
     }

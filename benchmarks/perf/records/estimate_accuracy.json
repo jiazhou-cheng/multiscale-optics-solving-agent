@@ -26,32 +26,36 @@
  "rows": [
   {
    "component": "M_RAY_OPTILAND",
-   "confidence": "low",
-   "measured_median_s": 0.02059374599775765,
+   "confidence": "unknown",
+   "measured_median_s": 0.01962471500155516,
    "notes": [
-    "Heuristic only -- optiland is not imported for this estimate.",
-    "Registry cost_model: O(number_of_surfaces * number_of_rays); this estimator does not read the actual surface count.",
-    "requested num_rays=32; the traced ray count returned by Optic.trace() is typically much larger due to pupil sampling (see knowledge/solvers/optiland/failure_guide.md) and is not known until after the solver call."
+    "Cost model: benchmarks/perf/records/optiland_trace_chunk_sweep.json (CHE-118 (M5.1)). Form: 0.0132012 s per call + 2.71527e-09 s per ray per surface, fitted on NVIDIA RTX A6000 / cuda / fp32, 1000-1000000 rays per call, to within 1.9%.",
+    "Covers propagation of a caller-supplied ray population only -- not Optiland's own ray generation, not the wave-side emitter, and not the reconstruction.",
+    "NO PREDICTION: this environment's fingerprint (8a536c665351...) is not the one the model was calibrated on (fb66d7be8b4a...). GPU, driver, container image and thread counts change speed without changing the answer, which is why `core.performance.compare` refuses a ratio across them; extrapolating a cost model across them would be the same error with a friendlier interface. Re-run `benchmarks/perf/records/optiland_trace_chunk_sweep.json`'s sweep here to calibrate.",
+    "For reference only, not a prediction on this host: the model would give 0.0132 s.",
+    "config['num_rays']=32 is a RING count, not a ray count: Optiland's hexapolar sampler produces 3169 rays from it, per field and per wavelength, and that is the number the cost model was given.",
+    "M3SingletRef has 2 prescription surfaces, so 3 are traced (the object surface is skipped, the image plane is not).",
+    "The calibration covers ray propagation through the surfaces. This path additionally builds the system, generates its own rays and writes artifacts, none of which is calibrated -- so read the prediction as the trace's share of the call rather than as the call."
    ],
    "predicted_wall_time_s": null,
    "ratio_predicted_over_measured": null,
-   "verdict": "NO PREDICTION. estimate() returns wall_time_s=None with confidence='low' and says why: it does not import optiland and does not know the surface count or the traced ray count. That is an honest refusal, and it means a planner cannot use this estimator to order work by cost."
+   "verdict": "NO PREDICTION on this host, and the reason is now specific: the cost model in solvers.optiland.cost_model is bound to the environment fingerprint it was calibrated on (CHE-118) and refuses to extrapolate. It is not the old refusal -- the surface count and the traced ray count ARE known now, and are reported in the notes. Re-run the calibration sweep on this host to get a prediction here."
   },
   {
    "component": "C_RAY_TO_WAVE",
    "confidence": "medium",
-   "measured_median_s": 0.46429381500638556,
-   "measured_peak_host_rss_bytes": 974008320,
-   "measured_reconstruction_only_s": 0.05383988699759357,
+   "measured_median_s": 0.4894069729925832,
+   "measured_peak_host_rss_bytes": 923906048,
+   "measured_reconstruction_only_s": 0.08312249400478322,
    "notes": [
     "cost driver = rays x grid points = 3169 x 35344 = 1.12e+08 ray-pixel products at a measured ~5.5e+08/s (shared unpinned machine, M3.2; an ordering figure, not a regression envelope)"
    ],
    "predicted_peak_memory_bytes": 19630208,
    "predicted_wall_time_s": 0.2036457018181818,
-   "ratio_predicted_over_measured": 0.4386138588027088,
-   "ratio_predicted_over_reconstruction": 3.7824318209895944,
+   "ratio_predicted_over_measured": 0.4161070705081025,
+   "ratio_predicted_over_reconstruction": 2.4499469638923874,
    "reconstruction_record": {
-    "cost_per_unit": 1.6989550961689354e-05,
+    "cost_per_unit": 2.622988135209316e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -175,47 +179,47 @@
     "label": "C_RAY_TO_WAVE reconstruction only",
     "measurement": {
      "all_s": [
-      0.05503249500179663,
-      0.05383988699759357,
-      0.05380916800640989
+      0.08446991699747741,
+      0.08312249400478322,
+      0.056201749001047574
      ],
-     "median_s": 0.05383988699759357,
-     "min_s": 0.05380916800640989,
-     "p95_s": 0.05503249500179663,
+     "median_s": 0.08312249400478322,
+     "min_s": 0.056201749001047574,
+     "p95_s": 0.08446991699747741,
      "repeats": 3,
      "tail_rule": "max_of_3",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 358305792,
+      "cgroup_memory_bytes": 358862848,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 389850402816,
+      "mem_available_bytes": 389865377792,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 96770.187929911,
-      "rss_bytes": 539361280
+      "monotonic_s": 109825.294097249,
+      "rss_bytes": 539181056
      },
      "before": {
-      "cgroup_memory_bytes": 358350848,
+      "cgroup_memory_bytes": 358891520,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 389857579008,
+      "mem_available_bytes": 389872795648,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 96769.967877843,
-      "rss_bytes": 539353088
+      "monotonic_s": 109825.011854606,
+      "rss_bytes": 539389952
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 389850402816,
+     "min_mem_available_bytes": 389852794880,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 539361280,
+     "peak_rss_bytes": 560955392,
      "process_rss_budget_bytes": null,
-     "samples": 2,
+     "samples": 3,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -228,16 +232,16 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 539361280,
+    "peak_host_rss_bytes": 560955392,
     "stages": {
-     "accounted_s": 0.0537,
+     "accounted_s": 0.0561,
      "fraction_of_total": {
-      "transform": 0.9985
+      "transform": 0.9987
      },
      "seconds": {
-      "transform": 0.0537
+      "transform": 0.0561
      },
-     "total_s": 0.0538,
+     "total_s": 0.0562,
      "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
@@ -250,7 +254,7 @@
      "unit": "ray"
     }
    },
-   "verdict": "WRONG IN BOTH DIRECTIONS, and the two errors have different causes. Against the shipping call (0.464 s) it under-predicts by 2.3x, because it models the ray x pixel reconstruction and the call is dominated by the O(N^2) ray-density diagnostic. Against the reconstruction alone (0.054 s) it over-predicts by 3.8x, because its _RAY_PIXEL_PRODUCTS_PER_SECOND constant is not calibrated to this host. A planner ordering work by this number would be wrong about which node is expensive, which is the failure that matters."
+   "verdict": "WRONG IN BOTH DIRECTIONS, and the two errors have different causes. Against the shipping call (0.489 s) it under-predicts by 2.4x, because it models the ray x pixel reconstruction and the call is dominated by the O(N^2) ray-density diagnostic. Against the reconstruction alone (0.083 s) it over-predicts by 2.4x, because its _RAY_PIXEL_PRODUCTS_PER_SECOND constant is not calibrated to this host. A planner ordering work by this number would be wrong about which node is expensive, which is the failure that matters."
   }
  ],
  "why_this_matters": "M3's executor and M6's planner both order work by CostEstimate. An estimator that has never been scored against a measurement is a guess, and one that returns None is at least a guess that says so."

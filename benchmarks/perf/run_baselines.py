@@ -597,14 +597,38 @@ def baseline_estimate() -> None:
                 "component": "M_RAY_OPTILAND",
                 "predicted_wall_time_s": predicted.wall_time_s,
                 "measured_median_s": record.measurement.median_s,
-                "ratio_predicted_over_measured": None,
+                "ratio_predicted_over_measured": (
+                    predicted.wall_time_s / record.measurement.median_s
+                    if predicted.wall_time_s and record.measurement.median_s
+                    else None
+                ),
                 "confidence": predicted.confidence,
+                # Derived from the estimate rather than written down, because the
+                # answer now depends on the host: CHE-118 gave `estimate()` a
+                # measured cost model that is bound to the environment fingerprint
+                # it was calibrated on, so the same code predicts on the GPU box it
+                # was fitted on and refuses elsewhere. Hardcoded prose here would be
+                # wrong on one of the two.
                 "verdict": (
-                    "NO PREDICTION. estimate() returns wall_time_s=None with "
-                    "confidence='low' and says why: it does not import optiland and "
-                    "does not know the surface count or the traced ray count. That is "
-                    "an honest refusal, and it means a planner cannot use this "
-                    "estimator to order work by cost."
+                    (
+                        f"PREDICTS {predicted.wall_time_s:.4f} s at confidence "
+                        f"'{predicted.confidence}', against a measured "
+                        f"{record.measurement.median_s:.4f} s for the whole adapter "
+                        "call. The prediction covers the TRACE only -- the call also "
+                        "builds the system, generates its rays and writes artifacts, "
+                        "none of which is calibrated -- so a ratio below 1 here is "
+                        "expected and is not an underestimate of what was modelled."
+                    )
+                    if predicted.wall_time_s is not None
+                    else (
+                        "NO PREDICTION on this host, and the reason is now specific: "
+                        "the cost model in solvers.optiland.cost_model is bound to "
+                        "the environment fingerprint it was calibrated on (CHE-118) "
+                        "and refuses to extrapolate. It is not the old refusal -- the "
+                        "surface count and the traced ray count ARE known now, and "
+                        "are reported in the notes. Re-run the calibration sweep on "
+                        "this host to get a prediction here."
+                    )
                 ),
                 "notes": predicted.notes,
             }
@@ -880,7 +904,7 @@ DEMO_RECORDS = ROOT / "benchmarks" / "probes" / "records" / "ray_wave"
 
 
 def _demo(script: str, name: str, extra: list[str], *, declared_rays: float, unit: str,
-          route: str, detail: dict[str, Any]) -> None:
+          route: str, detail: dict[str, Any], label_suffix: str | None = None) -> None:
     """Time a demo end to end, and take its ray count and stage split from its record.
 
     Two things the earlier version of this got wrong and that matter for the
@@ -896,6 +920,15 @@ def _demo(script: str, name: str, extra: list[str], *, declared_rays: float, uni
       with `--output-name` to a `perf_`-prefixed name, so a timing run never
       touches a scientific record.
     """
+    # `label_suffix` before the device suffix, so a re-measurement of the same
+    # configuration lands BESIDE the committed one instead of on top of it. Without
+    # it, a before/after on one configuration -- which is what any optimization
+    # ticket needs -- destroys its own baseline on the second run, and the only
+    # evidence left is that a number changed. That already happened once here with
+    # demo2 (see `_device_suffix`), and the device suffix only separates records
+    # that differ by device.
+    if label_suffix:
+        name = f"{name}_{label_suffix}"
     name = f"{name}_{_device_suffix()}"
     probe_record_name = f"perf_{name}"
     payload = _timed_command(
@@ -929,6 +962,7 @@ def _demo(script: str, name: str, extra: list[str], *, declared_rays: float, uni
             **detail,
             "declared_rays": declared_rays,
             "rays_read_from": f"{probe_record_name}.json",
+            **({"label_suffix": label_suffix} if label_suffix else {}),
         }
         payload["cost_per_unit"] = (
             payload["measurement"]["median_s"] / rays if rays else None
@@ -1036,6 +1070,7 @@ def baseline_demo2(args: argparse.Namespace) -> None:
         unit="ray",
         route=args.reconstruction,
         detail={"preset": args.preset, "routes": args.routes, "backend": args.backend},
+        label_suffix=args.label_suffix,
     )
 
 
@@ -1049,6 +1084,7 @@ def baseline_demo3(args: argparse.Namespace) -> None:
         unit="ray",
         route=args.reconstruction,
         detail={"preset": args.preset, "routes": args.routes, "backend": args.backend},
+        label_suffix=args.label_suffix,
     )
 
 
@@ -1090,6 +1126,15 @@ def main() -> int:
     d2.add_argument("--reconstruction", default="ramp_sum")
     d2.add_argument("--backend", default="jax")
     d2.add_argument("--rays", type=float, required=True, help="ray budget, for cost per ray")
+    d2.add_argument(
+        "--label-suffix",
+        default=None,
+        help=(
+            "distinguish this measurement from an earlier one of the SAME "
+            "configuration, e.g. --label-suffix che118_after. Without it the second "
+            "run overwrites the first and the baseline is gone."
+        ),
+    )
 
     d3 = sub.add_parser("demo3")
     d3.add_argument("--preset", default="characterization")
@@ -1097,6 +1142,15 @@ def main() -> int:
     d3.add_argument("--reconstruction", default="ramp_sum")
     d3.add_argument("--backend", default="jax")
     d3.add_argument("--rays", type=float, required=True)
+    d3.add_argument(
+        "--label-suffix",
+        default=None,
+        help=(
+            "distinguish this measurement from an earlier one of the SAME "
+            "configuration, e.g. --label-suffix che118_after. Without it the second "
+            "run overwrites the first and the baseline is gone."
+        ),
+    )
 
     args = parser.parse_args()
     started = time.perf_counter()

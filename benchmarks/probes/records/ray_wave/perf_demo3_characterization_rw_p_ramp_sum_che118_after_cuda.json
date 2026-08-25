@@ -7,9 +7,9 @@
     ],
     "doe_pitch_m": 6.3e-06,
     "gap_doe_lens_mm": 3.0,
-    "kspace_oversample": 1.5,
+    "kspace_oversample": null,
     "rays_per_chunk": 200000.0,
-    "reconstruction": "kspace_splat",
+    "reconstruction": "ramp_sum",
     "seeds": [
       20260822
     ],
@@ -152,10 +152,10 @@
       },
       "python_version": "3.12.14"
     },
-    "probe": "perf_demo3_characterization_rw_p_kspace_splat_cuda",
+    "probe": "perf_demo3_characterization_rw_p_ramp_sum_che118_after_cuda",
     "schema_version": 2,
     "source_commit": "a6cc31c5d1cad141af73da87fc23826826571db8",
-    "timestamp_utc": "2026-08-25T02:37:17.058119+00:00",
+    "timestamp_utc": "2026-08-25T01:57:18.856060+00:00",
     "working_tree_dirty": true
   },
   "routes": {
@@ -181,8 +181,8 @@
             "available": true,
             "bytes_limit": 38275448832,
             "device": "cuda:0",
-            "peak_bytes_in_use": 65204224,
-            "peak_gb": 0.065
+            "peak_bytes_in_use": 2377415680,
+            "peak_gb": 2.377
           },
           "energy": {
             "captured_by_sensor_fraction": 0.09903421954874955,
@@ -266,32 +266,23 @@
             "patch_px": 101
           },
           "rays_emitted_here": 60000000,
-          "rays_per_second": 594815.0531184444,
+          "rays_per_second": 528347.9769112148,
           "reconstruction": {
-            "kspace_oversample": 1.5,
-            "measured": {
-              "dropped_fraction": 0.0,
-              "kspace_grid_shape": [
-                630,
-                630
-              ],
-              "on_node_fraction": 0.04,
-              "rays_dropped_out_of_band": 0,
-              "rays_splatted": 200000
-            },
-            "route": "kspace_splat"
+            "kspace_oversample": null,
+            "measured": null,
+            "route": "ramp_sum"
           },
           "route_kind": "patch",
           "secondary_chunks_per_group": 5,
           "secondary_per_patch": 20000,
           "seed": 20260822,
           "stage_wall_clock_s": {
-            "emit_patch_spectra": 83.223,
-            "host_to_device": 3.404,
+            "emit_patch_spectra": 86.879,
+            "host_to_device": 3.657,
             "note": "Sums to slightly less than wall_clock_s: finalize and the plan setup are outside the loop. `power_bookkeeping` is this probe's own accounting -- three host round-trips per chunk -- not part of the physics, and is separated so it cannot be mistaken for one.",
-            "optiland_trace": 5.338,
-            "power_bookkeeping": 0.778,
-            "reconstruct": 7.49
+            "optiland_trace": 6.448,
+            "power_bookkeeping": 0.794,
+            "reconstruct": 14.433
           },
           "streaming": {
             "chunk_count": 300,
@@ -306,16 +297,7 @@
                 420
               ],
               "incident_amplitude_power_sum": 47203074048.0,
-              "kspace": {
-                "dropped_fraction": 0.0,
-                "kspace_grid_shape": [
-                  630,
-                  630
-                ],
-                "on_node_fraction": 0.04,
-                "rays_dropped_out_of_band": 0,
-                "rays_splatted": 200000
-              },
+              "kspace": null,
               "max_adjacent_ray_phase_rad": null,
               "max_projection_factor": 1.0000001192092896,
               "max_transverse_direction": 0.0707392767071724,
@@ -326,8 +308,8 @@
               "ray_count": 200000,
               "ray_density_status": "not_computed_above_scan_limit",
               "ray_spacing_estimate_m": null,
-              "reconstructed_discrete_power": 101543.5625,
-              "reconstruction": "kspace_splat",
+              "reconstructed_discrete_power": 156711.53125,
+              "reconstruction": "ramp_sum",
               "sample_pitch_m": [
                 4.2e-06,
                 4.2e-06
@@ -345,7 +327,7 @@
             "valid_rays": 54080000
           },
           "total_rays": 60000000,
-          "wall_clock_s": 100.87169059598818
+          "wall_clock_s": 113.56152123599895
         }
       ],
       "seed_reproducibility": {
