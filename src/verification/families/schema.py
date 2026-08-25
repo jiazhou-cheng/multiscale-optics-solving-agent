@@ -975,6 +975,16 @@ class BenchmarkFamily:
         """Whether anything here can decide a pass/fail at all."""
         return bool(self.gating_tolerances)
 
+    @property
+    def refinement_dimensions(self) -> tuple[Parameter, ...]:
+        """The NUMERICAL parameters that declare a refinement direction.
+
+        A family with one of these owes a convergence ladder: it has said that
+        somewhere in its parameter space is a direction along which the answer
+        should stop moving, and a single point cannot show that it does.
+        """
+        return tuple(p for p in self.parameters if p.refines_toward is not None)
+
     def parameters_of_kind(self, kind: ParameterKind) -> tuple[Parameter, ...]:
         return tuple(p for p in self.parameters if p.kind is kind)
 
