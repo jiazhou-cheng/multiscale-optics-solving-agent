@@ -1,33 +1,41 @@
-# V1 agent benchmark — can an agent turn a physics problem into a right answer?
+# The agent-evaluation harness — can an agent turn a physics problem into a right answer?
 
-CHE-71. Six tasks, three per supported library, every one graded against an
-analytic oracle.
+CHE-71 built this around six `A1-*` tasks. **CHE-133 retired those tasks and kept
+the harness**, which is the part that took the arguing. Each task named one
+library implicitly and had one right answer, so it graded tool use rather than
+modelling, and none was ever run against a real agent. M9 authors the
+replacement, posing problems over the B0–B4 families in
+`src/verification/families/` rather than over one library each.
 
-The question this asks is deliberately different from the one
-`benchmarks/manifest.yaml` asks. That registry grades a **solver's physics** and
-its whole value is reproducible fingerprints. This grades an **agent's
-behaviour**: given a physics problem in prose, can it work out which tool applies,
-build the simulation, run it, and produce a number that is *right*?
+What was promoted out of the task set before it went, because it was the
+expensive part:
+
+| what | where it lives now |
+|---|---|
+| the five closed forms, each verified against the pinned solver before it shipped, with its measured agreement and the wrong answer its tolerance rejects | `src/verification/analytic.py`, destined for `B1-RAY-EFL`, `B1-RAY-PLATE`, `B1-WAVE-GAUSS`, `B1-WAVE-AIRY`, `B1-WAVE-TILT` |
+| the two measured traps — Optiland's µm/nm slip and Chromatix's `kykx` 2π-and-sign — with the numbers the mistaken code actually returns | `src/verification/hazards.py`, destined for `B0-UNITS-01` and `B0-UNITS-02` |
+| the exclusion table below, with its measured reasons | here, unchanged |
+
+The question this asks is deliberately different from the one the family
+registry asks. A family grades a **solver's physics** and its whole value is a
+reproducible fingerprint. This grades an **agent's behaviour**: given a physics
+problem in prose, can it work out which tool applies, build the simulation, run
+it, and produce a number that is *right*?
 
 ```bash
-# The suite's gate on itself: reference + negative participants. Seconds.
-make test-agent-benchmark            # ./run.sh pytest -q benchmarks/agents
+# The harness's own unit tests. Deterministic, in the default gate, seconds.
+./run.sh pytest -q tests/test_agent_benchmark.py
 
-# One end-to-end run, 3 trials per task, against the reference participant.
-make agent-benchmark
-
-# Against a deliberately-wrong participant, to see the taxonomy fire.
-make agent-benchmark PARTICIPANT=broken:trap
-
-# Against a real agent (see "Running an agent" below).
-./run.sh python -m agent.benchmark_suite \
-    --suite v1 --trials 3 --participant "command:my-agent --prompt {prompt}" \
-    --context-policy per-task --output outputs/che71_agent_v1
+# The runner. No suite is registered, so this reports that and exits non-zero.
+./run.sh python -m agent.benchmark_suite
 ```
 
 ---
 
 ## The five design decisions, as recorded
+
+These are what survived the task set, and each is a decision with a reason
+rather than a default.
 
 ### 1. What context does the agent under test receive?
 
@@ -47,13 +55,13 @@ legitimate, and they are **different benchmarks**.
 | `warm` | `+ card.yaml`, `api_minimal_examples.md` | correct use of a documented tool |
 | `guided` | `+ conventions.md` (which names the unit and sign hazards) | whether it reads a warning it has been handed |
 
-V1 uses `cold` for the four straightforward tasks and `warm` for the two traps.
-The traps are `warm` on purpose: the point is not whether an agent can find the
-library, it is whether it gets a unit right, and `cold` would confound the two. A
-`guided` run of the same two tasks is the natural next experiment — `conventions.md`
-names both hazards, so the difference between `warm` and `guided` on `A1-OPT-03`
-and `A1-CHX-03` measures something specific: **whether handing an agent the
-warning is enough.**
+The retired V1 set used `cold` for its four straightforward tasks and `warm` for
+its two traps, on purpose: the point of a trap is not whether an agent can find
+the library, it is whether it gets a unit right, and `cold` would confound the
+two. The experiment that was never run and is still the interesting one:
+`conventions.md` names both measured hazards, so the difference between `warm`
+and `guided` on a trap task measures something specific — **whether handing an
+agent the warning is enough.**
 
 The policy is a property of the task, not of the invocation. `--context-policy`
 therefore *asserts* rather than sets, and errors if it disagrees.
@@ -71,8 +79,8 @@ The split within that, and why:
 
 | what | where | in the default suite? |
 |---|---|---|
-| harness, task registry, reference implementations | `src/agent/benchmark_suite.py` | — |
-| grader / taxonomy / trial arithmetic tests | `tests/test_agent_benchmark.py` | **yes**, deterministic, 53 tests, 0.1 s |
+| harness and task registry (empty) | `src/agent/benchmark_suite.py` | — |
+| grader / taxonomy / trial arithmetic tests | `tests/test_agent_benchmark.py` | **yes**, deterministic, fast, and it defines its own throwaway tasks so it tests the harness rather than a task set |
 | prompts, recorded expectations, the graded run | `benchmarks/agents/` | no, opt-in |
 
 The grader decides whether an agent passed, so a regression in *it* silently
@@ -96,13 +104,12 @@ costs nothing on this side. The budget it spends is the agent's.
 
 ### 4. Relationship to the existing benchmark registry
 
-**Beside it, with a disjoint ID space (`A1-*`). Not inside it.** Those benchmarks
-(`L1-RAY-01`, `L2-PSF-01`, `L3-HYBRID-01`) grade a solver's physics with declared
-tolerances and scientific fingerprints; merging a nondeterministic agent score
-into a registry whose entire value is reproducibility would spoil it.
-`manifest.yaml`, its entries, tolerances and gates are untouched, and
-`test_the_id_space_does_not_collide_with_the_solver_benchmark_registry` holds the
-namespaces apart so nobody merges them later by accident.
+**Beside it, in a disjoint id space. Not inside it.** A physics family grades a
+solver with declared tolerances and a reproducible fingerprint; merging a
+nondeterministic agent score into a registry whose entire value is
+reproducibility would spoil it. The family registry enforces its own
+`family_id` uniqueness, which is what the retired `A1-*` collision test used to
+guard — an agent task set is registered here, not there.
 
 ### 5. Failure taxonomy as structured codes
 
@@ -126,85 +133,22 @@ number cannot also be judged on its physics, and reporting the later failure wou
 misattribute the cause. So the order above is the order of the walk, and
 `test_tool_selection_is_checked_before_the_numbers` pins it.
 
-`FAIL_PHYSICAL_RESULT` is the code the two trap tasks exist to produce, and every
-other code has a negative participant that produces it —
-`TestOutcomeCodesAreReachable` proves each one fires. A code nothing has ever
-emitted cannot be trusted to fire when it matters.
+`FAIL_PHYSICAL_RESULT` is the code a trap task exists to produce, and every code
+has a negative participant that produces it — `TestOutcomeCodesAreReachable`
+proves each one fires. A code nothing has ever emitted cannot be trusted to fire
+when it matters.
+
+A task owns its own trap submission (`AgentTask.trap_submission`), so the
+harness knows no optics. That is what let CHE-133 delete the task set without
+touching this file.
 
 ---
-
-## The tasks
-
-| id | title | library | policy | oracle | trap |
-|---|---|---|---|---|---|
-| `A1-OPT-01` | Focal length of a thick plano-convex singlet | optiland | cold | `R/(n-1)` and `EFL - t/n`, exact | — |
-| `A1-OPT-02` | Focal shift caused by a plane-parallel plate | optiland | cold | `t(1 - 1/n)`, exact; sign graded | — |
-| `A1-OPT-03` | Single-layer AR coating at 550 nm | optiland | warm | Fresnel + single-layer quarter-wave, exact | **µm vs nm** |
-| `A1-CHX-01` | Diffractive spreading of a Gaussian beam | chromatix | cold | `w0 sqrt(1 + (z/zR)^2)`, exact | — |
-| `A1-CHX-02` | First dark ring of a focused circular aperture | chromatix | cold | `0.61 lambda / NA`, exact | — |
-| `A1-CHX-03` | Lateral walk-off of a tilted beam | chromatix | warm | `z tan(theta)`, exact; sign graded | **`kykx` 2π** |
-
-Every check is `analytic`: the expected value is a closed form, **verified against
-the pinned solver before the task shipped**, and every one carries a
-`tolerance_basis` stating the measured agreement and what the tolerance is wide
-enough to admit and narrow enough to reject. A recorded solver output would be
-weaker in a way that matters — it cannot tell a wrong answer from a wrong
-reference. `expected/` therefore holds a *regression signal*, not the oracle, and
-says so in every file.
-
-### The two traps, and why they are the interesting failures
-
-Both are **measured** on the pinned versions, not hypothetical, and both are cases
-where the code runs perfectly and the physics is wrong:
-
-**`A1-OPT-03` — micrometres where the literature says nanometres.**
-`ThinFilmStack.add_layer` takes µm; a quarter-wave MgF₂ layer for 550 nm is
-naturally quoted as 99.64 nm. Passing `99.64` builds a layer 1000× too thick and
-the reflectance comes back **0.04216384** against bare glass's **0.04216456** — the
-coating does nothing, nothing raises, and the number looks like a reflectance.
-CHE-57 recorded the same hazard on upstream tutorial t07. The task grades
-`coating_thickness_nm` *separately* from the reflectances precisely so the report
-can tell a unit slip inside the model from a wrong design intent.
-
-**`A1-CHX-03` — the same parameter name, two units, and a sign.** `kykx` means
-cycles per length on `asm_propagate` and radians per length on `plane_wave` — a
-factor of 2π — and the resulting displacement runs *opposite* in sign to the
-parameter (CHE-57 finding on example c06). Either mistake is 6.28× or a sign away
-from the truth, far outside the tolerance, and neither raises.
-
-A taxonomy that collapsed "it ran" into "it worked" could express neither.
-
----
-
-## Adding a benchmark
-
-1. **Find a candidate with an analytic oracle.** Start from the CHE-57 inventories
-   (`knowledge/solvers/{optiland,chromatix}/tutorials/README.md`) — they classify
-   every check as reference / analytic / invariant / qualitative, so the
-   `analytic` column is the shortlist. Check it against the exclusions below.
-2. **Verify the oracle against the pinned solver first**, before writing anything
-   else. If the closed form and the solver disagree, you have found something more
-   interesting than a benchmark task, and it belongs in a ticket.
-3. **Write the reference implementation** as a `_reference_<id>()` in
-   `agent_suite.py`, returning a dict with `library` and one key per check.
-4. **Write the `AgentTask`**: id in the `A1-*` space, library, context policy, what
-   it `exercises`, and a `CheckSpec` per graded quantity. Every `CheckSpec` needs a
-   `tolerance_basis` that states the measured agreement and names a wrong answer
-   the tolerance rejects. `test_every_check_is_analytic_and_declares_its_tolerance_basis`
-   will fail without one.
-5. **Write the prompt** in `prompts/<id>.md`. State the physics, the required
-   submission keys and their units. Do **not** name a library, a function, a module
-   or a tutorial — `TestPromptsDoNotLeakTheAnswer` enforces this, and choosing the
-   tool is the thing being measured.
-6. **If it is a trap**, fill in `trap` with the *measured* wrong number the
-   plausible mistake produces, and add the mistake to `_trap_submission` so a
-   negative participant exercises it.
-7. `./run.sh python -m agent.benchmark_suite --write-expected`
-8. `make test-agent-benchmark` and `./run.sh pytest -q tests/test_agent_benchmark.py`.
 
 ### Candidates excluded, with the reason measured rather than guessed
 
-From the CHE-71 context and the CHE-57 inventories:
+Recording why a candidate is **not** a benchmark is expensive knowledge, and it
+outlives the task set the candidates were rejected from. From the CHE-71 context
+and the CHE-57 inventories:
 
 | excluded | why |
 |---|---|
@@ -219,9 +163,32 @@ From the CHE-71 context and the CHE-57 inventories:
 | `t39` wrong surface normal | a real, silent physics error, but the task would be "write correct calculus", not "simulate optics" |
 
 The two Adam-state traps and `t35` are the most valuable rejections to record:
-they are exactly the "it ran and it is wrong" shape this suite wants, and the only
-reason they are out is runtime. A V2 with a cheaper surrogate for them is the
-single highest-value extension.
+they are exactly the "it ran and it is wrong" shape this suite wants, and the
+**only** reason they are out is runtime. A cheaper surrogate for them is the
+single highest-value extension, and they are the shortlist M9 should start from.
+
+---
+
+## Adding a task
+
+There is no task set to add to yet; M9 defines one. The requirements a task must
+meet do not change:
+
+1. **An analytic oracle**, verified against the pinned solver *before* the task
+   ships. A recorded solver output is weaker in a way that matters — it cannot
+   tell a wrong answer from a wrong reference.
+2. **A `tolerance_basis` per `CheckSpec`** that states the measured agreement and
+   names a wrong answer the tolerance rejects.
+   `test_every_check_is_analytic_and_declares_its_tolerance_basis` fails without
+   one.
+3. **A prompt that names no library, function, module or tutorial.** Choosing the
+   tool is the thing being measured, and `TestPromptsDoNotLeakTheAnswer` enforces
+   it.
+4. **A `trap_submission`** if it is a trap: the *measured* wrong number the
+   plausible mistake produces, not an invented one.
+5. Register it in `SUITES` in `src/agent/benchmark_suite.py`.
+
+Start from the exclusion table above rather than from a blank page.
 
 ---
 
@@ -239,20 +206,21 @@ minimal so any agent can satisfy it:
 
 ```bash
 ./run.sh python -m agent.benchmark_suite \
-    --suite v1 --trials 3 \
+    --suite <name> --trials 3 \
     --participant "command:my-agent --prompt {prompt} --cwd {workspace}" \
-    --context-policy per-task --output outputs/che71_agent_v1
+    --context-policy per-task --output outputs/agent_run
 ```
 
-**This was implemented but not executed in the CHE-71 delivery run, and the reason
-is recorded rather than glossed:** the `agent_solver` container has no agent CLI
-installed and no API credentials, so running one would need a decision about
-spending model tokens that belongs to whoever owns the budget. The container *does*
-have outbound network access, so the only missing pieces are a CLI and a key.
+**This was implemented and never executed, and the reason is recorded rather than
+glossed:** the `agent_solver` container has no agent CLI installed and no API
+credentials, so running one would need a decision about spending model tokens
+that belongs to whoever owns the budget. The container *does* have outbound
+network access, so the only missing pieces are a CLI and a key.
 
 What *was* executed is the whole harness against the reference and negative
 participants, which is what establishes that the grading is sound. See
-`benchmarks/reports/2026-08/agent_benchmark_v1.md`.
+`benchmarks/reports/2026-08/agent_benchmark_v1.md` — a historical report, whose
+per-task numbers describe the retired set and whose harness findings stand.
 
 ## Result format
 

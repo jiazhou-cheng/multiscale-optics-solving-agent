@@ -6,9 +6,9 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
-| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 96 |
+| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 99 |
 | **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 3 |
-| **C** | does this exist only to serve the old evaluation design? | delete | 11 |
+| **C** | does this exist only to serve the old evaluation design? | delete | 8 |
 
 Nothing is deleted by this inventory. Deletion is CHE-133 (M0.5.4), and the `L2-PSF-01` runner goes later still — it is the only way to run that case until the executor and family runner exist.
 
@@ -33,7 +33,6 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `benchmarks/protocols/m2_coupler_protocol.md` | Prose contract for the coupler benchmarks. | B2 family question/basis text. |
 | `benchmarks/protocols/m3_slice_protocol.md` | Prose contract for the M3 slice, including the reference-plane decision. | B3-PSF-SINGLET family question/basis text. |
 | `benchmarks/schemas/performance.schema.json` | The performance-record contract behind the M0.4 baseline harness; taxonomy- free and still the shape the cost records are written in. | B4-COST resource_cost schema. |
-| `benchmarks/schemas/provenance.schema.json` | The provenance contract, including the scientific-fingerprint projection. Reproducibility is not a property of the retired task layer. | VerificationResult.provenance and family provenance_rule. |
 | `benchmarks/roadmap.md`<br>*the removed-solver findings and the independent-validation standard* | FMMAX's unresolved phase/sign convention against a reflectance magnitude matched to ~1e-7; fdtdx's two failed gradient paths (jax.grad w.r.t. source wavelength returning exactly 0.0, and ConcretizationTypeError from place_objects); jax-fem's PyPI-BSD-versus-actual-GPLv3 mismatch and its unconditional petsc4py import. Plus the standard the L3 tasks were written against: independent final validation, multiple initializations, held-out perturbations, equal compute budgets, gradient checks, and a full accounting of solver calls -- which still applies to whatever replaces them. | Retired-component register (keeps living in roadmap.md), and the independence standard becomes the oracle-independence rules the family schema enforces structurally. |
 | `benchmarks/roadmap.md`<br>*the C_FIELD_TO_PSF paragraph* | Records that C_FIELD_TO_PSF was retired on a definitional argument -- extracting \|U\|^2 from a terminal field is a measurement, not a cross-representation handoff -- and names the test that pins it. Nothing in this migration reopens it. | Unchanged in place; tests/test_graph_validation.py::test_field_to_psf_is_not_a_registered_coupler stays as its executable form. |
 | `benchmarks/roadmap_source_catalog.yaml` | Source catalog for the roadmap's claims -- which paper or probe each retired component's finding came from. | Retired-component register provenance. |
@@ -107,7 +106,11 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `src/verification/psf_oracles.py` | The independent analytic PSF oracles. Expensive to derive and the only independent deciders the composed families have. | B3-PSF-SINGLET oracle callables. |
 | `src/verification/psf_measurement.py` | PSF metric measurement -- Strehl, first null, encircled energy, residual L2. | src/verification/metrics.py (M2.4), one canonical definition each. |
 | `src/verification/asm_oracle.py` | The repository's own float64 ASM/RS propagator (O2). Genuinely useful characterization evidence that must NEVER decide a gate -- L2-PSF-01 once set a negative-control floor from an O2 comparison and had to retire it as circular. | Oracle kind with independence SHARES_CODE, structurally barred from gating. |
+| `src/verification/analytic.py` | The five closed forms promoted out of the retired A1 task set before it was deleted, each with the measured agreement against the pinned solver that its tolerance was derived from, the wrong answer that tolerance rejects, and where relevant what it deliberately does NOT separate. | Oracles of B1-RAY-EFL, B1-RAY-PLATE, B1-WAVE-GAUSS, B1-WAVE-AIRY and B1-WAVE-TILT, authored by M1.1 and M1.2. |
+| `src/verification/hazards.py` | The two measured traps, with the numbers the mistaken code actually returns: Optiland's add_layer um/nm slip at 0.04216384 against bare glass's 0.04216456, and Chromatix's kykx meaning cycles-per-length on asm_propagate and radians-per-length on plane_wave with the displacement opposite in sign. Both report an `ok` contract, which is what makes them the archetype. | B0-UNITS-01 and B0-UNITS-02, authored by M1.3. |
 | `src/verification/status.py` | The seven verification statuses, in their own module because both the family schema and the verifier need them. They exist separately because a pass/fail boolean cannot tell "the solver refuses this dtype" from "the approximation does not apply here" from "it ran and the number is wrong". | VerificationResult.status (M0.5.3) and BenchmarkFamily.failure_semantics. |
+| `src/verification/result.py` | VerificationResult and its parts: Measurement (a number cannot be reported without an uncertainty and a basis), MetricResult carrying whether its tolerance may gate, declared-versus-observed validity, the negative-control outcomes including FIRED_BACKWARDS, and the structured diagnostic codes. No top-level pass boolean and no scalar score. | The structure every scientific verdict this project makes is reported in; schemas/verification_result.schema.json is generated from it. |
+| `src/verification/verifier.py` | verify(family, instance, execution_record). Re-evaluates the family's validity predicates against the parameters the run actually realized rather than trusting the instance's declaration, and reads no committed record as truth. | The single entry point fixed evaluation and future RL both call. |
 | `src/verification/families/__init__.py` | The family substrate's public surface (CHE-131). | Unchanged; grows as families are authored. |
 | `src/verification/families/schema.py` | BenchmarkFamily, BenchmarkInstance, the four parameter kinds, the signed validity margin, and the oracle-independence and tolerance-gating rules enforced at construction. | The substrate M1/M2/M4 author against. |
 | `src/verification/families/registry.py` | The one place that knows which families exist, with the family_id uniqueness rule that replaces the retired A1-* id-space collision test. | Unchanged. |
@@ -127,17 +130,28 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 
 | artifact | why it goes |
 | -- | -- |
-| `benchmarks/agents/prompts/A1-*.md` | The old agent-facing task set. Each prompt names one library implicitly and has one right answer, so it grades tool use rather than modelling, and none was ever run against a real agent. |
-| `benchmarks/agents/expected/A1-*.json` | Recorded expectations for the six A1 tasks. Explicitly a regression signal and not the oracle (the oracle is the closed form in the task definition), so nothing scientific is lost with the task. |
 | `benchmarks/agents/README.md`<br>*the six-task table and "Adding a benchmark"* | Documents the A1-* task set and the procedure for extending it in the retired id space. |
-| `benchmarks/agents/test_agent_suite.py` | The opt-in graded run over the six A1 tasks. Its harness-level assertions are duplicated in tests/test_agent_benchmark.py, which is in the default gate and stays; what is unique to this file is the A1 task set. **Verify before deletion that no assertion here is unique to this file. Owner CHE-133.** |
 | `benchmarks/manifest.yaml`<br>*levels: block (L2-PSF-01 task entry)* | The L1/L2/L3 "levels" taxonomy is the old design, replaced by the family registry plus benchmarks/instances/. |
 | `benchmarks/physics/L2-PSF-01/run_benchmark.py`<br>*the task wrapper (CLI, result.json emission, protocol plumbing)* | Serves the old evaluation design. Replaced by GraphExecutor (M3.1) plus the family runner. **NOT deleted in M0.5.4. It is the only way to run this case until the executor and family runner exist; deletion is owned by M4 (CHE-115/CHE-116).** |
-| `benchmarks/schemas/result.schema.json` | Hard-codes benchmark_id enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01] and protocol_id enums -- the retired taxonomy baked into a schema. Replaced by the VerificationResult schema (M0.5.3). |
+| `benchmarks/schemas/provenance.schema.json` | RECLASSIFIED by CHE-133 after the grep test found it. This carries the SAME baked-in taxonomy as result.schema.json -- benchmark_id: enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01] and a protocol_id enum of M1/M2 protocol names -- which is what result.schema.json was deleted for; the ticket named only the one file. Its only readers are archived gen1 tests (archive/tests/gen1/) which cannot run, and the live provenance contract is the generated schemas/provenance.schema.json plus core.provenance.VOLATILE_KEYS. **NOT deleted here: the M0.5.4 deletion list did not include it and deleting a file only archived code reads is a separate decision. Removal owned by CHE-115, and tests/test_retired_taxonomy.py allowlists it with this reason so the finding cannot go quiet.** |
 | `benchmarks/roadmap.md`<br>*the ten L1/L2/L3 planned-benchmark rows* | Task definitions in a retired taxonomy. Four name model ids (M_TMM_JAXLAYERLUMOS, M_PC_LEGUME and the two dangling L1 entries) that never existed anywhere in this repository. |
 | `benchmarks/reports/2026-08/agent_benchmark_v1.md`<br>*the per-task A1 results* | Results for the six retired A1 tasks against the reference participant. |
 | `benchmarks/README.md` | Describes the per-task `benchmarks/levelN/<task_id>/` layout -- task.md, public_config.yaml, oracle_graph.yaml, cases/public, cases/hidden -- which is the retired design, and points at a `level2/` path that no longer exists. Rewritten rather than deleted; see pending_edits. |
 | `src/agent/benchmark_suite.py`<br>*the six _reference_A1-* implementations and AgentTask entries* | The task definitions in the retired A1 id space. |
+
+## Removed, and where the content went
+
+Kept here rather than as table rows: the coverage test refuses a row that matches no file, because a classification of something that is not there reads as coverage and is not.
+
+| artifact | n | removed by | survives as |
+| -- | -- | -- | -- |
+| `benchmarks/agents/prompts/A1-*.md` | 6 | CHE-133 (M0.5.4) | nothing; a prompt is a task statement and the task set is retired. The closed forms they were graded against are in src/verification/analytic.py. |
+| `benchmarks/agents/expected/A1-*.json` | 6 | CHE-133 (M0.5.4) | nothing. Each file said in its own text that it was a regression signal and not the oracle, so nothing scientific went with it. |
+| `benchmarks/agents/test_agent_suite.py` | 1 | CHE-133 (M0.5.4) | tests/test_agent_benchmark.py, which now defines its own throwaway tasks and therefore tests the harness rather than a task set. |
+| `benchmarks/schemas/result.schema.json` | 1 | CHE-133 (M0.5.4) | schemas/verification_result.schema.json, generated from verification.result.VerificationResult. The old one hard-coded benchmark_id: enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01]. |
+| `benchmarks/manifest.yaml levels: block` | 1 | CHE-133 (M0.5.4) | verification.claim_ledger.open_gates() for the unmet 1.0e-3 gate and the backwards quadrature control; a caveat on the primary claim for the PB7 rule that it must not be closed against another Optiland PSF route; and a construction-time rule in BenchmarkFamily that refuses a CROSS_ROUTE oracle outside B4. |
+| `benchmarks/roadmap.md L1/L2/L3 planned rows` | 10 | CHE-133 (M0.5.4) | the independent-validation standard, kept in roadmap.md and given an executable form by the family schema's oracle-independence rules. |
+| `src/agent/benchmark_suite.py A1 task definitions` | 6 | CHE-133 (M0.5.4) | src/verification/analytic.py (five closed forms with their measured agreements) and src/verification/hazards.py (the two measured traps with their numbers), both covered by tests/test_preserved_evidence.py. |
 
 ## Edits this triage requires but does not make
 

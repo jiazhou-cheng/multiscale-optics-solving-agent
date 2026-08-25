@@ -660,6 +660,12 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "converged for radius-like metrics, and off-axis the weighted "
             "configuration is 7.5x worse against the same analytic oracle. Neither "
             "closes the item; both are inputs to it.",
+            "This gate must NOT be closed against another Optiland PSF route. FFTPSF "
+            "and HuygensPSF share one Wavefront/OPD front end and are therefore one "
+            "oracle, not two (PB7/CHE-58 finding F2). Migrated here by CHE-133 from "
+            "benchmarks/manifest.yaml's gate_disposition prose, and enforced "
+            "structurally by BenchmarkFamily, which refuses a CROSS_ROUTE oracle "
+            "outside category B4 and refuses a gating tolerance inside it.",
         ),
     ),
     Claim(

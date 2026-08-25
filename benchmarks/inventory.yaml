@@ -63,25 +63,64 @@ pending_edits:
     owner: CHE-133 (M0.5.4)
     why_not_here: This issue changes no behaviour and no repository-wide prose.
 
+# Bucket-C artifacts CHE-133 removed, and where their content survives. Kept as a
+# record rather than as `entries:` rows, because the coverage test refuses a row
+# that matches no file -- a classification of something that is not there reads
+# as coverage and is not.
+deleted:
+  - path: benchmarks/agents/prompts/A1-*.md
+    count: 6
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      nothing; a prompt is a task statement and the task set is retired. The
+      closed forms they were graded against are in src/verification/analytic.py.
+  - path: benchmarks/agents/expected/A1-*.json
+    count: 6
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      nothing. Each file said in its own text that it was a regression signal and
+      not the oracle, so nothing scientific went with it.
+  - path: benchmarks/agents/test_agent_suite.py
+    count: 1
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      tests/test_agent_benchmark.py, which now defines its own throwaway tasks and
+      therefore tests the harness rather than a task set.
+  - path: benchmarks/schemas/result.schema.json
+    count: 1
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      schemas/verification_result.schema.json, generated from
+      verification.result.VerificationResult. The old one hard-coded
+      benchmark_id: enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01].
+  - path: "benchmarks/manifest.yaml levels: block"
+    count: 1
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      verification.claim_ledger.open_gates() for the unmet 1.0e-3 gate and the
+      backwards quadrature control; a caveat on the primary claim for the PB7 rule
+      that it must not be closed against another Optiland PSF route; and a
+      construction-time rule in BenchmarkFamily that refuses a CROSS_ROUTE oracle
+      outside B4.
+  - path: benchmarks/roadmap.md L1/L2/L3 planned rows
+    count: 10
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      the independent-validation standard, kept in roadmap.md and given an
+      executable form by the family schema's oracle-independence rules.
+  - path: src/agent/benchmark_suite.py A1 task definitions
+    count: 6
+    by: CHE-133 (M0.5.4)
+    survives_as: >-
+      src/verification/analytic.py (five closed forms with their measured
+      agreements) and src/verification/hazards.py (the two measured traps with
+      their numbers), both covered by tests/test_preserved_evidence.py.
+
 entries:
 
   # =========================================================================
   # benchmarks/agents/ -- the V1 agent suite
   # =========================================================================
-  - path: benchmarks/agents/prompts/A1-*.md
-    glob: true
-    bucket: C
-    justification: >-
-      The old agent-facing task set. Each prompt names one library implicitly and
-      has one right answer, so it grades tool use rather than modelling, and none
-      was ever run against a real agent.
-  - path: benchmarks/agents/expected/A1-*.json
-    glob: true
-    bucket: C
-    justification: >-
-      Recorded expectations for the six A1 tasks. Explicitly a regression signal
-      and not the oracle (the oracle is the closed form in the task definition),
-      so nothing scientific is lost with the task.
   - path: benchmarks/agents/README.md
     part: the A1 exclusion table
     bucket: A
@@ -112,16 +151,6 @@ entries:
     justification: >-
       Documents the A1-* task set and the procedure for extending it in the
       retired id space.
-  - path: benchmarks/agents/test_agent_suite.py
-    bucket: C
-    justification: >-
-      The opt-in graded run over the six A1 tasks. Its harness-level assertions
-      are duplicated in tests/test_agent_benchmark.py, which is in the default
-      gate and stays; what is unique to this file is the A1 task set.
-    note: >-
-      Verify before deletion that no assertion here is unique to this file. Owner
-      CHE-133.
-
   # =========================================================================
   # benchmarks/manifest.yaml
   # =========================================================================
@@ -254,12 +283,6 @@ entries:
   # =========================================================================
   # benchmarks/schemas/
   # =========================================================================
-  - path: benchmarks/schemas/result.schema.json
-    bucket: C
-    justification: >-
-      Hard-codes benchmark_id enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01] and
-      protocol_id enums -- the retired taxonomy baked into a schema. Replaced by
-      the VerificationResult schema (M0.5.3).
   - path: benchmarks/schemas/performance.schema.json
     bucket: A
     justification: >-
@@ -267,11 +290,21 @@ entries:
       free and still the shape the cost records are written in.
     destination: B4-COST resource_cost schema.
   - path: benchmarks/schemas/provenance.schema.json
-    bucket: A
+    bucket: C
     justification: >-
-      The provenance contract, including the scientific-fingerprint projection.
-      Reproducibility is not a property of the retired task layer.
-    destination: VerificationResult.provenance and family provenance_rule.
+      RECLASSIFIED by CHE-133 after the grep test found it. This carries the SAME
+      baked-in taxonomy as result.schema.json --
+      benchmark_id: enum[L1-RAY-01, L1-WAVE-01, L2-COUPLER-01] and a protocol_id
+      enum of M1/M2 protocol names -- which is what result.schema.json was deleted
+      for; the ticket named only the one file. Its only readers are archived gen1
+      tests (archive/tests/gen1/) which cannot run, and the live provenance
+      contract is the generated schemas/provenance.schema.json plus
+      core.provenance.VOLATILE_KEYS.
+    note: >-
+      NOT deleted here: the M0.5.4 deletion list did not include it and deleting a
+      file only archived code reads is a separate decision. Removal owned by
+      CHE-115, and tests/test_retired_taxonomy.py allowlists it with this reason
+      so the finding cannot go quiet.
 
   # =========================================================================
   # benchmarks/roadmap.md and its source catalog
@@ -818,6 +851,25 @@ entries:
       circular.
     destination: >-
       Oracle kind with independence SHARES_CODE, structurally barred from gating.
+  - path: src/verification/analytic.py
+    bucket: A
+    justification: >-
+      The five closed forms promoted out of the retired A1 task set before it was
+      deleted, each with the measured agreement against the pinned solver that its
+      tolerance was derived from, the wrong answer that tolerance rejects, and
+      where relevant what it deliberately does NOT separate.
+    destination: >-
+      Oracles of B1-RAY-EFL, B1-RAY-PLATE, B1-WAVE-GAUSS, B1-WAVE-AIRY and
+      B1-WAVE-TILT, authored by M1.1 and M1.2.
+  - path: src/verification/hazards.py
+    bucket: A
+    justification: >-
+      The two measured traps, with the numbers the mistaken code actually returns:
+      Optiland's add_layer um/nm slip at 0.04216384 against bare glass's
+      0.04216456, and Chromatix's kykx meaning cycles-per-length on asm_propagate
+      and radians-per-length on plane_wave with the displacement opposite in sign.
+      Both report an `ok` contract, which is what makes them the archetype.
+    destination: B0-UNITS-01 and B0-UNITS-02, authored by M1.3.
   - path: src/verification/status.py
     bucket: A
     justification: >-
@@ -827,6 +879,25 @@ entries:
       approximation does not apply here" from "it ran and the number is wrong".
     destination: >-
       VerificationResult.status (M0.5.3) and BenchmarkFamily.failure_semantics.
+  - path: src/verification/result.py
+    bucket: A
+    justification: >-
+      VerificationResult and its parts: Measurement (a number cannot be reported
+      without an uncertainty and a basis), MetricResult carrying whether its
+      tolerance may gate, declared-versus-observed validity, the negative-control
+      outcomes including FIRED_BACKWARDS, and the structured diagnostic codes.
+      No top-level pass boolean and no scalar score.
+    destination: >-
+      The structure every scientific verdict this project makes is reported in;
+      schemas/verification_result.schema.json is generated from it.
+  - path: src/verification/verifier.py
+    bucket: A
+    justification: >-
+      verify(family, instance, execution_record). Re-evaluates the family's
+      validity predicates against the parameters the run actually realized rather
+      than trusting the instance's declaration, and reads no committed record as
+      truth.
+    destination: The single entry point fixed evaluation and future RL both call.
   - path: src/verification/families/__init__.py
     bucket: A
     justification: The family substrate's public surface (CHE-131).

@@ -22,14 +22,25 @@ The currently supported core is the Optiland geometric-ray model, the Chromatix 
 
 The project is now in a **benchmark redesign + codebase hardening + agent integration** phase.
 
-The benchmark system has two physics benchmark classes:
+The benchmark system is a **shared scientific verification substrate**, not a list of tasks: `BenchmarkFamily`/`BenchmarkInstance` -> `GraphExecutor` emits an `ExecutionRecord` -> `verify(family, instance, record)` emits a `VerificationResult` -> fixed evaluation, future generated evaluation and agent scoring all consume that result.
 
-1. **single-component benchmarks** — one solver or one coupler in isolation,
-2. **composed physics benchmarks** — solver -> coupler -> solver chains.
+A **family** is a physical question with a declared parameter space, an oracle and its independence, executable validity predicates, metrics, tolerances with bases, and negative controls; an **instance** is one point in that space with a stable fingerprint. Five categories, by what may decide them:
 
-These physics benchmarks are the scientific tasks that the agentic benchmark operates on; they are not parallel to it. The **agentic benchmark is the higher-level evaluation framework**: the agent is given benchmark problems drawn from the single-component and composed-physics sets and must select the appropriate model(s), load the relevant knowledge, configure and execute the graph, and interpret and verify the result correctly.
+| | what it asks | what may decide it |
+| -- | -- | -- |
+| **B0** | contract and recovery: does the component refuse what it cannot do in a way a caller can act on — including silent hazards where the contract is `ok` and the physics is wrong | declared capability, structured refusal codes |
+| **B1** | primitive correctness inside one representation | analytic closed form or invariant |
+| **B2** | a representation transition: ray to wave, wave to ray, patch to global | exactness limit, conservation, convergence |
+| **B3** | a composed chain whose correctness is still decidable | analytic form, a genuinely independent route, or intermediate invariant evidence |
+| **B4** | characterization: convergence, cost, variance, reproducibility, cross-route consistency | **nothing — B4 never gates, by construction** |
 
-The purpose of the benchmark system is therefore twofold: the underlying physics benchmarks establish numerical and scientific correctness, while the agentic benchmark tests whether an agent can use those verified components correctly. Together they should cover model choice, boundary conventions, numerical convergence, physical correctness, failure behavior, reproducibility, and scientific interpretation.
+Four separations hold throughout, each enforced by code rather than convention:
+
+1. **Execution is not correctness.** The executor records what happened; the verifier decides what it means. `ExecutionRecord` carries no metric, tolerance or verdict, and `VerificationResult` has no pass boolean and no score.
+2. **Validation is not characterization.** A `SHARES_CODE` or `CROSS_ROUTE` oracle forces category B4, and a B4 family cannot carry a gating tolerance.
+3. **Executed successfully is not physically correct.** Silent wrong answers are first-class benchmark targets, and retiring the old task layer preserved its oracles, tolerance derivations, measured traps and exclusion reasons rather than the wrappers that ran them; `benchmarks/inventory.yaml` records where each went.
+
+The **agentic benchmark** is the higher-level framework built on top: the agent is given problems drawn from the B0–B4 families and must select the model(s), load the relevant knowledge, configure and execute the graph, and interpret and verify the result. It consumes `VerificationResult`; it does not grade physics itself, and `src/verification/` imports nothing from `src/agent/`.
 
 ## Sources of Truth
 
@@ -60,10 +71,10 @@ Keep startup context small.
 - `src/solvers/`: narrow adapters around external solver APIs. External solver imports stay here.
 - `src/couplers/`: representation-changing physics between models. Couplers must not depend on solver-specific implementation details unless the contract explicitly requires it.
 - `src/registry/`: declarations of supported models and couplers; it does not execute them.
-- `src/verification/`: independent scientific oracles and measurements.
+- `src/verification/`: independent scientific oracles, measurements, the benchmark family substrate (`families/`), and the physics verifier. Imports nothing from `src/agent/`.
 - `src/agent/`: agent execution/benchmark infrastructure, not solver physics.
 - `knowledge/`: compact agent-facing knowledge, not executable evidence or tutorial test code.
-- `benchmarks/`: benchmark protocols, probes, records, and agent tasks.
+- `benchmarks/`: benchmark protocols, probes, records, instances, and the artifact inventory.
 - `tests_tutorial/`: on-demand upstream tutorial reproductions.
 - `archive/`: historical and non-runnable material.
 
@@ -84,24 +95,16 @@ At every model boundary, make the relevant conventions explicit and testable: un
 
 ## Benchmark Requirements
 
-Every scientific benchmark should declare, as applicable:
+Scientific evidence is expressed as a **family**, not as a script with a hard-coded parameter set. A family declares, as applicable:
 
-- the physical question and approximation being tested,
-- input geometry/source and boundary conditions,
-- solver/coupler graph,
-- units, conventions, device, dtype, and sampling,
-- independent or analytic oracle,
-- quantitative metrics and pass/fail tolerance,
-- convergence variables and convergence criterion,
-- expected failure or out-of-domain cases,
-- reproducibility/provenance information,
-- runtime and memory budget when the workload is substantial.
+- the physical question and approximation being tested, and which components it speaks about; its parameters, split into `PhysicalParameter` (moves the correct answer), `NumericalParameter` (moves achieved accuracy and cost, not the answer), `RepresentationParameter` and `ExecutionParameter` (neither, beyond a declared budget);
+- executable `ValidityPredicate`s with a normalized signed margin — positive inside, zero at the boundary, negative outside — aggregating to `INSIDE` / `NEAR_BOUNDARY` / `OUTSIDE` / `FAR_OUTSIDE`; the oracle (kind, independence, callable); metrics, each stating what it is **blind to**; tolerances, each with its basis and whether that basis may gate; invariants and negative controls, including any control known to fire backwards;
+- the stochastic policy — a stochastic family owes exactness limit, unbiasedness, convergence exponent and variance, and requires more than one seed;
+- the execution policy (allowed devices and dtypes, runtime and memory envelope), canonical instances, the sampler or a recorded reason for having none, and the provenance rule.
 
-For coupled benchmarks, test both the individual components and the handoff. A correct final image can hide an incorrect intermediate convention.
+A family whose `NumericalParameter` moves its oracle value has a defect. The parameter split is what makes that testable, and it is why measuring how much a parameter that should not change the answer does is itself a benchmark. Every reported number carries an uncertainty and a basis for it; a value with no error bar is a schema violation, not a pass. Every successful round trip needs a deliberately broken twin that fails, and a gate a known-wrong twin can pass is reported as untrustworthy rather than green. For composed families, test both the components and the handoff — a correct final image can hide an incorrect intermediate convention. For agent benchmarks, grade the reasoning-relevant behavior: model selection, knowledge use, graph construction, parameterization, error handling, and interpretation — not only whether the final number happens to match.
 
-For agent benchmarks, grade the reasoning-relevant behavior: model selection, knowledge use, graph construction, parameterization, error handling, and interpretation — not only whether the final number happens to match.
-
-Do not treat an old milestone benchmark as canonical simply because it exists. If its oracle, scope, or gate is no longer scientifically trusted, replace or retire it explicitly.
+Do not treat an old milestone benchmark as canonical simply because it exists. If its oracle, scope, or gate is no longer scientifically trusted, replace or retire it explicitly — and preserve the evidence separately from the wrapper that ran it.
 
 ## Execution Environment
 
@@ -113,15 +116,15 @@ Do not treat an old milestone benchmark as canonical simply because it exists. I
 
 Do not silently fall back to host-side project execution. If a required check cannot run through `./run.sh`, report the environment failure.
 
-Normal testing policy:
+Testing policy — targeted verification is the default, and verification cost scales with the regression risk the diff actually carries. Run the smallest relevant probe or test that establishes the changed contract; do not run several overlapping pytest subsets; do not rerun an expensive check that already passed unless a later edit could invalidate it. The full repository suite is **not** the default gate for every meaningful implementation change.
 
-- During implementation, run the smallest relevant probe or test needed to answer the current question.
-- Do not shotgun many overlapping pytest subsets.
-- For a meaningful code change, normally run the default suite once before completion: `./run.sh pytest -q`, unless the task defines a different gate.
-- Tutorial tests are on-demand; do not run them routinely.
-- Agent benchmarks are on-demand when agent prompts, tasks, graders, or orchestration change.
-- GPU tests/benchmarks run only when the task needs GPU evidence.
-- Archived tests are not part of the active test surface.
+Run `./run.sh pytest -q` when broader regression risk justifies it, including when: shared core contracts or widely used boundary artifacts changed; solver or coupler behavior changed in a way that can affect multiple callers; dependency, Docker, or environment configuration changed; test collection, common fixtures, or repository-wide infrastructure changed; the task explicitly requires the full gate; or targeted verification exposed a plausible repository-wide regression.
+
+The full suite is normally unnecessary for documentation-only changes that do not alter a scientific claim, narrowly isolated implementation fixes, local validation or failure-path fixes, registry metadata changes that introduce no new executable scientific capability, and test cleanup that changes no oracle, tolerance, or contract.
+
+Do not rerun an expensive gate solely so both the implementation agent and the independent reviewer can observe the same passing result. A reviewer may rely on recorded test evidence unless the diff, subsequent edits, or the evidence itself gives a concrete reason to distrust it.
+
+Scoped surfaces stay on-demand: tutorial tests are not run routinely; agent benchmarks run when agent prompts, tasks, graders, or orchestration change; GPU tests/benchmarks run only when the task needs GPU evidence; archived tests are not part of the active test surface. Targeted verification reduces cost, not standards: a change that runs, or produces visually plausible output, is still unverified until the changed contract itself has evidence.
 
 Do not hard-code historical test counts or runtimes into this file; they become stale quickly.
 
@@ -168,22 +171,24 @@ While editing:
 
 Before completion:
 
-- Run the task-required checks and the appropriate default repository gate.
+- Run the task-required checks and the targeted verification for the changed contract; escalate to the full gate only when the testing policy above calls for it.
 - Review the diff for unrelated changes.
-- Obtain an independent code review for non-trivial implementation changes.
+- Check the independent-review triggers below, and obtain a review when one applies.
 - Report tests run, tests not run, scientific risks, resource issues, intentional non-goals, and follow-up work.
 
 ## Independent Code Review
 
-Implementation and review are separate roles. The agent that writes a non-trivial change should not be the only agent judging whether that change is correct.
+Implementation and review are separate roles. Where a change carries scientific risk, the agent that wrote it must not be the only agent judging whether it is correct. Review is triggered by that risk, not by diff size.
 
-The repository may provide a tool-specific reviewer definition (for Claude Code, `.claude/agents/code-reviewer.md`). Keep the detailed reviewer prompt there rather than expanding this file.
+Independent review is **required** when the change affects any of: external solver adapter behavior or solver API use; couplers or representation-changing boundaries; physical assumptions or conventions; units, coordinate systems, wavelength/frequency handling, polarization/coherence, normalization, sampling, or reference planes, when those contracts change; numerical algorithms, interpolation, quadrature, precision, tolerances, or convergence behavior; gradients, autodiff, differentiability, or cross-framework derivative claims; shared core scientific boundary artifacts; executable model/coupler capability claims; benchmark oracles, scientific tolerances, or acceptance criteria; or GPU/RAM allocation, batching, workload scale, or otherwise substantial resource behavior.
 
-The reviewer is read-only by default. What it evaluates — scope compliance, solver API correctness, the validity of the chosen approximation, conventions and artifact boundaries, coupler assumptions, numerics and convergence, gradient claims, structured failures, oracle independence, GPU/RAM behavior, and unrelated changes — is enumerated in that reviewer definition, not here.
+Independent review is normally **optional** for documentation-only changes that do not alter a scientific claim, formatting and comments, isolated developer tooling changes, test cleanup that alters no scientific oracle or tolerance, and narrow implementation changes with no solver/API/physics/boundary/numerical/resource contract impact.
 
-Review findings are classified as **must fix before merge**, **should fix soon**, or **safe to merge / no blocker**.
+When invoking the reviewer, supply: the task acceptance criteria, the relevant diff, the tests/probes already run and their results, known uncertainties, and areas intentionally left unverified. The reviewer is expected to consume that evidence rather than recreate it.
 
-A reviewer may run narrow read-only checks through `./run.sh`, but should not duplicate expensive tutorial/GPU/full benchmark runs unless the task specifically requires them.
+The repository may provide a tool-specific reviewer definition (for Claude Code, `.claude/agents/code-reviewer.md`). Keep the detailed reviewer prompt there rather than expanding this file. The reviewer is read-only, scopes its depth to the risk domains the diff actually touches, and stops once the affected acceptance criteria and changed-code risks have sufficient evidence.
+
+Review findings are classified as **must fix before merge**, **should fix soon**, or **safe to merge / no blocker**. A reviewer may run one narrow read-only check through `./run.sh` when a specific review question cannot be settled from the available evidence, but should not duplicate the implementation agent's passing runs or expensive tutorial/GPU/full benchmark runs unless the task specifically requires them.
 
 ## PR Contract
 

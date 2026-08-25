@@ -56,42 +56,31 @@ cross-representation handoff, so it is not a coupler.
 `tests/test_graph_validation.py::test_field_to_psf_is_not_a_registered_coupler`
 pins that.
 
-## Planned benchmarks, moved off `manifest.yaml`
+## The planned L1/L2/L3 benchmarks are gone (CHE-133, M0.5.4)
 
-Level 1 — one-model simulation. Two of the four name a model id that has never
-existed anywhere in this repository, which is worth stating plainly: writing an
-id into a plan does not create a component.
+Ten rows lived here: four Level 1 one-model tasks, three Level 2 orchestrations
+and three Level 3 inverse-design demonstrations. They were task definitions in a
+retired taxonomy, and four of them named model ids — `M_TMM_JAXLAYERLUMOS`,
+`M_PC_LEGUME`, and the two dangling Level 1 entries — that have never existed
+anywhere in this repository. Writing an id into a plan does not create a
+component, and keeping the rows meant the plan looked like coverage.
 
-| Task | Model | Status |
-| -- | -- | -- |
-| `L1-TMM-01` — multilayer Bragg mirror | `M_TMM_JAXLAYERLUMOS` | **dangling id**: no adapter, no registry entry, no package chosen |
-| `L1-RCWA-01` — binary grating diffraction | `M_RCWA_FMMAX` | integration removed above |
-| `L1-EM-01` — full-wave waveguide component | `M_EM_FDTDX` | integration removed above |
-| `L1-PC-01` — photonic-crystal band structure | `M_PC_LEGUME` | **dangling id**: same |
+Two things in them were worth keeping and are kept:
 
-Level 2 — two-to-three-model orchestration. `L2-PSF-01` is implemented and stays
-in the manifest; `L2-COUPLER-01` is implemented and archived with gen1.
+* **The standard the Level 3 tasks were written against.** Independent final
+  validation, multiple initializations, held-out perturbations, equal compute
+  budgets, gradient checks, and a complete accounting of solver calls and human
+  interventions. A composed task passes only when the **coupling boundary** is
+  independently tested; passing each model separately is not sufficient and never
+  was. That standard now has an executable form: `BenchmarkFamily` refuses to let
+  an oracle that shares code with the thing under test decide anything, and a
+  composed family that cannot name an independent decider is category B4.
+* **The observation behind the hybrid-microscope row**: that a joint refractive–diffractive wide-field
+  microscope is the nearest to reachable of the three, because it exercises the
+  ray–wave bridge that exists rather than a solver that does not. That is the
+  demo2/demo3 line of work, which is real and is where it went.
 
-| Task | Graph | Status |
-| -- | -- | -- |
-| `L2-META-01` — unit-cell-to-system meta-optic imaging | `M_RCWA_FMMAX → C_CELL_TO_SURFACE → M_WAVE_CHROMATIX` | every non-Chromatix component removed |
-| `L2-GRATING-01` — near-field to far-field / fiber overlap | `M_EM_FDTDX → C_NEAR_TO_FAR` | both removed |
-| `L2-THERMO-01` — optical absorption to thermo-optic response | `M_EM_FDTDX → C_ABSORPTION_TO_HEAT → M_THERMAL_JAX_FEM → C_TEMPERATURE_TO_MATERIAL` | all four removed |
+The replacement is the B0–B4 family architecture: `src/verification/families/`
+and `benchmarks/inventory.yaml`. What each retired row's content became, if
+anything, is recorded there.
 
-Level 3 — hard inverse design. Three candidate paper demonstrations, none
-implemented and none with a protocol:
-
-1. `L3-HYBRID-01` — joint refractive-diffractive wide-field microscope. The
-   nearest to reachable, because it exercises the ray-wave bridge that exists
-   rather than a solver that does not.
-2. `L3-ACHROMATIC-01` — achromatic meta-optic computational imager with
-   RCWA-to-system coupling.
-3. `L3-ROBUST-01` — fabrication- and temperature-robust grating coupler with
-   adaptive fidelity.
-
-The standard these were written against, which still applies to whatever
-replaces them: independent final validation, multiple initializations, held-out
-perturbations, equal compute budgets, gradient checks, and a complete accounting
-of solver calls and human interventions. A Level 2 task passes only when the
-**coupling boundary** is independently tested; passing each model separately is
-not sufficient and never was.

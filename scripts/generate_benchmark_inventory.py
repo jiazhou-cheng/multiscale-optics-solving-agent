@@ -103,6 +103,25 @@ def render(inventory: dict) -> str:
             ]
         lines.append("")
 
+    deleted = inventory.get("deleted", ())
+    if deleted:
+        lines += [
+            "## Removed, and where the content went",
+            "",
+            "Kept here rather than as table rows: the coverage test refuses a row that "
+            "matches no file, because a classification of something that is not there "
+            "reads as coverage and is not.",
+            "",
+            "| artifact | n | removed by | survives as |",
+            "| -- | -- | -- | -- |",
+        ]
+        lines += [
+            f"| `{d['path']}` | {d.get('count', 1)} | {_cell(d['by'])} | "
+            f"{_cell(d['survives_as'])} |"
+            for d in deleted
+        ]
+        lines.append("")
+
     lines += ["## Edits this triage requires but does not make", ""]
     lines += [
         "| file | section | required change | owner | why not here |",

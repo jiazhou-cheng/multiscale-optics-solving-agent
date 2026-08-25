@@ -25,6 +25,7 @@ and a register of unmet gates is what makes it checkable rather than aspirationa
 * **notes**
   * Measured at 787,969 rays with the production (weighted) configuration. The UNIFORM configuration reaches 9.21e-4 and clears the gate -- the opposite ordering from the O2 diagnostic, and an open item.
   * CHE-103 adds a candidate contributor the original write-up did not have: the frozen grid samples the Airy radius with 2.44 pixels and is not converged for radius-like metrics, and off-axis the weighted configuration is 7.5x worse against the same analytic oracle. Neither closes the item; both are inputs to it.
+  * This gate must NOT be closed against another Optiland PSF route. FFTPSF and HuygensPSF share one Wavefront/OPD front end and are therefore one oracle, not two (PB7/CHE-58 finding F2). Migrated here by CHE-133 from benchmarks/manifest.yaml's gate_disposition prose, and enforced structurally by BenchmarkFamily, which refuses a CROSS_ROUTE oracle outside category B4 and refuses a gating tolerance inside it.
 
 ## `C_RAY_TO_WAVE` -- quadrature_weight_min_improvement_factor vs O1
 

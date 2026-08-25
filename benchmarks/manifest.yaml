@@ -12,43 +12,82 @@ version: 0.2.0
 # they are not runnable from here.
 m1_exit_report: benchmarks/reports/2026-08/ray_and_wave_baselines.md
 m1_independence_check: archive/benchmarks/gen1/archive/benchmarks/gen1/benchmarks/verify_m1_independence.py
-levels:
-  2:
-    name: two-to-three-model orchestration
-    tasks:
-      - id: L2-PSF-01
-        title: PSF-engineered microscope
-        # Amended by CHE-36 (M3.7): the graph terminates at the propagated
-        # ComplexField. PSF extraction is a measurement on that terminal state,
-        # not an edge, and C_FIELD_TO_PSF is no longer a registered coupler.
-        # M_SENSOR_IDEAL stays out of M3 (no pixel integration, no noise model).
-        graph: [M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]
-        terminal_measurement: psf
-        protocol_id: M3-SLICE-CPU-V1
-        milestone: M3
-        implemented: true
-        entry_point: benchmarks/physics/L2-PSF-01/run_benchmark.py
-        note: >
-          Closed by CHE-39 (M3.10). The blocked_by above is gone: M3.1 (CHE-30)
-          and M3.4 (CHE-33) verified Optiland's opd_native sign and reference
-          plane, and the sensor-side handoff itself was verified by M3.9R
-          (CHE-38). What remains open is narrower than the old blocker: on the
-          real traced M3-SINGLET-REF system the reconstruction is
-          discretization-converged and within its declared validity region,
-          but does NOT meet the frozen 1.0e-3 fft_oracle_intensity_relative_l2
-          gate (CHE-47 measures 2.2e-3-2.5e-3 at 787,969 rays; a synthetic
-          aberration-free bundle reaches 4.07e-4, inside the gate). See
-          benchmarks/physics/L2-PSF-01/README.md and the M3 exit report.
-        gate_disposition: >-
-          CHE-62 re-checked this note and it STANDS UNCHANGED. The gate is still
-          unmet; no tolerance is widened and nothing is promoted. CHE-48 -- the
-          ticket that would have decomposed the unattributed half of the residual
-          -- was marked Done with no comment, no commit and no artifact, so the
-          decomposition was never performed and the ticket, not this note, was
-          the thing that was wrong. CHE-48 is reopened. The 1.0e-3
-          fft_oracle_intensity_relative_l2 gate is therefore carried into M4 as an
-          explicit open limitation on benchmark #3, which per PB7 (CHE-58)
-          finding F2 must not close it against another Optiland PSF route --
-          FFTPSF and HuygensPSF share one Wavefront/OPD front end and are not two
-          oracles. Full disposition:
-          benchmarks/reports/2026-08/slice_cleanup_disposition.md item 3.
+# ---------------------------------------------------------------------------
+# The levels: block is gone (CHE-133, M0.5.4)
+# ---------------------------------------------------------------------------
+#
+# The L1/L2/L3 "levels" taxonomy was the retired evaluation design: a task id, a
+# level number and a protocol id, with the interesting scientific content -- the
+# tolerance, the oracle, the unmet gate -- as prose in a `gate_disposition`
+# field that nothing could query. That is how the one live composed benchmark
+# came to have an unmet primary gate and a false negative_controls_pass while
+# being easy to plan against as though green.
+#
+# Its replacement is the family registry (`src/verification/families/`) plus
+# `benchmarks/instances/`. Nothing was lost in the move, and each piece now has
+# an executable home:
+#
+#   the 1.0e-3 fft_oracle_intensity_relative_l2 gate, UNMET at 2.2072e-3
+#     -> verification.claim_ledger.open_gates(), cross-checked against
+#        benchmarks/probes/records/m3_quadrature_weight.json by
+#        tests/test_claim_ledger.py rather than restated here
+#   the quadrature-weight control that fires BACKWARDS at 0.417
+#     -> the same register, with its caveats
+#   the rule that the gate must not be closed against another Optiland PSF
+#   route -- FFTPSF and HuygensPSF share one Wavefront/OPD front end and are
+#   not two oracles (PB7/CHE-58 finding F2)
+#     -> structurally enforced: BenchmarkFamily refuses a CROSS_ROUTE oracle
+#        outside category B4, and a B4 family cannot carry a gating tolerance
+#   the residual analysis and the full disposition
+#     -> benchmarks/physics/L2-PSF-01/README.md and
+#        benchmarks/reports/2026-08/slice_cleanup_disposition.md item 3
+#
+# The runner `benchmarks/physics/L2-PSF-01/run_benchmark.py` is still the only
+# way to execute that workload and stays until M3's executor and the family
+# runner replace it (CHE-115). It is bucket C in benchmarks/inventory.yaml.
+
+# ---------------------------------------------------------------------------
+# Characterizations — NOT benchmarks, and the distinction is the entry
+# ---------------------------------------------------------------------------
+#
+# CHE-120 (M5.3). These are recorded here because the question "is demo3 a
+# validation target?" kept being answerable only by reading a report, and a
+# manifest that lists benchmarks without saying which scientific tasks cannot
+# become one invites somebody to plan against a validation that cannot exist.
+#
+# A characterization measures a property of an estimator or a cost. It has no
+# oracle, so it has no pass/fail gate, and no number in its records is a
+# threshold. That is a permanent property of the task, not a backlog item.
+characterizations:
+  - id: DEMO3-RW-P
+    title: patch-route hologram + refractive lens (the paper's Fig 5c system)
+    graph: [C_PATCH_WFT, M_RAY_OPTILAND, C_RAY_TO_WAVE]
+    probes:
+      - benchmarks/probes/ray_wave/demo3_hologram_lens.py
+      - benchmarks/probes/ray_wave/demo3_convergence.py
+      - benchmarks/probes/ray_wave/demo3_variance.py
+    validation_target: false
+    why_not: >-
+      The paper states no conventional reference exists for this system; that is
+      the point of its Fig 5c. Every demo3 number is a self-comparison -- one
+      realization against another, or one arm of a probe against another arm.
+      Nothing is scored against an independent oracle and no recorded threshold
+      is a gate. This CANNOT be fixed by more compute: the missing thing is a
+      reference, not a budget.
+    what_it_does_support: >-
+      Characterization of cost, convergence rate and estimator variance;
+      anti-bias work, because unbiasedness IS testable at a reduced size where
+      an enumerated oracle exists (tests/test_patch_positions.py,
+      tests/test_patch_wft.py) and transfers to demo3 by construction; and
+      relative claims between two arms of one probe. The components are
+      validated elsewhere -- the full-aperture patch against an independent
+      float64 ASM at 7.1e-13, and demo2 against the same oracle. demo3 is those
+      validated components composed at a scale where the composition has no
+      reference of its own.
+    cost_ceiling: >-
+      NCC 0.9 seed-to-seed needs 1.49e9 rays and 0.14 h/run on the shipped
+      estimator, or 1.02e9 rays and 0.094 h with CHE-120's position importance
+      sampling. The paper's SI Table S2 budget for this system is
+      2.6e9 rays. Extrapolation basis and its 2.9x model spread:
+      benchmarks/reports/2026-08/demo3_estimator_variance.md.
+    report: benchmarks/reports/2026-08/demo3_estimator_variance.md

@@ -281,13 +281,46 @@ def test_the_open_gate_register_reproduces_l2_psf_01() -> None:
     assert finest["gate_met"] is False
 
 
-def test_the_register_is_not_empty_while_the_manifest_says_a_gate_is_open() -> None:
-    """The manifest's prose and the register must agree that something is open."""
-    manifest = (ROOT / "benchmarks" / "manifest.yaml").read_text()
-    assert "gate_disposition" in manifest
+def test_the_register_is_not_empty_while_the_frozen_tolerance_is_unreached() -> None:
+    """The tolerance file and the register must agree that something is open.
+
+    This used to cross-check against ``benchmarks/manifest.yaml``'s
+    ``gate_disposition`` prose. CHE-133 deleted that prose along with the
+    ``levels:`` block it lived in -- it was the exact failure mode the register
+    exists to fix, an unmet gate discoverable only by reading a paragraph. The
+    independent source is now the frozen tolerance beside the measurement it was
+    never reached by.
+    """
+    tolerances = yaml.safe_load(
+        (ROOT / "benchmarks" / "physics" / "L2-PSF-01" / "tolerances.yaml").read_text()
+    )
+    finest = json.loads(
+        (ROOT / "benchmarks" / "probes" / "records" / "m3_quadrature_weight.json").read_text()
+    )["finest_configuration"]
+    assert finest["weighted_vs_o1"] > tolerances["fft_oracle_intensity_relative_l2"], (
+        "the record no longer exceeds the frozen tolerance. If the gate has genuinely "
+        "been met, that is a finding to attribute -- not a reason to delete this test."
+    )
     assert open_gates(), (
-        "benchmarks/manifest.yaml still carries a gate_disposition describing an "
-        "unmet gate, but the ledger reports no open gates. One of them is wrong."
+        "the frozen 1.0e-3 tolerance is still unreached by the recorded measurement, "
+        "and the ledger reports no open gates. One of them is wrong."
+    )
+
+
+def test_the_retired_levels_block_did_not_take_its_disposition_with_it() -> None:
+    """CHE-133 preserve check: the PB7 rule survived the manifest edit.
+
+    The gate must not be closed against another Optiland PSF route, because
+    FFTPSF and HuygensPSF share one Wavefront/OPD front end and are one oracle,
+    not two. That was prose in ``manifest.yaml``; it is now a caveat on the claim
+    AND a construction-time rule in ``BenchmarkFamily``.
+    """
+    primary = next(
+        c for c in open_gates() if "fft_oracle_intensity_relative_l2" in (c.metric or "")
+    )
+    assert any("FFTPSF" in caveat and "HuygensPSF" in caveat for caveat in primary.caveats), (
+        "the oracle-independence rule that guarded this gate is no longer recorded "
+        "against the claim it guards"
     )
 
 

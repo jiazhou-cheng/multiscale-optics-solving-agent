@@ -1,48 +1,45 @@
-"""V1 agent benchmark: can an agent turn a physics problem into a right answer? (CHE-71)
+"""The agent-evaluation harness: what a task is, how a trial is graded, what a
+run reports. (CHE-71, retired task set removed by CHE-133.)
 
-The existing benchmark registry (`benchmarks/manifest.yaml`) grades a **solver's
-physics** and its whole value is reproducible fingerprints. This grades an
-**agent's behaviour**, which is nondeterministic by nature. Putting a
-nondeterministic score into that registry would spoil it, so this sits beside it
-with its own ID space (`A1-*`) and its own runner. Design decision 4.
+This grades an **agent's behaviour**, which is nondeterministic by nature --
+distinct from a physics family, whose whole value is a reproducible fingerprint.
+Putting a nondeterministic score into the family registry would spoil it, so
+this sits beside it with its own runner.
 
-What a task is
---------------
-A task hands a participant a natural-language physics problem and a workspace, and
-asks for a `submission.json`. It does **not** hand over a preconstructed adapter
-input, a solver choice, or an API call — choosing the tool and building the
-simulation is the thing being measured.
+**There is no shipped suite.** The six ``A1-*`` tasks this harness was written
+for were retired by CHE-133: each named one library implicitly and had one right
+answer, so it graded tool use rather than modelling, and none was ever run
+against a real agent. Their closed forms and their two measured traps were
+promoted out first -- ``verification/analytic.py`` and ``verification/hazards.py``
+-- and M9 authors the replacement over the B0-B4 families.
 
-Grading is then a two-stage question, and keeping the stages apart is the whole
-point (§"Outcome"): *did it run* and *is it right* are different questions, and
-this repository has two documented cases where the answer is "yes" and "no".
+What survived, and why each piece is worth keeping
+--------------------------------------------------
+The harness is the part that took the arguing:
 
-Three properties every task here has
-------------------------------------
-1. **An analytic oracle.** Every expected value is a closed form, verified against
-   the pinned solver before the task shipped. Not a recorded solver output — a
-   recorded output cannot tell a wrong answer from a wrong reference.
-2. **Cheap.** The whole suite is seconds of solver time, so a trial count of 3+
-   costs nothing on the grading side and the budget goes to the agent.
-3. **No tutorial hints in the prompt.** The prompts state physics and required
-   outputs. They never name a function, a module, or a tutorial.
+* **Context policy is a property of the task, not the invocation.** ``cold`` /
+  ``warm`` / ``guided`` change *what is being measured* -- discovery, correct use
+  of a documented tool, or whether a handed warning gets read -- so ``--context-
+  policy`` asserts rather than sets.
+* **Trials are declared and reported as a rate.** A single agent run is one
+  realization of a stochastic process, and this project's rule for stochastic
+  claims is ensemble statistics. The denominator is always printed.
+* **Void is not failed.** A trial that broke because the *harness* broke is
+  excluded from the denominator rather than charged to the agent, and a task
+  whose every trial was void reports no rate at all instead of zero.
+* **Eight structured outcome codes, not a boolean.** ``FAIL_PHYSICAL_RESULT`` --
+  it ran, it produced numbers, and the numbers are wrong -- is a different
+  finding from ``FAIL_TOOL_EXECUTION``, and a suite that collapsed them could
+  express neither of the measured traps.
+* **Grading reports the FIRST stage that failed.** A run that never produced a
+  number cannot also be judged on its physics, and reporting the later failure
+  would misattribute the cause.
+* **A pluggable ``command:`` participant**, so any agent CLI can be measured
+  without changing this file.
 
-Two tasks are deliberately traps
---------------------------------
-`A1-OPT-03` and `A1-CHX-03` are cases where a plausible mistake produces code that
-**runs perfectly and answers wrongly**, both measured on the pinned versions:
-
-* Optiland's `ThinFilmStack.add_layer` takes micrometres while the AR-coating
-  literature and the upstream tutorial talk in nanometres (CHE-57 finding on t07).
-  A 1000x-too-thin quarter-wave layer gives R = 0.042164 against bare glass's
-  0.042165 — the coating does nothing, no error is raised, and the number looks
-  like a reflectance.
-* Chromatix's `kykx` means *cycles per length* on `asm_propagate` and *radians per
-  length* on `plane_wave` — same name, factor of 2*pi apart, and the displacement
-  is opposite in sign to the parameter (CHE-57 finding on c06).
-
-A taxonomy that collapsed "it ran" into "it worked" could not express either, and
-they are the interesting failures.
+A task defines its own oracle and its own trap submission. The harness knows
+nothing about optics; that is what let the task set be deleted without touching
+it.
 """
 
 from __future__ import annotations
@@ -62,7 +59,7 @@ from typing import Any
 from core.paths import repository_root
 
 __all__ = [
-    "SUITE_V1",
+    "SUITES",
     "AgentTask",
     "CheckResult",
     "CheckSpec",
@@ -77,6 +74,7 @@ __all__ = [
     "grade",
     "main",
     "reference_participant",
+    "registered_tasks",
     "run_suite",
     "task_by_id",
 ]
@@ -257,6 +255,19 @@ class CheckResult:
         }
 
 
+def _repo_relative(path: Path) -> str:
+    """A repository-relative path where that is meaningful, absolute otherwise.
+
+    A prompt outside the checkout is legitimate -- an external suite, a test's
+    tmpdir -- and ``relative_to`` raising on one would make the record
+    unwritable for a reason that has nothing to do with the run.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
 @dataclass(frozen=True)
 class AgentTask:
     """One benchmark task: the problem, what it exercises, and how it is graded."""
@@ -275,11 +286,20 @@ class AgentTask:
     #: Non-empty only for the trap tasks: the plausible mistake, and the wrong
     #: number it produces. Printed next to a FAIL_PHYSICAL_RESULT.
     trap: str = ""
+    #: The submission the *measured* plausible mistake actually produces, used by
+    #: the negative participants. A task owns this rather than the harness
+    #: keyed by task id -- the harness must not know any optics, which is what
+    #: let CHE-133 delete the A1 task set without touching this file.
+    trap_submission: Callable[[], dict[str, Any]] | None = None
     notes: str = ""
+    #: Where the prompt lives, when it is not the conventional location. A suite
+    #: that keeps its prompts elsewhere -- or a test that writes one to a tmpdir
+    #: -- should not have to plant a file in `benchmarks/agents/prompts/`.
+    prompt_file: Path | None = None
 
     @property
     def prompt_path(self) -> Path:
-        return SUITE_DIR / "prompts" / f"{self.task_id}.md"
+        return self.prompt_file or SUITE_DIR / "prompts" / f"{self.task_id}.md"
 
     @property
     def expected_path(self) -> Path:
@@ -312,449 +332,40 @@ class AgentTask:
             "checks": [check.as_dict() for check in self.checks],
             "trap": self.trap,
             "notes": self.notes,
-            "prompt": str(self.prompt_path.relative_to(REPO_ROOT)),
+            "prompt": _repo_relative(self.prompt_path),
         }
 
 
 # --------------------------------------------------------------------------- #
-# Reference implementations. Each one is the known-good solution, and each one
-# was checked against its closed form before the task shipped -- see the
-# `tolerance_basis` on every check for the measured agreement.
+# The suite registry
 # --------------------------------------------------------------------------- #
+#
+# Empty. The six A1-* tasks were retired by CHE-133 and M9 owns the replacement,
+# which will pose problems over the B0-B4 families rather than over one library
+# each. An empty registry is the honest state: a placeholder task would be a
+# benchmark nobody designed, and leaving the old set in place would have kept a
+# task layer alive purely so this dict had a value.
+
+#: name -> tasks. ``run_suite`` takes the tasks it is given, so a caller with its
+#: own tasks (a test, an experiment) does not need to register them here.
+SUITES: dict[str, tuple[AgentTask, ...]] = {}
 
 
-def _optiland_numpy() -> Any:
-    import optiland.backend as be
-
-    be.set_backend("numpy")
-    be.set_precision("float64")
-    return be
-
-
-def _reference_opt_01() -> dict[str, Any]:
-    """Thick plano-convex singlet: EFL and BFL from a paraxial solve."""
-    _optiland_numpy()
-    from optiland.materials import IdealMaterial
-    from optiland.optic import Optic
-
-    lens = Optic()
-    lens.surfaces.add(index=0, thickness=math.inf)
-    lens.surfaces.add(
-        index=1, radius=25.0, thickness=4.0,
-        material=IdealMaterial(n=1.5168), is_stop=True,
-    )
-    lens.surfaces.add(index=2, radius=math.inf, thickness=45.737482)
-    lens.surfaces.add(index=3)
-    lens.set_aperture("EPD", 10.0)
-    lens.fields.add(y=0.0)
-    lens.wavelengths.add(0.5876, is_primary=True)
-    return {
-        "effective_focal_length_mm": float(lens.paraxial.f2()),
-        "back_focal_length_mm": float(lens.paraxial.f2()) - 4.0 / 1.5168,
-        "library": "optiland",
-    }
-
-
-def _reference_opt_02() -> dict[str, Any]:
-    """Plane-parallel plate: focal shift from a real ray trace, not a formula."""
-    import numpy as np
-
-    _optiland_numpy()
-    from optiland.materials import IdealMaterial
-    from optiland.optic import Optic
-    from optiland.rays import RealRays
-
-    focus_mm, height_mm, thickness_mm, index = 100.0, 0.5, 10.0, 1.6
-    lens = Optic()
-    lens.surfaces.add(index=0, thickness=math.inf)
-    lens.surfaces.add(
-        index=1, radius=math.inf, thickness=thickness_mm,
-        material=IdealMaterial(n=index), is_stop=True,
-    )
-    lens.surfaces.add(index=2, radius=math.inf, thickness=1.0)
-    lens.surfaces.add(index=3)
-    lens.set_aperture("EPD", 2.0)
-    lens.fields.add(y=0.0)
-    lens.wavelengths.add(0.5876, is_primary=True)
-
-    slope = -height_mm / focus_mm
-    axial = 1.0 / math.sqrt(1.0 + slope * slope)
-    rays = RealRays(
-        np.array([0.0]), np.array([height_mm]), np.array([0.0]),
-        np.array([0.0]), np.array([slope * axial]), np.array([axial]),
-        np.array([1.0]), np.array([0.5876]),
-    )
-    traced = lens.surfaces.trace(rays, skip=1)
-    y, z = float(traced.y[0]), float(traced.z[0])
-    crossing = z - y * float(traced.N[0]) / float(traced.M[0])
-    return {"focal_shift_mm": crossing - focus_mm, "library": "optiland"}
-
-
-def _reference_opt_03() -> dict[str, Any]:
-    """Single-layer quarter-wave AR coating: reflectance with and without it.
-
-    The whole task turns on one line: ``add_layer`` takes **micrometres**. The
-    quarter-wave thickness is 99.64 nm, i.e. 0.09964 um, and passing 99.64 builds
-    a stack 1000x too thick whose reflectance is indistinguishable from bare glass.
-    """
-    import numpy as np
-
-    _optiland_numpy()
-    from optiland.coatings import ThinFilmStack
-    from optiland.materials import IdealMaterial
-
-    air = IdealMaterial(n=1.0)
-    substrate = IdealMaterial(n=1.5168)
-    coating = IdealMaterial(n=1.38)
-    design_nm = 550.0
-    quarter_wave_um = design_nm / (4.0 * 1.38) / 1000.0
-
-    bare = ThinFilmStack(air, substrate)
-    coated = ThinFilmStack(air, substrate)
-    coated.add_layer(coating, quarter_wave_um, "MgF2")
-    def reflectance(stack: Any) -> float:
-        return float(np.asarray(stack.reflectance_nm_deg(design_nm, 0.0)).ravel()[0])
-
-    return {
-        "uncoated_reflectance": reflectance(bare),
-        "coated_reflectance": reflectance(coated),
-        "coating_thickness_nm": design_nm / (4.0 * 1.38),
-        "library": "optiland",
-    }
-
-
-def _chromatix_field(u: Any, pitch_um: float, wavelength_um: float) -> Any:
-    import jax
-    import jax.numpy as jnp
-
-    # Pinned off, matching every other Chromatix path in this repository: a
-    # process that flipped it would change every recorded number.
-    jax.config.update("jax_enable_x64", False)
-    import chromatix.functional as cf
-
-    return cf.Field.build(
-        jnp.asarray(u, dtype=jnp.complex64), jnp.asarray([[pitch_um, pitch_um]]), wavelength_um
-    )
-
-
-def _reference_chx_01() -> dict[str, Any]:
-    """Gaussian beam diffraction: the 1/e^2 radius after 100 um of free space."""
-    import chromatix.functional as cf
-    import jax.numpy as jnp
-    import numpy as np
-
-    wavelength, waist, distance = 0.532, 5.0, 100.0
-    grid, pitch = 512, 0.25
-    axis = (np.arange(grid) - grid // 2) * pitch
-    x, y = np.meshgrid(axis, axis, indexing="xy")
-    field = _chromatix_field(np.exp(-(x**2 + y**2) / waist**2), pitch, wavelength)
-    out = cf.asm_propagate(field, z=distance, n=1.0, pad_width=grid, mode="same")
-    intensity = np.asarray(jnp.abs(out.u) ** 2).squeeze()
-    # Second moment, which is the 1/e^2 radius for a Gaussian: I ~ exp(-2r^2/w^2)
-    # has <x^2> = w^2/4.
-    second_moment = float(((x**2) * intensity).sum() / intensity.sum())
-    return {
-        "beam_radius_um": 2.0 * math.sqrt(second_moment),
-        "library": "chromatix",
-    }
-
-
-def _reference_chx_02() -> dict[str, Any]:
-    """Airy pattern: the first dark ring of a focused circular aperture."""
-    import chromatix.functional as cf
-    import jax.numpy as jnp
-    import numpy as np
-
-    wavelength, diameter, focal = 0.532, 40.0, 400.0
-    grid, pitch = 512, 0.5
-    axis = (np.arange(grid) - grid // 2) * pitch
-    x, y = np.meshgrid(axis, axis, indexing="xy")
-    aperture = (np.hypot(x, y) <= diameter / 2).astype(np.complex64)
-    field = _chromatix_field(aperture, pitch, wavelength)
-    out = cf.ff_lens(field, f=focal, n=1.0)
-    intensity = np.asarray(jnp.abs(out.u) ** 2).squeeze()
-    output_pitch = float(np.asarray(out.dx).ravel()[0])
-    row = intensity[grid // 2]
-    index = grid // 2
-    while index + 1 < grid and row[index + 1] < row[index]:
-        index += 1
-    return {
-        "first_null_radius_um": (index - grid // 2) * output_pitch,
-        "library": "chromatix",
-    }
-
-
-def _reference_chx_03() -> dict[str, Any]:
-    """Tilted beam: the lateral displacement of the centroid after propagation.
-
-    The tilt is built into the field as ``exp(+2i pi (sin(theta)/lambda) x)``,
-    which is unambiguous. Reaching for ``plane_wave(kykx=...)`` or
-    ``asm_propagate(kykx=...)`` instead is the trap: same parameter name, one in
-    radians per length and one in cycles per length, and the displacement runs
-    opposite to the parameter.
-    """
-    import chromatix.functional as cf
-    import jax.numpy as jnp
-    import numpy as np
-
-    wavelength, waist, distance, tilt_deg = 0.532, 8.0, 200.0, 5.0
-    grid, pitch = 1024, 0.2
-    axis = (np.arange(grid) - grid // 2) * pitch
-    x, y = np.meshgrid(axis, axis, indexing="xy")
-    envelope = np.exp(-(x**2 + y**2) / waist**2)
-    spatial_frequency = math.sin(math.radians(tilt_deg)) / wavelength
-    tilt = np.exp(2j * math.pi * spatial_frequency * x)
-    field = _chromatix_field(envelope * tilt, pitch, wavelength)
-    out = cf.asm_propagate(field, z=distance, n=1.0, pad_width=grid, mode="same")
-    intensity = np.asarray(jnp.abs(out.u) ** 2).squeeze()
-    return {
-        "centroid_x_um": float((x * intensity).sum() / intensity.sum()),
-        "library": "chromatix",
-    }
-
-
-# --------------------------------------------------------------------------- #
-# The V1 suite. Six tasks, three per library, all analytic-oracle-backed.
-# --------------------------------------------------------------------------- #
-
-SUITE_V1: tuple[AgentTask, ...] = (
-    AgentTask(
-        task_id="A1-OPT-01",
-        title="Focal length of a thick plano-convex singlet",
-        library="optiland",
-        context_policy=ContextPolicy.COLD,
-        exercises=(
-            "recognising a paraxial-property question, choosing a ray-tracing "
-            "package, transcribing a prescription into it, and reading back two "
-            "derived quantities in the right units"
-        ),
-        checks=(
-            CheckSpec(
-                key="effective_focal_length_mm",
-                description="effective focal length",
-                expected=25.0 / 0.5168,
-                unit="mm",
-                rtol=1e-6,
-                tolerance_basis=(
-                    "R/(n-1) is exact for a single refracting surface in air; the "
-                    "pinned solver reproduces it to 1e-13 relative (measured), so "
-                    "1e-6 admits only a genuinely different answer"
-                ),
-            ),
-            CheckSpec(
-                key="back_focal_length_mm",
-                description="back focal length from the rear vertex",
-                expected=25.0 / 0.5168 - 4.0 / 1.5168,
-                unit="mm",
-                rtol=1e-6,
-                tolerance_basis="EFL - t/n, exact for a plano rear surface",
-            ),
-        ),
-        reference=_reference_opt_01,
-        notes=(
-            "The thick-lens correction is what makes this more than arithmetic: "
-            "EFL - t/n differs from EFL by 2.64 mm, so an agent that reports the "
-            "same number twice fails the second check and only the second check."
-        ),
-    ),
-    AgentTask(
-        task_id="A1-OPT-02",
-        title="Focal shift caused by a plane-parallel plate",
-        library="optiland",
-        context_policy=ContextPolicy.COLD,
-        exercises=(
-            "building a real (non-paraxial) ray trace, injecting a converging ray, "
-            "and finding an axis crossing from the traced state"
-        ),
-        checks=(
-            CheckSpec(
-                key="focal_shift_mm",
-                description="axial displacement of the focus, positive away from the plate",
-                expected=10.0 * (1.0 - 1.0 / 1.6),
-                unit="mm",
-                rtol=1e-3,
-                tolerance_basis=(
-                    "t(1 - 1/n) is the paraxial result; a real trace at h = 0.5 mm "
-                    "into f = 100 mm gives 3.750048 mm (measured), 1.3e-5 relative "
-                    "from the closed form, so 1e-3 covers any sane sampling while "
-                    "still rejecting a sign error or a t/n answer"
-                ),
-            ),
-        ),
-        reference=_reference_opt_02,
-        notes=(
-            "The sign is graded. A plate in a converging beam moves the focus "
-            "*away* from the plate; reporting -3.75 fails."
-        ),
-    ),
-    AgentTask(
-        task_id="A1-OPT-03",
-        title="Single-layer anti-reflection coating at 550 nm",
-        library="optiland",
-        context_policy=ContextPolicy.WARM,
-        exercises=(
-            "thin-film modelling, and getting a length unit right when the "
-            "literature's unit and the API's unit differ"
-        ),
-        checks=(
-            CheckSpec(
-                key="uncoated_reflectance",
-                description="normal-incidence reflectance of the bare substrate",
-                expected=((1.0 - 1.5168) / (1.0 + 1.5168)) ** 2,
-                unit="fraction",
-                rtol=1e-3,
-                tolerance_basis=(
-                    "the Fresnel formula at normal incidence is exact; the pinned "
-                    "solver gives 0.04216456 against 0.04216471 analytic"
-                ),
-            ),
-            CheckSpec(
-                key="coated_reflectance",
-                description="normal-incidence reflectance with the quarter-wave layer",
-                expected=((1.5168 - 1.38**2) / (1.5168 + 1.38**2)) ** 2,
-                unit="fraction",
-                rtol=5e-3,
-                tolerance_basis=(
-                    "the single-layer quarter-wave formula is exact for a "
-                    "non-absorbing film; the pinned solver gives 0.01283544 "
-                    "against 0.01283537 analytic. 5e-3 is 300x tighter than the "
-                    "gap to the bare-glass value the unit trap produces"
-                ),
-            ),
-            CheckSpec(
-                key="coating_thickness_nm",
-                description="physical thickness of the quarter-wave layer",
-                expected=550.0 / (4.0 * 1.38),
-                unit="nm",
-                rtol=1e-3,
-                tolerance_basis="lambda/(4 n) is the definition of a quarter-wave layer",
-            ),
-        ),
-        reference=_reference_opt_03,
-        trap=(
-            "MEASURED TRAP. `ThinFilmStack.add_layer` takes MICROMETRES while the "
-            "quarter-wave thickness is naturally quoted in nanometres (99.64 nm). "
-            "Passing 99.64 builds a layer 1000x too thick and the reflectance comes "
-            "back 0.04216384 -- indistinguishable from the bare substrate's "
-            "0.04216456, with no error raised and a number that looks like a "
-            "reflectance. `coating_thickness_nm` is graded separately precisely so "
-            "the report can tell a unit slip from a wrong design."
-        ),
-        notes="CHE-57 recorded the same unit hazard on upstream tutorial t07.",
-    ),
-    AgentTask(
-        task_id="A1-CHX-01",
-        title="Diffractive spreading of a Gaussian beam",
-        library="chromatix",
-        context_policy=ContextPolicy.COLD,
-        exercises=(
-            "choosing a wave-propagation package, sampling a field adequately, "
-            "propagating it, and measuring a beam radius from an intensity map"
-        ),
-        checks=(
-            CheckSpec(
-                key="beam_radius_um",
-                description="1/e^2 intensity radius after 100 um",
-                expected=5.0 * math.sqrt(1.0 + (100.0 * 0.532 / (math.pi * 25.0)) ** 2),
-                unit="um",
-                rtol=2e-2,
-                tolerance_basis=(
-                    "w(z) = w0 sqrt(1 + (z/zR)^2) is exact for a paraxial Gaussian; "
-                    "the pinned solver's second moment gives 6.040167 um against "
-                    "6.039084 analytic (1.8e-4 relative). 2e-2 absorbs a different "
-                    "but reasonable grid or radius definition while rejecting the "
-                    "unpropagated waist (5.0 um, 17% low)"
-                ),
-            ),
-        ),
-        reference=_reference_chx_01,
-        notes=(
-            "The discriminating wrong answer is 5.0 um -- the input waist, which is "
-            "what a run that propagated zero distance, or measured the input, "
-            "returns. It is 17% away, so the tolerance separates them cleanly."
-        ),
-    ),
-    AgentTask(
-        task_id="A1-CHX-02",
-        title="First dark ring of a focused circular aperture",
-        library="chromatix",
-        context_policy=ContextPolicy.COLD,
-        exercises=(
-            "recognising a focal-plane diffraction problem, choosing a "
-            "Fourier-transforming propagation rather than a near-field one, and "
-            "handling the output sampling that comes with it"
-        ),
-        checks=(
-            CheckSpec(
-                key="first_null_radius_um",
-                description="radius of the first zero of the focal-plane intensity",
-                expected=0.61 * 0.532 / (20.0 / math.hypot(20.0, 400.0)),
-                unit="um",
-                rtol=5e-2,
-                tolerance_basis=(
-                    "0.61 lambda / NA is the exact Airy first null. The pinned "
-                    "solver's focal-plane pitch is 0.83 um, so the null lands "
-                    "between samples and the measured value is 6.65 um against "
-                    "6.4985 analytic -- 2.3%, which is a sampling limit rather than "
-                    "a physics error. 5e-2 covers it and still rejects the "
-                    "1.22 lambda/NA (2x) and 0.5 lambda/NA confusions"
-                ),
-            ),
-        ),
-        reference=_reference_chx_02,
-        notes=(
-            "Deliberately in the regime where a near-field method would wrap "
-            "around: the tool choice is part of the task, not incidental to it."
-        ),
-    ),
-    AgentTask(
-        task_id="A1-CHX-03",
-        title="Lateral walk-off of a tilted beam",
-        library="chromatix",
-        context_policy=ContextPolicy.WARM,
-        exercises=(
-            "representing an off-axis beam, propagating it, and getting both the "
-            "magnitude and the sign of a transverse displacement right"
-        ),
-        checks=(
-            CheckSpec(
-                key="centroid_x_um",
-                description="signed x displacement of the intensity centroid",
-                expected=200.0 * math.tan(math.radians(5.0)),
-                unit="um",
-                rtol=2e-2,
-                tolerance_basis=(
-                    "z tan(theta) is exact geometry for a collimated beam. The "
-                    "pinned solver gives +17.5017 um against +17.4977 analytic "
-                    "(2.3e-4 relative). 2e-2 rejects z sin(theta) only if the angle "
-                    "were large -- at 5 degrees they differ by 0.4%, so this check "
-                    "deliberately does NOT claim to separate them, and the report "
-                    "says so"
-                ),
-            ),
-        ),
-        reference=_reference_chx_03,
-        trap=(
-            "MEASURED TRAP. `kykx` means CYCLES per length on `asm_propagate` and "
-            "RADIANS per length on `plane_wave` -- same parameter name, a factor of "
-            "2*pi apart -- and the resulting displacement is OPPOSITE in sign to the "
-            "parameter (CHE-57 finding on upstream example c06). Either mistake is "
-            "off by 6.28x or by a sign, both far outside the tolerance, and neither "
-            "raises."
-        ),
-        notes=(
-            "The sign is the point. A magnitude-only answer, or one from the "
-            "opposite convention, fails."
-        ),
-    ),
-)
+def registered_tasks() -> tuple[AgentTask, ...]:
+    return tuple(task for suite in SUITES.values() for task in suite)
 
 
 def task_by_id(task_id: str) -> AgentTask:
-    for task in SUITE_V1:
+    known = registered_tasks()
+    for task in known:
         if task.task_id == task_id:
             return task
-    raise KeyError(f"unknown task {task_id!r}; suite v1 is {[t.task_id for t in SUITE_V1]}")
+    if not known:
+        raise KeyError(
+            f"unknown task {task_id!r}: no suite is registered. The A1-* set was "
+            "retired by CHE-133 and M9 owns its replacement."
+        )
+    raise KeyError(f"unknown task {task_id!r}; registered: {[t.task_id for t in known]}")
 
 
 # --------------------------------------------------------------------------- #
@@ -904,13 +515,15 @@ class SuiteResult:
     tasks: list[TaskResult] = field(default_factory=list)
     started_unix: float = 0.0
     wall_time_s: float = 0.0
+    #: Which registered suite this was, or a caller-supplied label. Recorded
+    #: rather than hard-coded: the id space is no longer a fixed one.
+    suite: str = "unregistered"
 
     def as_dict(self) -> dict[str, Any]:
         valid = [trial for task in self.tasks for trial in task.valid_trials]
         rates = [task.pass_rate for task in self.tasks if task.pass_rate is not None]
         return {
-            "suite": "v1",
-            "id_space": "A1-* (deliberately disjoint from benchmarks/manifest.yaml)",
+            "suite": self.suite,
             "participant": self.participant,
             "declared_trials_per_task": self.trials,
             "context_policies": self.context_policies,
@@ -997,43 +610,19 @@ def broken_participant(mode: str) -> Participant:
 def _trap_submission(task: AgentTask) -> dict[str, Any]:
     """The answer the *measured* plausible mistake actually produces.
 
-    Not an invented wrong number: each value below was produced by running the
-    mistaken code against the pinned solver, so the taxonomy is exercised by the
-    failure mode the task was designed around rather than by a placeholder.
+    Owned by the task, not by a lookup table here: the value must be the output
+    of running the mistaken code against the pinned solver, so that the taxonomy
+    is exercised by the failure mode the task was designed around rather than by
+    an invented placeholder. A task with no trap submission cannot be handed to
+    the ``broken:trap`` participant, and saying so is better than substituting
+    something plausible.
     """
-    if task.task_id == "A1-OPT-03":
-        # add_layer given 99.638 (nanometres) where it wants micrometres.
-        return {
-            "library": "optiland",
-            "uncoated_reflectance": 0.04216456,
-            "coated_reflectance": 0.04216384,
-            "coating_thickness_nm": 550.0 / (4.0 * 1.38),
-        }
-    if task.task_id == "A1-CHX-03":
-        # The 2*pi confusion, with the sign the parameter actually produces.
-        return {
-            "library": "chromatix",
-            "centroid_x_um": -200.0 * math.tan(math.radians(5.0)) / (2.0 * math.pi),
-        }
-    if task.task_id == "A1-OPT-01":
-        # BFL reported as the EFL: the thick-lens correction omitted.
-        efl = 25.0 / 0.5168
-        return {
-            "library": "optiland",
-            "effective_focal_length_mm": efl,
-            "back_focal_length_mm": efl,
-        }
-    if task.task_id == "A1-OPT-02":
-        return {"library": "optiland", "focal_shift_mm": -10.0 * (1.0 - 1.0 / 1.6)}
-    if task.task_id == "A1-CHX-01":
-        return {"library": "chromatix", "beam_radius_um": 5.0}
-    if task.task_id == "A1-CHX-02":
-        # 1.22 lambda / NA -- the diameter formula used as a radius.
-        return {
-            "library": "chromatix",
-            "first_null_radius_um": 1.22 * 0.532 / (20.0 / math.hypot(20.0, 400.0)),
-        }
-    raise KeyError(task.task_id)  # pragma: no cover
+    if task.trap_submission is None:
+        raise KeyError(
+            f"{task.task_id} declares no trap_submission, so there is no measured "
+            "wrong answer to hand a negative participant"
+        )
+    return task.trap_submission()
 
 
 def command_participant(argv: Sequence[str], *, timeout_s: float = 1800.0) -> Participant:
@@ -1097,17 +686,19 @@ def run_suite(
     name: str,
     trials: int = 3,
     output: Path | None = None,
-    tasks: Sequence[AgentTask] = SUITE_V1,
+    tasks: Sequence[AgentTask] = (),
+    suite: str = "unregistered",
 ) -> SuiteResult:
     """Run every task ``trials`` times, sequentially, and record everything."""
     if trials < 1:
         raise ValueError(f"trials must be at least 1, got {trials}")
     started = time.time()
-    suite = SuiteResult(
+    result_bundle = SuiteResult(
         participant=name,
         context_policies={task.task_id: str(task.context_policy) for task in tasks},
         trials=trials,
         started_unix=started,
+        suite=suite,
     )
     for task in tasks:
         task_result = TaskResult(task=task)
@@ -1115,7 +706,7 @@ def run_suite(
             workspace = (
                 (output / "workspaces" / f"{task.task_id}_trial{trial}")
                 if output
-                else Path(os.environ.get("TMPDIR", "/tmp")) / f"a1_{task.task_id}_{trial}"
+                else Path(os.environ.get("TMPDIR", "/tmp")) / f"agentsuite_{task.task_id}_{trial}"
             )
             workspace.mkdir(parents=True, exist_ok=True)
             try:
@@ -1129,18 +720,18 @@ def run_suite(
             result.trial = trial
             task_result.trials.append(result)
             print(
-                f"[A1] {task.task_id} trial {trial}: {result.outcome}"
+                f"[agent-suite] {task.task_id} trial {trial}: {result.outcome}"
                 + (f" — {result.detail}" if not result.passed else ""),
                 flush=True,
             )
-        suite.tasks.append(task_result)
-    suite.wall_time_s = time.time() - started
+        result_bundle.tasks.append(task_result)
+    result_bundle.wall_time_s = time.time() - started
     if output is not None:
         output.mkdir(parents=True, exist_ok=True)
         (output / "results.json").write_text(
-            json.dumps(suite.as_dict(), indent=2, default=str)
+            json.dumps(result_bundle.as_dict(), indent=2, default=str)
         )
-    return suite
+    return result_bundle
 
 
 def write_expected() -> list[Path]:
@@ -1151,7 +742,7 @@ def write_expected() -> list[Path]:
     is why re-recording cannot make a wrong answer pass.
     """
     written = []
-    for task in SUITE_V1:
+    for task in registered_tasks():
         record = task.reference()
         payload = {
             "task_id": task.task_id,
@@ -1171,7 +762,11 @@ def write_expected() -> list[Path]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--suite", default="v1", choices=["v1"])
+    parser.add_argument(
+        "--suite",
+        default=None,
+        help="a registered suite name. None are registered; see SUITES.",
+    )
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument(
         "--participant", default="reference",
@@ -1198,15 +793,28 @@ def main(argv: list[str] | None = None) -> int:
             print(f"wrote {path}")
         return 0
 
-    try:
-        tasks = (
-            tuple(task_by_id(task_id) for task_id in args.task) if args.task else SUITE_V1
+    if args.suite is not None and args.suite not in SUITES:
+        parser.error(
+            f"unknown suite {args.suite!r}; registered: {sorted(SUITES)}. The A1-* set "
+            "was retired by CHE-133 and M9 owns its replacement."
         )
+    try:
+        if args.task:
+            tasks = tuple(task_by_id(task_id) for task_id in args.task)
+        elif args.suite is not None:
+            tasks = SUITES[args.suite]
+        else:
+            tasks = registered_tasks()
     except KeyError as exc:
         # A mistyped --task is a usage error, not a traceback. The message already
         # lists the suite, so surface it rather than re-deriving one.
         parser.error(str(exc.args[0]))
         return 2
+    if not tasks:
+        parser.error(
+            "no tasks to run: no suite is registered. The A1-* set was retired by "
+            "CHE-133; M9 authors the replacement over the B0-B4 families."
+        )
     if args.context_policy != "per-task":
         mismatched = [
             task.task_id for task in tasks if str(task.context_policy) != args.context_policy
@@ -1230,12 +838,17 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"unknown participant {spec!r}")
         return 2
 
-    suite = run_suite(
-        participant, name=name, trials=args.trials, output=args.output, tasks=tasks
+    result_bundle = run_suite(
+        participant,
+        name=name,
+        trials=args.trials,
+        output=args.output,
+        tasks=tasks,
+        suite=args.suite or "unregistered",
     )
-    record = suite.as_dict()
+    record = result_bundle.as_dict()
     print(
-        f"\n[A1] participant={name} tasks={record['task_count']} "
+        f"\n[agent-suite] participant={name} tasks={record['task_count']} "
         f"trials/task={args.trials} "
         f"passes={record['total_passes']}/{record['total_valid_trials']} "
         f"suite_pass_rate={record['suite_pass_rate']}"
