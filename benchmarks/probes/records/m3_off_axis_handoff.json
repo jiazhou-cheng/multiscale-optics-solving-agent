@@ -113,7 +113,7 @@
  },
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "1d75559645864d80e068706b2e8494cae6aea35879560fe5a6f8a8bf73f49266",
+   "combined_sha256": "c6a8fc6494c3ee7bce025d4a46147d426eddb378d3f26da469be24cf24ff8851",
    "files": {
     "benchmarks/probes/off_axis_handoff.py": "7b6960510b108278a88eab7099fc1aa91882febfd7ec04dd5fc4a74f315119ad",
     "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
@@ -135,7 +135,7 @@
     "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
     "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
     "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
-    "src/couplers/patch.py": "a0207bd071bb1280585ab46eda7681167a19f67054ce32f40d52ea74a68d2996",
+    "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
     "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
     "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
     "src/couplers/quadrature.py": "6c56cb1fa0b8eb3d0a68ce14f7bd0fa4a9fbcd95acfd592fbcffa030b080f3a9",
@@ -190,8 +190,8 @@
   },
   "probe": "m3_off_axis_handoff",
   "schema_version": 2,
-  "source_commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
-  "timestamp_utc": "2026-08-25T04:16:40.203158+00:00",
+  "source_commit": "8552e0b87298bc1b0d2f08ef912d14cdc6874360",
+  "timestamp_utc": "2026-08-25T08:31:03.675309+00:00",
   "working_tree_dirty": true
  },
  "sampling": {

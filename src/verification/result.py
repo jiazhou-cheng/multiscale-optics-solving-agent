@@ -439,11 +439,30 @@ class VerificationResult(BaseModel):
     def gate_is_trustworthy(self) -> bool:
         """Whether the negative controls support believing a met gate.
 
-        A control that did not fire, or fired backwards, means the gate cannot
-        distinguish right from wrong on this instance -- so a met gate is not
-        evidence, and this is the flag that says so instead of a green tick.
+        Three ways to be false, and the third is the one that is easy to get
+        wrong. A control that did not fire, or fired backwards, means the gate
+        cannot distinguish right from wrong on this instance. A control that was
+        **never run** means nothing established that it can -- which is not the
+        same as a failure, and is also not evidence of trustworthiness. A result
+        with four unexercised controls reporting ``True`` here would be the
+        green tick this whole structure exists to refuse.
+
+        A family with no declared controls at all is likewise not trustworthy:
+        there is nothing to be trusted on.
         """
-        return not any(c.undermines_the_gate for c in self.negative_control_results)
+        if not self.negative_control_results:
+            return False
+        return all(
+            c.outcome is NegativeControlOutcome.FIRED for c in self.negative_control_results
+        )
+
+    @property
+    def untrustworthy_controls(self) -> tuple[NegativeControlResult, ...]:
+        """The controls that are the reason, so a reader does not have to hunt."""
+        return tuple(
+            c for c in self.negative_control_results
+            if c.outcome is not NegativeControlOutcome.FIRED
+        )
 
     def diagnostic_codes(self) -> tuple[DiagnosticCode, ...]:
         return tuple(d.code for d in self.diagnostics)

@@ -28,7 +28,7 @@
     "reconstruction_normalization": "one_over_n, applied once at finalize"
   },
   "environment": {
-    "commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
+    "commit": "195f23c399b782ffe5e745945c1afe876c57119f",
     "container_image": "agent_solver",
     "jax_devices": [
       "cuda:0"
@@ -66,7 +66,7 @@
   "probe": "demo2_hologram",
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "8ab514c2e07977ce9200586849780b970b9f2f3891a4ee683f5b934760ec53a0",
+      "combined_sha256": "9d80aa1cec83e4d9f12c84ec149ddfe1d7ca7340c62360f94ff5d8124fd979da",
       "files": {
         "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
         "benchmarks/probes/ray_wave/demo2_hologram.py": "3c61e858215b313c517c64a7609c9adc59770c92394d2205901a76798d4d0235",
@@ -88,7 +88,7 @@
         "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
         "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
         "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
-        "src/couplers/patch.py": "a0207bd071bb1280585ab46eda7681167a19f67054ce32f40d52ea74a68d2996",
+        "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
         "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
         "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
         "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
@@ -114,8 +114,8 @@
     },
     "probe": "perf_demo2_paper_rw_p_ramp_sum_cuda",
     "schema_version": 2,
-    "source_commit": "a700d4d1e5dc1c5f131dfd1400ceb46a105293ae",
-    "timestamp_utc": "2026-08-25T04:18:54.868671+00:00",
+    "source_commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "timestamp_utc": "2026-08-25T07:15:33.594067+00:00",
     "working_tree_dirty": true
   },
   "routes": {
@@ -142,6 +142,7 @@
         "curvature_bound_rad": 0.0,
         "enumerated": false,
         "evanescent_modes": 0,
+        "mean_center_weight": null,
         "outgoing_ray_count": 4000000,
         "pad_px": 205,
         "patch_count": 400,
@@ -256,7 +257,7 @@
         "relative_l2_field": 0.029858573915114414,
         "relative_l2_field_after_global_phase": 0.02983824409161394
       },
-      "wall_clock_s": 62.63163603900466
+      "wall_clock_s": 62.62836460300605
     }
   },
   "system": "paper Fig 5b / SI Table S2 System 2 -- planar hologram, free space"

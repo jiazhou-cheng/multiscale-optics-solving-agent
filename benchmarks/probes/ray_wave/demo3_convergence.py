@@ -224,6 +224,19 @@ def main() -> int:
                 "floor. The two-point log-log fit is reported next to it; the "
                 "spread between them is the uncertainty on this number."
             ),
+            "superseded_by": (
+                "CHE-120. The slope-1 anchor is one power out. What two "
+                "realizations SHARE is the deterministic |mu|^2; what differs is "
+                "the noise, whose spatial variance goes as (E|n|^2)^2 once the "
+                "noise dominates, so NCC ~ N^2 rather than N. This ladder does "
+                "not see that because its rungs sit 1.5-2.9x above the noise "
+                "floor, where the floor itself flattens the fit -- a four-rung "
+                "ladder starting 3.2x above it and spanning 8x in rays measures "
+                "1.40 (power law) and prefers a saturating law NCC = 1 / (1 + c "
+                "N^-p) with p = 1.64, validated out of sample on its own top "
+                "rung. Read `demo3_variance_ladderfit_control.json` for the "
+                "current cost ceiling; the rungs and the wall clock here stand."
+            ),
             "measured_seconds_per_ray": seconds_per_ray,
             "extrapolated_seconds_per_run": required * seconds_per_ray,
             "extrapolated_hours_per_run": required * seconds_per_ray / 3600.0,

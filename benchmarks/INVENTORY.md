@@ -7,7 +7,7 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
 | **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 105 |
-| **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 3 |
+| **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 4 |
 | **C** | does this exist only to serve the old evaluation design? | delete | 8 |
 
 Nothing is deleted by this inventory. Deletion is CHE-133 (M0.5.4), and the `L2-PSF-01` runner goes later still — it is the only way to run that case until the executor and family runner exist.
@@ -129,6 +129,7 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | artifact | justification | destination in the new architecture |
 | -- | -- | -- |
 | `benchmarks/physics/L2-PSF-01/run_benchmark.py`<br>*the M3-SINGLET-REF prescription and its graph construction* | POSITIVE: this is the only composed ray-to-wave case in the repository with an independent analytic decider, and it is the case that carries the project's one open unmet gate. Freezing it keeps the residual investigation (CHE-117) anchored to a fixed physical setup, so a change in the number is attributable to code rather than to a moved prescription. Its scientific fingerprint is the regression signal for the whole ray-to-wave path. | B3-PSF-SINGLET-01, canonical instance, origin CANONICAL. |
+| `benchmarks/instances/b3_psf_singlet.py` | POSITIVE: this is the substrate proof. It is the only place a real Optiland trace becomes a real ExecutionRecord and that record is handed to verify() against a real family, so freezing it keeps the loop -- family, instance, executor, verifier -- exercised end to end by the test suite rather than by a person remembering to run it. **It does NOT yet reproduce the 2.21e-3 frozen number, and does not claim to: 256 rings rather than 512, and a centred-half-window metric rather than the 5-Airy-radius radial-profile residual. Both differences are declared.** | B3-PSF-SINGLET-01, the canonical instance, and the replacement for benchmarks/physics/L2-PSF-01/run_benchmark.py once it reproduces the frozen fingerprint (CHE-115). |
 | `benchmarks/probes/ray_wave/demo2_hologram.py` | POSITIVE: demo2 is the composed ray-wave case that DOES have an independent decider -- the full-aperture patch validated against an independent float64 ASM at 7.1e-13 -- so freezing it gives B3 a second decidable composed instance beside the singlet, on a different coupler route. | B3-DEMO2-01 canonical instance. |
 | `benchmarks/probes/ray_wave/demo3_hologram_lens.py` | POSITIVE: the paper's Fig 5c system is the repository's only case at a scale where the composition has no reference of its own, which is exactly what a characterization family must be anchored to. Freezing it keeps B4-DEMO3's cost and variance numbers comparable across the optimization work (CHE-118/119/120) rather than drifting with the configuration. | B4-DEMO3 canonical instance -- characterization only, validation_target false, no gating tolerance. |
 

@@ -1,5 +1,5 @@
 {
- "cost_per_unit": 5.945144037276887e-06,
+ "cost_per_unit": 5.747295268176293e-06,
  "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
  "cuda": null,
  "environment": {
@@ -114,45 +114,45 @@
  "label": "demo2_paper_rw_f_paper_budget_ramp_sum_cuda",
  "measurement": {
   "all_s": [
-   6.539658441004576
+   6.322024794993922
   ],
-  "median_s": 6.539658441004576,
-  "min_s": 6.539658441004576,
-  "p95_s": 6.539658441004576,
+  "median_s": 6.322024794993922,
+  "min_s": 6.322024794993922,
+  "p95_s": 6.322024794993922,
   "repeats": 1,
   "tail_rule": "max_of_1",
   "warmup": 0
  },
  "memory_report": {
   "after": {
-   "cgroup_memory_bytes": 28233728,
+   "cgroup_memory_bytes": 29937664,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390844456960,
+   "mem_available_bytes": 390378590208,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 115473.253038855,
-   "rss_bytes": 29294592
+   "monotonic_s": 126194.543236843,
+   "rss_bytes": 30842880
   },
   "before": {
-   "cgroup_memory_bytes": 20008960,
+   "cgroup_memory_bytes": 20488192,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390526205952,
+   "mem_available_bytes": 390209859584,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 115466.711399814,
-   "rss_bytes": 29294592
+   "monotonic_s": 126188.219385036,
+   "rss_bytes": 30842880
   },
   "cgroup_swap_after_bytes": 0,
   "cgroup_swap_before_bytes": 0,
   "host_reserve_bytes": 60801321984,
   "interval_s": 0.25,
-  "min_mem_available_bytes": 388664504320,
+  "min_mem_available_bytes": 388154171392,
   "peak_cgroup_swap_bytes": 0,
-  "peak_rss_bytes": 29294592,
+  "peak_rss_bytes": 30842880,
   "process_rss_budget_bytes": null,
-  "samples": 28,
+  "samples": 27,
   "signal": "/sys/fs/cgroup/memory.swap.current",
   "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
   "swap_delta_peak_bytes": 0,
@@ -170,17 +170,17 @@
   "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
   "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
  ],
- "peak_host_rss_bytes": 29294592,
+ "peak_host_rss_bytes": 30842880,
  "stages": {
-  "accounted_s": 6.5389,
+  "accounted_s": 6.3214,
   "fraction_of_total": {
    "subprocess": 0.9999
   },
   "seconds": {
-   "subprocess": 6.5389
+   "subprocess": 6.3214
   },
-  "total_s": 6.5397,
-  "unaccounted_s": 0.0008
+  "total_s": 6.322,
+  "unaccounted_s": 0.0007
  },
  "subprocess": {
   "argv": [
@@ -197,12 +197,12 @@
    "--output-name",
    "perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda"
   ],
-  "peak_child_rss_bytes": 2242400256,
+  "peak_child_rss_bytes": 2242306048,
   "returncode": 0,
   "stderr_tail": [],
   "tail": [
    "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json",
-   "  rw_f_paper_budget: NCC 0.998693  rel-L2 8.8716e-02  rays 1,100,000  3.60 s"
+   "  rw_f_paper_budget: NCC 0.998693  rel-L2 8.8716e-02  rays 1,100,000  3.46 s"
   ]
  },
  "swap_growth_bytes": 0,

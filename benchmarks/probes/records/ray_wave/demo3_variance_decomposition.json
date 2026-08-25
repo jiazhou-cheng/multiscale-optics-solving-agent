@@ -1,0 +1,420 @@
+{
+  "arms": [
+    {
+      "decomposition": {
+        "direction_share_at_shipped_S": 0.7458794688674624,
+        "direction_term_B": 22019174862.550198,
+        "model": "P * V = A + B / S, V the absolute field variance sum",
+        "position_term_A": 375095.7523785766,
+        "reading": "A is the part of the variance that falls only with P; B is the part that falls with P*S. Their ratio, with the cost model's per-patch and per-ray constants, is what sets the optimal S -- that is what this split is FOR. It is not a split into reducible and irreducible: a position density scales BOTH terms, because the per-ray weight modulus ||U~_c||_1 is a per-patch quantity and the importance weight multiplies the whole patch. Read the share as 'how V responds to P versus S', never as a cap on what reweighting can achieve -- run this stage per arm to get each arm's own A and B.",
+        "relative_rms_residual": 0.0013559755174135796
+      },
+      "label": "uniform_iid",
+      "rungs": [
+        {
+          "field_variance_sum": 9178.741875698637,
+          "jackknife_relative_error": 0.010626127464296847,
+          "jackknife_standard_error": 97.53448113305284,
+          "label": "uniform_iid S=2500",
+          "mean_field_power": 2343.3235800120156,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "uniform",
+            "draw_kind": "iid",
+            "path": "plan_patches internal draw (shipped)"
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 2500,
+          "seed_to_seed_ncc_max": 0.07510752670825345,
+          "seed_to_seed_ncc_mean": 0.07060078619685105,
+          "seed_to_seed_ncc_min": 0.06365931228612666,
+          "total_rays_realized": 2500000,
+          "total_rays_requested": 2500000,
+          "variance_times_rays": 22946854689.246593,
+          "wall_clock_s_all": [
+            6.900628139002947,
+            2.8406215290015098,
+            2.809849311990547,
+            2.809743035992142
+          ],
+          "wall_clock_s_first_realization": 6.900628139002947,
+          "wall_clock_s_per_realization": 2.8252354204960284
+        },
+        {
+          "field_variance_sum": 4787.340472486098,
+          "jackknife_relative_error": 0.008798813229548364,
+          "jackknife_standard_error": 42.122914683663,
+          "label": "uniform_iid S=5000",
+          "mean_field_power": 1235.1886589198427,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "uniform",
+            "draw_kind": "iid",
+            "path": "plan_patches internal draw (shipped)"
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 5000,
+          "seed_to_seed_ncc_max": 0.0745849622516328,
+          "seed_to_seed_ncc_mean": 0.07216732426392926,
+          "seed_to_seed_ncc_min": 0.06951219954956002,
+          "total_rays_realized": 5000000,
+          "total_rays_requested": 5000000,
+          "variance_times_rays": 23936702362.430492,
+          "wall_clock_s_all": [
+            7.337533544996404,
+            3.2069945920084137,
+            3.2084381230088184,
+            3.190521914002602
+          ],
+          "wall_clock_s_first_realization": 7.337533544996404,
+          "wall_clock_s_per_realization": 3.207716357508616
+        },
+        {
+          "field_variance_sum": 2579.9507477412726,
+          "jackknife_relative_error": 0.011138356324550647,
+          "jackknife_standard_error": 28.736410728133176,
+          "label": "uniform_iid S=10000",
+          "mean_field_power": 691.3790205957861,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "uniform",
+            "draw_kind": "iid",
+            "path": "plan_patches internal draw (shipped)"
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 10000,
+          "seed_to_seed_ncc_max": 0.07899833870319327,
+          "seed_to_seed_ncc_mean": 0.07560636559881163,
+          "seed_to_seed_ncc_min": 0.07104910998079,
+          "total_rays_realized": 10000000,
+          "total_rays_requested": 10000000,
+          "variance_times_rays": 25799507477.412727,
+          "wall_clock_s_all": [
+            8.570376978997956,
+            4.391745512999478,
+            4.398547927004984,
+            4.350256560996058
+          ],
+          "wall_clock_s_first_realization": 8.570376978997956,
+          "wall_clock_s_per_realization": 4.395146720002231
+        },
+        {
+          "field_variance_sum": 1468.731060500946,
+          "jackknife_relative_error": 0.009164514868253698,
+          "jackknife_standard_error": 13.46020764142694,
+          "label": "uniform_iid S=20000",
+          "mean_field_power": 417.59435057967085,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "uniform",
+            "draw_kind": "iid",
+            "path": "plan_patches internal draw (shipped)"
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 20000,
+          "seed_to_seed_ncc_max": 0.08317064618254608,
+          "seed_to_seed_ncc_mean": 0.0800587852160022,
+          "seed_to_seed_ncc_min": 0.07702214804571852,
+          "total_rays_realized": 20000000,
+          "total_rays_requested": 20000000,
+          "variance_times_rays": 29374621210.018917,
+          "wall_clock_s_all": [
+            10.548564794007689,
+            6.769012916003703,
+            6.854924364000908,
+            6.665760991003481
+          ],
+          "wall_clock_s_first_realization": 10.548564794007689,
+          "wall_clock_s_per_realization": 6.811968640002306
+        }
+      ]
+    },
+    {
+      "decomposition": {
+        "direction_share_at_shipped_S": 0.7637336048955853,
+        "direction_term_B": 15300724491.1554,
+        "model": "P * V = A + B / S, V the absolute field variance sum",
+        "position_term_A": 236669.3697146763,
+        "reading": "A is the part of the variance that falls only with P; B is the part that falls with P*S. Their ratio, with the cost model's per-patch and per-ray constants, is what sets the optimal S -- that is what this split is FOR. It is not a split into reducible and irreducible: a position density scales BOTH terms, because the per-ray weight modulus ||U~_c||_1 is a per-patch quantity and the importance weight multiplies the whole patch. Read the share as 'how V responds to P versus S', never as a cap on what reweighting can achieve -- run this stage per arm to get each arm's own A and B.",
+        "relative_rms_residual": 0.0013328038618062195
+      },
+      "label": "sqrt_energy_stratified_cdf",
+      "rungs": [
+        {
+          "field_variance_sum": 6359.17005267066,
+          "jackknife_relative_error": 0.0028715625554759138,
+          "jackknife_standard_error": 18.26075460715286,
+          "label": "sqrt_energy_stratified_cdf S=2500",
+          "mean_field_power": 1636.3118799940441,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "sqrt_window_energy",
+            "draw_kind": "stratified_cdf",
+            "draw_positions": 90601,
+            "empty_positions": 9388,
+            "mean_center_weight": 0.957653871462037,
+            "patch_count": 1000,
+            "path": "patch_positions.plan_positions",
+            "predicted_variance_ratio": 1.4475084333686425,
+            "support_positions": 81213,
+            "support_power_fraction": 1.0,
+            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 2500,
+          "seed_to_seed_ncc_max": 0.07596586263008213,
+          "seed_to_seed_ncc_mean": 0.07033763832271632,
+          "seed_to_seed_ncc_min": 0.06610671990734708,
+          "total_rays_realized": 2500000,
+          "total_rays_requested": 2500000,
+          "variance_times_rays": 15897925131.676651,
+          "wall_clock_s_all": [
+            2.6008063519984717,
+            2.5579364799923496,
+            2.5939754959981656,
+            2.586812302994076
+          ],
+          "wall_clock_s_first_realization": 2.6008063519984717,
+          "wall_clock_s_per_realization": 2.590393899496121
+        },
+        {
+          "field_variance_sum": 3290.1791933143145,
+          "jackknife_relative_error": 0.0015045715595216889,
+          "jackknife_standard_error": 4.950310039990731,
+          "label": "sqrt_energy_stratified_cdf S=5000",
+          "mean_field_power": 874.6632153849157,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "sqrt_window_energy",
+            "draw_kind": "stratified_cdf",
+            "draw_positions": 90601,
+            "empty_positions": 9388,
+            "mean_center_weight": 0.957653871462037,
+            "patch_count": 1000,
+            "path": "patch_positions.plan_positions",
+            "predicted_variance_ratio": 1.4475084333686425,
+            "support_positions": 81213,
+            "support_power_fraction": 1.0,
+            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 5000,
+          "seed_to_seed_ncc_max": 0.07532738237815945,
+          "seed_to_seed_ncc_mean": 0.07122076323021992,
+          "seed_to_seed_ncc_min": 0.06823248847680939,
+          "total_rays_realized": 5000000,
+          "total_rays_requested": 5000000,
+          "variance_times_rays": 16450895966.571571,
+          "wall_clock_s_all": [
+            3.039641028997721,
+            3.037466983005288,
+            3.0394213760009734,
+            3.018322199000977
+          ],
+          "wall_clock_s_first_realization": 3.039641028997721,
+          "wall_clock_s_per_realization": 3.0384441795031307
+        },
+        {
+          "field_variance_sum": 1771.1708372677303,
+          "jackknife_relative_error": 0.003145511533981054,
+          "jackknife_standard_error": 5.571238297276526,
+          "label": "sqrt_energy_stratified_cdf S=10000",
+          "mean_field_power": 497.24891522665035,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "sqrt_window_energy",
+            "draw_kind": "stratified_cdf",
+            "draw_positions": 90601,
+            "empty_positions": 9388,
+            "mean_center_weight": 0.957653871462037,
+            "patch_count": 1000,
+            "path": "patch_positions.plan_positions",
+            "predicted_variance_ratio": 1.4475084333686425,
+            "support_positions": 81213,
+            "support_power_fraction": 1.0,
+            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 10000,
+          "seed_to_seed_ncc_max": 0.08055426840084458,
+          "seed_to_seed_ncc_mean": 0.07695827122042738,
+          "seed_to_seed_ncc_min": 0.07107721315969626,
+          "total_rays_realized": 10000000,
+          "total_rays_requested": 10000000,
+          "variance_times_rays": 17711708372.677303,
+          "wall_clock_s_all": [
+            4.189470732992049,
+            4.226665213005617,
+            4.185412743987399,
+            4.248186999000609
+          ],
+          "wall_clock_s_first_realization": 4.189470732992049,
+          "wall_clock_s_per_realization": 4.208067972998833
+        },
+        {
+          "field_variance_sum": 1001.7007639725421,
+          "jackknife_relative_error": 0.005791538288749633,
+          "jackknife_standard_error": 5.801388328416737,
+          "label": "sqrt_energy_stratified_cdf S=20000",
+          "mean_field_power": 303.067998980432,
+          "patches": 1000,
+          "positions": {
+            "density_kind": "sqrt_window_energy",
+            "draw_kind": "stratified_cdf",
+            "draw_positions": 90601,
+            "empty_positions": 9388,
+            "mean_center_weight": 0.957653871462037,
+            "patch_count": 1000,
+            "path": "patch_positions.plan_positions",
+            "predicted_variance_ratio": 1.4475084333686425,
+            "support_positions": 81213,
+            "support_power_fraction": 1.0,
+            "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
+          },
+          "realized_patches": 1000,
+          "replicates": 4,
+          "secondary_per_patch": 20000,
+          "seed_to_seed_ncc_max": 0.0884581207313651,
+          "seed_to_seed_ncc_mean": 0.08504487372523,
+          "seed_to_seed_ncc_min": 0.08165059645909371,
+          "total_rays_realized": 20000000,
+          "total_rays_requested": 20000000,
+          "variance_times_rays": 20034015279.45084,
+          "wall_clock_s_all": [
+            6.608087746004458,
+            6.611913318003644,
+            6.613934608001728,
+            6.818412310996791
+          ],
+          "wall_clock_s_first_realization": 6.608087746004458,
+          "wall_clock_s_per_realization": 6.612923963002686
+        }
+      ]
+    }
+  ],
+  "configuration": {
+    "backend": "jax",
+    "kspace_oversample": 1.5,
+    "patch_px": 101,
+    "precision": "fp32",
+    "reconstruction": "kspace_splat",
+    "replicates": 4,
+    "seeds": [
+      20260824,
+      20260825,
+      20260826,
+      20260827
+    ],
+    "sensor_grid": [
+      420,
+      420
+    ],
+    "sensor_pitch_m": 4.2e-06
+  },
+  "device_memory": {
+    "available": true,
+    "bytes_limit": 38275448832,
+    "device": "cuda:0",
+    "peak_bytes_in_use": 293647616,
+    "peak_gb": 0.294
+  },
+  "environment": {
+    "commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "cuda:0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-120",
+  "noise_floor": {
+    "note": "3 / sqrt(N_px). Seed-to-seed NCC below this is zero with an error bar; the earlier demo3 ladder fitted through such points and returned a slope of 5.7. The relative_variance metric has no such floor, which is why the variance work is scored on it.",
+    "seed_to_seed_ncc": 0.007142857142857143
+  },
+  "probe": "demo3_variance",
+  "record_provenance": {
+    "code_fingerprint": {
+      "combined_sha256": "c689992a27f31a5f0ad26f0a44e5c12ebcdc6d66eeb12580c3be767d56d43edb",
+      "files": {
+        "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
+        "benchmarks/probes/ray_wave/demo3_hologram_lens.py": "9e56980436b0c099a388ef5ad1037c75f6c4e511d9e6210847cbc55b78efc9cc",
+        "benchmarks/probes/ray_wave/demo3_variance.py": "987b9967bee87e84baa1f1debf50624a0b103348a7b4db01c240bc956663ddb6",
+        "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+        "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+        "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
+        "src/core/bridge.py": "89deacd30cd5e03285c1f187e4745113057ff736bf1694deb9452ca30bd418c6",
+        "src/core/capabilities.py": "209975060902708c3279a428dcf4a6057f4ad94892bf60fdcc9c059d8e37140f",
+        "src/core/coherent_batch.py": "1651fe93e0486dd96c1aa73a8d47c83e8b2fd8c7bfa995d2aec6df66ac48a262",
+        "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+        "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+        "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+        "src/core/optical_system.py": "a469d554531dd3d4550a8d3fadc7bd0c0fbae303e6295c37e50266d37f73dfa1",
+        "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+        "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+        "src/core/specs.py": "2de6b0421e75013dcec221570d1129dc2ff09aceef22c02dc19c6fa2543f702a",
+        "src/couplers/__init__.py": "36e91bb9ee450658c7575477d7c976e49ce964e7829af877617bd4044d6dc6d1",
+        "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+        "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+        "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+        "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+        "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
+        "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+        "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
+        "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
+        "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
+        "src/couplers/patch_positions.py": "cf63f501672155a163c4f6984f9a10b63eab8d9abf21fc019309ec652165ea5e",
+        "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+        "src/couplers/streaming.py": "4ec1b96ee3ed898382bb322c61aa8ddaed93971f4500f80dfb2085bf94fdb2b7",
+        "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+        "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+        "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+        "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
+        "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
+        "src/solvers/optiland/coherent_trace.py": "1e62fa59ca0918bc134816583d8daf3260df31ebe611ccf1ea91841c9eaadaa8",
+        "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
+        "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7"
+      }
+    },
+    "data_fingerprint": {},
+    "environment_fingerprint": {
+      "combined_sha256": "4e4d1486b1525368f6a65370de5cfdb8ad5e859b954999e88255c671a024fade",
+      "packages": {
+        "chromatix": "0.6.0",
+        "jax": "0.6.2",
+        "jaxlib": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "scipy": "1.15.3",
+        "torch": "2.13.0+cu126"
+      },
+      "python_version": "3.12.14"
+    },
+    "probe": "demo3_variance_decomposition",
+    "schema_version": 2,
+    "source_commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "timestamp_utc": "2026-08-25T06:39:45.304725+00:00",
+    "working_tree_dirty": true
+  },
+  "reference_power_note": "Every `field_variance_sum` is absolute, in the units of `mean_field_power` on the same rows. Divide by a `mean_field_power` to read a variance as a fraction -- but the fits and the ratios use the absolute values, because a signal-power denominator is not measurable at these budgets. See `variance_statistics`.",
+  "route": "rw_p",
+  "stage": "decomposition",
+  "status_of_this_evidence": "CHARACTERIZATION, not validation. demo3 has no conventional reference; every number here is a property of the estimator, measured against itself across seeds or against another arm of the same probe. The unbiasedness of each arm is gated against an enumerated oracle in tests/test_patch_positions.py, at the size where such an oracle exists.",
+  "term_by_term_ratio_vs_first_arm": [
+    {
+      "direction_term_B_ratio": 1.4390936112390238,
+      "label": "sqrt_energy_stratified_cdf",
+      "position_term_A_ratio": 1.5848935281772387,
+      "reading": "A position density scales both terms. These two ratios are the measurement of that, and they are what makes the total reduction larger than the direction share would allow if B were fixed."
+    }
+  ]
+}

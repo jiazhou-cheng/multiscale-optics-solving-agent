@@ -1,0 +1,200 @@
+{
+  "arms": [
+    {
+      "anti_bias": {
+        "control": true,
+        "note": "the control arm is what every other arm is tested against; comparing it to itself would report a separation of exactly zero and mean nothing"
+      },
+      "field_variance_sum": 2237.161016208157,
+      "jackknife_relative_error": 0.007057741412730578,
+      "jackknife_standard_error": 15.789303951038734,
+      "label": "uniform_iid",
+      "mean_field_power": 831.009485245048,
+      "patches": 1000,
+      "positions": {
+        "density_kind": "uniform",
+        "draw_kind": "iid",
+        "path": "plan_patches internal draw (shipped)"
+      },
+      "realized_patches": 1000,
+      "replicates": 3,
+      "secondary_per_patch": 20000,
+      "seconds_per_realization_ratio_vs_control": 1.0,
+      "seed_to_seed_ncc_max": 0.006679603875042487,
+      "seed_to_seed_ncc_mean": 0.005384507603166606,
+      "seed_to_seed_ncc_min": 0.00448177750018835,
+      "total_rays_realized": 20000000,
+      "total_rays_requested": 20000000,
+      "variance_ratio_at_fixed_cost": 1.0,
+      "variance_ratio_relative_error": 0.009981153625605832,
+      "variance_ratio_vs_control": 1.0,
+      "variance_times_rays": 44743220324.16314,
+      "wall_clock_s_all": [
+        11.011540813007741,
+        6.7032066590036266,
+        6.659205597999971
+      ],
+      "wall_clock_s_first_realization": 11.011540813007741,
+      "wall_clock_s_per_realization": 6.7032066590036266
+    },
+    {
+      "anti_bias": {
+        "bias_ratio": 0.994436793193966,
+        "expected_fluctuation": 0.0065274652254723314,
+        "fluctuation_from_pixel_count": 0.002380952380952381,
+        "fluctuation_from_variance_estimate": 0.0060777354359487995,
+        "observed_mean_field_separation": 1245.741647308427,
+        "predicted_from_own_noise": 1252.7107362020581,
+        "reading": "1.0 means the two arms estimate the same field. Read a departure against `expected_fluctuation`, which combines the pixel-count scatter with the error on the variance estimate that forms the denominator -- the second is the larger term at these seed counts, and omitting it would make a 1.008 look like a 2.5-sigma detection when it is inside one. Pixel noise in speckle is also not independent, which pushes the true scale up further, so this is a lower bound on the fluctuation and not a tight threshold. The exact unbiasedness gate is the enumerated-oracle test in tests/test_patch_positions.py, not this."
+      },
+      "field_variance_sum": 1520.9711923980174,
+      "jackknife_relative_error": 0.010851441599204132,
+      "jackknife_standard_error": 16.504730068378958,
+      "label": "sqrt_energy_stratified_cdf",
+      "mean_field_power": 587.7176249459276,
+      "patches": 1000,
+      "positions": {
+        "density_kind": "sqrt_window_energy",
+        "draw_kind": "stratified_cdf",
+        "draw_positions": 90601,
+        "empty_positions": 9388,
+        "mean_center_weight": 0.9084374265077636,
+        "patch_count": 1000,
+        "path": "patch_positions.plan_positions",
+        "predicted_variance_ratio": 1.4475084333686425,
+        "support_positions": 81213,
+        "support_power_fraction": 1.0,
+        "variance_model": "f = sqrt(window energy), the quasi-random-phase approximation to ||U~_c||_1. Exact f needs spectral_l1_map."
+      },
+      "realized_patches": 1000,
+      "replicates": 3,
+      "secondary_per_patch": 20000,
+      "seconds_per_realization_ratio_vs_control": 0.9887979658371164,
+      "seed_to_seed_ncc_max": 0.014795903256177488,
+      "seed_to_seed_ncc_mean": 0.012568153012365982,
+      "seed_to_seed_ncc_min": 0.010298431218224293,
+      "total_rays_realized": 20000000,
+      "total_rays_requested": 20000000,
+      "variance_ratio_at_fixed_cost": 1.487540127953515,
+      "variance_ratio_relative_error": 0.012944709291054401,
+      "variance_ratio_vs_control": 1.4708766526215196,
+      "variance_times_rays": 30419423847.960346,
+      "wall_clock_s_all": [
+        6.628117109008599,
+        6.569608606994734,
+        6.69661101399106
+      ],
+      "wall_clock_s_first_realization": 6.628117109008599,
+      "wall_clock_s_per_realization": 6.628117109008599
+    }
+  ],
+  "configuration": {
+    "backend": "jax",
+    "kspace_oversample": 8.0,
+    "patch_px": 101,
+    "precision": "fp32",
+    "reconstruction": "kspace_splat",
+    "replicates": 3,
+    "seeds": [
+      20260824,
+      20260825,
+      20260826
+    ],
+    "sensor_grid": [
+      420,
+      420
+    ],
+    "sensor_pitch_m": 4.2e-06
+  },
+  "device_memory": {
+    "available": true,
+    "bytes_limit": 38275448832,
+    "device": "cuda:0",
+    "peak_bytes_in_use": 754056192,
+    "peak_gb": 0.754
+  },
+  "environment": {
+    "commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "cuda:0"
+    ],
+    "working_tree_dirty": true
+  },
+  "issue": "CHE-120",
+  "noise_floor": {
+    "note": "3 / sqrt(N_px). Seed-to-seed NCC below this is zero with an error bar; the earlier demo3 ladder fitted through such points and returned a slope of 5.7. The relative_variance metric has no such floor, which is why the variance work is scored on it.",
+    "seed_to_seed_ncc": 0.007142857142857143
+  },
+  "probe": "demo3_variance",
+  "record_provenance": {
+    "code_fingerprint": {
+      "combined_sha256": "c689992a27f31a5f0ad26f0a44e5c12ebcdc6d66eeb12580c3be767d56d43edb",
+      "files": {
+        "benchmarks/probes/ray_wave/_demo_support.py": "02f06729175299a1b1db16ad73e93b429b711e25e4cbf3fa5cb8d00d06aa0815",
+        "benchmarks/probes/ray_wave/demo3_hologram_lens.py": "9e56980436b0c099a388ef5ad1037c75f6c4e511d9e6210847cbc55b78efc9cc",
+        "benchmarks/probes/ray_wave/demo3_variance.py": "987b9967bee87e84baa1f1debf50624a0b103348a7b4db01c240bc956663ddb6",
+        "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+        "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+        "src/core/boundary.py": "432d668da89406a9d99e8468fde9c0d8c590c6cbf4f5eb507609f2e5248d36c2",
+        "src/core/bridge.py": "89deacd30cd5e03285c1f187e4745113057ff736bf1694deb9452ca30bd418c6",
+        "src/core/capabilities.py": "209975060902708c3279a428dcf4a6057f4ad94892bf60fdcc9c059d8e37140f",
+        "src/core/coherent_batch.py": "1651fe93e0486dd96c1aa73a8d47c83e8b2fd8c7bfa995d2aec6df66ac48a262",
+        "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+        "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+        "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+        "src/core/optical_system.py": "a469d554531dd3d4550a8d3fadc7bd0c0fbae303e6295c37e50266d37f73dfa1",
+        "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+        "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+        "src/core/specs.py": "2de6b0421e75013dcec221570d1129dc2ff09aceef22c02dc19c6fa2543f702a",
+        "src/couplers/__init__.py": "36e91bb9ee450658c7575477d7c976e49ce964e7829af877617bd4044d6dc6d1",
+        "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+        "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+        "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+        "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+        "src/couplers/handoff.py": "f97b95806b355bd30898a011a7f58cc423a3bae68b75fe57af3ac9db70d6f637",
+        "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+        "src/couplers/patch.py": "fa9c73448f9261e1889363094617f44e3a375bc41ea96ba644e5271a8c024e1b",
+        "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
+        "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
+        "src/couplers/patch_positions.py": "cf63f501672155a163c4f6984f9a10b63eab8d9abf21fc019309ec652165ea5e",
+        "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+        "src/couplers/streaming.py": "4ec1b96ee3ed898382bb322c61aa8ddaed93971f4500f80dfb2085bf94fdb2b7",
+        "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+        "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+        "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+        "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
+        "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/solvers/optiland/builder.py": "a95538534bd109723267ec266f70b1873f91711a094152b0c73cb9b5466efdc9",
+        "src/solvers/optiland/coherent_trace.py": "1e62fa59ca0918bc134816583d8daf3260df31ebe611ccf1ea91841c9eaadaa8",
+        "src/solvers/optiland/constants.py": "53ce76a74a6f7742e1ae93a32173c345f26bec16f77582d29fdac935394a9056",
+        "src/solvers/optiland/execution.py": "ab2700c1d24f9204f18255a68d0dc6576e8f81ec08e3d1d30d9b8338a92f55a7"
+      }
+    },
+    "data_fingerprint": {},
+    "environment_fingerprint": {
+      "combined_sha256": "4e4d1486b1525368f6a65370de5cfdb8ad5e859b954999e88255c671a024fade",
+      "packages": {
+        "chromatix": "0.6.0",
+        "jax": "0.6.2",
+        "jaxlib": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "scipy": "1.15.3",
+        "torch": "2.13.0+cu126"
+      },
+      "python_version": "3.12.14"
+    },
+    "probe": "demo3_variance_confirm_os8_p1000",
+    "schema_version": 2,
+    "source_commit": "195f23c399b782ffe5e745945c1afe876c57119f",
+    "timestamp_utc": "2026-08-25T06:48:17.553601+00:00",
+    "working_tree_dirty": true
+  },
+  "reference_power_note": "Every `field_variance_sum` is absolute, in the units of `mean_field_power` on the same rows. Divide by a `mean_field_power` to read a variance as a fraction -- but the fits and the ratios use the absolute values, because a signal-power denominator is not measurable at these budgets. See `variance_statistics`.",
+  "route": "rw_p",
+  "stage": "candidates",
+  "status_of_this_evidence": "CHARACTERIZATION, not validation. demo3 has no conventional reference; every number here is a property of the estimator, measured against itself across seeds or against another arm of the same probe. The unbiasedness of each arm is gated against an enumerated oracle in tests/test_patch_positions.py, at the size where such an oracle exists."
+}

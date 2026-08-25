@@ -66,7 +66,7 @@ from core.optical_system import (
 )
 from core.precision import ArrayNamespace, DeviceKind, DevicePlacement, DType, Precision
 from couplers.cascade import planar_doe_step
-from couplers.patch import patch_secondary_rays, plan_patches
+from couplers.patch import CoverageBasis, patch_secondary_rays, plan_patches
 from couplers.ray_to_wave import DEFAULT_KSPACE_OVERSAMPLE, Projection, Reconstruction
 from couplers.streaming import StreamingReconstruction
 from solvers.optiland.builder import build_optiland_system
@@ -199,6 +199,7 @@ def run_route(
     reconstruction_route: str = "ramp_sum",
     kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
     emitters_override: np.ndarray | None = None,
+    center_weights_override: np.ndarray | None = None,
     total_rays_override: int | None = None,
 ) -> dict[str, Any]:
     """Rays from the DOE, an Optiland trace, and one coherent sensor field.
@@ -229,14 +230,35 @@ def run_route(
 
     plan = None
     if route == "patch":
-        plan = plan_patches(
-            grid_shape=doe.grid_shape,
-            sample_pitch_m=doe.pitch_m,
-            patch_px=patch_px,
-            pad_factor=pad_factor,
-            patch_count=patch_count,
-            rng=rng,
-        )
+        if center_weights_override is not None:
+            # Weighted centres go through the SUPPLIED-centres branch, so the
+            # plan declares `IMPORTANCE_OVER_DILATED_APERTURE` and carries the
+            # weights. Overriding a uniform plan's centres afterwards would run
+            # the same physics and leave every record claiming a uniform draw,
+            # which is the declaration failure `CoverageBasis` exists to prevent.
+            if emitters_override is None:
+                raise ValueError(
+                    "center_weights_override needs the centres they weight; "
+                    "pass emitters_override from the same PositionPlan"
+                )
+            plan = plan_patches(
+                grid_shape=doe.grid_shape,
+                sample_pitch_m=doe.pitch_m,
+                patch_px=patch_px,
+                pad_factor=pad_factor,
+                centers_xy_m=np.asarray(emitters_override, dtype=np.float64),
+                coverage_basis=CoverageBasis.IMPORTANCE_OVER_DILATED_APERTURE,
+                center_weights=np.asarray(center_weights_override, dtype=np.float64),
+            )
+        else:
+            plan = plan_patches(
+                grid_shape=doe.grid_shape,
+                sample_pitch_m=doe.pitch_m,
+                patch_px=patch_px,
+                pad_factor=pad_factor,
+                patch_count=patch_count,
+                rng=rng,
+            )
         emitters = (
             np.asarray(emitters_override, dtype=np.float64)
             if emitters_override is not None
@@ -256,6 +278,16 @@ def run_route(
         emitters = np.column_stack(
             [cols * doe.pitch_m[1], rows * doe.pitch_m[0]]
         ).astype(np.float64)
+    center_weights = (
+        None
+        if center_weights_override is None
+        else np.asarray(center_weights_override, dtype=np.float64)
+    )
+    if center_weights is not None and route != "patch":
+        raise ValueError(
+            "center_weights_override is a patch-route quantity; the full-field "
+            "route's launch positions carry no per-position importance weight"
+        )
     n_patches = emitters.shape[0]
     groups = np.array_split(np.arange(n_patches), max(1, min(batches, n_patches)))
 
@@ -288,7 +320,18 @@ def run_route(
         if route == "patch":
             bundle, patch_diagnostics = patch_secondary_rays(
                 doe.transmission,
-                plan=dataclasses.replace(plan, centers_xy_m=emitters[indices]),
+                plan=dataclasses.replace(
+                    plan,
+                    centers_xy_m=emitters[indices],
+                    # Sliced with the centres, never separately: the weight
+                    # belongs to the centre and a batched run that kept the whole
+                    # vector would weight patch i by patch 0's weight.
+                    center_weights=(
+                        None
+                        if center_weights is None
+                        else center_weights[indices]
+                    ),
+                ),
                 sample_pitch_m=doe.pitch_m,
                 wavelength_m=WAVELENGTH_M,
                 plane=doe_plane,

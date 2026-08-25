@@ -241,6 +241,26 @@ entries:
       either close or re-scope.
 
   # =========================================================================
+  # benchmarks/instances/ -- canonical instances, run through the substrate
+  # =========================================================================
+  - path: benchmarks/instances/b3_psf_singlet.py
+    bucket: B
+    justification: >-
+      POSITIVE: this is the substrate proof. It is the only place a real Optiland
+      trace becomes a real ExecutionRecord and that record is handed to verify()
+      against a real family, so freezing it keeps the loop -- family, instance,
+      executor, verifier -- exercised end to end by the test suite rather than by
+      a person remembering to run it.
+    destination: >-
+      B3-PSF-SINGLET-01, the canonical instance, and the replacement for
+      benchmarks/physics/L2-PSF-01/run_benchmark.py once it reproduces the frozen
+      fingerprint (CHE-115).
+    note: >-
+      It does NOT yet reproduce the 2.21e-3 frozen number, and does not claim to:
+      256 rings rather than 512, and a centred-half-window metric rather than the
+      5-Airy-radius radial-profile residual. Both differences are declared.
+
+  # =========================================================================
   # benchmarks/protocols/ -- frozen contracts holding tolerance derivations
   # =========================================================================
   - path: benchmarks/protocols/protocol.yaml

@@ -1,5 +1,5 @@
 {
- "cost_per_unit": 4.093551077437951e-07,
+ "cost_per_unit": 4.093588835125047e-07,
  "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
  "cuda": null,
  "environment": {
@@ -114,43 +114,43 @@
  "label": "demo2_paper_rw_p_ramp_sum_cuda",
  "measurement": {
   "all_s": [
-   65.49681723900721
+   65.49742136200075
   ],
-  "median_s": 65.49681723900721,
-  "min_s": 65.49681723900721,
-  "p95_s": 65.49681723900721,
+  "median_s": 65.49742136200075,
+  "min_s": 65.49742136200075,
+  "p95_s": 65.49742136200075,
   "repeats": 1,
   "tail_rule": "max_of_1",
   "warmup": 0
  },
  "memory_report": {
   "after": {
-   "cgroup_memory_bytes": 30994432,
+   "cgroup_memory_bytes": 30306304,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390144757760,
+   "mem_available_bytes": 389577060352,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 115547.707166595,
-   "rss_bytes": 30183424
+   "monotonic_s": 126146.475426504,
+   "rss_bytes": 29827072
   },
   "before": {
-   "cgroup_memory_bytes": 19673088,
+   "cgroup_memory_bytes": 19832832,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390815936512,
+   "mem_available_bytes": 388245164032,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 115482.208433369,
-   "rss_bytes": 30183424
+   "monotonic_s": 126080.976029863,
+   "rss_bytes": 29827072
   },
   "cgroup_swap_after_bytes": 0,
   "cgroup_swap_before_bytes": 0,
   "host_reserve_bytes": 60801321984,
   "interval_s": 0.25,
-  "min_mem_available_bytes": 387407622144,
+  "min_mem_available_bytes": 385357586432,
   "peak_cgroup_swap_bytes": 0,
-  "peak_rss_bytes": 30183424,
+  "peak_rss_bytes": 29827072,
   "process_rss_budget_bytes": null,
   "samples": 263,
   "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -170,17 +170,17 @@
   "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_p_ramp_sum_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
   "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
  ],
- "peak_host_rss_bytes": 30183424,
+ "peak_host_rss_bytes": 29827072,
  "stages": {
-  "accounted_s": 65.4962,
+  "accounted_s": 65.4967,
   "fraction_of_total": {
    "subprocess": 1.0
   },
   "seconds": {
-   "subprocess": 65.4962
+   "subprocess": 65.4967
   },
-  "total_s": 65.4968,
-  "unaccounted_s": 0.0006
+  "total_s": 65.4974,
+  "unaccounted_s": 0.0007
  },
  "subprocess": {
   "argv": [
@@ -197,7 +197,7 @@
    "--output-name",
    "perf_demo2_paper_rw_p_ramp_sum_cuda"
   ],
-  "peak_child_rss_bytes": 2797686784,
+  "peak_child_rss_bytes": 2792181760,
   "returncode": 0,
   "stderr_tail": [],
   "tail": [

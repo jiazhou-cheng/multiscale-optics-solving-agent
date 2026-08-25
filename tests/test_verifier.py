@@ -475,6 +475,30 @@ def test_a_control_that_fires_backwards_makes_the_gate_untrustworthy() -> None:
     assert DiagnosticCode.NEGATIVE_CONTROL_UNDERMINES_GATE in result.diagnostic_codes()
 
 
+def test_a_control_that_was_never_run_does_not_leave_the_gate_trustworthy() -> None:
+    """Unexercised is not the same as passed, and it is not evidence either.
+
+    A result with four declared controls and none exercised reporting a
+    trustworthy gate would be exactly the green tick this structure refuses.
+    """
+    family = make_family(negative_controls=(BACKWARDS,))
+    instance = make_instance(family)
+    result = verify(family, instance, make_record(), measurements={"relative_l2": measured(1e-5)})
+
+    assert result.negative_control_results[0].outcome is NegativeControlOutcome.NOT_RUN
+    assert not result.gate_is_trustworthy
+    assert len(result.untrustworthy_controls) == 1
+
+
+def test_a_family_with_no_controls_at_all_is_not_trustworthy() -> None:
+    """There is nothing to be trusted on."""
+    family = make_family()
+    instance = make_instance(family)
+    result = verify(family, instance, make_record(), measurements={"relative_l2": measured(1e-5)})
+    assert result.negative_control_results == []
+    assert not result.gate_is_trustworthy
+
+
 def test_a_control_that_fires_leaves_the_gate_trustworthy() -> None:
     family = make_family(negative_controls=(BACKWARDS,))
     instance = make_instance(family)

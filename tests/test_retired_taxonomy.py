@@ -80,6 +80,10 @@ ALLOWED: dict[str, str] = {
         "benchmarks/inventory.yaml with the removal owned by CHE-115"
     ),
     "benchmarks/inventory.yaml": "the triage has to name what it classified",
+    "benchmarks/instances/b3_psf_singlet.py": (
+        "the substrate proof, whose docstring explains why its number is not the "
+        "singlet runner's and what reproducing that would take"
+    ),
     "benchmarks/INVENTORY.md": "generated from the triage, so it names what was classified",
     "benchmarks/README.md": "points at the live runner and says why it is still there",
     "benchmarks/manifest.yaml": "records where the deleted levels: block's content went",
