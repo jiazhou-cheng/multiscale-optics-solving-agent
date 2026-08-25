@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "RefusalView": {
+      "additionalProperties": false,
+      "description": "What happens if you get it wrong, from the M1.3 catalogue.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "could_have_proceeded": {
+          "title": "Could Have Proceeded",
+          "type": "boolean"
+        },
+        "remedy": {
+          "title": "Remedy",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "trigger": {
+          "title": "Trigger",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "status",
+        "trigger",
+        "remedy",
+        "could_have_proceeded"
+      ],
+      "title": "RefusalView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Whether two ports can be connected, and what the edge must declare.",
+  "properties": {
+    "compatible": {
+      "title": "Compatible",
+      "type": "boolean"
+    },
+    "coupler": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coupler"
+    },
+    "issues": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "possible_refusals": {
+      "items": {
+        "$ref": "#/$defs/RefusalView"
+      },
+      "title": "Possible Refusals",
+      "type": "array"
+    },
+    "required_edge_declarations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Edge Declarations",
+      "type": "array"
+    },
+    "source_component": {
+      "title": "Source Component",
+      "type": "string"
+    },
+    "source_port": {
+      "title": "Source Port",
+      "type": "string"
+    },
+    "target_component": {
+      "title": "Target Component",
+      "type": "string"
+    },
+    "target_port": {
+      "title": "Target Port",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_component",
+    "source_port",
+    "target_component",
+    "target_port",
+    "compatible"
+  ],
+  "title": "ConnectionReport",
+  "type": "object"
+}

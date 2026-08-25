@@ -61,6 +61,14 @@ FORBIDDEN: dict[str, tuple[frozenset[str], str]] = {
         "an oracle that depends on a study is not independent of it. Independence "
         "is the whole reason verification/ exists as its own package.",
     ),
+    "discovery": (
+        frozenset({"studies", "agent", "cli"}),
+        "discovery/ joins the registry, the capability table, the validator, the "
+        "ledger and the families into one queryable surface -- so it imports all of "
+        "them, and that is why it is not in registry/ (which must not import "
+        "verification) or in runtime/ (same rule). What it must not know is anything "
+        "about an agent: it answers questions, and who is asking is not one of them.",
+    ),
     "runtime": (
         frozenset({"verification", "studies", "agent", "cli"}),
         "runtime/ orchestrates solvers and couplers -- that is what it is for, and "

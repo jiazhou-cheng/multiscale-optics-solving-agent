@@ -11,6 +11,11 @@ from rich.table import Table
 
 from core.execution import RunStatus
 from core.graph import GraphValidator, Severity
+from discovery import (
+    check_connection,
+    describe_component,
+    route_capability,
+)
 from registry.loader import Registry
 from runtime.executor import GraphExecutor, InMemoryCache
 
@@ -82,6 +87,7 @@ def validate(graph: Path) -> None:
 _OUTPUT_OPTION = typer.Option(None, help="Where to write the execution record JSON.")
 _SEED_OPTION = typer.Option(None, help="Seed threaded through every node.")
 _CACHE_OPTION = typer.Option(False, help="Reuse node results within this process.")
+_POLICY_OPTION = typer.Option("cold", help="Context policy: cold, warm or guided.")
 
 
 @app.command()
@@ -130,6 +136,107 @@ def run(
 
     console.print(f"status: {record.status.value}")
     if record.status is not RunStatus.SUCCEEDED:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def describe(component: str, policy: str = _POLICY_OPTION) -> None:
+    """Everything one query can say about one component.
+
+    Can, should, and what happens if you get it wrong -- from one call. Every
+    field is derived from the capability table, the registry, the validator, the
+    ledger, the family registry or the refusal catalogue; none is written here.
+    """
+
+    description = describe_component(component, policy=policy)
+    console.print(f"[bold]{description.component}[/bold] {description.version} "
+                  f"({description.kind}, {description.maturity})")
+    console.print(description.description)
+
+    if description.derivative_warning:
+        console.print(f"[red]{description.derivative_warning}[/red]")
+
+    ports = Table("Port", "Direction", "Artifact", "Requires", "Provides")
+    for port in [*description.inputs, *description.outputs]:
+        ports.add_row(
+            port.name,
+            port.direction,
+            port.artifact,
+            ", ".join(port.requires_metadata) or "—",
+            ", ".join(port.provides_metadata) or "—",
+        )
+    console.print(ports)
+
+    console.print(
+        f"devices {description.devices}  native dtypes "
+        f"{description.native_compute_dtypes}  lossy-in {description.lossy_input_dtypes}"
+    )
+
+    families = Table("Family", "Category", "Decides?", "Gate")
+    for family in description.families:
+        families.add_row(
+            family.family_id,
+            family.category,
+            "yes" if family.gate_deciding else "[yellow]no[/yellow]",
+            family.gate_status,
+        )
+    console.print(families)
+
+    refusals = Table("Refusal", "Outcome", "Remedy")
+    for refusal in description.refusals:
+        refusals.add_row(refusal.code, refusal.status, refusal.remedy)
+    console.print(refusals)
+
+
+@app.command("check-connection")
+def check_connection_command(source: str, target: str) -> None:
+    """`check-connection M_RAY_OPTILAND.rays M_WAVE_CHROMATIX.input_field`.
+
+    Answers with the mediating coupler and the declarations the edge must carry
+    -- which are otherwise discoverable only by being refused.
+    """
+
+    try:
+        source_component, source_port = source.split(".", 1)
+        target_component, target_port = target.split(".", 1)
+    except ValueError:
+        raise typer.BadParameter("use <COMPONENT>.<port> for both arguments") from None
+
+    report = check_connection(source_component, source_port, target_component, target_port)
+    verdict = "[green]compatible[/green]" if report.compatible else "[red]incompatible[/red]"
+    console.print(f"{source} -> {target}: {verdict}")
+    if report.coupler:
+        console.print(f"  coupler: {report.coupler}")
+    if report.required_edge_declarations:
+        console.print(f"  the edge must declare: {report.required_edge_declarations}")
+    for issue in report.issues:
+        console.print(f"  [{issue['code']}] {issue['message']}")
+    if not report.compatible:
+        raise typer.Exit(code=1)
+
+
+@app.command("route-capability")
+def route_capability_command(components: list[str]) -> None:
+    """At what device and precision can this ordered route execute?"""
+
+    answer = route_capability(components)
+    console.print(f"route: {' -> '.join(answer.route)}")
+    console.print(
+        f"  crossable: {answer.feasible}   devices: {answer.devices or '—'}"
+    )
+    console.print(
+        f"  one precision for the whole route: {answer.uniform_precision_available} "
+        f"{answer.uniform_compute_dtypes or ''}"
+    )
+    for handover in answer.handovers:
+        kind = "lossy" if handover.lossy else "exact"
+        dtypes = handover.lossy_dtypes if handover.lossy else handover.exact_dtypes
+        console.print(f"  {handover.producer} -> {handover.consumer}: {kind} {dtypes}")
+    if answer.blocking_pair:
+        console.print(f"  [yellow]blocking pair[/yellow]: {answer.blocking_pair}")
+    if answer.reason:
+        console.print(f"  {answer.reason}")
+    if not answer.feasible:
         raise typer.Exit(code=1)
 
 

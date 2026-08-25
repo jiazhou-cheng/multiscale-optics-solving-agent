@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "Where a parameter point sits relative to a component's declared bounds.",
+  "properties": {
+    "component": {
+      "title": "Component",
+      "type": "string"
+    },
+    "margins": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Margins",
+      "type": "object"
+    },
+    "predicates": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Predicates",
+      "type": "array"
+    },
+    "prose_only": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Prose Only",
+      "type": "array"
+    },
+    "state": {
+      "title": "State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "component",
+    "state"
+  ],
+  "title": "ValidityAnswer",
+  "type": "object"
+}
