@@ -60,6 +60,30 @@ background regions, where the mean approaches zero (SI Figure S3b). A large
 *relative* deviation there is not evidence of non-convergence; check the bright
 features and the integrated power instead.
 
+### Deciding it quantitatively
+
+"Rerun with a different seed and compare spatially" is the right instinct and it
+has three failure modes of its own. Each has bitten this repository.
+
+| Symptom | Cause | Check |
+|---|---|---|
+| Seed-to-seed NCC near zero, or negative | Below the noise floor `3/√N_px` — that is zero with an error bar, not a small correlation | Compute the floor and refuse to fit through rungs under it. A ladder that did returned a convergence slope of **5.7** |
+| A convergence ladder's slope is suspiciously shallow | Rungs too close to the floor: the floor biases each rung upward and flattens the fit | Start at ≥ 3× the floor. Rungs at 1.5–2.9× turned a slope of ~1.4 into 0.93 |
+| Seed-to-seed NCC does not move when the ray count or the variance does | The reconstruction, not the estimator, is setting it — a coarse `kspace_oversample` leaves structure common to both realizations | demo3 at `oversample=1.5` reads NCC ~0.08 while the variance changes 1.73×; at 8.0 it reads 0.0054 and tracks |
+| A ladder extrapolates to an implausible budget | Slope-1 extrapolation. NCC goes as `N²` while small, and saturates | Fit `NCC = 1/(1 + c·N^-p)`; it respects `NCC ≤ 1`, which matters at a target of 0.9 |
+
+The measurement that avoids all four: **the variance itself.** `V = Σ_px
+Var_r[F_r]` over ≥ 3 seeds has no floor and no saturation, and `V ∝ 1/N` is the
+direct statement of "noise-limited, more rays fix it" (measured at `N^-0.995`
+over 8× on demo3). Compare arms on **absolute** `V`: every arm estimates the
+same field with the same `one_over_n` normalization, so `V` is already
+comparable and its ratios are exact, while dividing by the signal estimate
+`Σ|F̄|² − V/R` (3.7% of the total at demo3's 2e7-ray configuration) would add
+that estimate's own error to every ratio for nothing.
+
+Full worked case, including the position-density optimum and the `(P, S)`
+allocation: `benchmarks/reports/2026-08/demo3_estimator_variance.md`.
+
 ## Structured failures the coupler must emit
 
 | Code | Condition |

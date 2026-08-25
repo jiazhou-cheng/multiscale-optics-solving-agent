@@ -338,6 +338,24 @@ couplers:
           and the sweep plateaus at ~0.28 instead of converging; an undilated
           draw is unbiased in the interior and biased at the rim, which reads as
           a soft edge rather than as a defect.
+        - >-
+          The centre DENSITY is uniform by default and that is a choice, not a
+          requirement of the convergence relation -- "uniformly covers" in SI S2
+          constrains the support, not the density. CHE-120 derived the
+          variance-optimal density (q ~ ||U~_c||_1, the L1 norm of the patch's
+          own spectrum) and measured it on demo3. The exactly-computed ceiling
+          on that axis is 1.4413x at matched ray count; the integral-image proxy
+          q ~ sqrt(window energy) captures 1.4412x of it, and the measured
+          end-to-end reduction is 1.4523x i.i.d. or 1.4685x with equal-mass CDF
+          strata. The default stays uniform so every committed record remains the
+          estimator that produced it;
+          couplers.patch_positions.plan_positions supplies the alternative and
+          PatchPlan.center_weights carries the lambda_c = P / (D pi_c) that keeps
+          it unbiased -- 1/(D q_c) for the i.i.d. and CDF draws, the stratum's
+          own mass for the equal-area tiling.
+          Unbiasedness of each density is gated against the enumerated exact
+          field in tests/test_patch_positions.py, not inferred from the noise
+          level. Not yet reachable through the graph node -- library only.
       warnings:
         - >-
           The step RESETS optical path length to zero on the outgoing rays, for

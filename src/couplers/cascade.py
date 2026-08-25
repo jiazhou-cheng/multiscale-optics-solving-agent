@@ -90,10 +90,28 @@ class PrimarySampling(StrEnum):
 
     Note the asymmetry, because it is not obviously right: directions are drawn
     **by spectrum magnitude** and these positions are drawn **uniformly**. The
-    paper does not justify the uniform choice, and this module does not adopt an
-    argument it does not have -- ``UNIFORM_ON_GRID`` is offered because it is
-    what the reference implementation does, not because it is established as the
+    paper does not justify the uniform choice, and this module did not adopt an
+    argument it did not have -- ``UNIFORM_ON_GRID`` was offered because it is
+    what the reference implementation does, not because it was established as the
     best estimator of the position integral.
+
+    **CHE-120 supplied the argument, and for this route it favours uniform.**
+    The variance-optimal density over a discrete set of positions is
+    ``q_c ~ f_c``, where ``f_c`` is the modulus of the importance weight a ray
+    launched from ``c`` carries (Cauchy-Schwarz; see
+    :mod:`couplers.patch_positions` for the derivation). On **this** route every
+    launch position resamples **one global spectrum**, and the only thing the
+    position changes is the phase ``exp(i k (d_u x_p + d_v y_p))`` -- modulus 1.
+    So ``f_c`` is the same at every position, ``q_c ~ f_c`` *is* the uniform
+    density, and no reweighting of positions can reduce the dominant variance
+    term here. The asymmetry is real and, on RW-F, correct.
+
+    It is **not** correct on the patch route, where each patch transforms its own
+    window and ``f_c = ||U~_c||_1`` varies with how much aperture that window
+    holds. There the same derivation gives a measured 1.44x, and
+    :mod:`couplers.patch_positions` implements it. The two routes differ because
+    one spectrum is shared and the other is not, which is the distinction this
+    docstring previously lacked the argument to draw.
     """
 
     #: Uniform over the DOE's sample positions, without replacement where

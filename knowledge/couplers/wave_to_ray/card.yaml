@@ -579,10 +579,126 @@ patch_step:
     separable einsum -- against upstream's O(N_rays) + one FFT. Measured
     consequences: demo2's RW-P needed 40 batches where the paper used 2, and
     94.9 s where the paper reports 2.275 s; demo3 does not converge at any
-    budget that fits, and the seed-to-seed NCC trend (log-log slope 0.956,
-    i.e. noise-limited) extrapolates to 1.78e9 rays and 1.2 h per run for
-    NCC 0.9. The paper's own RW-P budget for that system is 2.6e9 rays. This
-    is the evidence for the k-space fast path tracked on CHE-95.
+    budget that fits. This is the evidence for the k-space fast path tracked on
+    CHE-95, which landed as CHE-101 -- so the numbers below supersede the
+    O(N_rays x N_pixels) framing above for any run on the `kspace_splat` route.
+
+    **Current demo3 budget (CHE-120, M5.3).** NCC 0.9 seed-to-seed needs
+    **1.49e9 rays, 0.14 h/run** on the shipped estimator, or **1.02e9 rays,
+    0.094 h** with position importance sampling. Was 1.74e9 rays and 1.085 h at
+    M0.4, so 11.5x on wall clock, decomposing exactly as 6.71x throughput
+    (M5.1 + M5.2, field unchanged to 7 significant figures) x 1.162x
+    extrapolation-law correction x 1.471x variance. The paper's SI Table S2
+    budget is 2.6e9, so the shipped estimator sits 1.74x below it -- agreement,
+    on a two-decade extrapolation whose model spread is 2.9x.
+
+    **Do not extrapolate a seed-to-seed NCC ladder on slope 1.** The committed
+    record did, and it is one power out: what two realizations share is the
+    deterministic |mu|^2, what differs is noise whose spatial variance goes as
+    (E|n|^2)^2, so NCC ~ N^2 while it is small. Use the saturating form
+    NCC = 1 / (1 + c N^-p), which respects NCC <= 1; the measured p is 1.64 and
+    it beat the power law out of sample (0.437 predicted against 0.4105
+    measured, versus 0.57).
+  how_to_tell_a_converged_run_from_an_unconverged_one: >-
+    Four checks, in this order. The first two are cheap and catch almost
+    everything; the third is the one that actually decides.
+
+    1. **Is the NCC above the noise floor?** An NCC over N_px pixels has a
+    standard error near 1/sqrt(N_px), so anything below 3/sqrt(N_px) is zero
+    with an error bar. demo3's 420^2 sensor puts that floor at 0.0071. A ladder
+    fitted through sub-floor rungs returned a slope of 5.7 once; rungs only
+    1.5-2.9x above it flattened a slope from ~1.4 to 0.93. Start a ladder at 3x
+    the floor or higher.
+
+    2. **Is the reconstruction oversampled enough that the NCC means anything?**
+    At `kspace_oversample = 1.5` demo3's seed-to-seed NCC reads ~0.08 and does
+    not move when the variance changes by 1.73x -- it is dominated by a
+    reconstruction artifact common to both realizations. At `oversample = 8.0`
+    the same configuration reads 0.0054 and tracks the variance. A seed-to-seed
+    NCC at low oversampling is not a convergence measurement.
+
+    3. **Does the variance fall as 1/N?** This is the direct test and it has no
+    floor and no saturation. Estimate V = sum_px Var_r[F_r] over >= 3 seeds at
+    two or more ray counts; the exponent should be -1 (measured -0.995 over 8x).
+    A shallower exponent is a floor that no budget removes. Compare arms on
+    ABSOLUTE V rather than a signal-normalized version: every arm estimates the
+    same field with the same one_over_n normalization, so V is already comparable
+    and its ratios are exact, while the signal estimate sum|F_bar|^2 - V/R (3.7%
+    of the total at demo3's 2e7-ray configuration, known to a few percent) would
+    add its own error to every ratio for nothing.
+
+    4. **Is the estimator the one you think it is?** Two arms with different
+    sampling can have the same noise level and different means. Score
+    ||F_bar_A - F_bar_B||^2 against V_A/R_A + V_B/R_B; it is 1 when the means
+    agree. Its own fluctuation is ~sqrt(2/N_px), and pixel noise in speckle is
+    not independent, so read a departure against a few multiples of that.
+  primary_position_density: >-
+    The centre density is uniform by default, and "uniformly covers the DOE
+    profile" in SI S2 constrains the SUPPORT, not the density -- any density
+    with the right support converges, at different rates. CHE-120 derived the
+    optimum and measured it.
+
+    The variance-optimal density over the candidate positions is q_c ~ f_c with
+    f_c the modulus of the importance weight a ray from c carries
+    (Cauchy-Schwarz). Because the direction axis already uses p ~ |U~|, that
+    weight has constant modulus within a patch, so **f_c = ||U~_c||_1** -- the
+    L1 norm of that patch's own spectrum. Computed exactly over all 90,601
+    demo3 candidates, the ceiling on this axis is **1.4413x**, and
+    q ~ sqrt(window energy) -- one integral image, no transforms -- captures
+    1.4412x of it at correlation 0.99995, because a phase-only mask's patch is a
+    quasi-random phase over the n_c aperture samples in its window and
+    ||U~_c||_1 ~ sqrt(n_c). Measured end to end: 1.4523x i.i.d., 1.4685x with
+    equal-mass CDF strata, and the closed form predicts to 0.15% the direction
+    term it is derived for (B falls 1.4391x against 1.4413x predicted; the
+    position term A falls 1.5849x).
+
+    Why only 1.44x when M2 measured 4.96x for magnitude sampling on the
+    direction axis: demo3's DOE amplitude is FLAT inside its aperture, so the
+    only spatial structure is the rim taper of the dilated draw region -- mean
+    window fill 0.347, and 10.4% of candidate positions hold no aperture sample
+    at all. **On a DOE with structured transmission the ceiling is different and
+    possibly much larger**; compute it per configuration with
+    couplers.patch_positions.predicted_variance_ratio, which needs the mask
+    alone.
+
+    Two traps. `q ~ energy` instead of `q ~ sqrt(energy)` gets 1.096x, three
+    quarters of the way back to uniform. And equal-AREA strata with one draw
+    each cancel importance sampling almost entirely (1.090x), because the
+    between-cell allocation is then uniform whatever the density; use equal-mass
+    strata, where pi_c = P q_c exactly and the weights are unchanged. The
+    general weight the module applies is lambda_c = P / (D pi_c) with pi_c the
+    expected draw count -- 1/(D q_c) for the i.i.d. and CDF draws, the stratum's
+    own mass for the equal-area tiling.
+
+    Stratification on its own buys nothing here (1.008x): 1,000 draws over
+    90,601 positions is too sparse to bite on an integrand that decorrelates at
+    the sample pitch.
+  the_allocation_between_patches_and_secondaries: >-
+    Already optimal at the preset's values, and worth recording so it is not
+    searched again. Fixed P x S is NOT fixed cost -- the padded transform is per
+    patch and the draw, trace and reconstruction are per ray, so
+    c = P (a + b S) -- and the variance is V = A/P + B/(PS). Minimizing V at
+    fixed c gives S* = sqrt(a B / (b A)) = 2.15e4 against the shipped 20,000,
+    which is 0.1% from the optimum in the objective (2.26e4 and 0.3% for the
+    importance-sampled arm). Two significant figures because S* goes as
+    sqrt(a/b) and the cost model's residual is 6.4%. Confirmed directly: V x
+    cost over four cells at fixed P x S = 2e7 is minimized at the shipped cell.
+    The optimum is quadratically flat, which is why it was never worth tuning.
+  where_the_variance_is: >-
+    V(P, S) = A/P + B/(PS), fitted to 0.14% residual and cross-validating onto
+    an axis it was not fitted on (0.6%). At the shipped S = 20,000, 74.6% of V
+    sits in the term that falls with P*S and 25.4% in the term that falls only
+    with P. **That split says how V responds to the two knobs -- it is what sets
+    S* -- and is NOT a division into reducible and irreducible shares.** Reading
+    it as one would cap the achievable gain at 1.084x, which the measured 1.4685x
+    falsifies: a position density multiplies whole patches, so it scales both
+    terms (A by 1.5849x, B by 1.4391x, both measured). What IS irreducible is
+    reweighting the DIRECTION axis: p ~ |U~| is the Cauchy-Schwarz optimum over
+    densities, a proof rather than a measurement. So every "choose a better
+    density" lever is now at its optimum, and what remains untried is correlated
+    sampling on the direction axis -- the bound constrains densities, not
+    correlations -- and control variates against an analytic surrogate.
+    benchmarks/reports/2026-08/demo3_estimator_variance.md.
   gradient: >-
     None certified. Inherits the fixed-direction estimator; the registry records
     derivative.mode=surrogate with verified=false and the node refuses

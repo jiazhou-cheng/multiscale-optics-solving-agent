@@ -44,6 +44,14 @@ Two consequences, both asserted in `tests/test_patch_wft.py`:
 2. many smaller patches uniformly covering the aperture converge to the same
    field.
 
+Note what (2) does **not** say. "Uniformly covers" is a condition on the
+ensemble's coverage, not an instruction to draw the centres from a uniform
+density -- any density with the right support converges, and they do not
+converge at the same rate. `couplers/patch_positions.py` derives the
+variance-optimal one and measures it at 1.44x on demo3 (CHE-120); this module's
+own draw stays uniform, and `PatchPlan.center_weights` is how a different one
+is carried without touching the coverage correction.
+
 **On a curved substrate neither holds.** Every patch has its own tangent frame
 and normal, the exactness relation is gone, and all that remains is the SI S3
 bound `eps_curv <= arcsin(D/2R)` in `couplers/curvature.py`. That asymmetry is
@@ -286,6 +294,16 @@ class CoverageBasis(StrEnum):
     #: aperture, each used once. Deterministic, and the correction is the same
     #: ratio -- it is a count of positions either way.
     ENUMERATED_OVER_DILATED_APERTURE = "enumerated_over_dilated_aperture"
+    #: Centres come from :func:`couplers.patch_positions.plan_positions` with a
+    #: non-uniform density or a stratified draw, and ``PatchPlan.center_weights``
+    #: carries the ``lambda_c = P / (D pi_c)`` that keeps the ensemble unbiased.
+    #:
+    #: The coverage ratio still applies **unchanged**: it counts the same ``D``
+    #: candidate positions, and every departure from uniform is carried in the
+    #: weight rather than in the ratio. Folding one into the other would give a
+    #: field wrong by a constant that looks entirely plausible, which is the
+    #: failure mode this enum exists for.
+    IMPORTANCE_OVER_DILATED_APERTURE = "importance_over_dilated_aperture"
     #: The caller does not know. Refused: an unbiased estimator needs a known
     #: sampling density, and there is no safe default.
     UNKNOWN = "unknown"
@@ -319,6 +337,16 @@ class PatchPlan:
     #: ``arcsin(D / 2R)`` for the declared substrate. Exactly 0 for planar,
     #: recorded rather than left implicit.
     curvature_bound_rad: float
+    #: ``(P,)`` importance weights, one per centre, or ``None`` for the uniform
+    #: i.i.d. draw where every weight is exactly 1. Built by
+    #: :func:`couplers.patch_positions.plan_positions` as ``P / (D pi_c)``; the
+    #: emitter multiplies each patch's amplitudes by its own weight.
+    #:
+    #: ``None`` rather than ``ones`` on purpose: the multiply is then absent from
+    #: the default path rather than a no-op in it, so the shipped estimator stays
+    #: bitwise what it was and the comparison in CHE-120 is between densities
+    #: instead of between one density and a rounding of itself.
+    center_weights: np.ndarray[Any, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -336,6 +364,11 @@ class PatchDiagnostics:
     curvature_bound_rad: float
     apodization: str = "none -- a taper breaks the partition-of-unity exactness argument"
     reconstruction_normalization: str = "one_over_n"
+    #: Mean of the applied per-centre importance weights, or ``None`` when the
+    #: uniform draw ran and no weight was applied. Reported because a weighted
+    #: and an unweighted run are otherwise indistinguishable in a record, and
+    #: they are different estimators of the same field.
+    mean_center_weight: float | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -352,6 +385,7 @@ class PatchDiagnostics:
             "curvature_bound_rad": self.curvature_bound_rad,
             "apodization": self.apodization,
             "reconstruction_normalization": self.reconstruction_normalization,
+            "mean_center_weight": self.mean_center_weight,
         }
 
 
@@ -448,6 +482,7 @@ def plan_patches(
     radius_m: float = math.inf,
     error_threshold_rad: float = 1e-3,
     rng: np.random.Generator | None = None,
+    center_weights: np.ndarray[Any, Any] | None = None,
 ) -> PatchPlan:
     """Choose patch centres and sizes, with the curvature bound enforced first.
 
@@ -538,6 +573,47 @@ def plan_patches(
             ),
         )
 
+    if center_weights is not None:
+        if not supplied:
+            raise ContractError(
+                ContractCode.MISSING_DECLARATION,
+                "center_weights only means something for supplied centres; this "
+                "function's own uniform draw has weights identically 1",
+                declaration="center_weights",
+                remedy=(
+                    "Draw the centres with couplers.patch_positions.plan_positions "
+                    "and pass its centres and weights together."
+                ),
+            )
+        if np.asarray(center_weights).shape != (
+            np.asarray(centers_xy_m).shape[0],
+        ):
+            raise ContractError(
+                ContractCode.SHAPE_MISMATCH,
+                f"center_weights has shape {np.asarray(center_weights).shape} but "
+                f"{np.asarray(centers_xy_m).shape[0]} centres were supplied",
+                declaration="center_weights",
+            )
+        if coverage_basis is not CoverageBasis.IMPORTANCE_OVER_DILATED_APERTURE:
+            raise ContractError(
+                ContractCode.MISSING_DECLARATION,
+                (
+                    f"center_weights was supplied with coverage_basis="
+                    f"{coverage_basis.value!r}; weights are what makes a "
+                    "non-uniform draw unbiased, so the basis has to say the draw "
+                    "was non-uniform"
+                ),
+                declaration="coverage_basis",
+                remedy="Declare CoverageBasis.IMPORTANCE_OVER_DILATED_APERTURE.",
+            )
+    elif coverage_basis is CoverageBasis.IMPORTANCE_OVER_DILATED_APERTURE:
+        raise ContractError(
+            ContractCode.MISSING_DECLARATION,
+            "IMPORTANCE_OVER_DILATED_APERTURE without center_weights would apply "
+            "the uniform correction to a non-uniform draw",
+            declaration="center_weights",
+        )
+
     max_center_px = (
         0.0
         if patch_count is None and not supplied
@@ -617,6 +693,9 @@ def plan_patches(
         coverage=coverage,
         dilation_px=int(dilation),
         curvature_bound_rad=float(budget.error_bound_rad),
+        center_weights=(
+            None if center_weights is None else np.asarray(center_weights, dtype=np.float64)
+        ),
     )
 
 
@@ -727,6 +806,23 @@ def patch_secondary_rays(
         )
 
     centers = np.asarray(plan.centers_xy_m, dtype=np.float64)
+    center_weights = (
+        None
+        if plan.center_weights is None
+        else np.asarray(plan.center_weights, dtype=np.float64)
+    )
+    if center_weights is not None and center_weights.shape != (centers.shape[0],):
+        raise ContractError(
+            ContractCode.SHAPE_MISMATCH,
+            f"center_weights has shape {center_weights.shape} but there are "
+            f"{centers.shape[0]} centres; one importance weight per centre or None",
+            declaration="center_weights",
+            remedy=(
+                "Slice the weights wherever the centres are sliced. A batched "
+                "caller that splits centres and forgets the weights produces a "
+                "field that is wrong per batch and plausible overall."
+            ),
+        )
     off = (pad - plan.patch_px) // 2
     threads = emitter_threads()
     uniform_density = np.full(n_propagating, 1.0 / n_propagating)
@@ -838,7 +934,12 @@ def patch_secondary_rays(
 
             _map_patches(pool, draw_slot, len(block))
 
-            for center, (modal, density, picks) in zip(block, drawn, strict=True):
+            weight_block = (
+                None if center_weights is None else center_weights[first : first + len(block)]
+            )
+            for slot, (center, (modal, density, picks)) in enumerate(
+                zip(block, drawn, strict=True)
+            ):
                 # No launch-position phase here, and the reason is the one thing
                 # about this module most likely to be got wrong.
                 #
@@ -856,7 +957,17 @@ def patch_secondary_rays(
                 # centre is at the origin and the extra factor is exactly 1 --
                 # which is how it survived until the sub-aperture relation was
                 # measured.
-                amplitudes.append(plan.coverage * modal[picks] / density[picks])
+                # The importance weight multiplies here and nowhere else. It is
+                # a property of WHERE this patch was drawn from, so it scales the
+                # whole patch and cannot be folded into the coverage ratio (which
+                # is one number for the ensemble) or into the spectral density
+                # (which is per mode within the patch).
+                scale = (
+                    plan.coverage
+                    if weight_block is None
+                    else plan.coverage * float(weight_block[slot])
+                )
+                amplitudes.append(scale * modal[picks] / density[picks])
 
                 normal = np.sqrt(
                     np.clip(1.0 - (du[picks] ** 2 + dv[picks] ** 2), 0.0, None)
@@ -902,6 +1013,9 @@ def patch_secondary_rays(
         evanescent_modes=int(pad * pad - n_propagating),
         substrate=Substrate.PLANAR.value,
         curvature_bound_rad=plan.curvature_bound_rad,
+        mean_center_weight=(
+            None if center_weights is None else float(center_weights.mean())
+        ),
     )
 
 
