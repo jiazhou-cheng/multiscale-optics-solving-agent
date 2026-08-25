@@ -120,8 +120,7 @@ def airy_first_null_radius_m(wavelength_m: float, numerical_aperture: float) -> 
     if wavelength_m <= 0.0 or numerical_aperture <= 0.0:
         raise ContractError(
             ContractCode.UNIT_NOT_SI,
-            f"wavelength and NA must be positive, got {wavelength_m!r} and "
-            f"{numerical_aperture!r}",
+            f"wavelength and NA must be positive, got {wavelength_m!r} and {numerical_aperture!r}",
             declaration="wavelength_m / numerical_aperture",
         )
     return AIRY_FIRST_NULL_COEFFICIENT_EXACT * wavelength_m / numerical_aperture
@@ -396,9 +395,7 @@ def pupil_aberration(
         )
     )
 
-    residual = _sphere_residual(
-        positions[:, 0], positions[:, 1], plane_z_m, opl, sphere.center_m
-    )
+    residual = _sphere_residual(positions[:, 0], positions[:, 1], plane_z_m, opl, sphere.center_m)
 
     # RayBundle.amplitude is complex, because an amplitude may carry phase. This
     # oracle takes the modulus and refuses a bundle whose amplitude carries phase
@@ -439,11 +436,7 @@ def _monomial_design(
     x: np.ndarray[Any, Any], y: np.ndarray[Any, Any], *, order: int
 ) -> np.ndarray[Any, Any]:
     """Monomials ``x^i y^j`` with ``i + j <= order``, on normalized coordinates."""
-    columns = [
-        (x**i) * (y ** (total - i))
-        for total in range(order + 1)
-        for i in range(total + 1)
-    ]
+    columns = [(x**i) * (y ** (total - i)) for total in range(order + 1) for i in range(total + 1)]
     return np.stack(columns, axis=1)
 
 
@@ -578,9 +571,7 @@ def fraunhofer_psf(
         diagnostics={
             "pupil_samples_inside_aperture": int(inside.sum()),
             "amplitude_source": "mean (uniform control)" if uniform_amplitude else "fitted",
-            "fitted_wavefront_rms_waves": float(
-                np.std(w_grid[inside]) / aberration.wavelength_m
-            ),
+            "fitted_wavefront_rms_waves": float(np.std(w_grid[inside]) / aberration.wavelength_m),
             "sampled_wavefront_rms_waves": aberration.rms_waves,
             "spatial_factor": "exp(+i k z), this project's convention",
         },

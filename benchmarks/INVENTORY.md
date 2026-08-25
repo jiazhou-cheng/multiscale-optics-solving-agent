@@ -6,7 +6,7 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
-| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 90 |
+| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 96 |
 | **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 3 |
 | **C** | does this exist only to serve the old evaluation design? | delete | 11 |
 
@@ -107,6 +107,12 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `src/verification/psf_oracles.py` | The independent analytic PSF oracles. Expensive to derive and the only independent deciders the composed families have. | B3-PSF-SINGLET oracle callables. |
 | `src/verification/psf_measurement.py` | PSF metric measurement -- Strehl, first null, encircled energy, residual L2. | src/verification/metrics.py (M2.4), one canonical definition each. |
 | `src/verification/asm_oracle.py` | The repository's own float64 ASM/RS propagator (O2). Genuinely useful characterization evidence that must NEVER decide a gate -- L2-PSF-01 once set a negative-control floor from an O2 comparison and had to retire it as circular. | Oracle kind with independence SHARES_CODE, structurally barred from gating. |
+| `src/verification/status.py` | The seven verification statuses, in their own module because both the family schema and the verifier need them. They exist separately because a pass/fail boolean cannot tell "the solver refuses this dtype" from "the approximation does not apply here" from "it ran and the number is wrong". | VerificationResult.status (M0.5.3) and BenchmarkFamily.failure_semantics. |
+| `src/verification/families/__init__.py` | The family substrate's public surface (CHE-131). | Unchanged; grows as families are authored. |
+| `src/verification/families/schema.py` | BenchmarkFamily, BenchmarkInstance, the four parameter kinds, the signed validity margin, and the oracle-independence and tolerance-gating rules enforced at construction. | The substrate M1/M2/M4 author against. |
+| `src/verification/families/registry.py` | The one place that knows which families exist, with the family_id uniqueness rule that replaces the retired A1-* id-space collision test. | Unchanged. |
+| `src/verification/families/predicates.py` | The already-measured validity bounds made executable: SI S3 curvature, per-axis Nyquist, ASM transfer-function sampling, capability intersection, hexapolar ring membership, declared planarity, Fresnel number, paraxial field angle. | Family validity tuples. |
+| `src/verification/families/projection.py` | Projects registered families into claim_ledger Claims, so the coverage ledger is derived rather than typed twice. | Unchanged; the projection grows as families land. |
 | `src/verification/__init__.py` | Package marker. | Unchanged. |
 
 ## Bucket B — candidate canonical case

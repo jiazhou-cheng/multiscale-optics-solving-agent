@@ -818,6 +818,46 @@ entries:
       circular.
     destination: >-
       Oracle kind with independence SHARES_CODE, structurally barred from gating.
+  - path: src/verification/status.py
+    bucket: A
+    justification: >-
+      The seven verification statuses, in their own module because both the
+      family schema and the verifier need them. They exist separately because a
+      pass/fail boolean cannot tell "the solver refuses this dtype" from "the
+      approximation does not apply here" from "it ran and the number is wrong".
+    destination: >-
+      VerificationResult.status (M0.5.3) and BenchmarkFamily.failure_semantics.
+  - path: src/verification/families/__init__.py
+    bucket: A
+    justification: The family substrate's public surface (CHE-131).
+    destination: Unchanged; grows as families are authored.
+  - path: src/verification/families/schema.py
+    bucket: A
+    justification: >-
+      BenchmarkFamily, BenchmarkInstance, the four parameter kinds, the signed
+      validity margin, and the oracle-independence and tolerance-gating rules
+      enforced at construction.
+    destination: The substrate M1/M2/M4 author against.
+  - path: src/verification/families/registry.py
+    bucket: A
+    justification: >-
+      The one place that knows which families exist, with the family_id
+      uniqueness rule that replaces the retired A1-* id-space collision test.
+    destination: Unchanged.
+  - path: src/verification/families/predicates.py
+    bucket: A
+    justification: >-
+      The already-measured validity bounds made executable: SI S3 curvature,
+      per-axis Nyquist, ASM transfer-function sampling, capability intersection,
+      hexapolar ring membership, declared planarity, Fresnel number, paraxial
+      field angle.
+    destination: Family validity tuples.
+  - path: src/verification/families/projection.py
+    bucket: A
+    justification: >-
+      Projects registered families into claim_ledger Claims, so the coverage
+      ledger is derived rather than typed twice.
+    destination: Unchanged; the projection grows as families land.
   - path: src/verification/__init__.py
     bucket: A
     justification: Package marker.

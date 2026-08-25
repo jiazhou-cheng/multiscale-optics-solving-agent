@@ -262,8 +262,7 @@ def test_the_open_gate_register_reproduces_l2_psf_01() -> None:
     primary = next(c for m, c in gates.items() if "fft_oracle_intensity_relative_l2" in m)
     assert primary.tolerance == tolerances["fft_oracle_intensity_relative_l2"] == 1.0e-3
     assert primary.observed == pytest.approx(finest["weighted_vs_o1"]), (
-        "the ledger's observed value must be the one in the record, to the record's "
-        "precision"
+        "the ledger's observed value must be the one in the record, to the record's precision"
     )
     assert primary.observed == pytest.approx(2.21e-3, abs=5e-6), "the value CHE-104 names"
     assert primary.gate_status is GateStatus.NOT_MET
@@ -409,3 +408,62 @@ def test_the_generated_document_matches_the_ledger(name: str, generators: dict) 
         f"benchmarks/validation/{name} is stale. Regenerate with: "
         "./run.sh python scripts/generate_validation_coverage.py"
     )
+
+
+# ---------------------------------------------------------------------------
+# The ledger as a projection (CHE-131, M0.5.2)
+# ---------------------------------------------------------------------------
+
+
+def test_the_ledger_is_the_family_registry_plus_what_is_not_migrated_yet() -> None:
+    """``CLAIMS`` is derived, not typed twice.
+
+    The direction is: the family registry is authoritative wherever it has
+    content, and this table is its projection plus the rows M1/M2/M4 have not
+    absorbed yet. Asserting the arithmetic here is what stops somebody adding a
+    hand-written claim *beside* a family and having both survive.
+    """
+    from verification.claim_ledger import _LEGACY_CLAIMS, all_claims
+    from verification.families.projection import claims_from_families
+
+    projected = claims_from_families()
+    assert all_claims() == projected + _LEGACY_CLAIMS
+
+
+def test_a_family_and_a_legacy_row_cannot_describe_the_same_cell() -> None:
+    """The anti-drift mechanism.
+
+    When M1/M2/M4 land a family, the hand-written row it replaces must be
+    deleted -- leaving it produces a collision here rather than a silent
+    duplicate that slowly disagrees with the family it shadows.
+    """
+    from verification.claim_ledger import _LEGACY_CLAIMS
+    from verification.families.projection import claims_from_families
+
+    legacy_cells = {(c.component, c.kind) for c in _LEGACY_CLAIMS}
+    collisions = sorted(
+        f"{c.component}/{c.kind.value}"
+        for c in claims_from_families()
+        if (c.component, c.kind) in legacy_cells
+    )
+    assert not collisions, (
+        "a registered family and a hand-written claim occupy the same cell:\n  "
+        + "\n  ".join(collisions)
+        + "\nDelete the legacy row in src/verification/claim_ledger.py::_LEGACY_CLAIMS; "
+        "the family is now the source of truth for it."
+    )
+
+
+def test_no_claim_kind_cell_is_claimed_twice_within_the_projection() -> None:
+    """Two families making the same claim about the same component is two
+    families that disagree with each other eventually."""
+    from verification.families.projection import claims_from_families
+
+    seen: dict[tuple[str, object], str] = {}
+    for claim in claims_from_families():
+        key = (claim.component, claim.kind)
+        assert key not in seen, (
+            f"{claim.component}/{claim.kind.value} is claimed by two families: "
+            f"{seen[key]!r} and {claim.claim!r}"
+        )
+        seen[key] = claim.claim

@@ -54,6 +54,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import lru_cache
+from typing import TYPE_CHECKING
 
 __all__ = [
     "CLAIMS",
@@ -69,6 +71,7 @@ __all__ = [
     "Oracle",
     "OracleIndependence",
     "StochasticEvidence",
+    "all_claims",
     "claims_for",
     "coverage",
     "open_gates",
@@ -305,7 +308,15 @@ def _t(path: str, name: str) -> str:
 # accuracy claim on a real system, and at C_PLANAR_DOE_STEP / C_PATCH_WFT, which
 # have graph nodes and no knowledge packs.
 
-CLAIMS: tuple[Claim, ...] = (
+#: Claims not yet expressed as a :class:`~verification.families.schema.BenchmarkFamily`.
+#:
+#: CHE-131 made the family registry authoritative wherever it has content, and
+#: :data:`CLAIMS` below is that registry's projection plus this remainder. The
+#: two cannot drift, because ``tests/test_claim_ledger.py`` fails when a legacy
+#: row and a projected claim occupy the same ``(component, kind)`` cell -- so
+#: landing a family *forces* the row it replaces to be deleted rather than
+#: leaving a silent duplicate.
+_LEGACY_CLAIMS: tuple[Claim, ...] = (
     # -- M_RAY_OPTILAND ------------------------------------------------------
     Claim(
         component="M_RAY_OPTILAND",
@@ -1357,12 +1368,49 @@ GAPS: tuple[Gap, ...] = (
 
 
 # ---------------------------------------------------------------------------
+# The ledger, as a projection
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def all_claims() -> tuple[Claim, ...]:
+    """Every claim this project makes: the registry's projection, then the rest.
+
+    Deferred rather than computed at import, and for a concrete reason: the
+    dependency runs family -> ledger-enums, so ``verification.families.schema``
+    imports :class:`Oracle` and friends from this module. Projecting at module
+    scope would invert that at exactly the wrong moment -- importing
+    ``verification.families`` first would find this module's bottom half asking
+    for a package that is still executing its own ``__init__``.
+
+    Cached, so that ``CLAIMS`` is one tuple for the life of the process and two
+    readers cannot see different ledgers.
+    """
+    from verification.families.projection import claims_from_families
+
+    return claims_from_families() + _LEGACY_CLAIMS
+
+
+if TYPE_CHECKING:  # pragma: no cover - the runtime value comes from __getattr__
+    #: Declared for the type checker and the linter, both of which cannot see a
+    #: PEP 562 module ``__getattr__``. The runtime value is :func:`all_claims`.
+    CLAIMS: tuple[Claim, ...]
+
+
+def __getattr__(name: str) -> object:
+    """``CLAIMS`` as a lazily-projected module attribute (PEP 562)."""
+    if name == "CLAIMS":
+        return all_claims()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# ---------------------------------------------------------------------------
 # Queries
 # ---------------------------------------------------------------------------
 
 
 def claims_for(component: str) -> tuple[Claim, ...]:
-    return tuple(claim for claim in CLAIMS if claim.component == component)
+    return tuple(claim for claim in all_claims() if claim.component == component)
 
 
 def open_gates() -> tuple[Claim, ...]:
@@ -1371,7 +1419,7 @@ def open_gates() -> tuple[Claim, ...]:
     The register M0.3 replaces ``gate_disposition`` prose with. An unmet gate
     that only exists as a paragraph in a manifest is one nobody queries.
     """
-    return tuple(claim for claim in CLAIMS if claim.is_open_gate)
+    return tuple(claim for claim in all_claims() if claim.is_open_gate)
 
 
 def coverage() -> dict[str, dict[ClaimKind, tuple[Claim, ...]]]:
