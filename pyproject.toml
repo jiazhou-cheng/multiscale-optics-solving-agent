@@ -70,7 +70,16 @@ where = ["src"]
 # `multiscale_optics_agent/` level, so `where = ["src"]` now discovers whatever
 # directory happens to sit there; an enumeration means a stray scratch directory
 # cannot silently become a shipped package.
-include = ["agent*", "core*", "couplers*", "registry*", "solvers*", "studies*", "verification*"]
+include = [
+  "agent*",
+  "core*",
+  "couplers*",
+  "registry*",
+  "runtime*",
+  "solvers*",
+  "studies*",
+  "verification*",
+]
 
 [tool.setuptools.package-data]
 "registry" = ["*.yaml"]
@@ -150,5 +159,15 @@ explicit_package_bases = true
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
 # package to name any more.
-source = ["agent", "cli", "core", "couplers", "registry", "solvers", "studies", "verification"]
+source = [
+  "agent",
+  "cli",
+  "core",
+  "couplers",
+  "registry",
+  "runtime",
+  "solvers",
+  "studies",
+  "verification",
+]
 branch = true

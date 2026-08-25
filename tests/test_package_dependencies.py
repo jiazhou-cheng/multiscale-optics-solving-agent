@@ -61,6 +61,13 @@ FORBIDDEN: dict[str, tuple[frozenset[str], str]] = {
         "an oracle that depends on a study is not independent of it. Independence "
         "is the whole reason verification/ exists as its own package.",
     ),
+    "runtime": (
+        frozenset({"verification", "studies", "agent", "cli"}),
+        "runtime/ orchestrates solvers and couplers -- that is what it is for, and "
+        "why the executor is not in core/. What it must NOT know is what the "
+        "numbers mean: an executor that imported verification/ could grade its own "
+        "run, and the whole point of the ExecutionRecord is that something else does.",
+    ),
     "registry": (
         frozenset({"solvers", "couplers", "verification", "studies", "agent", "cli"}),
         "the registry declares what exists; it does not execute any of it. "

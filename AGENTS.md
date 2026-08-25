@@ -71,6 +71,7 @@ Keep startup context small.
 - `src/solvers/`: narrow adapters around external solver APIs. External solver imports stay here.
 - `src/couplers/`: representation-changing physics between models. Couplers must not depend on solver-specific implementation details unless the contract explicitly requires it.
 - `src/registry/`: declarations of supported models and couplers; it does not execute them.
+- `src/runtime/`: the graph executor. Orchestrates solvers and couplers and emits an `ExecutionRecord`; it records what happened and never decides whether it was right.
 - `src/verification/`: independent scientific oracles, measurements, the benchmark family substrate (`families/`), and the physics verifier. Imports nothing from `src/agent/`.
 - `src/agent/`: agent execution/benchmark infrastructure, not solver physics.
 - `knowledge/`: compact agent-facing knowledge, not executable evidence or tutorial test code.

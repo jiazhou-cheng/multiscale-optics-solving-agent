@@ -15,11 +15,31 @@ nodes:
   - id: lens
     model: M_RAY_OPTILAND
     config:
-      wavelength_m: 5.5e-7
+      # CHE-113 found this node had NEVER been executable and nothing noticed,
+      # because until the executor existed nothing ran this file. It declared
+      # `wavelength_m` and `pupil_samples`, and the adapter reads `wavelength`
+      # (micrometres, its verified native unit), `num_rays` and `sample` -- so
+      # every value here was silently ignored and the trace fell back to the
+      # adapter's defaults on a different lens. The graph validator cannot catch
+      # that: it checks ports and artifact kinds, not whether a config key is a
+      # key the adapter reads.
+      sample: M3SingletRef
+      # Micrometres. 5.5e-7 m is the same wavelength, in the unit the frozen
+      # protocol states it in.
+      wavelength: 0.55
+      Hx: 0.0
+      Hy: 0.0
       # Hexapolar DENSITY request, not an output ray count -- Optiland returns
       # the survivor count, which is what the protocol's ray criterion applies
       # to. Tested by CHE-38 rather than assumed.
-      pupil_samples: 256
+      num_rays: 256
+      # The plane the trace is EXPORTED at, and it has to agree with the plane
+      # the edge below declares. Without it Optiland exports at
+      # `image_surface`, C_RAY_TO_WAVE refuses with REFERENCE_PLANE_MISMATCH,
+      # and it is right to: the two planes are a pupil-to-focus distance apart,
+      # so accepting the mismatch would defocus the reconstruction rather than
+      # piston it.
+      handoff_plane: exit_pupil
   - id: wave
     model: M_WAVE_CHROMATIX
     config:
