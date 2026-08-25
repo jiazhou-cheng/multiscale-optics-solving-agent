@@ -252,10 +252,33 @@ def test_grid_snapping_is_declared_to_have_a_cost() -> None:
 
 
 def test_the_curvature_bound_is_a_validity_predicate_on_the_equivalence_family() -> None:
-    """The SI S3 bound, executable rather than assumed. Infinite radius is the
-    planar case both couplers declare."""
+    """The SI S3 bound, executable rather than assumed.
+
+    A declared-planarity predicate was here too and was removed while authoring
+    FIXED-V1: it read a ``surface_sag_m`` and a ``planarity_tolerance_m`` this
+    family does not declare, so it could not be evaluated on the family's own
+    parameters. A bound nothing can check is not a bound, and the curvature
+    predicate covers the same physics with parameters that exist -- an infinite
+    substrate radius IS the planar case, and it fingerprints.
+    """
     predicates = {p.predicate_id for p in B2_EQUIV.validity}
-    assert {"SI_S3_CURVATURE", "DECLARED_PLANARITY"} <= predicates
+    assert "SI_S3_CURVATURE" in predicates
+
+    import math
+
+    params = {
+        "aperture_width_m": 1e-3,
+        "substrate_radius_m": math.inf,
+        "wavelength_m": 5.32e-7,
+        "patch_count": 1,
+        "grid_snapping": "exact",
+        "pad_width": 566,
+        "patch_width_m": 1e-3,
+        "tangent_plane_error_rad": 0.0,
+    }
+    status, margins = B2_EQUIV.evaluate_validity(params)
+    assert margins["SI_S3_CURVATURE"] == 1.0, "planar admits exactly zero tangent error"
+    assert status is ValidityState.INSIDE
 
 
 # --------------------------------------------------------------------------- #

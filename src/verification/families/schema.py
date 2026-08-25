@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -719,6 +720,13 @@ def _canonical(value: Any) -> Any:
         return [_canonical(v) for v in value]
     if isinstance(value, Mapping):
         return {str(k): _canonical(v) for k, v in sorted(value.items())}
+    if isinstance(value, float) and not math.isfinite(value):
+        # Infinity is a legitimate PHYSICAL parameter here -- an infinite
+        # substrate radius is the planar case -- and JSON has no literal for it.
+        # Mapped to a sentinel rather than dropped or coerced, so the planar
+        # instance keeps a stable fingerprint that is distinguishable from a very
+        # large finite radius.
+        return {float("inf"): "+inf", float("-inf"): "-inf"}.get(value, "nan")
     if isinstance(value, float | int | str | bool) or value is None:
         return value
     raise TypeError(
@@ -1031,7 +1039,24 @@ class BenchmarkFamily:
         margins: dict[str, float] = {}
         states: list[ValidityState] = []
         for predicate in self.validity:
-            margin, state = predicate.evaluate(parameters)
+            try:
+                margin, state = predicate.evaluate(parameters)
+            except KeyError as missing:
+                # A family that declares a bound its own parameters cannot feed
+                # has declared a bound nothing can check. Found twice while
+                # authoring FIXED-V1 -- B1-WAVE-AIRY and B1-WAVE-TALBOT both
+                # carried the ASM sampling predicate without the distance and
+                # pitch it reads -- so the message names all three things a
+                # reader needs rather than raising a bare KeyError from inside a
+                # lambda.
+                raise ValueError(
+                    f"{self.family_id}: validity predicate "
+                    f"{predicate.predicate_id} reads {missing.args[0]!r}, which is not "
+                    f"in this family's parameter space "
+                    f"{sorted(p.name for p in self.parameters)}. Either the family "
+                    "declares a bound it cannot evaluate, or the predicate is "
+                    "configured against the wrong key names."
+                ) from missing
             margins[predicate.predicate_id] = margin
             states.append(state)
         return aggregate_validity(states), margins

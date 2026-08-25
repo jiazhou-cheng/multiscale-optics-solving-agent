@@ -342,7 +342,27 @@ B1_WAVE_AIRY = register(
                 refines_toward=-1,
             ),
         ),
-        validity=(ASM_SAMPLING,),
+        validity=(
+            ValidityPredicate(
+                predicate_id="AIRY_CORE_SAMPLING",
+                statement=(
+                    "the focal-plane pitch puts at least two samples across the Airy "
+                    "radius, so a first-null measurement has something to interpolate "
+                    "between"
+                ),
+                basis=ValidityBasis.PER_AXIS_NYQUIST,
+                margin=lambda p: fractional_margin(
+                    float(p["focal_plane_pitch_um"]),
+                    0.61 * float(p["wavelength_um"]) / float(p["numerical_aperture"]) / 2.0,
+                ),
+                blind_to=(
+                    "convergence. Two samples per Airy radius is the floor at which the "
+                    "measurement is DEFINED, not the point at which it has converged -- "
+                    "CHE-103 measured the frozen configuration at 2.44 px and found it "
+                    "not converged for radius-like quantities",
+                ),
+            ),
+        ),
         oracle=FamilyOracle(
             kind=Oracle.ANALYTIC,
             independence=OracleIndependence.INDEPENDENT,
@@ -928,7 +948,31 @@ B1_WAVE_TALBOT = register(
                 refines_toward=1,
             ),
         ),
-        validity=(ASM_SAMPLING,),
+        validity=(
+            ValidityPredicate(
+                predicate_id="TALBOT_TF_SAMPLING",
+                statement=(
+                    "the revival distance stays inside the angular-spectrum transfer "
+                    "function's own sampling limit, z_T <= N pitch^2 / lambda, with "
+                    "the grid and pitch DERIVED from the grating rather than declared "
+                    "separately"
+                ),
+                basis=ValidityBasis.ASM_SAMPLING,
+                margin=lambda p: fractional_margin(
+                    2.0
+                    * float(p["talbot_order"])
+                    * float(p["period_um"]) ** 2
+                    / float(p["wavelength_um"]),
+                    (float(p["periods_across_grid"]) * float(p["samples_per_period"]))
+                    * (float(p["period_um"]) / float(p["samples_per_period"])) ** 2
+                    / float(p["wavelength_um"]),
+                ),
+                blind_to=(
+                    "the window edges, which are excluded from the metric and are where "
+                    "a too-small periods_across_grid would show first",
+                ),
+            ),
+        ),
         oracle=FamilyOracle(
             kind=Oracle.ANALYTIC,
             independence=OracleIndependence.INDEPENDENT,

@@ -469,10 +469,23 @@ _B0_DTYPE = BenchmarkFamily(
                     "request has nothing to execute"
                 ),
                 basis=ValidityBasis.CAPABILITY_INTERSECTION,
-                margin=lambda p: boolean_margin(str(p["requested_dtype"]) == "complex64"),
+                # +1 native, 0 lossily accepted, -1 refused. The middle value is
+                # exactly right: a dtype the component ingests and truncates IS
+                # the boundary, and calling it outside would make the verifier
+                # report out_of_validity for a run whose whole point is
+                # lossy_but_allowed.
+                margin=lambda p: (
+                    1.0
+                    if str(p["requested_dtype"]) == "complex64"
+                    else (
+                        0.0
+                        if str(p["bridge_policy"]) == "allow_downcast"
+                        else -1.0
+                    )
+                ),
                 blind_to=(
-                    "whether the caller MINDS the downcast, which is what bridge_policy "
-                    "says and is a separate decision from whether it is available",
+                    "how MUCH is lost. It says the request is admissible, not that the "
+                    "loss is small -- measured_precision_loss is the number for that",
                 ),
             ),
         ),

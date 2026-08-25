@@ -51,9 +51,7 @@ from collections.abc import Mapping
 
 from core.precision import ArrayNamespace, DeviceKind, DType
 from verification.families.predicates import (
-    asm_transfer_function_sampling,
     boolean_margin,
-    declared_planarity,
     fractional_margin,
     si_s3_curvature_bound,
 )
@@ -412,11 +410,19 @@ B2_R2W_ROUTE = register(
             ),
         ),
         validity=(
-            asm_transfer_function_sampling(
-                distance_key="propagation_distance_m",
-                pitch_key="sample_pitch_m",
-                grid_key="grid_n",
-                wavelength_key="wavelength_m",
+            ValidityPredicate(
+                predicate_id="OVERSAMPLING_AT_OR_ABOVE_MEASURED",
+                statement=(
+                    "the k-grid oversampling is at least the 8x at which the route's "
+                    "error budget was measured. Below it the budget is not a budget, "
+                    "because nothing has measured what the route costs there"
+                ),
+                basis=ValidityBasis.ASM_SAMPLING,
+                margin=lambda p: (float(p["oversampling"]) - 8.0) / 8.0,
+                blind_to=(
+                    "whether MORE oversampling helps. The predicate bounds where the "
+                    "budget is known, not where the route is accurate",
+                ),
             ),
         ),
         oracle=FamilyOracle(
@@ -843,6 +849,23 @@ B2_EQUIV = register(
                 domain=(1, 4096),
                 default=1,
             ),
+            PhysicalParameter(
+                "patch_width_m",
+                "width of one patch. Declared rather than derived from "
+                "aperture_width_m / patch_count, because a decomposition may overlap "
+                "and the SI S3 bound takes the actual patch width",
+                unit="m",
+                domain=(1e-9, 1e-1),
+                default=1e-3,
+            ),
+            PhysicalParameter(
+                "tangent_plane_error_rad",
+                "the direction error the tangent-plane approximation incurs on this "
+                "patch. What eq S9 bounds",
+                unit="rad",
+                domain=(0.0, 1.5),
+                default=0.0,
+            ),
             RepresentationParameter(
                 "grid_snapping",
                 "whether patch centres are snapped to grid nodes. A representation "
@@ -856,8 +879,11 @@ B2_EQUIV = register(
             ),
         ),
         validity=(
-            si_s3_curvature_bound(),
-            declared_planarity(),
+            si_s3_curvature_bound(
+                error_key="tangent_plane_error_rad",
+                width_key="patch_width_m",
+                radius_key="substrate_radius_m",
+            ),
         ),
         oracle=FamilyOracle(
             kind=Oracle.INDEPENDENT_IMPLEMENTATION,

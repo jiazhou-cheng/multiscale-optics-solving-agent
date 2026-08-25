@@ -42,7 +42,6 @@ from typing import Any
 
 from core.precision import ArrayNamespace, DeviceKind, DType
 from verification.families.predicates import (
-    asm_transfer_function_sampling,
     fractional_margin,
     paraxial_field_angle,
 )
@@ -484,11 +483,20 @@ B3_DEMO2 = register(
             ExecutionParameter("device", "cpu or cuda", domain=("cpu", "cuda"), default="cuda"),
         ),
         validity=(
-            asm_transfer_function_sampling(
-                distance_key="propagation_distance_m",
-                pitch_key="sample_pitch_m",
-                grid_key="grid_n",
-                wavelength_key="wavelength_m",
+            ValidityPredicate(
+                predicate_id="AT_OR_ABOVE_PAPER_BUDGET",
+                statement=(
+                    "the ray budget is at least the paper's own Table S2 choice for "
+                    "this route. Below it the comparison is against a published figure "
+                    "the run has not converged to, which measures the budget rather "
+                    "than the physics"
+                ),
+                basis=ValidityBasis.CAPABILITY_INTERSECTION,
+                margin=lambda p: (float(p["ray_count"]) - 1.6e8) / 1.6e8,
+                blind_to=(
+                    "whether the budget is enough for a DIFFERENT route. 1.6e8 is the "
+                    "patch route's Table S2 number; the full-aperture route's is 1.1e6",
+                ),
             ),
         ),
         oracle=FamilyOracle(

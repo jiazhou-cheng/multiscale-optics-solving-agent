@@ -146,6 +146,14 @@ B4_DEMO3 = register(
                 domain=(0, 2**31 - 1),
                 default=0,
             ),
+            ExecutionParameter(
+                "seed_count",
+                "how many seeds the ensemble has. Declared rather than read with a "
+                "default, so a family that forgets to say fails loudly instead of "
+                "being treated as a single realization",
+                domain=(1, 1024),
+                default=1,
+            ),
             RepresentationParameter(
                 "reconstruction_route",
                 "RAMP_SUM or the k-space splat. On demo2 they agree to 7.1e-13; on demo3 "
@@ -164,7 +172,7 @@ B4_DEMO3 = register(
                     "anything"
                 ),
                 basis=ValidityBasis.CAPABILITY_INTERSECTION,
-                margin=lambda p: fractional_margin(4.0, float(p.get("seed_count", 1))),
+                margin=lambda p: fractional_margin(4.0, float(p["seed_count"])),
                 blind_to=(
                     "whether the seeds are independent, which depends on the sampler and "
                     "not on how many were drawn",

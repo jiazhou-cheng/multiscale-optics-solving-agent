@@ -243,6 +243,15 @@ entries:
   # =========================================================================
   # benchmarks/instances/ -- canonical instances, run through the substrate
   # =========================================================================
+  - path: benchmarks/instances/FIXED-V1.yaml
+    bucket: A
+    justification: >-
+      The canonical fixed suite's committed, versioned manifest (CHE-135):
+      33 instances across all five categories, each with its fingerprint, its tier
+      and the positive justification for selecting it. Generated from
+      src/verification/fixed_suite.py and re-rendered in memory by the test, so
+      the two cannot disagree. Replaces what manifest.yaml's levels: block did.
+    destination: The acceptance-criteria layer for every claim made after it.
   - path: benchmarks/instances/b3_psf_singlet.py
     bucket: B
     justification: >-
@@ -893,6 +902,13 @@ entries:
     destination: >-
       Oracles of B1-RAY-EFL, B1-RAY-PLATE, B1-WAVE-GAUSS, B1-WAVE-AIRY and
       B1-WAVE-TILT, authored by M1.1 and M1.2.
+  - path: src/verification/fixed_suite.py
+    bucket: A
+    justification: >-
+      The FIXED-V1 selection itself (CHE-135). The choice is the deliverable, so
+      it lives in one reviewable place; a test rejects any justification
+      reducible to "it already existed".
+    destination: The versioned manifest under benchmarks/instances/.
   - path: src/verification/hazards.py
     bucket: A
     justification: >-
