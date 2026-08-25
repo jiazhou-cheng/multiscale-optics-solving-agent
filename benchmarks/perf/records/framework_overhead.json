@@ -1,7 +1,7 @@
 {
  "coupler": {
   "direct_record": {
-   "cost_per_unit": 4.034304310879967e-09,
+   "cost_per_unit": 4.060170767610116e-09,
    "cost_per_unit_name": "seconds_per_ray_pixel_product [direct]",
    "cuda": {
     "allocated_bytes": null,
@@ -125,44 +125,45 @@
    "label": "C_RAY_TO_WAVE direct kernel call",
    "measurement": {
     "all_s": [
-     0.45186280300549697,
-     0.4567786399857141,
-     0.44758427700435277
+     0.4560807969974121,
+     0.45475997900939547,
+     0.4539296349976212
     ],
-    "median_s": 0.45186280300549697,
-    "min_s": 0.44758427700435277,
-    "p95_s": 0.4567786399857141,
+    "median_s": 0.45475997900939547,
+    "min_s": 0.4539296349976212,
+    "p95_s": 0.4560807969974121,
     "repeats": 3,
+    "tail_rule": "max_of_3",
     "warmup": 1
    },
    "memory_report": {
     "after": {
-     "cgroup_memory_bytes": 360562688,
+     "cgroup_memory_bytes": 361353216,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390405644288,
+     "mem_available_bytes": 389967646720,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93741.300881288,
-     "rss_bytes": 541540352
+     "monotonic_s": 96744.530662329,
+     "rss_bytes": 541474816
     },
     "before": {
-     "cgroup_memory_bytes": 361410560,
+     "cgroup_memory_bytes": 361824256,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390438068224,
+     "mem_available_bytes": 390035378176,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93739.491958003,
-     "rss_bytes": 541540352
+     "monotonic_s": 96742.711436282,
+     "rss_bytes": 541474816
     },
     "cgroup_swap_after_bytes": 0,
     "cgroup_swap_before_bytes": 0,
     "host_reserve_bytes": 60801321984,
     "interval_s": 0.25,
-    "min_mem_available_bytes": 390143389696,
+    "min_mem_available_bytes": 389788422144,
     "peak_cgroup_swap_bytes": 0,
-    "peak_rss_bytes": 1024417792,
+    "peak_rss_bytes": 999190528,
     "process_rss_budget_bytes": null,
     "samples": 9,
     "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -177,16 +178,17 @@
     }
    },
    "notes": [],
-   "peak_host_rss_bytes": 1024417792,
+   "peak_host_rss_bytes": 999190528,
    "stages": {
-    "accounted_s": 0.4475,
+    "accounted_s": 0.4538,
     "fraction_of_total": {
-     "ray_to_wave": 0.9904
+     "ray_to_wave": 0.9998
     },
     "seconds": {
-     "ray_to_wave": 0.4475
+     "ray_to_wave": 0.4538
     },
-    "unaccounted_s": 0.0043
+    "total_s": 0.4539,
+    "unaccounted_s": 0.0001
    },
    "swap_growth_bytes": 0,
    "workload": {
@@ -199,9 +201,9 @@
     "unit": "ray_pixel_product"
    }
   },
-  "direct_s": 0.45186280300549697,
+  "direct_s": 0.45475997900939547,
   "framework_record": {
-   "cost_per_unit": 4.129677044334094e-09,
+   "cost_per_unit": 4.134012952831675e-09,
    "cost_per_unit_name": "seconds_per_ray_pixel_product [node]",
    "cuda": {
     "allocated_bytes": null,
@@ -325,44 +327,45 @@
    "label": "C_RAY_TO_WAVE via node.transform",
    "measurement": {
     "all_s": [
-     0.4628238230070565,
-     0.46202658300171606,
-     0.4625450389867183
+     0.46303068300767336,
+     0.4667589830060024,
+     0.46249903900024947
     ],
-    "median_s": 0.4625450389867183,
-    "min_s": 0.46202658300171606,
-    "p95_s": 0.4628238230070565,
+    "median_s": 0.46303068300767336,
+    "min_s": 0.46249903900024947,
+    "p95_s": 0.4667589830060024,
     "repeats": 3,
+    "tail_rule": "max_of_3",
     "warmup": 1
    },
    "memory_report": {
     "after": {
-     "cgroup_memory_bytes": 361156608,
+     "cgroup_memory_bytes": 361566208,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390438068224,
+     "mem_available_bytes": 390035378176,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93739.479747075,
-     "rss_bytes": 541540352
+     "monotonic_s": 96742.698670393,
+     "rss_bytes": 541474816
     },
     "before": {
-     "cgroup_memory_bytes": 357003264,
+     "cgroup_memory_bytes": 357421056,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390539145216,
+     "mem_available_bytes": 390228611072,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93737.602101953,
-     "rss_bytes": 540229632
+     "monotonic_s": 96740.836065716,
+     "rss_bytes": 539545600
     },
     "cgroup_swap_after_bytes": 0,
     "cgroup_swap_before_bytes": 0,
     "host_reserve_bytes": 60801321984,
     "interval_s": 0.25,
-    "min_mem_available_bytes": 390132170752,
+    "min_mem_available_bytes": 389784649728,
     "peak_cgroup_swap_bytes": 0,
-    "peak_rss_bytes": 976191488,
+    "peak_rss_bytes": 976130048,
     "process_rss_budget_bytes": null,
     "samples": 9,
     "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -377,15 +380,16 @@
     }
    },
    "notes": [],
-   "peak_host_rss_bytes": 976191488,
+   "peak_host_rss_bytes": 976130048,
    "stages": {
-    "accounted_s": 0.4625,
+    "accounted_s": 0.4624,
     "fraction_of_total": {
-     "node_transform": 0.9999
+     "node_transform": 0.9998
     },
     "seconds": {
-     "node_transform": 0.4625
+     "node_transform": 0.4624
     },
+    "total_s": 0.4625,
     "unaccounted_s": 0.0001
    },
    "swap_growth_bytes": 0,
@@ -399,10 +403,10 @@
     "unit": "ray_pixel_product"
    }
   },
-  "framework_s": 0.4625450389867183,
+  "framework_s": 0.46303068300767336,
   "note": "CHE-34 pinned the node's output as bit-identical to the direct call, so the difference is overhead and not a different computation. The node adds config validation, the handoff declaration the direct arm was handed pre-built, and the artifact write.",
-  "overhead_ratio": 1.023640441103295,
-  "overhead_s": 0.01068223598122131
+  "overhead_ratio": 1.01818696538841,
+  "overhead_s": 0.008270703998277895
  },
  "environment": {
   "container_image": "agent_solver",
@@ -430,7 +434,7 @@
  "probe": "perf_framework_overhead",
  "solver": {
   "direct_record": {
-   "cost_per_unit": 0.00025346299980810727,
+   "cost_per_unit": 0.00025894837517626,
    "cost_per_unit_name": "seconds_per_ray_fan_ring [direct]",
    "cuda": {
     "allocated_bytes": null,
@@ -554,44 +558,45 @@
    "label": "M_RAY_OPTILAND direct build + trace",
    "measurement": {
     "all_s": [
-     0.008110815993859433,
-     0.0076617659942712635,
-     0.008256002998678014
+     0.007975100001203828,
+     0.00828634800564032,
+     0.008663566011819057
     ],
-    "median_s": 0.008110815993859433,
-    "min_s": 0.0076617659942712635,
-    "p95_s": 0.008256002998678014,
+    "median_s": 0.00828634800564032,
+    "min_s": 0.007975100001203828,
+    "p95_s": 0.008663566011819057,
     "repeats": 3,
+    "tail_rule": "max_of_3",
     "warmup": 1
    },
    "memory_report": {
     "after": {
-     "cgroup_memory_bytes": 356233216,
+     "cgroup_memory_bytes": 356659200,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390537609216,
+     "mem_available_bytes": 390228512768,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93737.547155398,
-     "rss_bytes": 538263552
+     "monotonic_s": 96740.779974895,
+     "rss_bytes": 538890240
     },
     "before": {
-     "cgroup_memory_bytes": 354447360,
+     "cgroup_memory_bytes": 354832384,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390537515008,
+     "mem_available_bytes": 390227628032,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93737.513633799,
-     "rss_bytes": 536297472
+     "monotonic_s": 96740.745757288,
+     "rss_bytes": 536268800
     },
     "cgroup_swap_after_bytes": 0,
     "cgroup_swap_before_bytes": 0,
     "host_reserve_bytes": 60801321984,
     "interval_s": 0.25,
-    "min_mem_available_bytes": 390537515008,
+    "min_mem_available_bytes": 390227628032,
     "peak_cgroup_swap_bytes": 0,
-    "peak_rss_bytes": 538263552,
+    "peak_rss_bytes": 538890240,
     "process_rss_budget_bytes": null,
     "samples": 2,
     "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -606,18 +611,19 @@
     }
    },
    "notes": [],
-   "peak_host_rss_bytes": 538263552,
+   "peak_host_rss_bytes": 538890240,
    "stages": {
-    "accounted_s": 0.0082,
+    "accounted_s": 0.0086,
     "fraction_of_total": {
-     "build_optic": 0.0361,
-     "trace": 0.9796
+     "build_optic": 0.0396,
+     "trace": 0.9576
     },
     "seconds": {
      "build_optic": 0.0003,
-     "trace": 0.0079
+     "trace": 0.0083
     },
-    "unaccounted_s": -0.0001
+    "total_s": 0.0087,
+    "unaccounted_s": 0.0
    },
    "swap_growth_bytes": 0,
    "workload": {
@@ -627,9 +633,9 @@
     "unit": "ray_fan_ring"
    }
   },
-  "direct_s": 0.008110815993859433,
+  "direct_s": 0.00828634800564032,
   "framework_record": {
-   "cost_per_unit": 0.0006157584061838861,
+   "cost_per_unit": 0.0006228815309441416,
    "cost_per_unit_name": "seconds_per_ray_fan_ring [adapter]",
    "cuda": {
     "allocated_bytes": null,
@@ -753,44 +759,45 @@
    "label": "M_RAY_OPTILAND via adapter.run",
    "measurement": {
     "all_s": [
-     0.01983271399512887,
-     0.01967274400522001,
-     0.019704268997884355
+     0.0197191670013126,
+     0.01993220899021253,
+     0.020223765997798182
     ],
-    "median_s": 0.019704268997884355,
-    "min_s": 0.01967274400522001,
-    "p95_s": 0.01983271399512887,
+    "median_s": 0.01993220899021253,
+    "min_s": 0.0197191670013126,
+    "p95_s": 0.020223765997798182,
     "repeats": 3,
+    "tail_rule": "max_of_3",
     "warmup": 1
    },
    "memory_report": {
     "after": {
-     "cgroup_memory_bytes": 354185216,
+     "cgroup_memory_bytes": 354578432,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390537773056,
+     "mem_available_bytes": 390227628032,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93737.502411602,
-     "rss_bytes": 536297472
+     "monotonic_s": 96740.734329355,
+     "rss_bytes": 536268800
     },
     "before": {
-     "cgroup_memory_bytes": 184897536,
+     "cgroup_memory_bytes": 183549952,
      "cgroup_swap_bytes": 0,
      "host_swap_total_bytes": 2002545270784,
      "host_swap_used_bytes": 0,
-     "mem_available_bytes": 390515449856,
+     "mem_available_bytes": 390229082112,
      "mem_total_bytes": 405342146560,
-     "monotonic_s": 93735.542694359,
-     "rss_bytes": 251170816
+     "monotonic_s": 96738.823070951,
+     "rss_bytes": 251564032
     },
     "cgroup_swap_after_bytes": 0,
     "cgroup_swap_before_bytes": 0,
     "host_reserve_bytes": 60801321984,
     "interval_s": 0.25,
-    "min_mem_available_bytes": 390373703680,
+    "min_mem_available_bytes": 390087348224,
     "peak_cgroup_swap_bytes": 0,
-    "peak_rss_bytes": 536297472,
+    "peak_rss_bytes": 536268800,
     "process_rss_budget_bytes": null,
     "samples": 9,
     "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -805,15 +812,16 @@
     }
    },
    "notes": [],
-   "peak_host_rss_bytes": 536297472,
+   "peak_host_rss_bytes": 536268800,
    "stages": {
-    "accounted_s": 0.0197,
+    "accounted_s": 0.0202,
     "fraction_of_total": {
-     "adapter_run": 0.999
+     "adapter_run": 0.9984
     },
     "seconds": {
-     "adapter_run": 0.0197
+     "adapter_run": 0.0202
     },
+    "total_s": 0.0202,
     "unaccounted_s": 0.0
    },
    "swap_growth_bytes": 0,
@@ -824,10 +832,10 @@
     "unit": "ray_fan_ring"
    }
   },
-  "framework_s": 0.019704268997884355,
+  "framework_s": 0.01993220899021253,
   "note": "The direct arm rebuilds the Optic each repeat, which the adapter also does, so the comparison is like for like. What the adapter adds on top is request validation, the precision/device bridge, the .npy write and the artifact record.",
-  "overhead_ratio": 2.4293818294980603,
-  "overhead_s": 0.011593453004024923
+  "overhead_ratio": 2.4054274544884127,
+  "overhead_s": 0.01164586098457221
  },
  "what_overhead_means_here": "adapter/node wall time divided by the wall time of the physics call it wraps, on the same configuration. Above 1.0 by definition; the interesting quantity is how far above."
 }

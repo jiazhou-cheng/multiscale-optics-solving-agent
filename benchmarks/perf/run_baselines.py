@@ -39,6 +39,8 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -61,9 +63,82 @@ SCHEMA_PATH = ROOT / "benchmarks" / "schemas" / "performance.schema.json"
 def _write(name: str, payload: dict[str, Any]) -> Path:
     RECORDS.mkdir(parents=True, exist_ok=True)
     path = RECORDS / f"{name}.json"
-    path.write_text(json.dumps(payload, indent=1, sort_keys=True, default=str) + "\n")
+    # No `default=str`. It would silently stringify a numpy scalar into a
+    # provenance record -- `"0.451"` where a reader expects a number -- rather
+    # than failing here, which is the wrong direction for a file whose whole
+    # purpose is that a later reader can trust what it says.
+    path.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
     print(f"wrote {path.relative_to(ROOT)}")
     return path
+
+
+@contextmanager
+def scan_limit_forced_off() -> Iterator[None]:
+    """Run the reconstruction with the O(N^2) ray-density diagnostic disabled.
+
+    Reaching into `couplers.ray_to_wave._NEAREST_NEIGHBOUR_SCAN_LIMIT`, a private
+    module global, from a benchmark. Deliberate and narrow: it is the only way to
+    separate the diagnostic from the reconstruction on ONE configuration rather
+    than inferring the split from the threshold crossing, which would compare two
+    different ray counts. Forcing the limit to 0 makes `_ray_density_diagnostic`
+    take its `count > limit` early return, which changes the returned diagnostic
+    triple and leaves the reconstructed field untouched -- so the two arms really
+    are the same reconstruction.
+
+    One helper rather than two hand-rolled try/finally blocks, because the next
+    copy is the one that forgets the `finally`.
+    """
+    import couplers.ray_to_wave as rtw
+
+    previous = rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT
+    rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = 0
+    try:
+        yield
+    finally:
+        rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = previous
+
+
+#: `workload.route` for the diagnostic-disabled arm, and for the shipping arm
+#: whenever the ray count is above the scan limit so the diagnostic does not run
+#: anyway. Those two really are the same computation and comparing them is fair.
+ROUTE_DIAGNOSTIC_OFF = "ramp_sum"
+#: `workload.route` for a shipping call in which the O(N^2) diagnostic actually
+#: runs. It goes in `route`, not only in `detail`, so that
+#: `core.performance.compare` refuses to divide it by the diagnostic-disabled
+#: call: with the marker only in `detail` the two records were byte-identical in
+#: unit and route, and compare() returned an 11x "speedup" between two different
+#: computations, from committed artifacts, with no refusal.
+ROUTE_AS_SHIPPED = "ramp_sum+density_diagnostic"
+
+
+def _r2(fit: Any) -> str:
+    """`r_squared` for prose. `None` means the costs were all equal, not r^2 = 1."""
+    return "n/a (no variance to explain)" if fit.r_squared is None else f"{fit.r_squared:.4f}"
+
+
+#: Repeats per point in the ray-axis scaling sweep.
+#:
+#: Seven, not the protocol's three, and the number is measured rather than
+#: chosen. At three repeats, four realizations of this baseline returned
+#: ray-density-diagnostic exponents of 2.071, 2.020, 1.609 and 2.040 -- a spread
+#: of 0.46 on the exponent that is quoted as evidence that a pairwise scan is
+#: quadratic. The outlier came from the 817-ray row, whose call is ~0.04 s on a
+#: shared 80-core box, where a 3-repeat median is not a median of anything
+#: stable. The whole sweep is seconds, so buying the exponent back is nearly
+#: free. What was already stable at three repeats and stays stable: the 3169-ray
+#: diagnostic share (90.6-91.1%) and the reconstruction exponent (1.05-1.13).
+_SCALING_REPEATS = 7
+
+
+def shipping_route(ray_count: float) -> str:
+    """Which route string a shipping `ray_to_wave` call is, at this ray count."""
+    import couplers.ray_to_wave as rtw
+
+    return (
+        ROUTE_AS_SHIPPED
+        if ray_count <= rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT
+        else ROUTE_DIAGNOSTIC_OFF
+    )
 
 
 def _validate(record: PerformanceRecord) -> dict[str, Any]:
@@ -338,48 +413,60 @@ def baseline_scaling() -> None:
                         _b, grid_shape=(grid_n, grid_n), sample_pitch_m=(pitch_m, pitch_m)
                     )
 
+            diagnostic_runs = ray_count <= scan_limit
             full, _ = measure(
                 kernel,
                 label=f"C_RAY_TO_WAVE full call rings={rings}",
                 workload=Workload(
-                    size=ray_count, unit="ray", route="ramp_sum",
+                    size=ray_count, unit="ray", route=shipping_route(ray_count),
                     detail={"rings": rings, "grid_n": grid_n, "diagnostic": "as shipped"},
                 ),
-                repeats=3,
+                repeats=_SCALING_REPEATS,
                 warmup=1,
             )
 
             # The same call with the diagnostic forced off, to separate the two
             # costs on ONE configuration rather than inferring the split from the
             # threshold crossing.
-            rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = 0
-            try:
+            with scan_limit_forced_off():
                 reconstruction, _ = measure(
                     kernel,
                     label=f"C_RAY_TO_WAVE reconstruction only rings={rings}",
                     workload=Workload(
-                        size=ray_count, unit="ray", route="ramp_sum",
+                        size=ray_count, unit="ray", route=ROUTE_DIAGNOSTIC_OFF,
                         detail={"rings": rings, "grid_n": grid_n, "diagnostic": "forced off"},
                     ),
-                    repeats=3,
+                    repeats=_SCALING_REPEATS,
                     warmup=1,
                 )
-            finally:
-                rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = scan_limit
 
-            diagnostic_s = full.measurement.median_s - reconstruction.measurement.median_s
+            # Only a difference between two DIFFERENT computations is a
+            # diagnostic cost. Above the scan limit the diagnostic does not run in
+            # either arm, so the difference is run-to-run noise -- and publishing
+            # noise under the name `diagnostic_share_of_call` produced committed
+            # rows reading -10.8% and -2.5%, which a downstream tool would read as
+            # a share. Reported as null instead, with the noise kept under its own
+            # name so the ~10% spread at 3 repeats stays visible.
+            delta_s = full.measurement.median_s - reconstruction.measurement.median_s
             rows.append(
                 {
                     "rings": rings,
                     "rays": ray_count,
-                    "diagnostic_runs": ray_count <= scan_limit,
+                    "diagnostic_runs": diagnostic_runs,
                     "full_call_s": full.measurement.median_s,
                     "reconstruction_only_s": reconstruction.measurement.median_s,
-                    "diagnostic_s": diagnostic_s,
+                    "diagnostic_s": delta_s if diagnostic_runs else None,
                     "diagnostic_share_of_call": (
-                        diagnostic_s / full.measurement.median_s
-                        if full.measurement.median_s
+                        delta_s / full.measurement.median_s
+                        if diagnostic_runs and full.measurement.median_s
                         else None
+                    ),
+                    "arm_difference_s": delta_s,
+                    "arm_difference_note": (
+                        "the diagnostic's cost"
+                        if diagnostic_runs
+                        else "run-to-run noise between two identical computations, "
+                        "which is the noise floor the shares above should be read against"
                     ),
                     "seconds_per_ray_full": full.cost_per_unit,
                     "seconds_per_ray_reconstruction": reconstruction.cost_per_unit,
@@ -391,7 +478,9 @@ def baseline_scaling() -> None:
     reconstruction_fit = fit_scaling(
         [(r["rays"], r["reconstruction_only_s"]) for r in rows], axis="rays"
     )
-    diagnostic_rows = [r for r in rows if r["diagnostic_runs"] and r["diagnostic_s"] > 0]
+    diagnostic_rows = [
+        r for r in rows if r["diagnostic_runs"] and (r["diagnostic_s"] or 0) > 0
+    ]
     diagnostic_fit = (
         fit_scaling([(r["rays"], r["diagnostic_s"]) for r in diagnostic_rows], axis="rays")
         if len(diagnostic_rows) >= 3
@@ -405,7 +494,17 @@ def baseline_scaling() -> None:
             "probe": "perf_scaling_ray_axis",
             "issue": "CHE-105 (M0.4)",
             "environment": environment_fingerprint().as_dict(),
-            "held_fixed": {"grid_n": grid_n, "sample_pitch_m": pitch_m, "route": "ramp_sum"},
+            "held_fixed": {
+                "grid_n": grid_n,
+                "sample_pitch_m": pitch_m,
+                # The reconstruction is `ramp_sum` on every row. `workload.route`
+                # on the individual records is NOT always that string: below the
+                # scan limit the shipping arm is marked
+                # `ramp_sum+density_diagnostic`, so that `compare` refuses to
+                # divide it by the diagnostic-disabled arm. Same reconstruction,
+                # different work.
+                "reconstruction": "ramp_sum",
+            },
             "nearest_neighbour_scan_limit_rays": scan_limit,
             "fits": {
                 "reconstruction_only": reconstruction_fit.as_dict(),
@@ -424,12 +523,12 @@ def baseline_scaling() -> None:
             "rows": rows,
             "finding": (
                 f"The reconstruction scales as rays^{reconstruction_fit.exponent:.3f} "
-                f"(r^2 {reconstruction_fit.r_squared:.4f}) at fixed grid -- linear in "
+                f"(r^2 {_r2(reconstruction_fit)}) at fixed grid -- linear in "
                 "rays, consistent with the O(rays x pixels) product model and NOT with "
                 "the registry's O(rays + pixels). The ray-density diagnostic scales as "
                 + (
                     f"rays^{diagnostic_fit.exponent:.3f} "
-                    f"(r^2 {diagnostic_fit.r_squared:.4f}), i.e. quadratic as its "
+                    f"(r^2 {_r2(diagnostic_fit)}), i.e. quadratic as its "
                     "pairwise scan implies"
                     if diagnostic_fit
                     else "quadratic by construction (pairwise scan)"
@@ -439,11 +538,17 @@ def baseline_scaling() -> None:
                 "3169 rays the diagnostic is ~91% of the call."
             ),
             "consequence": (
-                "Any optimization of the reconstruction kernel below 4096 rays moves "
-                "at most ~9% of the wall time. The diagnostic is the target there, and "
-                "it is not physics -- it is a sampling check that could be sampled "
-                "rather than computed exhaustively, or cached. Handed to M5.2 "
-                "(CHE-119) as a measured target rather than a guess."
+                "At the frozen M3-SINGLET-REF configuration (3169 rays) the "
+                "reconstruction is ~9% of the call, so optimizing the kernel there "
+                "moves ~9% of the wall time and the diagnostic is the target. The "
+                "share is NOT ~9% across the whole sub-4096-ray range -- it rises as "
+                "the ray count falls, reaching ~30% at 817 rays, because the "
+                "diagnostic is quadratic and the reconstruction is linear. Read the "
+                "per-row `diagnostic_share_of_call` for a given ray count rather than "
+                "carrying one number across the range. The diagnostic is not physics: "
+                "it is a sampling check that could be sampled rather than computed "
+                "exhaustively, or cached. Handed to M5.2 (CHE-119) as a measured "
+                "target rather than a guess."
             ),
         },
     )
@@ -529,13 +634,19 @@ def baseline_estimate() -> None:
                     )
                 )
 
+        ray_count = float(rays.shape[0]) if rays.shape else 1.0
         coupler_record, _ = measure(
             run_node,
             label="C_RAY_TO_WAVE",
             workload=Workload(
-                size=float(rays.shape[0]) if rays.shape else 1.0,
+                size=ray_count,
                 unit="ray",
-                route="ramp_sum",
+                # Marked, so `compare` refuses to divide this by the arm below.
+                # Unmarked, these two were byte-identical in unit and route and
+                # compare() returned an 11x "speedup" between two different
+                # computations.
+                route=shipping_route(ray_count),
+                detail={"diagnostic": "as shipped"},
             ),
             repeats=3,
             warmup=1,
@@ -543,24 +654,19 @@ def baseline_estimate() -> None:
         # Scored against BOTH denominators, because the estimator models the
         # ray x pixel reconstruction and the shipping call is dominated by
         # something else. Reporting one ratio would pick which error to show.
-        import couplers.ray_to_wave as rtw
-
-        scan_limit = rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT
-        rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = 0
-        try:
+        with scan_limit_forced_off():
             reconstruction_record, _ = measure(
                 run_node,
                 label="C_RAY_TO_WAVE reconstruction only",
                 workload=Workload(
-                    size=float(rays.shape[0]) if rays.shape else 1.0,
+                    size=ray_count,
                     unit="ray",
-                    route="ramp_sum",
+                    route=ROUTE_DIAGNOSTIC_OFF,
+                    detail={"diagnostic": "forced off"},
                 ),
                 repeats=3,
                 warmup=1,
             )
-        finally:
-            rtw._NEAREST_NEIGHBOUR_SCAN_LIMIT = scan_limit
 
         predicted_s = coupler_predicted.wall_time_s
         full_s = coupler_record.measurement.median_s
@@ -615,21 +721,98 @@ def baseline_estimate() -> None:
 # ---------------------------------------------------------------------------
 
 
+#: How often the memory guard looks at a running subprocess. AGENTS.md asks for
+#: swap to be watched *during* a substantial run, and `measure` only checks
+#: between repeats -- which, for a one-repeat 200-second command, is after it has
+#: already finished. Half a second is fine against a workload whose memory grows
+#: over seconds.
+_CHILD_POLL_S = 0.5
+
+
 def _timed_command(
     argv: list[str], *, label: str, workload: Workload, notes: list[str]
 ) -> dict[str, Any]:
-    """Run a subprocess once and record it. One repeat, and the record says so."""
+    """Run a subprocess once and record it. One repeat, and the record says so.
+
+    The child is polled rather than waited on, so a memory guard breach
+    **terminates it** instead of being discovered in the report afterwards. For
+    the demo baselines this is the difference between a stop condition and a
+    post-mortem: they are single-repeat commands of minutes, and `measure` can
+    only check its own watchdog between repeats.
+    """
+    from core.performance import MemoryGuardBreached, SwapGrowthAbort
+    from core.resources import MemoryWatchdog
+
     captured: dict[str, Any] = {}
 
     def run(timer: StageTimer) -> int:
-        with timer.stage("subprocess"):
-            proc = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True)
-        captured["returncode"] = proc.returncode
-        captured["tail"] = proc.stdout.strip().splitlines()[-8:]
-        captured["stderr_tail"] = proc.stderr.strip().splitlines()[-12:]
-        return proc.returncode
+        import resource
 
-    record, _ = measure(run, label=label, workload=workload, repeats=1, warmup=0, notes=notes)
+        # `ru_maxrss` over waited-for children, which is the only figure here that
+        # describes the CHILD. `record.peak_host_rss_bytes` is this process's own
+        # RSS and says nothing about the workload -- it read 0.32 GB when the
+        # parent imported torch and 0.03 GB once it stopped, neither of which is
+        # the demo's memory. Sampled as a delta because the counter is a
+        # high-water mark across every child this process has ever reaped.
+        rss_before = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+
+        # Output to files, not pipes: a chunked demo prints steadily and a
+        # subprocess that fills a pipe nobody is draining deadlocks, which would
+        # look like a slow benchmark.
+        with timer.stage("subprocess"), tempfile.TemporaryDirectory() as logs:
+            out_path, err_path = Path(logs) / "stdout", Path(logs) / "stderr"
+            guard = MemoryWatchdog(interval_s=_CHILD_POLL_S).start()
+            try:
+                with out_path.open("w") as out, err_path.open("w") as err:
+                    proc = subprocess.Popen(argv, cwd=ROOT, stdout=out, stderr=err, text=True)
+                    while True:
+                        try:
+                            returncode = proc.wait(timeout=_CHILD_POLL_S)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pass
+                        growth = guard.swap_growth_bytes
+                        breach = guard.verdict.breached
+                        if growth or breach:
+                            proc.terminate()
+                            try:
+                                proc.wait(timeout=30)
+                            except subprocess.TimeoutExpired:  # pragma: no cover
+                                proc.kill()
+                                proc.wait()
+                            report = guard.report()
+                            if growth:
+                                raise SwapGrowthAbort(growth, report)
+                            raise MemoryGuardBreached(guard.verdict, report)
+            finally:
+                guard.stop()
+            captured["returncode"] = returncode
+            captured["tail"] = out_path.read_text().strip().splitlines()[-8:]
+            captured["stderr_tail"] = err_path.read_text().strip().splitlines()[-12:]
+            after = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+            captured["peak_child_rss_bytes"] = (
+                # ru_maxrss is kilobytes on Linux.
+                int(after) * 1024 if after > rss_before else None
+            )
+        return returncode
+
+    record, _ = measure(
+        run,
+        label=label,
+        workload=workload,
+        repeats=1,
+        warmup=0,
+        notes=[
+            *notes,
+            "Measured across a process boundary, so this process does not touch a "
+            "device: initializing JAX here would preallocate ~78% of the card and "
+            "leave the child to OOM on an allocation it has room for alone. The "
+            "process boundary is the barrier, and `cuda` is null because a parent's "
+            "allocator snapshot is not the child's peak -- read the demo's own "
+            "record for its device memory.",
+        ],
+        touch_devices=False,
+    )
 
     # A failed run is not a baseline. Timing how long something took to crash and
     # committing it as a performance record is worse than having no record: the
@@ -688,22 +871,159 @@ def _device_suffix() -> str:
     return "cuda" if fingerprint.gpu_count else "cpu"
 
 
-def _demo(script: str, name: str, extra: list[str], *, unit_size: float, unit: str,
+#: Where the demo probes write their own scientific records. A timing run must
+#: not land on top of a committed one -- CHE-105 did exactly that once, a GPU
+#: demo2 run overwriting the CPU record, and the only evidence left was that a
+#: number had changed. So every timing run is given an explicit `--output-name`
+#: under the `perf_` prefix, which no committed record uses.
+DEMO_RECORDS = ROOT / "benchmarks" / "probes" / "records" / "ray_wave"
+
+
+def _demo(script: str, name: str, extra: list[str], *, declared_rays: float, unit: str,
           route: str, detail: dict[str, Any]) -> None:
+    """Time a demo end to end, and take its ray count and stage split from its record.
+
+    Two things the earlier version of this got wrong and that matter for the
+    numbers M5 will be set against:
+
+    * **The workload size was declared, not read.** `--rays` came from whoever
+      typed the command and was written straight into `workload.size`, so
+      `seconds_per_ray` was partly an operator's arithmetic. The demo record says
+      how many rays it actually emitted; that is the number used, and the typed
+      one is kept beside it as `declared_rays` so a mismatch is visible rather
+      than silently resolved.
+    * **The demo overwrote its own committed record as a side effect.** Redirected
+      with `--output-name` to a `perf_`-prefixed name, so a timing run never
+      touches a scientific record.
+    """
     name = f"{name}_{_device_suffix()}"
+    probe_record_name = f"perf_{name}"
     payload = _timed_command(
-        [sys.executable, str(ROOT / "benchmarks" / "probes" / "ray_wave" / script), *extra],
+        [
+            sys.executable,
+            str(ROOT / "benchmarks" / "probes" / "ray_wave" / script),
+            *extra,
+            "--output-name",
+            probe_record_name,
+        ],
         label=name,
-        workload=Workload(size=unit_size, unit=unit, route=route, detail=detail),
+        # Provisional: replaced below by the ray count the demo actually emitted.
+        workload=Workload(size=declared_rays, unit=unit, route=route, detail=detail),
         notes=[
             "One timed run, no warmup. Three repeats of this configuration is minutes "
             "of a shared GPU to improve a number that varies by a few percent.",
             "seconds_per_ray is route-specific: ramp_sum is O(rays x pixels) and "
             "kspace_splat is O(rays) + one FFT, so the two are not one number. "
             "core.performance.compare refuses to divide them.",
+            f"The demo's own record is at benchmarks/probes/records/ray_wave/"
+            f"{probe_record_name}.json -- written under a perf_ name so this timing "
+            "run does not overwrite a committed scientific record.",
         ],
     )
+
+    measured = _demo_workload(probe_record_name)
+    if measured is not None:
+        rays, stages = measured
+        payload["workload"]["size"] = rays
+        payload["workload"]["detail"] = {
+            **detail,
+            "declared_rays": declared_rays,
+            "rays_read_from": f"{probe_record_name}.json",
+        }
+        payload["cost_per_unit"] = (
+            payload["measurement"]["median_s"] / rays if rays else None
+        )
+        if stages:
+            # The five-stage breakdown CHE-129 asks for. It comes from the demo's
+            # own in-process timers, not from this harness's StageTimer, because
+            # the harness times a subprocess and cannot see inside it. Kept under
+            # its own key so nobody mistakes it for a StageTimer breakdown.
+            payload["stages"] = {
+                "seconds": stages,
+                "accounted_s": round(sum(stages.values()), 4),
+                "fraction_of_total": {
+                    k: round(v / payload["measurement"]["median_s"], 4)
+                    for k, v in stages.items()
+                },
+                "unaccounted_s": round(
+                    payload["measurement"]["median_s"] - sum(stages.values()), 4
+                ),
+                "total_s": round(payload["measurement"]["median_s"], 4),
+                "source": (
+                    f"{probe_record_name}.json stage_wall_clock_s -- the demo's own "
+                    "per-stage timers, summed over chunks. The denominator is the "
+                    "whole command, which includes interpreter start, JAX "
+                    "compilation, the plan setup and the record write, so the "
+                    "unaccounted remainder is real and named rather than hidden."
+                ),
+            }
+        if abs(rays - declared_rays) > 0.005 * max(rays, declared_rays):
+            print(
+                f"NOTE: declared {declared_rays:,.0f} rays, the demo emitted "
+                f"{rays:,.0f}. seconds_per_ray uses the emitted count."
+            )
+    else:
+        payload["workload"]["detail"] = {
+            **detail,
+            "declared_rays": declared_rays,
+            "rays_read_from": None,
+            "size_is_declared_not_measured": (
+                "the demo record could not be read, so workload.size is the operator's "
+                "typed --rays and seconds_per_ray inherits whatever that was"
+            ),
+        }
+    _validate_payload(payload)
     _write(name, payload)
+
+
+def _demo_workload(record_name: str) -> tuple[float, dict[str, float]] | None:
+    """The rays the demo actually emitted, and its per-stage wall clock.
+
+    Summed across routes and seeds, because the timed command is the whole demo:
+    a per-ray cost computed against one route's rays while the clock covers both
+    would be wrong by the ratio between them.
+
+    The two demos shape their records differently -- demo3 nests per-seed `runs`
+    and carries `stage_wall_clock_s`, demo2 puts one run per route inline and has
+    no stage split at all, since it is a bare SLM with no ray trace to time. Both
+    are read; a demo with no stages returns an empty dict rather than a fabricated
+    one.
+    """
+    path = DEMO_RECORDS / f"{record_name}.json"
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text())
+    rays = 0.0
+    stages: dict[str, float] = {}
+
+    def absorb(run: dict[str, Any]) -> None:
+        nonlocal rays
+        # `rays_emitted_here` is what THIS process traced; `total_rays` can name a
+        # larger enumeration carried by several processes, and a per-second rate
+        # against rays another process carried is not a rate.
+        rays += float(run.get("rays_emitted_here") or run.get("total_rays") or 0.0)
+        for key, value in (run.get("stage_wall_clock_s") or {}).items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue  # the stage dict carries a prose `note` alongside the numbers
+            stages[key] = stages.get(key, 0.0) + float(value)
+
+    for route in (record.get("routes") or {}).values():
+        if not isinstance(route, dict):
+            continue
+        runs = route.get("runs")
+        if isinstance(runs, list) and runs:
+            for run in runs:
+                if isinstance(run, dict):
+                    absorb(run)
+        else:
+            absorb(route)
+    return (rays, stages) if rays > 0 else None
+
+
+def _validate_payload(payload: dict[str, Any]) -> None:
+    from jsonschema import Draft202012Validator
+
+    Draft202012Validator(json.loads(SCHEMA_PATH.read_text())).validate(payload)
 
 
 def baseline_demo2(args: argparse.Namespace) -> None:
@@ -712,7 +1032,7 @@ def baseline_demo2(args: argparse.Namespace) -> None:
         f"demo2_{args.preset}_{args.routes}_{args.reconstruction}",
         ["--preset", args.preset, "--routes", args.routes,
          "--reconstruction", args.reconstruction, "--backend", args.backend],
-        unit_size=float(args.rays),
+        declared_rays=float(args.rays),
         unit="ray",
         route=args.reconstruction,
         detail={"preset": args.preset, "routes": args.routes, "backend": args.backend},
@@ -725,7 +1045,7 @@ def baseline_demo3(args: argparse.Namespace) -> None:
         f"demo3_{args.preset}_{args.routes}_{args.reconstruction}",
         ["--preset", args.preset, "--routes", args.routes,
          "--reconstruction", args.reconstruction, "--backend", args.backend],
-        unit_size=float(args.rays),
+        declared_rays=float(args.rays),
         unit="ray",
         route=args.reconstruction,
         detail={"preset": args.preset, "routes": args.routes, "backend": args.backend},

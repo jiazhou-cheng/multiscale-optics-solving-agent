@@ -563,7 +563,29 @@ def environment() -> dict[str, Any]:
 
 
 def write_record(name: str, payload: dict[str, Any]) -> Path:
+    """Write a demo record, stamped with the source and environment it ran under.
+
+    CHE-129 (M0.4 follow-up). The stamp is the enrollment: `REGISTER.yaml`
+    deferred the whole `ray_wave/*.json` corpus because regenerating it is hours
+    of GPU compute, and `tests/test_provenance_fingerprint.py` therefore could not
+    tell whether any of these records still described the code that produced them.
+    Stamping here rather than in each demo means a demo cannot be added that
+    writes an unstamped record.
+
+    Called with `sys.modules` already holding everything the run imported, since
+    every caller writes its record after the physics.
+    """
+    from core.provenance import RECORD_PROVENANCE_KEY, record_provenance
+
     RECORDS.mkdir(parents=True, exist_ok=True)
     path = RECORDS / f"{name}.json"
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    stamped = {
+        **payload,
+        RECORD_PROVENANCE_KEY: record_provenance(
+            probe=name,
+            root=REPO,
+            extra_sources=[Path(__file__)],
+        ),
+    }
+    path.write_text(json.dumps(stamped, indent=2, sort_keys=True) + "\n")
     return path

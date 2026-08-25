@@ -28,16 +28,44 @@
 
 unenrolled:
   # ---------------------------------------------------------------------------
-  # The ray_wave demo corpus. Regenerating these is hours of GPU compute (demo3
-  # at the paper's 60 M-ray configuration is ~200 s per point, and the
-  # enumerated-estimator shards are twelve of them), so they are not enrolled by
-  # the ticket that built the mechanism. M0.4 (CHE-105) re-runs demo2 and demo3
-  # to record performance baselines and is the natural place to enroll them,
-  # since it is paying the compute anyway.
+  # The ray_wave demo corpus, minus what CHE-129 regenerated.
+  #
+  # `_demo_support.write_record` now stamps every record it writes, so the demos
+  # cannot produce an unstamped record any more and the four configurations
+  # CHE-129 paid GPU compute for (`ray_wave/perf_demo*.json`) are enrolled and
+  # code-verified. What is deferred below is the 60 records CHE-96/CHE-101 left
+  # behind, which nothing has re-run.
+  #
+  # The globs are `demo2_*` / `demo3_*` rather than `*` so that they name only
+  # the records nothing has re-run. Note what this does NOT buy: a new record
+  # named `demo2_*` or `demo3_*` -- which is the demos' own default naming --
+  # still matches and is still exempt. What actually stops an unstamped ray_wave
+  # record from being added is `_demo_support.write_record` stamping
+  # unconditionally, plus `test_every_stamped_record_still_describes_this_tree_code`.
+  # The narrowing is bookkeeping, not a gate.
+  #
+  # One thing CHE-129 measured that the original deferral did not know, and that
+  # bounds what enrolling these can ever mean: the demo corpus is GPU-produced,
+  # and `provenance.environment_fingerprint` includes the torch build --
+  # `2.13.0+cu126` in `agent_solver_gpu` against `2.13.0+cpu` in `agent_solver`.
+  # So a GPU record's ENVIRONMENT half can never reproduce under the default CPU
+  # gate, whatever compute is spent. Its CODE half is image-independent and does
+  # reproduce, verified on the four stamped records. That is why enrollment here
+  # is code-only (`test_every_stamped_record_still_describes_this_tree_code`) and
+  # why the environment half is the part still outstanding -- it needs the same
+  # environment-aware verification mode the optiland/chromatix entries below ask
+  # for, from the other direction.
   # ---------------------------------------------------------------------------
-  "ray_wave/*.json": >-
-    hours of GPU compute to regenerate; enroll in M0.4 (CHE-105), which re-runs
-    demo2 and demo3 for performance baselines and can stamp them at no extra cost.
+  "ray_wave/demo2_*.json": >-
+    CHE-96/CHE-101 records that CHE-129 did not re-run; hours of GPU compute to
+    regenerate. Enroll by re-running the demo that produced each -- write_record
+    stamps automatically now, so it costs only the compute. Owner: M5 (CHE-118 /
+    CHE-119 / CHE-120), which re-measures demo2/demo3 and can stamp them at no
+    extra cost.
+  "ray_wave/demo3_*.json": >-
+    same as ray_wave/demo2_*.json. Includes the twelve enumerated-estimator
+    shards and the convergence ladders, which are the expensive part of this
+    corpus. Owner: M5 (CHE-118 / CHE-119 / CHE-120).
 
   # ---------------------------------------------------------------------------
   # Solver capability probes. Cheap, but they record what the PINNED PACKAGE

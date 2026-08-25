@@ -1,5 +1,5 @@
 {
- "consequence": "Any optimization of the reconstruction kernel below 4096 rays moves at most ~9% of the wall time. The diagnostic is the target there, and it is not physics -- it is a sampling check that could be sampled rather than computed exhaustively, or cached. Handed to M5.2 (CHE-119) as a measured target rather than a guess.",
+ "consequence": "At the frozen M3-SINGLET-REF configuration (3169 rays) the reconstruction is ~9% of the call, so optimizing the kernel there moves ~9% of the wall time and the diagnostic is the target. The share is NOT ~9% across the whole sub-4096-ray range -- it rises as the ray count falls, reaching ~30% at 817 rays, because the diagnostic is quadratic and the reconstruction is linear. Read the per-row `diagnostic_share_of_call` for a given ray count rather than carrying one number across the range. The diagnostic is not physics: it is a sampling check that could be sampled rather than computed exhaustively, or cached. Handed to M5.2 (CHE-119) as a measured target rather than a guess.",
  "environment": {
   "container_image": "agent_solver",
   "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
@@ -22,97 +22,97 @@
   "thread_env": {},
   "visible_devices": null
  },
- "finding": "The reconstruction scales as rays^1.086 (r^2 0.9956) at fixed grid -- linear in rays, consistent with the O(rays x pixels) product model and NOT with the registry's O(rays + pixels). The ray-density diagnostic scales as rays^2.031 (r^2 1.0000), i.e. quadratic as its pairwise scan implies, and is skipped entirely above 4096 rays. At the frozen M3-SINGLET-REF configuration of 3169 rays the diagnostic is ~91% of the call.",
+ "finding": "The reconstruction scales as rays^1.092 (r^2 0.9960) at fixed grid -- linear in rays, consistent with the O(rays x pixels) product model and NOT with the registry's O(rays + pixels). The ray-density diagnostic scales as rays^2.038 (r^2 1.0000), i.e. quadratic as its pairwise scan implies, and is skipped entirely above 4096 rays. At the frozen M3-SINGLET-REF configuration of 3169 rays the diagnostic is ~91% of the call.",
  "fits": {
   "as_shipped_do_not_use": {
    "axis": "rays",
-   "exponent": 0.37880085725221174,
-   "intercept_log10": -2.2537472422866043,
+   "exponent": 0.379131561391544,
+   "intercept_log10": -2.2538967776396364,
    "points": [
     [
      817.0,
-     0.03687386299134232
+     0.03677294100634754
     ],
     [
      1801.0,
-     0.15029876100015827
+     0.1532995449961163
     ],
     [
      3169.0,
-     0.44701060000807047
+     0.4487927409936674
     ],
     [
      4921.0,
-     0.06578507699305192
+     0.06310699600726366
     ],
     [
      7057.0,
-     0.10691715299617499
+     0.11046663101296872
     ],
     [
      12481.0,
-     0.20273195700428914
+     0.20314858699566685
     ]
    ],
-   "r_squared": 0.18008186617468314,
+   "r_squared": 0.17702068704045915,
    "why_not": "fitted across the scan-limit threshold, so it averages two different computations. Reported to show that a single exponent here is meaningless -- its r^2 is the evidence."
   },
   "ray_density_diagnostic": {
    "axis": "rays",
-   "exponent": 2.031485218412297,
-   "intercept_log10": -7.503861457699583,
+   "exponent": 2.037792592834115,
+   "intercept_log10": -7.521184378690315,
    "points": [
     [
      817.0,
-     0.02592377799737733
+     0.0258421280013863
     ],
     [
      1801.0,
-     0.12771776100271381
+     0.130393738989369
     ],
     [
      3169.0,
-     0.40756967500783503
+     0.40886649599997327
     ]
    ],
-   "r_squared": 0.9999755355567904
+   "r_squared": 0.9999881984729706
   },
   "reconstruction_only": {
    "axis": "rays",
-   "exponent": 1.0863905333696862,
-   "intercept_log10": -5.1587876596034725,
+   "exponent": 1.0919785225654361,
+   "intercept_log10": -5.173675402774551,
    "points": [
     [
      817.0,
-     0.010950084993964992
+     0.010930813004961237
     ],
     [
      1801.0,
-     0.02258099999744445
+     0.022905806006747298
     ],
     [
      3169.0,
-     0.03944092500023544
+     0.03992624499369413
     ],
     [
      4921.0,
-     0.07290515500062611
+     0.07352950300264638
     ],
     [
      7057.0,
-     0.10960901500948239
+     0.11186873199767433
     ],
     [
      12481.0,
-     0.2003286879917141
+     0.20330939700943418
     ]
    ],
-   "r_squared": 0.9956479306252894
+   "r_squared": 0.995988939026228
   }
  },
  "held_fixed": {
   "grid_n": 188,
-  "route": "ramp_sum",
+  "reconstruction": "ramp_sum",
   "sample_pitch_m": 2.6587352810843895e-06
  },
  "issue": "CHE-105 (M0.4)",
@@ -120,13 +120,15 @@
  "probe": "perf_scaling_ray_axis",
  "rows": [
   {
+   "arm_difference_note": "the diagnostic's cost",
+   "arm_difference_s": 0.0258421280013863,
    "diagnostic_runs": true,
-   "diagnostic_s": 0.02592377799737733,
-   "diagnostic_share_of_call": 0.7030393860134485,
-   "full_call_s": 0.03687386299134232,
+   "diagnostic_s": 0.0258421280013863,
+   "diagnostic_share_of_call": 0.7027484692324603,
+   "full_call_s": 0.03677294100634754,
    "full_record": {
-    "cost_per_unit": 4.5133247235425115e-05,
-    "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+    "cost_per_unit": 4.500971971401167e-05,
+    "cost_per_unit_name": "seconds_per_ray [ramp_sum+density_diagnostic]",
     "cuda": {
      "allocated_bytes": null,
      "available": false,
@@ -249,46 +251,51 @@
     "label": "C_RAY_TO_WAVE full call rings=16",
     "measurement": {
      "all_s": [
-      0.03767787299875636,
-      0.03604994100169279,
-      0.03687386299134232
+      0.03780360099335667,
+      0.03615166099916678,
+      0.03677294100634754,
+      0.03588764100277331,
+      0.036845567999989726,
+      0.03623045601125341,
+      0.03692344899172895
      ],
-     "median_s": 0.03687386299134232,
-     "min_s": 0.03604994100169279,
-     "p95_s": 0.03767787299875636,
-     "repeats": 3,
+     "median_s": 0.03677294100634754,
+     "min_s": 0.03588764100277331,
+     "p95_s": 0.03780360099335667,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 362323968,
+      "cgroup_memory_bytes": 361992192,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390632976384,
+      "mem_available_bytes": 389887606784,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93746.470886421,
-      "rss_bytes": 539914240
+      "monotonic_s": 102742.160772435,
+      "rss_bytes": 541298688
      },
      "before": {
-      "cgroup_memory_bytes": 293036032,
+      "cgroup_memory_bytes": 292073472,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390595297280,
+      "mem_available_bytes": 389988749312,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93746.031258247,
-      "rss_bytes": 444477440
+      "monotonic_s": 102741.556804877,
+      "rss_bytes": 445186048
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390595297280,
+     "min_mem_available_bytes": 389887606784,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 539914240,
+     "peak_rss_bytes": 541298688,
      "process_rss_budget_bytes": null,
-     "samples": 3,
+     "samples": 4,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -301,16 +308,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 539914240,
+    "peak_host_rss_bytes": 541298688,
     "stages": {
-     "accounted_s": 0.0368,
+     "accounted_s": 0.0369,
      "fraction_of_total": {
-      "ray_to_wave": 0.9987
+      "ray_to_wave": 0.9982
      },
      "seconds": {
-      "ray_to_wave": 0.0368
+      "ray_to_wave": 0.0369
      },
-     "unaccounted_s": 0.0
+     "total_s": 0.0369,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -319,15 +327,15 @@
       "grid_n": 188,
       "rings": 16
      },
-     "route": "ramp_sum",
+     "route": "ramp_sum+density_diagnostic",
      "size": 817,
      "unit": "ray"
     }
    },
    "rays": 817,
-   "reconstruction_only_s": 0.010950084993964992,
+   "reconstruction_only_s": 0.010930813004961237,
    "reconstruction_record": {
-    "cost_per_unit": 1.3402796810238668e-05,
+    "cost_per_unit": 1.337920808440788e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -451,44 +459,49 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=16",
     "measurement": {
      "all_s": [
-      0.010950084993964992,
-      0.01074027898721397,
-      0.011103470998932607
+      0.011187811993295327,
+      0.010964528992190026,
+      0.011133524007163942,
+      0.010666371003026143,
+      0.010897590007516555,
+      0.010671868993085809,
+      0.010930813004961237
      ],
-     "median_s": 0.010950084993964992,
-     "min_s": 0.01074027898721397,
-     "p95_s": 0.011103470998932607,
-     "repeats": 3,
+     "median_s": 0.010930813004961237,
+     "min_s": 0.010666371003026143,
+     "p95_s": 0.011187811993295327,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 362819584,
+      "cgroup_memory_bytes": 362483712,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390631694336,
+      "mem_available_bytes": 389887606784,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93746.528255986,
-      "rss_bytes": 539914240
+      "monotonic_s": 102742.261781881,
+      "rss_bytes": 541954048
      },
      "before": {
-      "cgroup_memory_bytes": 362586112,
+      "cgroup_memory_bytes": 362250240,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390632464384,
+      "mem_available_bytes": 389887606784,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93746.483287555,
-      "rss_bytes": 539914240
+      "monotonic_s": 102742.173063738,
+      "rss_bytes": 541298688
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390631694336,
+     "min_mem_available_bytes": 389887606784,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 539914240,
+     "peak_rss_bytes": 541954048,
      "process_rss_budget_bytes": null,
      "samples": 2,
      "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -503,16 +516,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 539914240,
+    "peak_host_rss_bytes": 541954048,
     "stages": {
-     "accounted_s": 0.0111,
+     "accounted_s": 0.0109,
      "fraction_of_total": {
-      "ray_to_wave": 1.0124
+      "ray_to_wave": 0.9973
      },
      "seconds": {
-      "ray_to_wave": 0.0111
+      "ray_to_wave": 0.0109
      },
-     "unaccounted_s": -0.0001
+     "total_s": 0.0109,
+     "unaccounted_s": 0.0
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -527,17 +541,19 @@
     }
    },
    "rings": 16,
-   "seconds_per_ray_full": 4.5133247235425115e-05,
-   "seconds_per_ray_reconstruction": 1.3402796810238668e-05
+   "seconds_per_ray_full": 4.500971971401167e-05,
+   "seconds_per_ray_reconstruction": 1.337920808440788e-05
   },
   {
+   "arm_difference_note": "the diagnostic's cost",
+   "arm_difference_s": 0.130393738989369,
    "diagnostic_runs": true,
-   "diagnostic_s": 0.12771776100271381,
-   "diagnostic_share_of_call": 0.8497592405474276,
-   "full_call_s": 0.15029876100015827,
+   "diagnostic_s": 0.130393738989369,
+   "diagnostic_share_of_call": 0.8505813829563056,
+   "full_call_s": 0.1532995449961163,
    "full_record": {
-    "cost_per_unit": 8.345294891735606e-05,
-    "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+    "cost_per_unit": 8.511912548368479e-05,
+    "cost_per_unit_name": "seconds_per_ray [ramp_sum+density_diagnostic]",
     "cuda": {
      "allocated_bytes": null,
      "available": false,
@@ -660,46 +676,51 @@
     "label": "C_RAY_TO_WAVE full call rings=24",
     "measurement": {
      "all_s": [
-      0.14962784000090323,
-      0.15029876100015827,
-      0.1525128399953246
+      0.15032661501027178,
+      0.15457080799387768,
+      0.1543616199924145,
+      0.1512646690098336,
+      0.1532995449961163,
+      0.15164837300835643,
+      0.15367359299852978
      ],
-     "median_s": 0.15029876100015827,
-     "min_s": 0.14962784000090323,
-     "p95_s": 0.1525128399953246,
-     "repeats": 3,
+     "median_s": 0.1532995449961163,
+     "min_s": 0.15032661501027178,
+     "p95_s": 0.15457080799387768,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 379392000,
+      "cgroup_memory_bytes": 376918016,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390499803136,
+      "mem_available_bytes": 389834280960,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93747.210945285,
-      "rss_bytes": 556933120
+      "monotonic_s": 102743.565176074,
+      "rss_bytes": 558170112
      },
      "before": {
-      "cgroup_memory_bytes": 365334528,
+      "cgroup_memory_bytes": 364593152,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390632595456,
+      "mem_available_bytes": 389887840256,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93746.599280675,
-      "rss_bytes": 543191040
+      "monotonic_s": 102742.333373316,
+      "rss_bytes": 543920128
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390499803136,
+     "min_mem_available_bytes": 389789847552,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 685457408,
+     "peak_rss_bytes": 684265472,
      "process_rss_budget_bytes": null,
-     "samples": 4,
+     "samples": 6,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -712,16 +733,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 685457408,
+    "peak_host_rss_bytes": 684265472,
     "stages": {
-     "accounted_s": 0.1525,
+     "accounted_s": 0.1536,
      "fraction_of_total": {
-      "ray_to_wave": 1.0143
+      "ray_to_wave": 0.9995
      },
      "seconds": {
-      "ray_to_wave": 0.1525
+      "ray_to_wave": 0.1536
      },
-     "unaccounted_s": -0.0022
+     "total_s": 0.1537,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -730,15 +752,15 @@
       "grid_n": 188,
       "rings": 24
      },
-     "route": "ramp_sum",
+     "route": "ramp_sum+density_diagnostic",
      "size": 1801,
      "unit": "ray"
     }
    },
    "rays": 1801,
-   "reconstruction_only_s": 0.02258099999744445,
+   "reconstruction_only_s": 0.022905806006747298,
    "reconstruction_record": {
-    "cost_per_unit": 1.2538034423900305e-05,
+    "cost_per_unit": 1.2718382013740866e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -862,44 +884,49 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=24",
     "measurement": {
      "all_s": [
-      0.023018099993350916,
-      0.02258099999744445,
-      0.022404118994018063
+      0.02308602699486073,
+      0.022593955000047572,
+      0.02256779199524317,
+      0.022526903994730674,
+      0.02860428500571288,
+      0.03195940700243227,
+      0.022905806006747298
      ],
-     "median_s": 0.02258099999744445,
-     "min_s": 0.022404118994018063,
-     "p95_s": 0.023018099993350916,
-     "repeats": 3,
+     "median_s": 0.022905806006747298,
+     "min_s": 0.022526903994730674,
+     "p95_s": 0.03195940700243227,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 379125760,
+      "cgroup_memory_bytes": 377155584,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390500061184,
+      "mem_available_bytes": 389850361856,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93747.316806826,
-      "rss_bytes": 556933120
+      "monotonic_s": 102743.778662346,
+      "rss_bytes": 558170112
      },
      "before": {
-      "cgroup_memory_bytes": 379420672,
+      "cgroup_memory_bytes": 377159680,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390499803136,
+      "mem_available_bytes": 389834280960,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93747.223344084,
-      "rss_bytes": 556933120
+      "monotonic_s": 102743.57845132,
+      "rss_bytes": 558170112
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390499803136,
+     "min_mem_available_bytes": 389834280960,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 556933120,
+     "peak_rss_bytes": 558170112,
      "process_rss_budget_bytes": null,
      "samples": 2,
      "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -914,16 +941,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 556933120,
+    "peak_host_rss_bytes": 558170112,
     "stages": {
-     "accounted_s": 0.0224,
+     "accounted_s": 0.0229,
      "fraction_of_total": {
-      "ray_to_wave": 0.9912
+      "ray_to_wave": 0.9985
      },
      "seconds": {
-      "ray_to_wave": 0.0224
+      "ray_to_wave": 0.0229
      },
-     "unaccounted_s": 0.0002
+     "total_s": 0.0229,
+     "unaccounted_s": 0.0
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -938,17 +966,19 @@
     }
    },
    "rings": 24,
-   "seconds_per_ray_full": 8.345294891735606e-05,
-   "seconds_per_ray_reconstruction": 1.2538034423900305e-05
+   "seconds_per_ray_full": 8.511912548368479e-05,
+   "seconds_per_ray_reconstruction": 1.2718382013740866e-05
   },
   {
+   "arm_difference_note": "the diagnostic's cost",
+   "arm_difference_s": 0.40886649599997327,
    "diagnostic_runs": true,
-   "diagnostic_s": 0.40756967500783503,
-   "diagnostic_share_of_call": 0.9117673607750614,
-   "full_call_s": 0.44701060000807047,
+   "diagnostic_s": 0.40886649599997327,
+   "diagnostic_share_of_call": 0.9110363396134843,
+   "full_call_s": 0.4487927409936674,
    "full_record": {
-    "cost_per_unit": 0.0001410573051461251,
-    "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
+    "cost_per_unit": 0.00014161967213432232,
+    "cost_per_unit_name": "seconds_per_ray [ramp_sum+density_diagnostic]",
     "cuda": {
      "allocated_bytes": null,
      "available": false,
@@ -1071,46 +1101,51 @@
     "label": "C_RAY_TO_WAVE full call rings=32",
     "measurement": {
      "all_s": [
-      0.44992891800939105,
-      0.44701060000807047,
-      0.4459155520016793
+      0.4496408950071782,
+      0.44857811999099795,
+      0.4534831710043363,
+      0.44406370000797324,
+      0.4462636259995634,
+      0.4487927409936674,
+      0.45532643600017764
      ],
-     "median_s": 0.44701060000807047,
-     "min_s": 0.4459155520016793,
-     "p95_s": 0.44992891800939105,
-     "repeats": 3,
+     "median_s": 0.4487927409936674,
+     "min_s": 0.44406370000797324,
+     "p95_s": 0.45532643600017764,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 401932288,
+      "cgroup_memory_bytes": 403423232,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390406283264,
+      "mem_available_bytes": 389687037952,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.149039335,
-      "rss_bytes": 579641344
+      "monotonic_s": 102747.412391855,
+      "rss_bytes": 586006528
      },
      "before": {
-      "cgroup_memory_bytes": 380170240,
+      "cgroup_memory_bytes": 377929728,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390500302848,
+      "mem_available_bytes": 389850857472,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93747.354328512,
-      "rss_bytes": 556933120
+      "monotonic_s": 102743.817744693,
+      "rss_bytes": 558170112
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390175326208,
+     "min_mem_available_bytes": 389422043136,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 981061632,
+     "peak_rss_bytes": 1067200512,
      "process_rss_budget_bytes": null,
-     "samples": 9,
+     "samples": 16,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -1123,16 +1158,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 981061632,
+    "peak_host_rss_bytes": 1067200512,
     "stages": {
-     "accounted_s": 0.4459,
+     "accounted_s": 0.4552,
      "fraction_of_total": {
-      "ray_to_wave": 0.9974
+      "ray_to_wave": 0.9996
      },
      "seconds": {
-      "ray_to_wave": 0.4459
+      "ray_to_wave": 0.4552
      },
-     "unaccounted_s": 0.0011
+     "total_s": 0.4553,
+     "unaccounted_s": 0.0002
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -1141,15 +1177,15 @@
       "grid_n": 188,
       "rings": 32
      },
-     "route": "ramp_sum",
+     "route": "ramp_sum+density_diagnostic",
      "size": 3169,
      "unit": "ray"
     }
    },
    "rays": 3169,
-   "reconstruction_only_s": 0.03944092500023544,
+   "reconstruction_only_s": 0.03992624499369413,
    "reconstruction_record": {
-    "cost_per_unit": 1.2445858315000139e-05,
+    "cost_per_unit": 1.259900441580755e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -1273,46 +1309,51 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=32",
     "measurement": {
      "all_s": [
-      0.03952809299516957,
-      0.03944092500023544,
-      0.03927081800065935
+      0.040132070003892295,
+      0.03992375198868103,
+      0.040191478008637205,
+      0.04026596499898005,
+      0.03992624499369413,
+      0.039242074999492615,
+      0.03979029000038281
      ],
-     "median_s": 0.03944092500023544,
-     "min_s": 0.03927081800065935,
-     "p95_s": 0.03952809299516957,
-     "repeats": 3,
+     "median_s": 0.03992624499369413,
+     "min_s": 0.039242074999492615,
+     "p95_s": 0.04026596499898005,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 401891328,
+      "cgroup_memory_bytes": 403644416,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390406799360,
+      "mem_available_bytes": 389727887360,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.324299967,
-      "rss_bytes": 579641344
+      "monotonic_s": 102747.763233781,
+      "rss_bytes": 586006528
      },
      "before": {
-      "cgroup_memory_bytes": 401928192,
+      "cgroup_memory_bytes": 403673088,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390406283264,
+      "mem_available_bytes": 389687037952,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.161847235,
-      "rss_bytes": 579641344
+      "monotonic_s": 102747.426581725,
+      "rss_bytes": 586006528
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390406283264,
+     "min_mem_available_bytes": 389687037952,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 579641344,
+     "peak_rss_bytes": 586006528,
      "process_rss_budget_bytes": null,
-     "samples": 2,
+     "samples": 3,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -1325,16 +1366,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 579641344,
+    "peak_host_rss_bytes": 586006528,
     "stages": {
-     "accounted_s": 0.0392,
+     "accounted_s": 0.0397,
      "fraction_of_total": {
-      "ray_to_wave": 0.9948
+      "ray_to_wave": 0.9986
      },
      "seconds": {
-      "ray_to_wave": 0.0392
+      "ray_to_wave": 0.0397
      },
-     "unaccounted_s": 0.0002
+     "total_s": 0.0398,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -1349,16 +1391,18 @@
     }
    },
    "rings": 32,
-   "seconds_per_ray_full": 0.0001410573051461251,
-   "seconds_per_ray_reconstruction": 1.2445858315000139e-05
+   "seconds_per_ray_full": 0.00014161967213432232,
+   "seconds_per_ray_reconstruction": 1.259900441580755e-05
   },
   {
+   "arm_difference_note": "run-to-run noise between two identical computations, which is the noise floor the shares above should be read against",
+   "arm_difference_s": -0.010422506995382719,
    "diagnostic_runs": false,
-   "diagnostic_s": -0.007120078007574193,
-   "diagnostic_share_of_call": -0.10823241885581743,
-   "full_call_s": 0.06578507699305192,
+   "diagnostic_s": null,
+   "diagnostic_share_of_call": null,
+   "full_call_s": 0.06310699600726366,
    "full_record": {
-    "cost_per_unit": 1.3368233487716301e-05,
+    "cost_per_unit": 1.282401869686317e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -1482,46 +1526,51 @@
     "label": "C_RAY_TO_WAVE full call rings=40",
     "measurement": {
      "all_s": [
-      0.06258369999704883,
-      0.06578507699305192,
-      0.07171498099341989
+      0.06298070900083985,
+      0.06310699600726366,
+      0.06278148198907729,
+      0.06410607100406196,
+      0.0635232139902655,
+      0.06308788100432139,
+      0.06408424300025217
      ],
-     "median_s": 0.06578507699305192,
-     "min_s": 0.06258369999704883,
-     "p95_s": 0.07171498099341989,
-     "repeats": 3,
+     "median_s": 0.06310699600726366,
+     "min_s": 0.06278148198907729,
+     "p95_s": 0.06410607100406196,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 414220288,
+      "cgroup_memory_bytes": 410673152,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390439575552,
+      "mem_available_bytes": 389719482368,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.638563029,
-      "rss_bytes": 591519744
+      "monotonic_s": 102748.322484296,
+      "rss_bytes": 592134144
      },
      "before": {
-      "cgroup_memory_bytes": 403722240,
+      "cgroup_memory_bytes": 404951040,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390407544832,
+      "mem_available_bytes": 389718597632,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.370342542,
-      "rss_bytes": 580296704
+      "monotonic_s": 102747.810861868,
+      "rss_bytes": 586006528
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390407544832,
+     "min_mem_available_bytes": 389718597632,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 591519744,
+     "peak_rss_bytes": 592134144,
      "process_rss_budget_bytes": null,
-     "samples": 3,
+     "samples": 4,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -1534,16 +1583,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 591519744,
+    "peak_host_rss_bytes": 592134144,
     "stages": {
-     "accounted_s": 0.0717,
+     "accounted_s": 0.064,
      "fraction_of_total": {
-      "ray_to_wave": 1.0894
+      "ray_to_wave": 0.9987
      },
      "seconds": {
-      "ray_to_wave": 0.0717
+      "ray_to_wave": 0.064
      },
-     "unaccounted_s": -0.0059
+     "total_s": 0.0641,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -1558,9 +1608,9 @@
     }
    },
    "rays": 4921,
-   "reconstruction_only_s": 0.07290515500062611,
+   "reconstruction_only_s": 0.07352950300264638,
    "reconstruction_record": {
-    "cost_per_unit": 1.4815109733921177e-05,
+    "cost_per_unit": 1.494198394689014e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -1684,46 +1734,51 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=40",
     "measurement": {
      "all_s": [
-      0.07290515500062611,
-      0.06583703300566413,
-      0.07376859498617705
+      0.07352950300264638,
+      0.06661944600637071,
+      0.07400850400154013,
+      0.06698792900715489,
+      0.07369302399456501,
+      0.0667361900123069,
+      0.07458344100450631
      ],
-     "median_s": 0.07290515500062611,
-     "min_s": 0.06583703300566413,
-     "p95_s": 0.07376859498617705,
-     "repeats": 3,
+     "median_s": 0.07352950300264638,
+     "min_s": 0.06661944600637071,
+     "p95_s": 0.07458344100450631,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 410910720,
+      "cgroup_memory_bytes": 409047040,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390483316736,
+      "mem_available_bytes": 389796212736,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.938240685,
-      "rss_bytes": 590872576
+      "monotonic_s": 102748.908649639,
+      "rss_bytes": 590696448
      },
      "before": {
-      "cgroup_memory_bytes": 359579648,
+      "cgroup_memory_bytes": 357539840,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390482862080,
+      "mem_available_bytes": 389768994816,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.651550967,
-      "rss_bytes": 539488256
+      "monotonic_s": 102748.33643456,
+      "rss_bytes": 539295744
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390482862080,
+     "min_mem_available_bytes": 389768994816,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 590872576,
+     "peak_rss_bytes": 590696448,
      "process_rss_budget_bytes": null,
-     "samples": 3,
+     "samples": 4,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -1736,16 +1791,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 590872576,
+    "peak_host_rss_bytes": 590696448,
     "stages": {
-     "accounted_s": 0.0737,
+     "accounted_s": 0.0745,
      "fraction_of_total": {
-      "ray_to_wave": 1.011
+      "ray_to_wave": 0.9987
      },
      "seconds": {
-      "ray_to_wave": 0.0737
+      "ray_to_wave": 0.0745
      },
-     "unaccounted_s": -0.0008
+     "total_s": 0.0746,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -1760,16 +1816,18 @@
     }
    },
    "rings": 40,
-   "seconds_per_ray_full": 1.3368233487716301e-05,
-   "seconds_per_ray_reconstruction": 1.4815109733921177e-05
+   "seconds_per_ray_full": 1.282401869686317e-05,
+   "seconds_per_ray_reconstruction": 1.494198394689014e-05
   },
   {
+   "arm_difference_note": "run-to-run noise between two identical computations, which is the noise floor the shares above should be read against",
+   "arm_difference_s": -0.001402100984705612,
    "diagnostic_runs": false,
-   "diagnostic_s": -0.0026918620133074,
-   "diagnostic_share_of_call": -0.025177082796094492,
-   "full_call_s": 0.10691715299617499,
+   "diagnostic_s": null,
+   "diagnostic_share_of_call": null,
+   "full_call_s": 0.11046663101296872,
    "full_record": {
-    "cost_per_unit": 1.5150510556351849e-05,
+    "cost_per_unit": 1.565348320999982e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -1893,46 +1951,51 @@
     "label": "C_RAY_TO_WAVE full call rings=48",
     "measurement": {
      "all_s": [
-      0.10691715299617499,
-      0.10865677600668278,
-      0.1060059250012273
+      0.11046663101296872,
+      0.1104068249987904,
+      0.11018944099487271,
+      0.11060630100837443,
+      0.11089317599544302,
+      0.11115609300031792,
+      0.11029530699306633
      ],
-     "median_s": 0.10691715299617499,
-     "min_s": 0.1060059250012273,
-     "p95_s": 0.10865677600668278,
-     "repeats": 3,
+     "median_s": 0.11046663101296872,
+     "min_s": 0.11018944099487271,
+     "p95_s": 0.11115609300031792,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 378789888,
+      "cgroup_memory_bytes": 376885248,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390478098432,
+      "mem_available_bytes": 389823107072,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93750.415112926,
-      "rss_bytes": 556183552
+      "monotonic_s": 102749.839715175,
+      "rss_bytes": 556544000
      },
      "before": {
-      "cgroup_memory_bytes": 413495296,
+      "cgroup_memory_bytes": 412188672,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390483730432,
+      "mem_available_bytes": 389797302272,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93749.990450898,
-      "rss_bytes": 592183296
+      "monotonic_s": 102748.959855183,
+      "rss_bytes": 592662528
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390478098432,
+     "min_mem_available_bytes": 389797302272,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 595734528,
+     "peak_rss_bytes": 619835392,
      "process_rss_budget_bytes": null,
-     "samples": 3,
+     "samples": 5,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -1945,16 +2008,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 595734528,
+    "peak_host_rss_bytes": 619835392,
     "stages": {
-     "accounted_s": 0.1059,
+     "accounted_s": 0.1102,
      "fraction_of_total": {
-      "ray_to_wave": 0.9909
+      "ray_to_wave": 0.9993
      },
      "seconds": {
-      "ray_to_wave": 0.1059
+      "ray_to_wave": 0.1102
      },
-     "unaccounted_s": 0.001
+     "total_s": 0.1103,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -1969,9 +2033,9 @@
     }
    },
    "rays": 7057,
-   "reconstruction_only_s": 0.10960901500948239,
+   "reconstruction_only_s": 0.11186873199767433,
    "reconstruction_record": {
-    "cost_per_unit": 1.5531956215032222e-05,
+    "cost_per_unit": 1.585216550909371e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -2095,46 +2159,51 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=48",
     "measurement": {
      "all_s": [
-      0.11037021200172603,
-      0.10960901500948239,
-      0.1076689309993526
+      0.11008275000494905,
+      0.11236450201249681,
+      0.11232627400022466,
+      0.10953090300608892,
+      0.11213610399863683,
+      0.11186873199767433,
+      0.11165411700494587
      ],
-     "median_s": 0.10960901500948239,
-     "min_s": 0.1076689309993526,
-     "p95_s": 0.11037021200172603,
-     "repeats": 3,
+     "median_s": 0.11186873199767433,
+     "min_s": 0.10953090300608892,
+     "p95_s": 0.11236450201249681,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 364126208,
+      "cgroup_memory_bytes": 364146688,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390502674432,
+      "mem_available_bytes": 389875310592,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93750.864502872,
-      "rss_bytes": 542937088
+      "monotonic_s": 102750.745349093,
+      "rss_bytes": 543825920
      },
      "before": {
-      "cgroup_memory_bytes": 378785792,
+      "cgroup_memory_bytes": 377139200,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390478098432,
+      "mem_available_bytes": 389823107072,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93750.427406534,
-      "rss_bytes": 556183552
+      "monotonic_s": 102749.851933575,
+      "rss_bytes": 556544000
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390478098432,
+     "min_mem_available_bytes": 389823107072,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 585248768,
+     "peak_rss_bytes": 612233216,
      "process_rss_budget_bytes": null,
-     "samples": 3,
+     "samples": 5,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -2147,16 +2216,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 585248768,
+    "peak_host_rss_bytes": 612233216,
     "stages": {
-     "accounted_s": 0.1076,
+     "accounted_s": 0.1116,
      "fraction_of_total": {
-      "ray_to_wave": 0.9817
+      "ray_to_wave": 0.9993
      },
      "seconds": {
-      "ray_to_wave": 0.1076
+      "ray_to_wave": 0.1116
      },
-     "unaccounted_s": 0.002
+     "total_s": 0.1117,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -2171,16 +2241,18 @@
     }
    },
    "rings": 48,
-   "seconds_per_ray_full": 1.5150510556351849e-05,
-   "seconds_per_ray_reconstruction": 1.5531956215032222e-05
+   "seconds_per_ray_full": 1.565348320999982e-05,
+   "seconds_per_ray_reconstruction": 1.585216550909371e-05
   },
   {
+   "arm_difference_note": "run-to-run noise between two identical computations, which is the noise floor the shares above should be read against",
+   "arm_difference_s": -0.00016081001376733184,
    "diagnostic_runs": false,
-   "diagnostic_s": 0.0024032690125750378,
-   "diagnostic_share_of_call": 0.01185441628486915,
-   "full_call_s": 0.20273195700428914,
+   "diagnostic_s": null,
+   "diagnostic_share_of_call": null,
+   "full_call_s": 0.20314858699566685,
    "full_record": {
-    "cost_per_unit": 1.6243246294711094e-05,
+    "cost_per_unit": 1.6276627433352044e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -2304,46 +2376,51 @@
     "label": "C_RAY_TO_WAVE full call rings=64",
     "measurement": {
      "all_s": [
-      0.20140745499520563,
-      0.20273195700428914,
-      0.20403011600137688
+      0.20314858699566685,
+      0.2025629459967604,
+      0.203988441004185,
+      0.20356641300895717,
+      0.2030857060017297,
+      0.20413808801095001,
+      0.20236276199284475
      ],
-     "median_s": 0.20273195700428914,
-     "min_s": 0.20140745499520563,
-     "p95_s": 0.20403011600137688,
-     "repeats": 3,
+     "median_s": 0.20314858699566685,
+     "min_s": 0.20236276199284475,
+     "p95_s": 0.20413808801095001,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 392159232,
+      "cgroup_memory_bytes": 392294400,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390499041280,
+      "mem_available_bytes": 389887332352,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93751.74313627,
-      "rss_bytes": 569233408
+      "monotonic_s": 102752.440776763,
+      "rss_bytes": 570556416
      },
      "before": {
-      "cgroup_memory_bytes": 374345728,
+      "cgroup_memory_bytes": 374624256,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390509826048,
+      "mem_available_bytes": 389876989952,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93750.935444189,
-      "rss_bytes": 550801408
+      "monotonic_s": 102750.815459653,
+      "rss_bytes": 551690240
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390498025472,
+     "min_mem_available_bytes": 389867184128,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 672657408,
+     "peak_rss_bytes": 682778624,
      "process_rss_budget_bytes": null,
-     "samples": 5,
+     "samples": 8,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -2356,16 +2433,17 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 672657408,
+    "peak_host_rss_bytes": 682778624,
     "stages": {
-     "accounted_s": 0.2039,
+     "accounted_s": 0.2023,
      "fraction_of_total": {
-      "ray_to_wave": 1.0058
+      "ray_to_wave": 0.9996
      },
      "seconds": {
-      "ray_to_wave": 0.2039
+      "ray_to_wave": 0.2023
      },
-     "unaccounted_s": -0.0012
+     "total_s": 0.2024,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
@@ -2380,9 +2458,9 @@
     }
    },
    "rays": 12481,
-   "reconstruction_only_s": 0.2003286879917141,
+   "reconstruction_only_s": 0.20330939700943418,
    "reconstruction_record": {
-    "cost_per_unit": 1.605069209131593e-05,
+    "cost_per_unit": 1.6289511818719188e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -2506,46 +2584,51 @@
     "label": "C_RAY_TO_WAVE reconstruction only rings=64",
     "measurement": {
      "all_s": [
-      0.2014166250010021,
-      0.19824340801278595,
-      0.2003286879917141
+      0.2028084229968954,
+      0.20242275099735707,
+      0.203477984003257,
+      0.20254660899809096,
+      0.20330939700943418,
+      0.20477015599317383,
+      0.20397267100634053
      ],
-     "median_s": 0.2003286879917141,
-     "min_s": 0.19824340801278595,
-     "p95_s": 0.2014166250010021,
-     "repeats": 3,
+     "median_s": 0.20330939700943418,
+     "min_s": 0.20242275099735707,
+     "p95_s": 0.20477015599317383,
+     "repeats": 7,
+     "tail_rule": "max_of_7",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 391397376,
+      "cgroup_memory_bytes": 392142848,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390505607168,
+      "mem_available_bytes": 389959405568,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93752.558859397,
-      "rss_bytes": 569253888
+      "monotonic_s": 102754.085025945,
+      "rss_bytes": 570572800
      },
      "before": {
-      "cgroup_memory_bytes": 392486912,
+      "cgroup_memory_bytes": 392286208,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390502572032,
+      "mem_available_bytes": 389887074304,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93751.756937734,
-      "rss_bytes": 569233408
+      "monotonic_s": 102752.453540495,
+      "rss_bytes": 570556416
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390502572032,
+     "min_mem_available_bytes": 389887074304,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 674775040,
+     "peak_rss_bytes": 682795008,
      "process_rss_budget_bytes": null,
-     "samples": 5,
+     "samples": 8,
      "signal": "/sys/fs/cgroup/memory.swap.current",
      "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
      "swap_delta_peak_bytes": 0,
@@ -2558,15 +2641,16 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 674775040,
+    "peak_host_rss_bytes": 682795008,
     "stages": {
-     "accounted_s": 0.2003,
+     "accounted_s": 0.2039,
      "fraction_of_total": {
-      "ray_to_wave": 0.9997
+      "ray_to_wave": 0.9996
      },
      "seconds": {
-      "ray_to_wave": 0.2003
+      "ray_to_wave": 0.2039
      },
+     "total_s": 0.204,
      "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
@@ -2582,8 +2666,8 @@
     }
    },
    "rings": 64,
-   "seconds_per_ray_full": 1.6243246294711094e-05,
-   "seconds_per_ray_reconstruction": 1.605069209131593e-05
+   "seconds_per_ray_full": 1.6276627433352044e-05,
+   "seconds_per_ray_reconstruction": 1.6289511818719188e-05
   }
  ]
 }

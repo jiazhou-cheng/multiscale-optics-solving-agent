@@ -58,7 +58,7 @@ import statistics
 import subprocess
 import time
 from collections.abc import Callable, Iterable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from pathlib import Path
@@ -122,6 +122,35 @@ class SwapGrowthAbort(RuntimeError):
         self.report = report
 
 
+class StageAccountingError(RuntimeError):
+    """A stage breakdown does not fit inside the call it claims to decompose.
+
+    Raised rather than emitted, because a ``fraction_of_total`` above 1.0 is not
+    a slightly wrong percentage -- it is evidence that the numerator and the
+    denominator came from different calls, and the whole point of this module is
+    that the stage share is the number CHE-101 lacked.
+    """
+
+
+class MemoryGuardBreached(RuntimeError):
+    """The memory watchdog tripped one of its guards during the measurement.
+
+    Wider than :class:`SwapGrowthAbort`: also covers host ``MemAvailable``
+    falling to the reserve and the process RSS budget. ``AGENTS.md`` asks for
+    memory to be monitored *during* a run and names a stop condition, so all
+    three guards stop it rather than only the one.
+    """
+
+    def __init__(self, verdict: Any, report: dict[str, Any]) -> None:
+        super().__init__(
+            f"memory guard {verdict.reason!r} breached during the measurement: "
+            f"{verdict.detail}. The run is stopped and reported as a resource "
+            "failure rather than timed."
+        )
+        self.verdict = verdict
+        self.report = report
+
+
 class Incomparable(RuntimeError):
     """Two records were measured in environments that are not the same.
 
@@ -162,7 +191,8 @@ def _observed_isolation(*, applied: bool = False) -> Isolation:
     )
 
 
-def _nvidia_smi(query: str) -> str | None:
+def _nvidia_smi_lines(query: str) -> list[str] | None:
+    """One line per visible device, or ``None`` when there is no CUDA to read."""
     try:
         out = subprocess.run(
             ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader"],
@@ -173,7 +203,13 @@ def _nvidia_smi(query: str) -> str | None:
         ).stdout.strip()
     except Exception:  # pragma: no cover - no GPU, or nvidia-smi absent
         return None
-    return out.splitlines()[0].strip() if out else None
+    lines = [line.strip() for line in out.splitlines() if line.strip()]
+    return lines or None
+
+
+def _nvidia_smi(query: str) -> str | None:
+    lines = _nvidia_smi_lines(query)
+    return lines[0] if lines else None
 
 
 @dataclass(frozen=True)
@@ -214,20 +250,8 @@ class EnvironmentFingerprint:
 
 def _gpu_count() -> int | None:
     """Visible CUDA devices, read from the runtime. ``None`` when there is no CUDA."""
-    listing = _nvidia_smi("name")
-    if listing is None:
-        return None
-    try:
-        out = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=20,
-        ).stdout.strip()
-    except Exception:  # pragma: no cover - nvidia-smi vanished between calls
-        return None
-    return len([line for line in out.splitlines() if line.strip()])
+    lines = _nvidia_smi_lines("name")
+    return len(lines) if lines else None
 
 
 def _cpu_model() -> str | None:
@@ -298,15 +322,34 @@ class StageTimer:
     stages: dict[str, float] = field(default_factory=dict)
     _order: list[str] = field(default_factory=list)
 
+    #: Stages currently open. Overlapping stages would double-count wall clock and
+    #: make the shares sum above 1, which `as_dict` then reports as "two different
+    #: calls" -- the wrong diagnosis for what is really a nesting bug.
+    _open: set[str] = field(default_factory=set)
+
     @contextmanager
     def stage(self, name: str) -> Iterator[None]:
+        if name in self._open:
+            raise StageAccountingError(
+                f"stage {name!r} is already open. Re-entering a stage would add the "
+                "inner interval to the outer one and count the same wall clock "
+                "twice. Use a distinct name for the inner region."
+            )
+        if self._open:
+            raise StageAccountingError(
+                f"cannot open stage {name!r} while {sorted(self._open)} is open. "
+                "These stages are a partition of the call's wall clock, not a call "
+                "tree: nesting them makes the shares sum above 1."
+            )
         if name not in self.stages:
             self.stages[name] = 0.0
             self._order.append(name)
+        self._open.add(name)
         started = time.perf_counter()
         try:
             yield
         finally:
+            self._open.discard(name)
             self.stages[name] += time.perf_counter() - started
 
     def as_dict(self, total_s: float | None = None) -> dict[str, Any]:
@@ -315,16 +358,33 @@ class StageTimer:
         The share is the number CHE-101 needed and did not have: a stage that is
         7% of the run cannot be made to matter by a 9.6x kernel speedup, and the
         percentage is what says so at a glance.
+
+        ``total_s`` must be the elapsed time of the **same** call these stages
+        were timed in. Dividing one repeat's stage seconds by a median over all
+        repeats is how a share reads 101% -- or, with one slow final repeat,
+        several hundred percent -- so the caller is required to pair them and the
+        result is checked rather than trusted.
         """
+        accounted = sum(self.stages.values())
         payload: dict[str, Any] = {
             "seconds": {name: round(self.stages[name], 4) for name in self._order},
-            "accounted_s": round(sum(self.stages.values()), 4),
+            "accounted_s": round(accounted, 4),
         }
         if total_s:
             payload["fraction_of_total"] = {
                 name: round(self.stages[name] / total_s, 4) for name in self._order
             }
-            payload["unaccounted_s"] = round(total_s - sum(self.stages.values()), 4)
+            payload["unaccounted_s"] = round(total_s - accounted, 4)
+            payload["total_s"] = round(total_s, 4)
+            # A stage cannot take longer than the call that contained it. Timer
+            # granularity allows a hair over 1.0; anything more means the
+            # numerator and the denominator came from different calls.
+            if accounted > total_s * 1.001 + 1e-6:
+                raise StageAccountingError(
+                    f"stage seconds sum to {accounted:.6f} s but the call they were "
+                    f"timed in took {total_s:.6f} s. A share above 100% means the "
+                    "numerator and denominator came from different calls."
+                )
         return payload
 
 
@@ -335,7 +395,10 @@ class ScalingFit:
     axis: str
     exponent: float
     intercept_log10: float
-    r_squared: float
+    #: ``None`` when the costs are all equal, so there is no variance to explain.
+    #: Reporting 1.0 there would be the one degenerate case where a perfect r^2
+    #: means nothing at all, in the function whose docstring argues exactly that.
+    r_squared: float | None
     points: tuple[tuple[float, float], ...]
 
     def as_dict(self) -> dict[str, Any]:
@@ -370,7 +433,7 @@ def fit_scaling(points: Iterable[tuple[float, float]], *, axis: str) -> ScalingF
         axis=axis,
         exponent=slope,
         intercept_log10=intercept,
-        r_squared=1.0 - ss_res / ss_tot if ss_tot else 1.0,
+        r_squared=1.0 - ss_res / ss_tot if ss_tot else None,
         points=tuple(pairs),
     )
 
@@ -385,9 +448,33 @@ class Measurement:
     min_s: float
     p95_s: float
     all_s: tuple[float, ...]
+    #: How ``p95_s`` was actually obtained, machine-readable, because the field
+    #: name is the part that travels. At these sample sizes it is
+    #: ``"max_of_<n>"`` -- the slowest observed run, not an interpolated
+    #: percentile -- and a downstream reader who never opens the schema still
+    #: gets the rule alongside the number.
+    tail_rule: str = "unknown"
 
     def as_dict(self) -> dict[str, Any]:
         return {**asdict(self), "all_s": list(self.all_s)}
+
+    @staticmethod
+    def tail(ordered: list[float]) -> tuple[float, str]:
+        """The tail statistic and the rule that produced it.
+
+        ``ceil(0.95n) - 1`` indexes the maximum for every ``n <= 19`` and the
+        second-slowest at ``n == 20``, so the "slowest observed run" description
+        holds up to 19 repeats, not 20. Stated exactly rather than approximately,
+        since the whole reason this rule is written down is that ``p95_s`` will
+        otherwise be quoted as a real 95th percentile.
+        """
+        index = min(len(ordered) - 1, math.ceil(0.95 * len(ordered)) - 1)
+        rule = (
+            f"max_of_{len(ordered)}"
+            if index == len(ordered) - 1
+            else f"order_statistic_{index + 1}_of_{len(ordered)}"
+        )
+        return ordered[index], rule
 
 
 @dataclass(frozen=True)
@@ -433,27 +520,46 @@ class PerformanceRecord:
         }
 
 
-def _synchronize() -> None:
+def _synchronize(result: Any = None) -> None:
     """Settle both device backends before reading a clock.
 
     Both, not one. JAX and torch each have their own async queue and this
     repository runs graphs that touch both, so synchronizing only the backend a
     caller happens to be thinking about would time a dispatch rather than a
     computation.
+
+    ``result`` is the value the timed callable returned, when there is one. It is
+    blocked on **directly** rather than relying on a barrier: blocking on a
+    freshly created ``jnp.zeros(1)`` is only a barrier under JAX's
+    single-compute-stream ordering, which is an implementation property and not a
+    contract, whereas ``block_until_ready`` on the workload's own arrays is one.
+    The per-device zeros block is kept as the fallback for callables that return
+    nothing device-resident.
     """
     try:
         import torch
 
         if torch.cuda.is_available():
-            torch.cuda.synchronize()
+            # No device argument syncs the current device only, so name every
+            # visible one -- a graph that ran on device 1 while the current
+            # device is 0 would otherwise be timed as a dispatch.
+            for index in range(torch.cuda.device_count()):
+                torch.cuda.synchronize(index)
     except Exception:  # pragma: no cover - torch absent or no CUDA
         pass
     try:
         import jax
 
+        if result is not None:
+            # Suppressed on its own: an un-blockable return value must not cost us
+            # the device barrier below.
+            with suppress(Exception):  # result is not a pytree of arrays
+                jax.block_until_ready(result)  # type: ignore[no-untyped-call]
         for device in jax.devices():
             if device.platform != "cpu":
-                jax.block_until_ready(jax.numpy.zeros(1, device=device))
+                jax.block_until_ready(  # type: ignore[no-untyped-call]
+                    jax.numpy.zeros(1, device=device)
+                )
     except Exception:  # pragma: no cover - jax absent
         pass
 
@@ -468,6 +574,7 @@ def measure(
     isolation_applied: bool = False,
     notes: Iterable[str] = (),
     watchdog_interval_s: float = 0.25,
+    touch_devices: bool = True,
 ) -> tuple[PerformanceRecord, Any]:
     """Time ``fn`` under the protocol, and return the record and its last result.
 
@@ -475,53 +582,92 @@ def measure(
     final *timed* repeat is the one recorded, because a stage breakdown averaged
     over repeats hides which repeat was slow.
 
-    The memory watchdog runs for the whole call, warmup included. Swap growth
-    raises :class:`SwapGrowthAbort` rather than being reported at the end: a
-    swapping measurement is not a slow measurement, it is a measurement of the
-    disk, and continuing would produce a number.
+    The memory watchdog runs for the whole call, warmup included, and **all
+    three** of its guards stop the run: cgroup swap growth raises
+    :class:`SwapGrowthAbort`, and host ``MemAvailable`` at the reserve or the
+    process RSS budget raises :class:`MemoryGuardBreached`. A swapping
+    measurement is not a slow measurement, it is a measurement of the disk, and
+    continuing would produce a number.
+
+    ``touch_devices=False`` for a workload that runs in a **child process**. This
+    is not a tuning knob; it is a correctness requirement. Synchronizing a device
+    initializes that backend in *this* process, and JAX preallocates ~78% of the
+    card when it initializes -- so a parent that syncs before forking leaves the
+    child ~10 GB of a 48 GB device, and the child dies with
+    ``RESOURCE_EXHAUSTED`` on an allocation it has room for when run alone. It was
+    measured here: demo2's RW-P route at the Table S2 budget completes in 94 s
+    standalone and OOMed at 16 s under a syncing parent. Nothing is lost by
+    skipping the sync, because a process boundary is a stronger barrier than any
+    device sync: the child cannot exit with work outstanding. The CUDA snapshot is
+    skipped for the same reason -- it would report the parent's zero allocations
+    as if they were the workload's peak.
     """
     if repeats < 1:
         raise ValueError("repeats must be >= 1")
+    if warmup < 0:
+        # Otherwise the loop runs fewer iterations than `repeats` and the record
+        # claims a sample size it does not have.
+        raise ValueError("warmup must be >= 0")
 
     environment = environment_fingerprint()
     isolation = _observed_isolation(applied=isolation_applied)
-    cuda_reset_peak_stats()
+    if touch_devices:
+        cuda_reset_peak_stats()
 
     timings: list[float] = []
     timer = StageTimer()
+    # The elapsed time of the repeat whose timer is retained, so the stage shares
+    # divide by the call they were measured in rather than by a median over all
+    # repeats.
+    timer_elapsed_s: float | None = None
     result: Any = None
 
     watchdog = MemoryWatchdog(interval_s=watchdog_interval_s).start()
     try:
         for index in range(warmup + repeats):
             timer = StageTimer()
-            _synchronize()
+            if touch_devices:
+                _synchronize()
             started = time.perf_counter()
             result = fn(timer)
-            _synchronize()
+            if touch_devices:
+                _synchronize(result)
             elapsed = time.perf_counter() - started
+            timer_elapsed_s = elapsed
 
             growth = watchdog.swap_growth_bytes
             if growth:
                 raise SwapGrowthAbort(growth, watchdog.report())
+            # Only guards attributable to THIS process stop the run. `swap_growth`
+            # and `process_rss` are ours; `mem_available` is host-wide, is
+            # evaluated from the baseline snapshot so it can be breached before
+            # this workload allocates anything, and never resets. On a shared box
+            # another tenant's memory would otherwise fail the ~20 `measure()`
+            # unit tests in the default gate while they time trivial closures --
+            # a resource error attributed to the wrong process. It is reported in
+            # `memory_report` and in the notes instead of raising.
+            if watchdog.verdict.breached and watchdog.verdict.reason != "mem_available":
+                raise MemoryGuardBreached(watchdog.verdict, watchdog.report())
             if index >= warmup:
                 timings.append(elapsed)
     finally:
         watchdog.stop()
 
     ordered = sorted(timings)
+    tail_s, tail_rule = Measurement.tail(ordered)
     measurement = Measurement(
         repeats=repeats,
         warmup=warmup,
         median_s=statistics.median(timings),
         min_s=ordered[0],
-        # For repeats <= 20 this is the slowest observed run rather than a real
-        # 95th percentile, and it is reported under that name because the
+        # At these sample sizes this is the slowest observed run rather than a
+        # real 95th percentile, and it is reported under that name because the
         # protocol asks for a tail statistic and the honest tail of 3 samples is
         # the maximum. Not interpolated -- interpolating 3 points would invent a
-        # smoothness the sample does not have.
-        p95_s=ordered[min(len(ordered) - 1, math.ceil(0.95 * len(ordered)) - 1)],
+        # smoothness the sample does not have. `tail_rule` carries which it is.
+        p95_s=tail_s,
         all_s=tuple(timings),
+        tail_rule=tail_rule,
     )
 
     record = PerformanceRecord(
@@ -530,12 +676,34 @@ def measure(
         measurement=measurement,
         environment=environment,
         isolation=isolation,
-        stages=timer.as_dict(measurement.median_s) if timer.stages else None,
+        stages=timer.as_dict(timer_elapsed_s) if timer.stages else None,
         peak_host_rss_bytes=watchdog.peak_rss_bytes,
-        cuda=cuda_memory_snapshot(),
-        swap_growth_bytes=watchdog.swap_growth_bytes or 0,
+        # NOT `or 0`. `None` means the cgroup file could not be read, which the
+        # schema documents and which a zero would silently convert into the claim
+        # "this run did not swap" -- making the swap guard unfalsifiable on any
+        # host where that cgroup path is absent.
+        swap_growth_bytes=watchdog.swap_growth_bytes,
+        # `None` rather than this process's zeros when the workload ran in a
+        # child. A snapshot of the parent's allocator says nothing about the
+        # child's peak, and reporting it under `cuda` would read as "the workload
+        # used no GPU memory".
+        cuda=cuda_memory_snapshot() if touch_devices else None,
         memory_report=watchdog.report(),
-        notes=tuple(notes),
+        notes=(
+            *notes,
+            # Reported rather than raised: see the guard in the loop above.
+            *(
+                (
+                    "HOST MEMORY PRESSURE during this measurement: "
+                    f"{watchdog.verdict.detail}. Host-wide and not attributable to "
+                    "this process, so the run was not stopped -- but the timing was "
+                    "taken on a machine under pressure and should be treated as an "
+                    "upper bound rather than a baseline.",
+                )
+                if watchdog.verdict.breached and watchdog.verdict.reason == "mem_available"
+                else ()
+            ),
+        ),
     )
     return record, result
 
@@ -546,11 +714,19 @@ def compare(
 ) -> dict[str, Any]:
     """Speedup of ``candidate`` over ``baseline``, or a refusal.
 
-    Refuses on two grounds, and the second is the one specific to this
-    repository: a different environment fingerprint, and a different workload
-    unit or route. Comparing ``seconds_per_ray`` across ``ramp_sum`` and
-    ``kspace_splat`` is comparing two different cost models, and the answer
-    would look like a speedup.
+    Refuses on three grounds, and the last two are the ones specific to this
+    repository: a different environment fingerprint, a different workload unit or
+    route, and a different workload ``detail``. Comparing ``seconds_per_ray``
+    across ``ramp_sum`` and ``kspace_splat`` is comparing two different cost
+    models, and the answer would look like a speedup.
+
+    ``detail`` is included because ``route`` alone was not enough. This
+    repository's own scaling baseline records the shipping call and the same call
+    with the O(N^2) ray-density diagnostic forced off under identical
+    ``unit``/``route``, distinguished only in ``detail``; dividing them returned
+    an 11x "speedup" between two different computations, from committed
+    artifacts, with no refusal. Two records that differ in what work they did are
+    not a before and an after.
     """
     a = baseline.as_dict() if isinstance(baseline, PerformanceRecord) else baseline
     b = candidate.as_dict() if isinstance(candidate, PerformanceRecord) else candidate
@@ -576,6 +752,22 @@ def compare(
             f"workloads are not the same kind of work: {a_unit}/{a_route} vs "
             f"{b_unit}/{b_route}. Cost per unit means something different on each, "
             "so the ratio would not be a speedup."
+        )
+
+    a_detail = a["workload"].get("detail") or {}
+    b_detail = b["workload"].get("detail") or {}
+    if a_detail != b_detail:
+        differing = sorted(
+            key
+            for key in set(a_detail) | set(b_detail)
+            if a_detail.get(key) != b_detail.get(key)
+        )
+        raise Incomparable(
+            f"workload detail differs on {differing}: {a_detail} vs {b_detail}. "
+            "The unit and the route match, so the ratio would print -- but a "
+            "record that says it did different work is not a before-and-after. "
+            "If these really are two measurements of the same work, make the "
+            "detail identical; if they are not, the refusal is the answer."
         )
 
     a_med = a["measurement"]["median_s"]

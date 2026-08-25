@@ -1,13 +1,13 @@
 {
- "cost_per_unit": 170.06161301500106,
- "cost_per_unit_name": "seconds_per_bundle_run [M3-SLICE-CPU-V1]",
+ "cost_per_unit": 5.794996622717008e-06,
+ "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
  "cuda": null,
  "environment": {
   "container_image": "agent_solver",
   "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
-  "gpu_count": null,
-  "gpu_driver": null,
-  "gpu_name": null,
+  "gpu_count": 1,
+  "gpu_driver": "550.163.01",
+  "gpu_name": "NVIDIA RTX A6000",
   "logical_cpus": 80,
   "packages": {
    "chromatix": "0.6.0",
@@ -16,11 +16,11 @@
    "numpy": "2.2.6",
    "optiland": "0.6.0",
    "scipy": "1.15.3",
-   "torch": "2.13.0+cpu"
+   "torch": "2.13.0+cu126"
   },
   "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
   "python_version": "3.12.14",
-  "sha256": "8a536c6653510329b7cd2da8eb9da82cb94e8a2a420ab4765315dbd8684313ad",
+  "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11",
   "thread_env": {},
   "visible_devices": null
  },
@@ -111,48 +111,48 @@
   "logical_cpus": 80,
   "thread_env": {}
  },
- "label": "L2-PSF-01 bundle",
+ "label": "demo2_paper_rw_f_paper_budget_ramp_sum_cuda",
  "measurement": {
   "all_s": [
-   170.06161301500106
+   6.374496284988709
   ],
-  "median_s": 170.06161301500106,
-  "min_s": 170.06161301500106,
-  "p95_s": 170.06161301500106,
+  "median_s": 6.374496284988709,
+  "min_s": 6.374496284988709,
+  "p95_s": 6.374496284988709,
   "repeats": 1,
   "tail_rule": "max_of_1",
   "warmup": 0
  },
  "memory_report": {
   "after": {
-   "cgroup_memory_bytes": 30711808,
+   "cgroup_memory_bytes": 31358976,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 389946056704,
+   "mem_available_bytes": 390093955072,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 100226.288907117,
-   "rss_bytes": 30420992
+   "monotonic_s": 100240.62779317,
+   "rss_bytes": 30793728
   },
   "before": {
-   "cgroup_memory_bytes": 20488192,
+   "cgroup_memory_bytes": 20467712,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390780289024,
+   "mem_available_bytes": 389781938176,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 100056.225904281,
-   "rss_bytes": 30420992
+   "monotonic_s": 100234.251193095,
+   "rss_bytes": 30793728
   },
   "cgroup_swap_after_bytes": 0,
   "cgroup_swap_before_bytes": 0,
   "host_reserve_bytes": 60801321984,
   "interval_s": 0.25,
-  "min_mem_available_bytes": 378339676160,
+  "min_mem_available_bytes": 387755290624,
   "peak_cgroup_swap_bytes": 0,
-  "peak_rss_bytes": 30420992,
+  "peak_rss_bytes": 30793728,
   "process_rss_budget_bytes": null,
-  "samples": 680,
+  "samples": 27,
   "signal": "/sys/fs/cgroup/memory.swap.current",
   "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
   "swap_delta_peak_bytes": 0,
@@ -165,44 +165,57 @@
   }
  },
  "notes": [
-  "One timed run, no warmup, for the same reason as the suite baseline.",
+  "One timed run, no warmup. Three repeats of this configuration is minutes of a shared GPU to improve a number that varies by a few percent.",
+  "seconds_per_ray is route-specific: ramp_sum is O(rays x pixels) and kspace_splat is O(rays) + one FFT, so the two are not one number. core.performance.compare refuses to divide them.",
+  "The demo's own record is at benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json -- written under a perf_ name so this timing run does not overwrite a committed scientific record.",
   "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
  ],
- "peak_host_rss_bytes": 30420992,
+ "peak_host_rss_bytes": 30793728,
  "stages": {
-  "accounted_s": 170.0614,
+  "accounted_s": 6.3736,
   "fraction_of_total": {
-   "subprocess": 1.0
+   "subprocess": 0.9999
   },
   "seconds": {
-   "subprocess": 170.0614
+   "subprocess": 6.3736
   },
-  "total_s": 170.0616,
-  "unaccounted_s": 0.0002
+  "total_s": 6.3745,
+  "unaccounted_s": 0.0009
  },
  "subprocess": {
   "argv": [
    "/usr/local/bin/python",
-   "/workspace/benchmarks/physics/L2-PSF-01/run_benchmark.py"
+   "/workspace/benchmarks/probes/ray_wave/demo2_hologram.py",
+   "--preset",
+   "paper",
+   "--routes",
+   "rw_f_paper_budget",
+   "--reconstruction",
+   "ramp_sum",
+   "--backend",
+   "jax",
+   "--output-name",
+   "perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda"
   ],
-  "peak_child_rss_bytes": 12476063744,
+  "peak_child_rss_bytes": 2243006464,
   "returncode": 0,
   "stderr_tail": [],
   "tail": [
-   "{",
-   "  \"status\": \"complete\",",
-   "  \"physical_correctness\": \"characterized_gate_not_met\",",
-   "  \"gate_met_on_production_configuration\": false,",
-   "  \"negative_controls_pass\": false,",
-   "  \"scientific_fingerprint\": \"411181d022378772bb6b0ab8ea31923a22f045669dc004cc597dd1f51c03ae54\"",
-   "}"
+   "wrote /workspace/benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json",
+   "  rw_f_paper_budget: NCC 0.998693  rel-L2 8.8716e-02  rays 1,100,000  3.51 s"
   ]
  },
  "swap_growth_bytes": 0,
  "workload": {
-  "detail": {},
-  "route": "M3-SLICE-CPU-V1",
-  "size": 1.0,
-  "unit": "bundle_run"
+  "detail": {
+   "backend": "jax",
+   "declared_rays": 1100000.0,
+   "preset": "paper",
+   "rays_read_from": "perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json",
+   "routes": "rw_f_paper_budget"
+  },
+  "route": "ramp_sum",
+  "size": 1100000.0,
+  "unit": "ray"
  }
 }

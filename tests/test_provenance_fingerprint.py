@@ -227,6 +227,110 @@ def test_the_enrolled_records_still_describe_this_tree(name: str) -> None:
     )
 
 
+def test_every_stamped_record_still_describes_this_tree_code() -> None:
+    """Stamping a record must MEAN something, for every stamped record.
+
+    CHE-129. `ENROLLED_PROBES` above is a hand-maintained list, so until now a
+    record could carry a `record_provenance` block, be treated as enrolled by
+    `test_every_committed_record_is_either_enrolled_or_declared`, and never
+    actually be verified by anything. That is the gap this closes: the check is
+    derived from which records carry the block, so the two cannot drift apart --
+    which is what `REGISTER.yaml`'s own header already claims.
+
+    The CODE half only, and the reason is measured rather than assumed. Some
+    stamped records are produced on the GPU image, whose torch build is
+    `2.13.0+cu126` against `2.13.0+cpu` in the default image; that difference is
+    inside `provenance.environment_fingerprint`, so a GPU record's environment
+    half can never reproduce under this CPU gate no matter how much compute is
+    spent on it. Its code half is image-independent. Code drift is also the defect
+    this mechanism was built for -- CHE-100 was `quadrature.py` moving under a
+    committed record, not a package bump.
+
+    Records whose environment half is also checked are the `ENROLLED_PROBES`
+    above, which are CPU-produced.
+    """
+    stale: list[str] = []
+    checked = 0
+    for path in _all_records():
+        payload = json.loads(path.read_text())
+        if RECORD_PROVENANCE_KEY not in payload:
+            continue
+        checked += 1
+        name = path.relative_to(ROOT).as_posix()
+        verdict = verify_record_provenance(payload, root=ROOT, name=name)
+        if verdict.code_changed:
+            stale.append(f"{name}: {verdict.explain()}")
+
+    assert checked, "no record carries a provenance block, so this gate is vacuous"
+    assert not stale, (
+        "these records no longer describe the code that produced them:\n  "
+        + "\n  ".join(stale)
+        + "\nRegenerate the record through its probe and say in the commit what "
+        "changed. Do not delete the assertion.\n"
+        + REGENERATION_COMMANDS
+    )
+
+
+#: How to clear a staleness failure, per record. Without this the message says
+#: "regenerate" and not "run this", which is how a gate gets deleted instead of
+#: satisfied -- `ENROLLED_PROBES` above exists for exactly that reason.
+#:
+#: The ray_wave rows need the GPU image, so a CPU-only contributor whose edit to
+#: `couplers/ray_to_wave.py` reds this cannot clear it themselves. That is a real
+#: cost of enrolling GPU-produced evidence and it is stated rather than hidden;
+#: M5.1/M5.2 are chartered to change that module and will hit it.
+REGENERATION_COMMANDS = """
+Regeneration commands:
+  benchmarks/probes/records/m3_*.json
+      ./run.sh python benchmarks/probes/<probe>.py     (see ENROLLED_PROBES)
+  benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_f_paper_budget_ramp_sum_cuda.json
+      MOA_GPUS=device=6 ./run.sh --gpu python benchmarks/perf/run_baselines.py \
+          demo2 --preset paper --routes rw_f_paper_budget --rays 1.1e6 --backend jax
+  benchmarks/probes/records/ray_wave/perf_demo2_paper_rw_p_ramp_sum_cuda.json
+      MOA_GPUS=device=6 ./run.sh --gpu python benchmarks/perf/run_baselines.py \
+          demo2 --preset paper --routes rw_p --rays 1.6e8 --backend jax
+  benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_ramp_sum_cuda.json
+      MOA_GPUS=device=6 ./run.sh --gpu python benchmarks/perf/run_baselines.py \
+          demo3 --preset characterization --routes rw_p --reconstruction ramp_sum \
+          --rays 6e7 --backend jax
+  benchmarks/probes/records/ray_wave/perf_demo3_characterization_rw_p_kspace_splat_cuda.json
+      MOA_GPUS=device=6 ./run.sh --gpu python benchmarks/perf/run_baselines.py \
+          demo3 --preset characterization --routes rw_p --reconstruction kspace_splat \
+          --rays 6e7 --backend jax
+Each demo3 command is ~3.5 minutes on one GPU. Re-running a demo also rewrites
+its perf baseline under benchmarks/perf/records/, which is intended: the timing
+and the science come from the same execution.
+"""
+
+
+def test_the_ray_wave_demos_stamp_what_they_write() -> None:
+    """The enrollment is in `write_record`, so a new demo cannot skip it.
+
+    CHE-129 enrolled the four demo configurations it paid GPU compute for by
+    moving the stamp into `_demo_support.write_record` rather than into each demo.
+    If the stamp moves back out into the callers, this fails -- because the next
+    demo added would write an unstamped record and only `REGISTER.yaml` would
+    notice, one commit too late.
+    """
+    support = (
+        ROOT / "benchmarks" / "probes" / "ray_wave" / "_demo_support.py"
+    ).read_text()
+    assert "record_provenance(" in support, (
+        "_demo_support.write_record must stamp the records it writes; without it "
+        "every ray_wave demo record is unverifiable evidence again"
+    )
+
+    stamped = [
+        path.name
+        for path in (RECORDS_DIR / "ray_wave").glob("*.json")
+        if RECORD_PROVENANCE_KEY in json.loads(path.read_text())
+    ]
+    assert stamped, (
+        "no ray_wave record carries a provenance block, so write_record's stamp "
+        "has never actually run -- re-run a demo"
+    )
+
+
 def test_a_record_that_drifts_from_its_probe_fails(tmp_path: Path) -> None:
     """Demonstrate the detection rather than asserting that it exists.
 

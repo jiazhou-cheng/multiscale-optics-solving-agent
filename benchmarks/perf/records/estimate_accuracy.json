@@ -27,7 +27,7 @@
   {
    "component": "M_RAY_OPTILAND",
    "confidence": "low",
-   "measured_median_s": 0.019991751003544778,
+   "measured_median_s": 0.02059374599775765,
    "notes": [
     "Heuristic only -- optiland is not imported for this estimate.",
     "Registry cost_model: O(number_of_surfaces * number_of_rays); this estimator does not read the actual surface count.",
@@ -40,18 +40,18 @@
   {
    "component": "C_RAY_TO_WAVE",
    "confidence": "medium",
-   "measured_median_s": 0.46258707100059837,
-   "measured_peak_host_rss_bytes": 973578240,
-   "measured_reconstruction_only_s": 0.055317617996479385,
+   "measured_median_s": 0.46429381500638556,
+   "measured_peak_host_rss_bytes": 974008320,
+   "measured_reconstruction_only_s": 0.05383988699759357,
    "notes": [
     "cost driver = rays x grid points = 3169 x 35344 = 1.12e+08 ray-pixel products at a measured ~5.5e+08/s (shared unpinned machine, M3.2; an ordering figure, not a regression envelope)"
    ],
    "predicted_peak_memory_bytes": 19630208,
    "predicted_wall_time_s": 0.2036457018181818,
-   "ratio_predicted_over_measured": 0.44023215213880973,
-   "ratio_predicted_over_reconstruction": 3.681389567987952,
+   "ratio_predicted_over_measured": 0.4386138588027088,
+   "ratio_predicted_over_reconstruction": 3.7824318209895944,
    "reconstruction_record": {
-    "cost_per_unit": 1.7455859260485763e-05,
+    "cost_per_unit": 1.6989550961689354e-05,
     "cost_per_unit_name": "seconds_per_ray [ramp_sum]",
     "cuda": {
      "allocated_bytes": null,
@@ -175,44 +175,45 @@
     "label": "C_RAY_TO_WAVE reconstruction only",
     "measurement": {
      "all_s": [
-      0.055659948993707076,
-      0.055075743002817035,
-      0.055317617996479385
+      0.05503249500179663,
+      0.05383988699759357,
+      0.05380916800640989
      ],
-     "median_s": 0.055317617996479385,
-     "min_s": 0.055075743002817035,
-     "p95_s": 0.055659948993707076,
+     "median_s": 0.05383988699759357,
+     "min_s": 0.05380916800640989,
+     "p95_s": 0.05503249500179663,
      "repeats": 3,
+     "tail_rule": "max_of_3",
      "warmup": 1
     },
     "memory_report": {
      "after": {
-      "cgroup_memory_bytes": 357265408,
+      "cgroup_memory_bytes": 358305792,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390674042880,
+      "mem_available_bytes": 389850402816,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93759.673279469,
-      "rss_bytes": 538935296
+      "monotonic_s": 96770.187929911,
+      "rss_bytes": 539361280
      },
      "before": {
-      "cgroup_memory_bytes": 357294080,
+      "cgroup_memory_bytes": 358350848,
       "cgroup_swap_bytes": 0,
       "host_swap_total_bytes": 2002545270784,
       "host_swap_used_bytes": 0,
-      "mem_available_bytes": 390652325888,
+      "mem_available_bytes": 389857579008,
       "mem_total_bytes": 405342146560,
-      "monotonic_s": 93759.449237293,
-      "rss_bytes": 538927104
+      "monotonic_s": 96769.967877843,
+      "rss_bytes": 539353088
      },
      "cgroup_swap_after_bytes": 0,
      "cgroup_swap_before_bytes": 0,
      "host_reserve_bytes": 60801321984,
      "interval_s": 0.25,
-     "min_mem_available_bytes": 390652325888,
+     "min_mem_available_bytes": 389850402816,
      "peak_cgroup_swap_bytes": 0,
-     "peak_rss_bytes": 538935296,
+     "peak_rss_bytes": 539361280,
      "process_rss_budget_bytes": null,
      "samples": 2,
      "signal": "/sys/fs/cgroup/memory.swap.current",
@@ -227,26 +228,29 @@
      }
     },
     "notes": [],
-    "peak_host_rss_bytes": 538935296,
+    "peak_host_rss_bytes": 539361280,
     "stages": {
-     "accounted_s": 0.0553,
+     "accounted_s": 0.0537,
      "fraction_of_total": {
-      "transform": 0.9993
+      "transform": 0.9985
      },
      "seconds": {
-      "transform": 0.0553
+      "transform": 0.0537
      },
-     "unaccounted_s": 0.0
+     "total_s": 0.0538,
+     "unaccounted_s": 0.0001
     },
     "swap_growth_bytes": 0,
     "workload": {
-     "detail": {},
+     "detail": {
+      "diagnostic": "forced off"
+     },
      "route": "ramp_sum",
      "size": 3169.0,
      "unit": "ray"
     }
    },
-   "verdict": "WRONG IN BOTH DIRECTIONS, and the two errors have different causes. Against the shipping call (0.463 s) it under-predicts by 2.3x, because it models the ray x pixel reconstruction and the call is dominated by the O(N^2) ray-density diagnostic. Against the reconstruction alone (0.055 s) it over-predicts by 3.7x, because its _RAY_PIXEL_PRODUCTS_PER_SECOND constant is not calibrated to this host. A planner ordering work by this number would be wrong about which node is expensive, which is the failure that matters."
+   "verdict": "WRONG IN BOTH DIRECTIONS, and the two errors have different causes. Against the shipping call (0.464 s) it under-predicts by 2.3x, because it models the ray x pixel reconstruction and the call is dominated by the O(N^2) ray-density diagnostic. Against the reconstruction alone (0.054 s) it over-predicts by 3.8x, because its _RAY_PIXEL_PRODUCTS_PER_SECOND constant is not calibrated to this host. A planner ordering work by this number would be wrong about which node is expensive, which is the failure that matters."
   }
  ],
  "why_this_matters": "M3's executor and M6's planner both order work by CostEstimate. An estimator that has never been scored against a measurement is a guess, and one that returns None is at least a guess that says so."

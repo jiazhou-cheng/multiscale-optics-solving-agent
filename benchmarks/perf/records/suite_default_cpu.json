@@ -1,16 +1,7 @@
 {
- "cost_per_unit": 212.79519617700134,
+ "cost_per_unit": 211.44416953199834,
  "cost_per_unit_name": "seconds_per_suite_run [pytest -q tests]",
- "cuda": {
-  "allocated_bytes": null,
-  "available": false,
-  "device": null,
-  "free_bytes": null,
-  "peak_allocated_bytes": null,
-  "peak_reserved_bytes": null,
-  "reserved_bytes": null,
-  "total_bytes": null
- },
+ "cuda": null,
  "environment": {
   "container_image": "agent_solver",
   "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
@@ -123,44 +114,45 @@
  "label": "default test suite",
  "measurement": {
   "all_s": [
-   212.79519617700134
+   211.44416953199834
   ],
-  "median_s": 212.79519617700134,
-  "min_s": 212.79519617700134,
-  "p95_s": 212.79519617700134,
+  "median_s": 211.44416953199834,
+  "min_s": 211.44416953199834,
+  "p95_s": 211.44416953199834,
   "repeats": 1,
+  "tail_rule": "max_of_1",
   "warmup": 0
  },
  "memory_report": {
   "after": {
-   "cgroup_memory_bytes": 290549760,
+   "cgroup_memory_bytes": 101715968,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390705905664,
+   "mem_available_bytes": 390241050624,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 95342.094797167,
-   "rss_bytes": 320282624
+   "monotonic_s": 103287.552581487,
+   "rss_bytes": 30732288
   },
   "before": {
-   "cgroup_memory_bytes": 163393536,
+   "cgroup_memory_bytes": 20537344,
    "cgroup_swap_bytes": 0,
    "host_swap_total_bytes": 2002545270784,
    "host_swap_used_bytes": 0,
-   "mem_available_bytes": 390601875456,
+   "mem_available_bytes": 390303997952,
    "mem_total_bytes": 405342146560,
-   "monotonic_s": 95128.90081996,
-   "rss_bytes": 228450304
+   "monotonic_s": 103076.10688166,
+   "rss_bytes": 30732288
   },
   "cgroup_swap_after_bytes": 0,
   "cgroup_swap_before_bytes": 0,
   "host_reserve_bytes": 60801321984,
   "interval_s": 0.25,
-  "min_mem_available_bytes": 388378812416,
+  "min_mem_available_bytes": 387605311488,
   "peak_cgroup_swap_bytes": 0,
-  "peak_rss_bytes": 320282624,
+  "peak_rss_bytes": 30732288,
   "process_rss_budget_bytes": null,
-  "samples": 851,
+  "samples": 844,
   "signal": "/sys/fs/cgroup/memory.swap.current",
   "signal_rationale": "container cgroup swap, not host swap: host swap is non-zero at rest on this machine (CHE-64), so a host-swap delta is not attributable to this run",
   "swap_delta_peak_bytes": 0,
@@ -174,17 +166,19 @@
  },
  "notes": [
   "One timed run, no warmup. Repeating a 3.5-minute suite three times to median it would cost ten minutes to sharpen a number whose useful resolution is 'did this grow by tens of seconds'.",
-  "Run INSIDE the already-containerized process, so this measures the suite and not docker startup."
+  "Run INSIDE the already-containerized process, so this measures the suite and not docker startup.",
+  "Measured across a process boundary, so this process does not touch a device: initializing JAX here would preallocate ~78% of the card and leave the child to OOM on an allocation it has room for alone. The process boundary is the barrier, and `cuda` is null because a parent's allocator snapshot is not the child's peak -- read the demo's own record for its device memory."
  ],
- "peak_host_rss_bytes": 320282624,
+ "peak_host_rss_bytes": 30732288,
  "stages": {
-  "accounted_s": 212.7949,
+  "accounted_s": 211.4439,
   "fraction_of_total": {
    "subprocess": 1.0
   },
   "seconds": {
-   "subprocess": 212.7949
+   "subprocess": 211.4439
   },
+  "total_s": 211.4442,
   "unaccounted_s": 0.0003
  },
  "subprocess": {
@@ -195,17 +189,18 @@
    "-q",
    "tests"
   ],
+  "peak_child_rss_bytes": 2692349952,
   "returncode": 0,
   "stderr_tail": [],
   "tail": [
-   "SKIPPED [1] tests/test_gpu_environment.py:264: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [1] tests/test_gpu_environment.py:338: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [15] tests/test_metalens_bridge_gpu.py: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [6] tests/test_precision_execution_matrix.py: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [2] tests/test_precision_gpu_pipeline.py:160: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [15] tests/test_precision_gpu_pipeline.py: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "SKIPPED [2] tests/test_precision_gpu_pipeline.py:230: gpu tests need a dedicated session; 1149 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
-   "1149 passed, 48 skipped, 3 warnings in 209.51s (0:03:29)"
+   "SKIPPED [1] tests/test_gpu_environment.py:264: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [1] tests/test_gpu_environment.py:338: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [15] tests/test_metalens_bridge_gpu.py: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [6] tests/test_precision_execution_matrix.py: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [2] tests/test_precision_gpu_pipeline.py:160: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [15] tests/test_precision_gpu_pipeline.py: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "SKIPPED [2] tests/test_precision_gpu_pipeline.py:230: gpu tests need a dedicated session; 1179 non-gpu test(s) are also selected. On the GPU image every test in the process computes on the GPU, and the non-gpu tolerances were derived on the CPU. Run: `./run.sh --gpu pytest -q -m gpu`",
+   "1179 passed, 48 skipped, 3 warnings in 208.18s (0:03:28)"
   ]
  },
  "swap_growth_bytes": 0,
