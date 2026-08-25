@@ -390,19 +390,38 @@ def sigma_margin(baseline_mean: float, mutated_mean: float, standard_error: floa
 # ---------------------------------------------------------------------------
 
 
+#: Dropped from the scientific fingerprint in its entirety. ``ResourceCost``
+#: carries ``wall_seconds``, ``solver_seconds`` and ``peak_memory_bytes``, and
+#: none of them is a scientific claim: two runs of the same physics on a busy
+#: machine differ by whatever the machine was doing. Measured while closing
+#: CHE-107 -- the wave instances' fingerprints did not reproduce, and this was
+#: why, at 2.76 s against 0.15 s and 466 MB against 538 MB for identical fields.
+#:
+#: Adding those three names to ``core.provenance.VOLATILE_KEYS`` would have been
+#: the wrong fix, and the test guarding that tuple says why: a B4 cost family's
+#: ``wall_seconds`` IS its measurement, and stripping the key everywhere would
+#: make two different cost measurements hash the same. A cost that is being
+#: CLAIMED arrives as a metric in ``physics_accuracy``, which this keeps.
+_UNFINGERPRINTED_FIELDS = ("resource_cost",)
+
+
 def result_fingerprint(result: VerificationResult) -> str:
     """A hash over the *scientific content* of a result.
 
-    ``strip_volatile`` removes run ids and timings at every depth, so two
-    independent runs of the same configuration hash the same and a changed
-    measurement changes the hash. That asymmetry is deliberate and is the
-    property M1.1 and M1.2 ask to be verified across two runs.
+    ``strip_volatile`` removes run ids and timings at every depth, and the
+    resource-cost block is dropped whole, so two independent runs of the same
+    configuration hash the same and a changed measurement changes the hash. That
+    asymmetry is deliberate and is the property M1.1 and M1.2 ask to be verified
+    across two runs; the other direction -- that a changed measurement changes
+    the hash -- is the one a too-aggressive projection breaks silently.
 
     Uncertainties are kept. An error bar is part of what was measured, and a
     fingerprint that ignored it would call two runs identical when one of them
     quoted a precision the other did not support.
     """
     payload = strip_volatile(json.loads(result.model_dump_json()))
+    for field in _UNFINGERPRINTED_FIELDS:
+        payload.pop(field, None)
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=float)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 

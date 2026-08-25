@@ -289,6 +289,24 @@ entries:
       probe (RAY-5). One family's gate does NOT close and says so:
       B1-RAY-LAGRANGE measures 1.3e-7 against a 1e-10 tolerance whose basis is a
       paraxial conservation law, and the tolerance is left alone.
+  - path: benchmarks/instances/b1_wave.py
+    bucket: B
+    justification: >-
+      POSITIVE: the seven B1 wave families executed through the Chromatix graph
+      node, and the only place three families were found unable to support their
+      own claims -- GAUSS/TILT/FWDBWD sitting outside their own sampling
+      predicate while meeting their gates, TALBOT unable to revive because a
+      binary grating's high orders dephase, and ASM-VALIDITY unable to
+      demonstrate aliasing because an 8 um beam's bandwidth is fifty times
+      inside the grid's. Each diagnosis is a comment beside the parameter it
+      changed, and no tolerance moved.
+    destination: >-
+      B1-WAVE-GAUSS / -AIRY / -TILT / -PLANEPHASE / -FWDBWD / -TALBOT /
+      -ASM-VALIDITY canonical instances, run by tests/test_b1_wave_instances.py.
+    note: >-
+      Also carries the device observation (WAVE-3). The complex64 accuracy cost
+      (WAVE-2) is measured once, by B0-DTYPE-01, against the independent float64
+      angular spectrum rather than twice.
   - path: benchmarks/instances/b3_psf_singlet.py
     bucket: B
     justification: >-

@@ -126,6 +126,63 @@ def test_the_projection_does_not_mutate_its_input() -> None:
 
 
 # ---------------------------------------------------------------------------
+# CHE-107: what a VerificationResult's scientific fingerprint additionally drops
+# ---------------------------------------------------------------------------
+
+
+def test_a_results_fingerprint_ignores_its_resource_cost() -> None:
+    """Two runs of the same physics on a busy machine must hash the same.
+
+    Found while closing CHE-107: the wave instances' fingerprints did not
+    reproduce, and ``ResourceCost`` was why -- 2.76 s against 0.15 s and 466 MB
+    against 538 MB for bit-identical fields. None of ``wall_seconds``,
+    ``solver_seconds`` or ``peak_memory_bytes`` is a scientific claim.
+    """
+    from core.execution_record import ResourceCost
+    from verification.evidence import result_fingerprint
+    from verification.families.schema import ValidityState
+    from verification.result import ProvenanceReport, ValidityReport, VerificationResult
+    from verification.status import VerificationStatus
+
+    def _result(wall: float, memory: int) -> VerificationResult:
+        return VerificationResult(
+            instance_id="i",
+            family_id="f",
+            family_version="1.0.0",
+            run_id="r",
+            category="B1",
+            status=VerificationStatus.OK,
+            validity=ValidityReport(
+                declared=ValidityState.INSIDE, observed=ValidityState.INSIDE
+            ),
+            resource_cost=ResourceCost(wall_seconds=wall, peak_memory_bytes=memory),
+            provenance=ProvenanceReport(
+                run_id="r",
+                instance_fingerprint="x",
+                family_version="1.0.0",
+                verifier_version="1.0.0",
+            ),
+        )
+
+    assert result_fingerprint(_result(0.15, 466)) == result_fingerprint(_result(2.76, 538))
+
+
+def test_the_resource_cost_keys_are_not_stripped_globally() -> None:
+    """Because for a B4 cost family, ``wall_seconds`` IS the measurement.
+
+    Adding those names to ``VOLATILE_KEYS`` would have been the easy fix and the
+    wrong one: it would make two different cost measurements hash the same, which
+    is the "stripping too much" failure this file's first half is about. A cost
+    that is being CLAIMED arrives as a metric, and a metric survives the
+    projection.
+    """
+    for key in ("wall_seconds", "solver_seconds", "peak_memory_bytes"):
+        assert key not in VOLATILE_KEYS
+    payload = {"metric": "wall_seconds", "measured": {"value": 12.5}}
+    assert strip_volatile(payload) == payload
+
+
+# ---------------------------------------------------------------------------
 # CHE-103: the committed records, checked against the tree that reads them
 # ---------------------------------------------------------------------------
 #

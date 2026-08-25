@@ -201,8 +201,7 @@ def _eps32_per_radian_basis(radians_of_phase: str) -> str:
 # B1-WAVE-GAUSS
 # ---------------------------------------------------------------------------
 
-B1_WAVE_GAUSS = register(
-    BenchmarkFamily(
+_B1_WAVE_GAUSS = BenchmarkFamily(
         family_id="B1-WAVE-GAUSS",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -282,13 +281,26 @@ B1_WAVE_GAUSS = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="gaussian_radius_relative_error",
-            observed=1.8e-4,
-            evidence=("src/verification/analytic.py",),
+            observed=1.82072e-4,
+            evidence=(
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_gaussian_reproduces_its_inherited_number",
+                "tests/test_b1_wave_instances.py::test_a_met_gate_is_inside_its_own_validity_domain",
+            ),
             note=(
-                "6.040167 um measured against 6.039084 analytic before the A1 task "
-                "shipped. On record; re-checked by nothing in the required gate."
+                "Re-run through the graph node: 1.82e-4 against a 2e-2 gate, "
+                "reproducing the inherited 1.8e-4 to the third significant figure. That "
+                "agreement is the useful outcome -- the historical number was right and "
+                "is now reproducible from code in the tree rather than from a report.\n\n"
+                "The grid moved from 512 to 1024 and the physics did not, because the "
+                "512-grid instance sat OUTSIDE this family's own validity predicate: "
+                "z <= N pitch^2 / lambda is 60.15 um at 512 and the propagation is "
+                "100 um. A metric inside its tolerance and a status of out_of_validity "
+                "is not a pass; it is a measurement whose validity claim contradicts "
+                "itself, and it is the kind of contradiction only running the family "
+                "surfaces."
             ),
         ),
         sampler=None,
@@ -302,7 +314,6 @@ B1_WAVE_GAUSS = register(
             "src/verification/analytic.py",
             "tests/test_preserved_evidence.py::test_the_gaussian_oracle_reproduces_its_measured_agreement",
         ),
-    )
 )
 
 
@@ -310,8 +321,43 @@ B1_WAVE_GAUSS = register(
 # B1-WAVE-AIRY
 # ---------------------------------------------------------------------------
 
-B1_WAVE_AIRY = register(
-    BenchmarkFamily(
+#: The A1-verified configuration: w0 = 5 um, z = 100 um, lambda = 0.532 um.
+#: Kept exactly, because the recorded 6.040167 um second-moment radius against
+#: 6.039084 analytic is what makes this an inherited-and-now-re-run measurement
+#: rather than a new one.
+B1_WAVE_GAUSS = register(
+    _B1_WAVE_GAUSS.with_instances(
+        _B1_WAVE_GAUSS.instantiate(
+            "B1-WAVE-GAUSS-01",
+            {
+                "waist_um": 5.0,
+                "distance_um": 100.0,
+                "wavelength_um": 0.532,
+                # 1024 rather than 512, and the reason is the family's own
+                # predicate: z <= N pitch^2 / lambda is 60.15 um at 512 and
+                # 120.30 um at 1024, so a 512-grid instance at z = 100 um would
+                # be declared OUTSIDE its own validity domain while meeting its
+                # gate to 1.8e-4. That combination is not a pass, it is a
+                # measurement whose validity claim contradicts itself.
+                "grid_n": 1024,
+                "sample_pitch_um": 0.25,
+                "device": "cpu",
+            },
+            expected={
+                "radius_um": 6.039084,
+                "why": (
+                    "w0 sqrt(1 + (z/zR)^2) is exact for a paraxial Gaussian, and the "
+                    "second moment of the propagated intensity is the estimator. The "
+                    "2e-2 tolerance rejects the UNPROPAGATED waist, 5.0 um, which is "
+                    "17% low and is what a run that propagated zero distance returns."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_AIRY = BenchmarkFamily(
         family_id="B1-WAVE-AIRY",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -408,19 +454,29 @@ B1_WAVE_AIRY = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="airy_first_null_relative_error",
-            observed=2.3e-2,
+            observed=1.75889e-2,
             evidence=(
-                "src/verification/analytic.py",
-                "benchmarks/probes/records/m3_first_null_grid_convergence.json",
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_airy_null_is_bias_corrected_rather_than_trusted",
             ),
             note=(
-                "6.65 um measured against 6.4985 analytic. CHE-103's grid sweep showed "
-                "the frozen M3 configuration puts only 2.44 pixels across the Airy "
-                "radius and is NOT converged for radius-like metrics, so this family "
-                "owes a ladder in focal_plane_pitch_um before its number means anything "
-                "stronger than 'inside a sampling-limited tolerance'."
+                "1.76e-2 against a 5e-2 gate, on a grid that puts 10.8 samples across "
+                "the Airy radius rather than the frozen configuration's 2.44 -- so the "
+                "sampling caveat CHE-103 raised is answered by the geometry rather than "
+                "carried forward as a caveat.\n\n"
+                "The estimator's own bias is measured rather than assumed away: the same "
+                "first-null estimator is run over the ANALYTIC Airy pattern on the same "
+                "grid, and the bias-cancelled ratio is reported beside the raw error. "
+                "Comparing a measured null straight to 0.61 lambda/NA at coarse pitch "
+                "measures the estimator and not the solver, which is what CHE-103's "
+                "11.9%-at-2.44-px finding established.\n\n"
+                "The geometry is derived from the declared NA rather than declared "
+                "separately -- the aperture radius is fixed and the focal length follows "
+                "as a/NA -- so NA is the one physical knob and the closed form depends "
+                "on nothing else. The focus is checked to sit inside the ASM sampling "
+                "limit (300 um against 346 um) rather than assumed to."
             ),
         ),
         sampler=None,
@@ -437,7 +493,6 @@ B1_WAVE_AIRY = register(
             "the physics does not, which is exactly the case the NUMERICAL/PHYSICAL "
             "split exists to make expressible."
         ),
-    )
 )
 
 
@@ -445,8 +500,41 @@ B1_WAVE_AIRY = register(
 # B1-WAVE-TILT
 # ---------------------------------------------------------------------------
 
-B1_WAVE_TILT = register(
-    BenchmarkFamily(
+#: A circular pupil with a converging lens phase, propagated to its focus.
+#:
+#: The geometry is derived from the declared NA rather than declared separately:
+#: the aperture radius is fixed at 30 um and the focal length follows as a/NA, so
+#: NA is the one physical knob and the closed form 0.61 lambda / NA depends on
+#: nothing else. Grid and pitch are chosen so the focal plane resolves the Airy
+#: core -- 10.8 samples per Airy radius -- and so the focus stays inside the ASM
+#: transfer function's own sampling limit, N pitch^2 / lambda = 346 um against a
+#: 300 um focal length. Both are checked at run time rather than asserted here.
+B1_WAVE_AIRY = register(
+    _B1_WAVE_AIRY.with_instances(
+        _B1_WAVE_AIRY.instantiate(
+            "B1-WAVE-AIRY-01",
+            {
+                "numerical_aperture": 0.1,
+                "wavelength_um": 0.532,
+                "grid_n": 2048,
+                "focal_plane_pitch_um": 0.3,
+            },
+            expected={
+                "first_null_um": 0.61 * 0.532 / 0.1,
+                "why": (
+                    "0.61 lambda / NA is the exact first zero of the focal-plane "
+                    "intensity. A first-null estimator is biased at finite sampling, so "
+                    "the same estimator is also run over the analytic pattern on the "
+                    "same grid and the bias-cancelled ratio is reported beside the raw "
+                    "error -- the cancellation is visible rather than assumed."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_TILT = BenchmarkFamily(
         family_id="B1-WAVE-TILT",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -551,17 +639,29 @@ B1_WAVE_TILT = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.MEASURED_OFF_GATE,
+            status=GateStatus.MET,
             metric="tilt_centroid_signed_relative_error",
-            observed=2.3e-4,
+            observed=9.92987e-5,
             evidence=(
-                "src/verification/analytic.py",
-                "knowledge/solvers/chromatix/conventions.md",
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_tilt_walkoff_carries_its_sign",
+                "tests/test_b1_wave_instances.py::test_the_kykx_unit_hazard_is_measured_where_it_belongs",
             ),
             note=(
-                "+17.5017 um measured against +17.4977 analytic on the explicit "
-                "phase-ramp encoding. The kykx_argument encoding is the one carrying "
-                "the hazard and has NOT been measured through this family."
+                "9.93e-5 against a 2e-2 gate on the explicit phase-ramp encoding, with "
+                "the SIGN gated: the measured centroid is +17.4960 um against "
+                "+17.4977 analytic, and the sign-flip control is a 2x relative error "
+                "rather than a marginal one.\n\n"
+                "The pitch moved from 0.25 to 0.5 um so the instance satisfies its own "
+                "sampling predicate -- N pitch^2 / lambda is 481 um at 0.5 and 120 um at "
+                "0.25, against a 200 um propagation.\n\n"
+                "The kykx_argument encoding is still not measured through THIS family, "
+                "and that is now a decision rather than a gap: the hazard there is the "
+                "parameter's UNIT rather than the physics, and B0-UNITS-02 measures both "
+                "call sites -- plane_wave handed cycles-per-length is 2*pi too small with "
+                "the sign preserved, and asm_propagate's kykx displaces opposite to its "
+                "parameter. Measuring both here would conflate 'the physics is right' "
+                "with 'the caller read the right unit'."
             ),
         ),
         sampler=None,
@@ -582,7 +682,6 @@ B1_WAVE_TILT = register(
             "by 2*pi and a sign, and the schema's own rule is that a family whose "
             "representation parameter moves the oracle value has found a defect."
         ),
-    )
 )
 
 
@@ -612,8 +711,49 @@ def _plane_wave_phase_advance(params: Mapping[str, Any]) -> float:
     return math.sqrt(k * k - kt * kt) * z
 
 
-B1_WAVE_PLANEPHASE = register(
-    BenchmarkFamily(
+#: A 5-degree tilt over 200 um: +17.4977 um of walk-off, sign included.
+#:
+#: The tilt is applied as an EXPLICIT phase ramp on the input field, which is the
+#: encoding that goes through the graph node. The `kykx_argument` encoding is the
+#: other declared value of `tilt_encoding` and is measured separately by
+#: B0-UNITS-02, because the hazard there is the parameter's UNIT rather than the
+#: physics: `kykx` means cycles per length on `asm_propagate` and radians per
+#: length on `plane_wave`, and the resulting displacement runs opposite in sign to
+#: the parameter on the propagator. Splitting them keeps this family about the
+#: walk-off and that one about the convention.
+B1_WAVE_TILT = register(
+    _B1_WAVE_TILT.with_instances(
+        _B1_WAVE_TILT.instantiate(
+            "B1-WAVE-TILT-01",
+            {
+                "tilt_rad": 0.08726646259971647,
+                "distance_um": 200.0,
+                "wavelength_um": 0.532,
+                # pitch 0.5 rather than 0.25, so N pitch^2 / lambda is 481 um
+                # against a 200 um propagation. At pitch 0.25 the same grid
+                # gives 120 um and the instance would sit outside its own
+                # validity domain.
+                "grid_n": 1024,
+                "sample_pitch_um": 0.5,
+                "tilt_encoding": "explicit_phase_ramp",
+            },
+            expected={
+                "walkoff_um": 17.497732705184802,
+                "sign": "positive: the beam walks toward +y for a +y tilt",
+                "why": (
+                    "z tan(theta) is exact geometry for a collimated beam and the SIGN "
+                    "is part of the claim. The 2e-2 tolerance does not separate "
+                    "z sin(theta) from z tan(theta) -- they differ by 0.4% at 5 degrees "
+                    "-- and the family says so rather than claiming a separation it "
+                    "does not have."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_PLANEPHASE = BenchmarkFamily(
         family_id="B1-WAVE-PLANEPHASE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -729,11 +869,27 @@ B1_WAVE_PLANEPHASE = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="plane_wave_phase_residual_rad",
+            observed=4.89889e-6,
+            evidence=(
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_plane_wave_phase_is_gated_off_axis",
+            ),
             note=(
-                "new to the repository. The phasor sign is documented in "
-                "knowledge/solvers/chromatix/conventions.md and asserted nowhere as a "
-                "gate on a propagated plane wave."
+                "4.90e-6 rad against a 1e-2 gate. The phasor sign was documented and "
+                "asserted nowhere as a gate on a propagated plane wave; it is now.\n\n"
+                "The measured quantity is the phase advance RELATIVE to an on-axis plane "
+                "wave propagated the same distance, which is (k_z - k) z. The absolute "
+                "advance k_z z is 236 rad and wraps, so a residual against it would be "
+                "a statement about the wrap. The instance declares a nonzero transverse "
+                "frequency for the same reason the ray family declares a nonzero field "
+                "angle: on axis k_z = k exactly and a frequency-grid scale error is "
+                "invisible.\n\n"
+                "Both controls fire, and the 2*pi one is worth reading: 2*pi too large "
+                "puts k_t past the light cone entirely, so the wrong answer is not a "
+                "shifted phase but an evanescent mode with no propagating advance at "
+                "all."
             ),
         ),
         sampler=None,
@@ -751,7 +907,6 @@ B1_WAVE_PLANEPHASE = register(
             "axis k_z = k and a 2*pi frequency-grid error is invisible -- the same shape "
             "of blind spot as B1-RAY-OFFAXIS-OPL's on-axis case."
         ),
-    )
 )
 
 
@@ -759,8 +914,42 @@ B1_WAVE_PLANEPHASE = register(
 # B1-WAVE-FWDBWD
 # ---------------------------------------------------------------------------
 
-B1_WAVE_FWDBWD = register(
-    BenchmarkFamily(
+#: A plane wave at a nonzero transverse frequency, so k_z != k.
+#:
+#: On axis ``k_z = k`` and a frequency-grid scale error is exactly invisible;
+#: off axis it is not. The instance therefore declares a nonzero
+#: `transverse_frequency_per_um`, and the measured quantity is the phase advance
+#: RELATIVE to an on-axis plane wave propagated the same distance -- which is
+#: ``(k_z - k) z``, unambiguous modulo nothing, where the absolute advance
+#: ``k_z z`` is thousands of radians and wraps.
+B1_WAVE_PLANEPHASE = register(
+    _B1_WAVE_PLANEPHASE.with_instances(
+        _B1_WAVE_PLANEPHASE.instantiate(
+            "B1-WAVE-PLANEPHASE-01",
+            {
+                "transverse_frequency_per_um": 0.09375,
+                "distance_um": 20.0,
+                "wavelength_um": 0.532,
+                "medium_index": 1.0,
+                "grid_n": 256,
+                "sample_pitch_um": 0.25,
+            },
+            expected={
+                "why": (
+                    "exp(+i k_z z) exactly, with k_z = sqrt(k^2 - k_t^2). The frequency "
+                    "is an exact grid frequency of a 256-sample 0.25 um grid "
+                    "(3/(256*0.25) = 0.046875 cycles/um times 2), so the plane wave is "
+                    "periodic on the grid and nothing wraps. A phasor-sign flip negates "
+                    "the advance and a 2*pi frequency-grid error moves k_z off the light "
+                    "cone entirely."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_FWDBWD = BenchmarkFamily(
         family_id="B1-WAVE-FWDBWD",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -862,11 +1051,28 @@ B1_WAVE_FWDBWD = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="round_trip_relative_l2",
+            observed=2.75199e-7,
+            evidence=(
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_round_trip_returns_the_input_and_can_be_made_to_fail",
+                "tests/test_b1_wave_instances.py::test_the_round_trip_declares_what_it_cannot_see",
+            ),
             note=(
-                "new to the repository, and the cheapest check in M1: two propagations "
-                "and a norm. It is declared NOT_MEASURED rather than assumed because "
-                "nothing has run it."
+                "2.75e-7 against a 1e-5 gate, and it lands BELOW the single-pass "
+                "complex64 floor of 1.4e-4 -- one float32 epsilon per radian of the "
+                "1181 rad the leg accumulates -- because the two legs' phase errors are "
+                "correlated. That is the cheapest check in M1 and it now runs.\n\n"
+                "Both controls are asymmetries the round trip cannot undo, and both are "
+                "SMALL on purpose: one sample of lateral shift between the legs, and an "
+                "aperture wide enough that energy leaves the window. A control that "
+                "moved the field by an order of magnitude would say nothing about a "
+                "1e-5 gate.\n\n"
+                "What this family cannot see is stated rather than left implicit: a "
+                "convention error SHARED by the two legs cancels exactly, so a phasor "
+                "sign flipped in both directions returns the input. B1-WAVE-PLANEPHASE "
+                "is the family that sees those, which is why both exist."
             ),
         ),
         sampler=None,
@@ -884,7 +1090,6 @@ B1_WAVE_FWDBWD = register(
             "says so: an error that the backward pass undoes is invisible here by "
             "construction. B1-WAVE-PLANEPHASE is the family that sees those."
         ),
-    )
 )
 
 
@@ -899,8 +1104,44 @@ def _talbot_distance_um(params: Mapping[str, Any]) -> float:
     return 2.0 * d * d / float(params["wavelength_um"])
 
 
-B1_WAVE_TALBOT = register(
-    BenchmarkFamily(
+#: Forward then backward, and the input comes back.
+#:
+#: The cheapest round trip available, and it catches a phasor-sign error or a
+#: 2*pi frequency-grid scale error immediately: the transfer function is
+#: unit-modulus, so ``H(-z) = conj(H(z))`` and the product is exactly 1 for every
+#: propagating mode. What it CANNOT catch is a shared convention error -- one that
+#: cancels between the two legs -- which is why the family carries a
+#: deliberately asymmetric control.
+B1_WAVE_FWDBWD = register(
+    _B1_WAVE_FWDBWD.with_instances(
+        _B1_WAVE_FWDBWD.instantiate(
+            "B1-WAVE-FWDBWD-01",
+            {
+                "distance_um": 100.0,
+                "wavelength_um": 0.532,
+                "aperture_fill_fraction": 0.4,
+                # 120.30 um of sampling limit against a 100 um leg.
+                "grid_n": 1024,
+                "sample_pitch_um": 0.25,
+            },
+            expected={
+                "residual": "dtype round-off",
+                "why": (
+                    "unitarity of the angular-spectrum transfer function. The 1e-5 "
+                    "tolerance is the complex64 floor: the field is held in complex64 "
+                    "throughout because Chromatix has no other precision, and one "
+                    "float32 epsilon per radian of accumulated phase over 2*pi*100/0.532 "
+                    "= 1181 rad is 1.4e-4 -- so a residual at 1e-5 is BELOW the "
+                    "single-pass floor, which the round trip achieves because the two "
+                    "legs' phase errors are correlated."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_TALBOT = BenchmarkFamily(
         family_id="B1-WAVE-TALBOT",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -1047,12 +1288,40 @@ B1_WAVE_TALBOT = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="talbot_revival_relative_l2",
+            observed=2.1774e-4,
+            evidence=(
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_grating_revives_at_the_talbot_distance",
+                "tests/test_b1_wave_instances.py::test_the_talbot_configuration_keeps_its_orders_paraxial",
+            ),
             note=(
-                "nothing in this repository tests periodic self-imaging. A revival is a "
-                "strong independent check on propagator phase that no existing probe "
-                "covers, and it is structurally unlike everything else here -- which is "
-                "also what makes it the natural physics-family holdout later."
+                "2.18e-4 against a 5e-3 gate. Nothing in this repository tested periodic "
+                "self-imaging before; a revival is a strong independent check on "
+                "propagator phase precisely because it depends on the propagator "
+                "reproducing the RELATIVE phases of many diffraction orders at once, "
+                "which a single-order comparison cannot see.\n\n"
+                "The period is the load-bearing choice and the first one did not work. A "
+                "binary grating carries every odd order, and the m-th order's phase after "
+                "z_T departs from the paraxial 2*pi m^2 by (pi/2) m^4 (lambda/d)^2 -- so "
+                "the residual is set by the HIGHEST PROPAGATING order the grid admits, "
+                "m_max = d/(2 pitch). Measured across eleven configurations: at d = 8 um "
+                "with 32 samples per period m_max is 16, the dephasing is 455 rad, and "
+                "the residual is 2.4e-1 with no revival at all. At d = 32 um with 8 "
+                "samples per period m_max is 4, the dephasing is 0.111 rad, and the "
+                "residual is 2.2e-4. The tolerance did not move; the configuration in "
+                "which the claim is true was found.\n\n"
+                "The tolerance's basis names finite-window truncation and the complex64 "
+                "floor and does NOT name the order dephasing, which is the term that "
+                "actually dominates. Completing that derivation is follow-up work; the "
+                "threshold is unaffected because the measured residual is an order below "
+                "it either way.\n\n"
+                "The half-Talbot control is the right control for a revival claim and "
+                "not merely a convenient one: at z_T/2 the pattern revives SHIFTED by "
+                "half a period, so it looks exactly as much like a grating as the "
+                "revival does. A metric that only asked 'does this look periodic' would "
+                "pass it."
             ),
         ),
         sampler=None,
@@ -1066,7 +1335,6 @@ B1_WAVE_TALBOT = register(
             "knowledge/solvers/chromatix/conventions.md",
             "src/solvers/chromatix/propagation.py",
         ),
-    )
 )
 
 
@@ -1074,8 +1342,58 @@ B1_WAVE_TALBOT = register(
 # B1-WAVE-ASM-VALIDITY -- the load-bearing one
 # ---------------------------------------------------------------------------
 
-B1_WAVE_ASM_VALIDITY = register(
-    BenchmarkFamily(
+#: Periodic self-imaging at z_T = 2 d^2 / lambda.
+#:
+#: Nothing in this repository tested periodic self-imaging before, and a revival
+#: is a strong independent check on propagator phase that no existing probe
+#: covers: it depends on the propagator reproducing the RELATIVE phases of many
+#: diffraction orders at once, which a single-order comparison cannot see.
+#:
+#: The period is chosen so that it is an exact number of samples and the grid an
+#: exact number of periods -- otherwise the grating is not periodic on the grid
+#: and the revival is contaminated by the discontinuity at the wrap rather than
+#: by the propagator.
+B1_WAVE_TALBOT = register(
+    _B1_WAVE_TALBOT.with_instances(
+        _B1_WAVE_TALBOT.instantiate(
+            "B1-WAVE-TALBOT-01",
+            {
+                # 32 um at 8 samples per period, and the period is the
+                # load-bearing choice rather than a convenience. A binary
+                # grating carries every odd order, and the m-th order's phase
+                # after z_T departs from the paraxial 2*pi m^2 by
+                # (pi/2) m^4 (lambda/d)^2 -- so the residual is set by the
+                # HIGHEST PROPAGATING order the grid admits, m_max = d/(2 pitch).
+                # Measured across eleven configurations: at d = 8 um with 32
+                # samples per period, m_max = 16 and the dephasing is 455 rad,
+                # which puts the residual at 2.4e-1 and no revival at all. At
+                # d = 32 um with 8 samples per period, m_max = 4, the dephasing
+                # is 0.111 rad, and the residual is 2.0e-4. The tolerance is
+                # unchanged; what changed is choosing a configuration in which
+                # the claim is true.
+                "period_um": 32.0,
+                "wavelength_um": 0.532,
+                "duty_cycle": 0.5,
+                "talbot_order": 1,
+                "periods_across_grid": 32,
+                "samples_per_period": 8,
+            },
+            expected={
+                "talbot_distance_um": 2.0 * 32.0 * 32.0 / 0.532,
+                "why": (
+                    "z_T = 2 d^2 / lambda = 3849.6 um. The half-Talbot control propagates "
+                    "z_T/2 instead, where the pattern is laterally shifted by d/2 -- a "
+                    "field that looks exactly as much like a grating as the revival does "
+                    "and is displaced by half a period, which is what makes it the right "
+                    "control for a revival claim."
+                ),
+            },
+        ),
+    )
+)
+
+
+_B1_WAVE_ASM_VALIDITY = BenchmarkFamily(
         family_id="B1-WAVE-ASM-VALIDITY",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
@@ -1218,14 +1536,42 @@ B1_WAVE_ASM_VALIDITY = register(
         execution_policy=WAVE_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MEASURED,
+            status=GateStatus.MET,
+            metric="asm_radius_relative_error_vs_closed_form",
+            observed=5.93565e-5,
+            evidence=(
+                "benchmarks/instances/b1_wave.py",
+                "tests/test_b1_wave_instances.py::test_the_sweep_straddles_the_declared_boundary",
+                "tests/test_b1_wave_instances.py::test_crossing_the_boundary_is_silent_and_wrong",
+                "tests/test_b1_wave_instances.py::test_the_two_boundary_controls_are_cross_instance_and_fire",
+            ),
             note=(
-                "the sampling bound is derived and now executable "
-                "(families/predicates.py::asm_transfer_function_sampling); the sweep "
-                "across it has not been run. The archived L1-WAVE-01 high-NA case is "
-                "the precedent for what the result should look like: refining pupil "
-                "sampling alone moved the focal scale 10x while an independent oracle "
-                "converged to 2e-14."
+                "MET refers to the INSIDE instance, 5.94e-5 against a 2e-2 gate, and the "
+                "family's content is the pair rather than either number. Three distances "
+                "straddle z = N pitch^2 / lambda at margins +0.80, +0.069 and -15.6. All "
+                "three RUN. The far one succeeds, raises nothing, returns a field that "
+                "looks like a Gaussian, and its radius is 9.0% wrong with 0.8% of its "
+                "power within one pitch of the window edge -- so its gate is UNMET and "
+                "that is the measurement.\n\n"
+                "The waist is 2.5 um and it is a tension resolved by measurement rather "
+                "than a default. At 8 um -- the obvious choice -- the beam's own "
+                "bandwidth is 1/(pi w0) = 0.04 cycles/um against a grid Nyquist of 2, a "
+                "fiftyfold margin, so the kernel's aliasing never touches it and even "
+                "FOUR TIMES past the limit the closed form is reproduced to 1.6e-5: the "
+                "family could not demonstrate its own failure mode. At 0.6 um it wraps "
+                "but is 2.4 samples across the waist, so the second-moment estimator is "
+                "4% biased and the inside instances fail too. 2.5 um is ten samples "
+                "across the waist, estimator bias 6e-5, and w(500 um) = 34.0 um against "
+                "a 32 um half-window.\n\n"
+                "The wrapped-power metric was also wrong first. Measured over the outer "
+                "QUARTER of the window it reads 0.35 for the correct field at 500 um and "
+                "0.35 for the aliased one, because the beam is genuinely that big -- so "
+                "it conflated 'large' with 'folded'. It is the edge band, one pitch wide, "
+                "with the ANALYTIC field's own edge fraction carried as the error bar.\n\n"
+                "Both controls are cross-instance and the mutation is the propagation "
+                "DISTANCE and nothing else: same code, same grid, same oracle, same "
+                "estimator. That is what makes them controls rather than two unrelated "
+                "runs."
             ),
         ),
         sampler=None,
@@ -1249,5 +1595,81 @@ B1_WAVE_ASM_VALIDITY = register(
             "other family here uses the predicates defensively; this one uses them as "
             "the coordinate it sweeps."
         ),
+)
+
+
+#: Three distances straddling ``z = N pitch^2 / lambda``, and the point is the
+#: pair rather than either one.
+#:
+#: This is the family that forces the validity margin to be signed and
+#: normalized rather than boolean, because what it measures is behaviour NEAR a
+#: boundary: the inside instance is well inside, the boundary instance sits just
+#: under, and the outside instance is a factor past it. All three RUN -- crossing
+#: the limit does not raise, it folds energy back in from the other side and
+#: returns a field that looks like a Gaussian and is the wrong size, which is
+#: exactly the class of silent wrongness B1 exists to catch.
+#:
+#: The oracle is the Gaussian closed form, which is exact at every distance and
+#: therefore stays valid on BOTH sides. That is what makes it usable to show the
+#: solver failing rather than merely disagreeing with another solver.
+B1_WAVE_ASM_VALIDITY = register(
+    _B1_WAVE_ASM_VALIDITY.with_instances(
+        *[
+            _B1_WAVE_ASM_VALIDITY.instantiate(
+                f"B1-WAVE-ASM-VALIDITY-{index:02d}",
+                {
+                    # 2.5 um, and the choice is a tension resolved by
+                    # measurement rather than a default. At a waist of 8 um the
+                    # beam's own bandwidth is 1/(pi w0) = 0.04 cycles/um against
+                    # a grid Nyquist of 2 -- a fiftyfold margin -- so the
+                    # kernel's aliasing never touches the beam and even four
+                    # times past the limit the closed form is reproduced to
+                    # 1.6e-5: the family could not demonstrate its own failure
+                    # mode. At 0.6 um the beam does wrap, and it is only 2.4
+                    # samples across the waist, so the second-moment estimator
+                    # is 4% biased and the INSIDE instances fail too. 2.5 um is
+                    # ten samples across the waist -- estimator bias 6e-5 -- and
+                    # w(500 um) = 34.0 um against a 32 um half-window, so the
+                    # far side wraps for the right reason.
+                    "waist_um": 2.5,
+                    "distance_um": distance,
+                    "wavelength_um": 0.532,
+                    "grid_n": 256,
+                    "sample_pitch_um": 0.25,
+                },
+                expected={
+                    "sampling_limit_um": 256 * 0.25**2 / 0.532,
+                    "side": side,
+                    "why": why,
+                },
+            )
+            for index, (distance, side, why) in enumerate(
+                (
+                    (
+                        6.0,
+                        "inside",
+                        "well inside z <= N pitch^2 / lambda = 30.08 um; the closed "
+                        "form is reproduced and the gate is met",
+                    ),
+                    (
+                        28.0,
+                        "near_boundary",
+                        "just under the limit. The margin is small and positive, and "
+                        "the point of having this instance is that the family's "
+                        "predicate can say HOW close rather than only which side",
+                    ),
+                    (
+                        500.0,
+                        "outside",
+                        "sixteen times the limit. It runs, it returns a plausible "
+                        "Gaussian, and the radius is 9% wrong -- no exception anywhere. "
+                        "The gate must NOT be met here, and a run that reported it met "
+                        "would mean the metric cannot see aliasing",
+                    ),
+                ),
+                start=1,
+            )
+        ]
     )
 )
+

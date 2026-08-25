@@ -550,21 +550,34 @@ def test_the_b1_families_show_up_in_the_ledger_as_the_states_they_declare() -> N
     assert by_metric["efl_relative_error"].gate_status is GateStatus.MET
     assert by_metric["launch_tilt_fraction_recovered"].gate_status is GateStatus.MET
     assert by_metric["lagrange_invariant_relative_drift"].gate_status is GateStatus.NOT_MET
-    assert by_metric["talbot_revival_relative_l2"].gate_status is GateStatus.NOT_MEASURED
+    assert by_metric["talbot_revival_relative_l2"].gate_status is GateStatus.MET
 
 
 def test_an_unmeasured_family_does_not_project_a_tolerance_it_has_not_met() -> None:
     """A declared threshold with nothing measured against it is a claim with no
     content, so the coverage view carries the threshold as a caveat instead.
 
-    B1-RAY-OFFAXIS-OPL used to be the example and is now measured, so the
-    example moves to a family that still is not: B1-WAVE-TALBOT. What is being
-    asserted is the projection rule, not which family happens to be unmeasured.
+    Every B1 family is now measured, so the rule is tested on a family whose
+    disposition is rewound to NOT_MEASURED rather than on whichever family
+    happens to be unmeasured this week. That is the better shape anyway: what is
+    being asserted is the PROJECTION rule, and borrowing a live family for it
+    made the test quietly depend on a milestone's progress.
     """
+    from dataclasses import replace
+
+    from verification.claim_ledger import GateStatus
     from verification.families.b1_wave import B1_WAVE_TALBOT
     from verification.families.projection import claims_from_family
+    from verification.families.schema import GateDisposition
 
-    (claim,) = claims_from_family(B1_WAVE_TALBOT)
+    rewound = replace(
+        B1_WAVE_TALBOT,
+        gate_disposition=GateDisposition(
+            status=GateStatus.NOT_MEASURED,
+            note="rewound in this test to exercise the projection rule",
+        ),
+    )
+    (claim,) = claims_from_family(rewound)
     assert claim.tolerance is None
     assert claim.observed is None
     assert any("nothing measured against it yet" in c for c in claim.caveats)
