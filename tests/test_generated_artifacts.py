@@ -24,8 +24,10 @@ from pathlib import Path
 import pytest
 
 from core.artifacts import ArtifactRecord
+from core.execution_record import ExecutionRecord
 from core.provenance import RunProvenance
 from core.specs import CouplerSpec, GraphSpec, ModelSpec
+from verification.result import VerificationResult
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = ROOT / "schemas"
@@ -36,9 +38,11 @@ SCHEMA_DIR = ROOT / "schemas"
 EXPECTED = {
     "artifact.schema.json": ArtifactRecord,
     "coupler.schema.json": CouplerSpec,
+    "execution_record.schema.json": ExecutionRecord,
     "graph.schema.json": GraphSpec,
     "model.schema.json": ModelSpec,
     "provenance.schema.json": RunProvenance,
+    "verification_result.schema.json": VerificationResult,
 }
 
 

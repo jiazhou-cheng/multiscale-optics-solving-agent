@@ -1,0 +1,950 @@
+{
+  "$defs": {
+    "ContractStatus": {
+      "additionalProperties": false,
+      "description": "Boundary conformance and capability facts, as recorded by the run.",
+      "properties": {
+        "capability_intersection_empty": {
+          "default": false,
+          "title": "Capability Intersection Empty",
+          "type": "boolean"
+        },
+        "codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Codes",
+          "type": "array"
+        },
+        "refusal_detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Refusal Detail"
+        },
+        "refusal_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Refusal Kind"
+        },
+        "silent_hazard_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Silent Hazard Ids",
+          "type": "array"
+        }
+      },
+      "title": "ContractStatus",
+      "type": "object"
+    },
+    "ConvergenceReport": {
+      "additionalProperties": false,
+      "description": "A refinement ladder and what it says, or an explicit absence of one.",
+      "properties": {
+        "converged": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Converged"
+        },
+        "dimension": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dimension"
+        },
+        "expected_exponent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Exponent"
+        },
+        "fitted_exponent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ladder": {
+          "items": {
+            "type": "number"
+          },
+          "title": "Ladder",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/Measurement"
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "title": "ConvergenceReport",
+      "type": "object"
+    },
+    "CostEstimate": {
+      "additionalProperties": false,
+      "description": "What a run is predicted to cost, and how much to trust the prediction.\n\n``confidence`` defaults to ``\"unknown\"`` on purpose: a cost model that has\nnot been calibrated should say so rather than present a number as a\nmeasurement.",
+      "properties": {
+        "confidence": {
+          "default": "unknown",
+          "title": "Confidence",
+          "type": "string"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "peak_memory_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Memory Bytes"
+        },
+        "solver_calls": {
+          "default": 1,
+          "title": "Solver Calls",
+          "type": "integer"
+        },
+        "wall_time_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wall Time S"
+        }
+      },
+      "title": "CostEstimate",
+      "type": "object"
+    },
+    "DevicePrecisionObservation": {
+      "additionalProperties": false,
+      "description": "Requested versus actual, and what the difference cost.\n\nRequested is not evidence of actual. Chromatix casts to ``complex64``\nunconditionally, so a graph that asked for FP64 and reports FP64 because\nthat is what it asked for has recorded a fiction. ``measured_loss`` is a\nnumber rather than a warning for the same reason.",
+      "properties": {
+        "actual_device": {
+          "title": "Actual Device",
+          "type": "string"
+        },
+        "actual_dtype": {
+          "title": "Actual Dtype",
+          "type": "string"
+        },
+        "actual_namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Namespace"
+        },
+        "measured_loss_basis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Loss Basis"
+        },
+        "measured_loss_relative": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Loss Relative"
+        },
+        "requested_device": {
+          "title": "Requested Device",
+          "type": "string"
+        },
+        "requested_dtype": {
+          "title": "Requested Dtype",
+          "type": "string"
+        },
+        "requested_namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requested Namespace"
+        }
+      },
+      "required": [
+        "requested_device",
+        "actual_device",
+        "requested_dtype",
+        "actual_dtype"
+      ],
+      "title": "DevicePrecisionObservation",
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/DiagnosticCode"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "title": "Diagnostic",
+      "type": "object"
+    },
+    "DiagnosticCode": {
+      "description": "Structured, never free text, so results aggregate.\n\nFollowing the repository's existing pattern (``ContractCode``, the precision\ncodes): a code, a detail, and where it came from.",
+      "enum": [
+        "declared_validity_disagrees_with_observed",
+        "parameter_drifted_during_execution",
+        "requested_precision_not_honoured",
+        "precision_loss_not_measured",
+        "negative_control_undermines_gate",
+        "negative_control_not_run",
+        "oracle_cannot_decide_correctness",
+        "no_uncertainty_estimated",
+        "stochastic_evidence_incomplete",
+        "single_seed_stochastic_run",
+        "convergence_not_established",
+        "instance_fingerprint_mismatch",
+        "metric_missing_from_record",
+        "resource_envelope_exceeded",
+        "cost_estimate_missed"
+      ],
+      "title": "DiagnosticCode",
+      "type": "string"
+    },
+    "InvariantResult": {
+      "additionalProperties": false,
+      "description": "Something that had to hold regardless of the parameters, and whether it did.",
+      "properties": {
+        "invariant_id": {
+          "title": "Invariant Id",
+          "type": "string"
+        },
+        "measured": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "met": {
+          "title": "Met",
+          "type": "boolean"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "tolerance": {
+          "title": "Tolerance",
+          "type": "number"
+        }
+      },
+      "required": [
+        "invariant_id",
+        "statement",
+        "measured",
+        "tolerance",
+        "met"
+      ],
+      "title": "InvariantResult",
+      "type": "object"
+    },
+    "Measurement": {
+      "additionalProperties": false,
+      "description": "A number that cannot be reported without saying how well it is known.\n\n``NOT_ESTIMATED`` requires ``uncertainty`` to be ``None`` rather than zero.\nZero is a claim of exactness and is the specific fabrication this class\nexists to make impossible to write by accident.",
+      "properties": {
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Uncertainty"
+        },
+        "uncertainty_basis": {
+          "$ref": "#/$defs/UncertaintyBasis"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "uncertainty",
+        "uncertainty_basis"
+      ],
+      "title": "Measurement",
+      "type": "object"
+    },
+    "MetricResult": {
+      "additionalProperties": false,
+      "description": "One metric, its tolerance, and whether the oracle behind it may decide.\n\n``met`` is per metric on purpose. It is not a verdict about the run: a\nresult can have a met accuracy metric and an unmet invariant, and collapsing\nthose loses the more interesting half.\n\n``tolerance_may_gate`` travels with the result rather than being looked up\nlater, so a consumer reducing this to a reward cannot accidentally gate on a\ncharacterization tolerance.",
+      "properties": {
+        "blind_to": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blind To",
+          "type": "array"
+        },
+        "measured": {
+          "$ref": "#/$defs/Measurement"
+        },
+        "met": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Met"
+        },
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "oracle": {
+          "$ref": "#/$defs/Oracle",
+          "default": "none"
+        },
+        "oracle_independence": {
+          "$ref": "#/$defs/OracleIndependence",
+          "default": "not_applicable"
+        },
+        "tolerance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance"
+        },
+        "tolerance_basis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tolerance Basis"
+        },
+        "tolerance_may_gate": {
+          "default": false,
+          "title": "Tolerance May Gate",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "metric",
+        "measured"
+      ],
+      "title": "MetricResult",
+      "type": "object"
+    },
+    "NegativeControlOutcome": {
+      "enum": [
+        "fired",
+        "did_not_fire",
+        "fired_backwards",
+        "not_run"
+      ],
+      "title": "NegativeControlOutcome",
+      "type": "string"
+    },
+    "NegativeControlResult": {
+      "additionalProperties": false,
+      "description": "Whether a deliberately broken twin behaved as a broken twin should.",
+      "properties": {
+        "baseline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "control_id": {
+          "title": "Control Id",
+          "type": "string"
+        },
+        "mutated": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/NegativeControlOutcome"
+        },
+        "target_metric": {
+          "title": "Target Metric",
+          "type": "string"
+        }
+      },
+      "required": [
+        "control_id",
+        "outcome",
+        "target_metric"
+      ],
+      "title": "NegativeControlResult",
+      "type": "object"
+    },
+    "Oracle": {
+      "description": "What decided the claim.\n\nOrdered roughly by how much independent information each carries. The first\nfour are answers arrived at without running the thing under test; the last\ntwo are comparisons against ourselves and are marked as such.",
+      "enum": [
+        "analytic_closed_form",
+        "conservation_law",
+        "convergence_exponent",
+        "independent_implementation",
+        "deterministic_limit",
+        "cross_route",
+        "none"
+      ],
+      "title": "Oracle",
+      "type": "string"
+    },
+    "OracleIndependence": {
+      "description": "Whether the oracle shares code with what it is judging.",
+      "enum": [
+        "independent",
+        "shares_code",
+        "not_applicable"
+      ],
+      "title": "OracleIndependence",
+      "type": "string"
+    },
+    "PredicateMargin": {
+      "additionalProperties": false,
+      "description": "One validity predicate's normalized signed margin, as evaluated.",
+      "properties": {
+        "basis": {
+          "title": "Basis",
+          "type": "string"
+        },
+        "blind_to": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blind To",
+          "type": "array"
+        },
+        "margin": {
+          "title": "Margin",
+          "type": "number"
+        },
+        "predicate_id": {
+          "title": "Predicate Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/ValidityState"
+        }
+      },
+      "required": [
+        "predicate_id",
+        "basis",
+        "margin",
+        "state"
+      ],
+      "title": "PredicateMargin",
+      "type": "object"
+    },
+    "ProvenanceReport": {
+      "additionalProperties": false,
+      "description": "Enough to say whether two results are comparable at all.",
+      "properties": {
+        "family_version": {
+          "title": "Family Version",
+          "type": "string"
+        },
+        "fingerprint_matched": {
+          "default": true,
+          "title": "Fingerprint Matched",
+          "type": "boolean"
+        },
+        "instance_fingerprint": {
+          "title": "Instance Fingerprint",
+          "type": "string"
+        },
+        "package_versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Package Versions",
+          "type": "object"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Commit"
+        },
+        "verifier_version": {
+          "title": "Verifier Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance_fingerprint",
+        "family_version",
+        "verifier_version"
+      ],
+      "title": "ProvenanceReport",
+      "type": "object"
+    },
+    "ResourceCost": {
+      "additionalProperties": false,
+      "description": "What the run actually cost, beside what it was predicted to cost.",
+      "properties": {
+        "device": {
+          "default": "cpu",
+          "title": "Device",
+          "type": "string"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CostEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "peak_memory_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Memory Bytes"
+        },
+        "solver_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Solver Seconds"
+        },
+        "wall_seconds": {
+          "title": "Wall Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "wall_seconds"
+      ],
+      "title": "ResourceCost",
+      "type": "object"
+    },
+    "StochasticReport": {
+      "additionalProperties": false,
+      "description": "Ensemble evidence, kept as four separate facts.\n\nThey fail independently: an estimator can be exact in the enumeration limit\nand still biased; unbiased and still converge at the wrong rate; converge\ncorrectly and have variance that makes the required ray count unreachable.",
+      "properties": {
+        "ensemble_mean": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ensemble_standard_error": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ensemble Standard Error"
+        },
+        "exactness_limit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fitted_convergence_rate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "seeds": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Seeds",
+          "type": "array"
+        },
+        "trials": {
+          "default": 0,
+          "title": "Trials",
+          "type": "integer"
+        },
+        "unbiasedness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Measurement"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "variance_by_sampling_density": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Variance By Sampling Density",
+          "type": "object"
+        }
+      },
+      "title": "StochasticReport",
+      "type": "object"
+    },
+    "UncertaintyBasis": {
+      "description": "Where an error bar came from. Required, so that \"we did not estimate it\"\nis a statement rather than a blank.",
+      "enum": [
+        "ensemble_standard_error",
+        "floating_point_floor",
+        "grid_convergence",
+        "oracle_error_bound",
+        "exact",
+        "not_estimated"
+      ],
+      "title": "UncertaintyBasis",
+      "type": "string"
+    },
+    "ValidityReport": {
+      "additionalProperties": false,
+      "description": "Declared and observed, separately, because they can disagree.\n\nThe verifier evaluates the family's predicates *itself*, against the\nparameters the run actually realized. Trusting what the instance declared\nwould mean a run that snapped a grid, clamped a ray count or fell back to a\ncoarser step reports as inside a domain it left.",
+      "properties": {
+        "declared": {
+          "$ref": "#/$defs/ValidityState"
+        },
+        "drifted_parameters": {
+          "additionalProperties": true,
+          "title": "Drifted Parameters",
+          "type": "object"
+        },
+        "margins": {
+          "items": {
+            "$ref": "#/$defs/PredicateMargin"
+          },
+          "title": "Margins",
+          "type": "array"
+        },
+        "observed": {
+          "$ref": "#/$defs/ValidityState"
+        }
+      },
+      "required": [
+        "declared",
+        "observed"
+      ],
+      "title": "ValidityReport",
+      "type": "object"
+    },
+    "ValidityState": {
+      "description": "Aggregated position relative to a validity domain.\n\nOrdered worst-last so aggregation over several predicates is a ``max``.",
+      "enum": [
+        "inside",
+        "near_boundary",
+        "outside",
+        "far_outside"
+      ],
+      "title": "ValidityState",
+      "type": "string"
+    },
+    "VerificationStatus": {
+      "description": "What kind of outcome a verification had.\n\nNot a verdict. ``OK`` means the run produced evidence the verifier could\nmeasure -- it does **not** mean the physics was right; that is what the\nper-metric ``met`` flags say.",
+      "enum": [
+        "ok",
+        "unsupported",
+        "invalid_configuration",
+        "out_of_validity",
+        "lossy_but_allowed",
+        "blocked",
+        "unconverged"
+      ],
+      "title": "VerificationStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the evidence says. Not what to do about it.\n\nThere is no ``passed`` and no ``score`` here, and\n``tests/test_verifier.py::test_the_result_has_no_verdict_and_no_score``\nfails if either appears. Reducing this to a verdict or a reward is the\nconsumer's job (M9's ``agent/reward.py``), and forcing the consumer to name\nthe fields it used is the point.",
+  "properties": {
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
+    "contract_status": {
+      "$ref": "#/$defs/ContractStatus"
+    },
+    "convergence": {
+      "$ref": "#/$defs/ConvergenceReport"
+    },
+    "device_precision_observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DevicePrecisionObservation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/Diagnostic"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "family_id": {
+      "title": "Family Id",
+      "type": "string"
+    },
+    "family_version": {
+      "title": "Family Version",
+      "type": "string"
+    },
+    "instance_id": {
+      "title": "Instance Id",
+      "type": "string"
+    },
+    "invariant_results": {
+      "items": {
+        "$ref": "#/$defs/InvariantResult"
+      },
+      "title": "Invariant Results",
+      "type": "array"
+    },
+    "negative_control_results": {
+      "items": {
+        "$ref": "#/$defs/NegativeControlResult"
+      },
+      "title": "Negative Control Results",
+      "type": "array"
+    },
+    "physics_accuracy": {
+      "items": {
+        "$ref": "#/$defs/MetricResult"
+      },
+      "title": "Physics Accuracy",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/ProvenanceReport"
+    },
+    "resource_cost": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResourceCost"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/VerificationStatus"
+    },
+    "stochastic_evidence": {
+      "$ref": "#/$defs/StochasticReport"
+    },
+    "validity": {
+      "$ref": "#/$defs/ValidityReport"
+    }
+  },
+  "required": [
+    "instance_id",
+    "family_id",
+    "family_version",
+    "run_id",
+    "category",
+    "status",
+    "validity",
+    "provenance"
+  ],
+  "title": "VerificationResult",
+  "type": "object"
+}

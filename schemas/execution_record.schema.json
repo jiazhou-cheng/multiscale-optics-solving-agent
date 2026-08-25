@@ -1,0 +1,481 @@
+{
+  "$defs": {
+    "CostEstimate": {
+      "additionalProperties": false,
+      "description": "What a run is predicted to cost, and how much to trust the prediction.\n\n``confidence`` defaults to ``\"unknown\"`` on purpose: a cost model that has\nnot been calibrated should say so rather than present a number as a\nmeasurement.",
+      "properties": {
+        "confidence": {
+          "default": "unknown",
+          "title": "Confidence",
+          "type": "string"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "peak_memory_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Memory Bytes"
+        },
+        "solver_calls": {
+          "default": 1,
+          "title": "Solver Calls",
+          "type": "integer"
+        },
+        "wall_time_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wall Time S"
+        }
+      },
+      "title": "CostEstimate",
+      "type": "object"
+    },
+    "DevicePrecisionObservation": {
+      "additionalProperties": false,
+      "description": "Requested versus actual, and what the difference cost.\n\nRequested is not evidence of actual. Chromatix casts to ``complex64``\nunconditionally, so a graph that asked for FP64 and reports FP64 because\nthat is what it asked for has recorded a fiction. ``measured_loss`` is a\nnumber rather than a warning for the same reason.",
+      "properties": {
+        "actual_device": {
+          "title": "Actual Device",
+          "type": "string"
+        },
+        "actual_dtype": {
+          "title": "Actual Dtype",
+          "type": "string"
+        },
+        "actual_namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Namespace"
+        },
+        "measured_loss_basis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Loss Basis"
+        },
+        "measured_loss_relative": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Measured Loss Relative"
+        },
+        "requested_device": {
+          "title": "Requested Device",
+          "type": "string"
+        },
+        "requested_dtype": {
+          "title": "Requested Dtype",
+          "type": "string"
+        },
+        "requested_namespace": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requested Namespace"
+        }
+      },
+      "required": [
+        "requested_device",
+        "actual_device",
+        "requested_dtype",
+        "actual_dtype"
+      ],
+      "title": "DevicePrecisionObservation",
+      "type": "object"
+    },
+    "NodeOutcome": {
+      "description": "What happened at one node. Distinct from a verdict about its physics.",
+      "enum": [
+        "executed",
+        "refused",
+        "raised",
+        "not_reached",
+        "executed_lossy"
+      ],
+      "title": "NodeOutcome",
+      "type": "string"
+    },
+    "NodeRecord": {
+      "additionalProperties": false,
+      "description": "One node's execution, including how it failed if it did.",
+      "properties": {
+        "component": {
+          "title": "Component",
+          "type": "string"
+        },
+        "contract_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contract Codes",
+          "type": "array"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceCost"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "device_precision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DevicePrecisionObservation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        },
+        "error_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Type"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/NodeOutcome"
+        },
+        "outputs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Outputs",
+          "type": "array"
+        },
+        "refusal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Refusal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "node_id",
+        "component",
+        "outcome"
+      ],
+      "title": "NodeRecord",
+      "type": "object"
+    },
+    "Refusal": {
+      "additionalProperties": false,
+      "description": "A structured refusal: a code, what was asked, and what would work.",
+      "properties": {
+        "declaration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declaration"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/RefusalKind"
+        },
+        "remedy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Remedy"
+        }
+      },
+      "required": [
+        "kind",
+        "detail"
+      ],
+      "title": "Refusal",
+      "type": "object"
+    },
+    "RefusalKind": {
+      "description": "Why something refused, structured so a caller can act on it.\n\nA generic failure is the thing this enum exists to prevent: \"unsupported\"\nand \"out of validity\" call for completely different responses, and a caller\nhanded one string can distinguish neither.",
+      "enum": [
+        "unsupported_capability",
+        "invalid_configuration",
+        "out_of_declared_validity",
+        "resource_guard",
+        "unverified_derivative",
+        "missing_edge_declaration"
+      ],
+      "title": "RefusalKind",
+      "type": "string"
+    },
+    "ResourceCost": {
+      "additionalProperties": false,
+      "description": "What the run actually cost, beside what it was predicted to cost.",
+      "properties": {
+        "device": {
+          "default": "cpu",
+          "title": "Device",
+          "type": "string"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CostEstimate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "peak_memory_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peak Memory Bytes"
+        },
+        "solver_seconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Solver Seconds"
+        },
+        "wall_seconds": {
+          "title": "Wall Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "wall_seconds"
+      ],
+      "title": "ResourceCost",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "partial"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Everything the verifier needs, and no opinion about any of it.\n\n``artifacts`` holds the computed objects by key -- fields, bundles, PSFs --\nand is excluded from serialization because arrays do not belong in a JSON\nrecord; the record carries their keys and the run writes them beside it.",
+  "properties": {
+    "artifacts": {
+      "additionalProperties": true,
+      "title": "Artifacts",
+      "type": "object"
+    },
+    "cost": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResourceCost"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "device_precision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DevicePrecisionObservation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "diagnostics": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "graph_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Graph Sha256"
+    },
+    "instance_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instance Fingerprint"
+    },
+    "instance_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instance Id"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NodeRecord"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "observed_parameters": {
+      "additionalProperties": true,
+      "title": "Observed Parameters",
+      "type": "object"
+    },
+    "provenance": {
+      "additionalProperties": true,
+      "title": "Provenance",
+      "type": "object"
+    },
+    "refusal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Refusal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "seeds": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Seeds",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    }
+  },
+  "required": [
+    "run_id",
+    "status"
+  ],
+  "title": "ExecutionRecord",
+  "type": "object"
+}
