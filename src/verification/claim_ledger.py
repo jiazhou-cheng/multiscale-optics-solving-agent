@@ -637,6 +637,8 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
         evidence=(
             "benchmarks/physics/L2-PSF-01/tolerances.yaml",
             "benchmarks/probes/records/m3_quadrature_weight.json",
+            "benchmarks/probes/records/singlet_residual_grid.json",
+            "benchmarks/probes/records/singlet_residual_attribution.json",
             "benchmarks/reports/2026-08/ray_to_wave_slice_exit.md",
         ),
         metric="fft_oracle_intensity_relative_l2 vs O1 over the 5-Airy-radius disc",
@@ -659,12 +661,29 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
         caveats=(
             "Measured at 787,969 rays with the production (weighted) configuration. "
             "The UNIFORM configuration reaches 9.21e-4 and clears the gate -- the "
-            "opposite ordering from the O2 diagnostic, and an open item.",
+            "opposite ordering from the O2 diagnostic.",
+            "CHE-117 attributed the residual and it is NOT a numerical artifact. It is "
+            "converged in both refinable directions: flat to 0.87% from 49,537 to "
+            "3,148,801 rays, and identical to ten significant figures across an 8x "
+            "sensor-pitch refinement at fixed window (6.5 to 51.9 pixels per Airy "
+            "radius). The uniform arm's 9.21e-4 is not a competing converged value -- "
+            "it descends through the weighted arm near 181 rings, reaches a 7.0e-4 "
+            "minimum at 362, and climbs back to 1.52e-3 by 1024 rings, heading for the "
+            "same limit. The two arms differ in exactly one place, the outermost "
+            "ring's half area weight; removing the central ray's 3/4 correction "
+            "changes nothing.",
+            "What remains open after CHE-117 is narrower than what it inherited: not "
+            "why the weight hurts (it does not), but whether an aberration-free "
+            "paraxial Airy oracle can decide a real traced singlet at the 1e-3 level "
+            "at all. Separating the system's own aberration from a coupler error needs "
+            "an oracle this family does not yet have, and O2 does not qualify.",
             "CHE-103 adds a candidate contributor the original write-up did not have: "
             "the frozen grid samples the Airy radius with 2.44 pixels and is not "
             "converged for radius-like metrics, and off-axis the weighted "
-            "configuration is 7.5x worse against the same analytic oracle. Neither "
-            "closes the item; both are inputs to it.",
+            "configuration is 7.5x worse against the same analytic oracle. CHE-117 "
+            "retired the first of those two: the sensor grid this residual is measured "
+            "on is converged, and the 2.44-pixel finding applies to the separate "
+            "pupil-to-focus grid. The off-axis factor is untouched and still open.",
             "This gate must NOT be closed against another Optiland PSF route. FFTPSF "
             "and HuygensPSF share one Wavefront/OPD front end and are therefore one "
             "oracle, not two (PB7/CHE-58 finding F2). Migrated here by CHE-133 from "
@@ -685,6 +704,7 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
         evidence=(
             "benchmarks/physics/L2-PSF-01/tolerances.yaml",
             "benchmarks/probes/records/m3_quadrature_weight.json",
+            "benchmarks/probes/records/singlet_residual_attribution.json",
         ),
         metric="quadrature_weight_min_improvement_factor vs O1",
         tolerance=1.2,
@@ -703,6 +723,15 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "reported rather than hidden or widened.",
             "The weight is independently required for absolute-power convergence "
             "(CHE-33's N^2.0024), so this is not an argument for removing it.",
+            "CHE-117 attributed it, and the finding is that the CONTROL is "
+            "mis-specified rather than the weight defective. The comparison is made at "
+            "one ray count with neither arm required to be converged, so its verdict "
+            "moves with that ray count: 10.7 at 8 rings, 1.79 at 128, 0.42 at 512, "
+            "0.69 at 1024. The weighted arm is converged from 24 rings; the uniform "
+            "arm descends past it, bottoms out at 7.0e-4 near 362 rings, and is "
+            "climbing back toward the same 2.208e-3 at 1024 rings. Respecifying the "
+            "control to require convergence of both arms is a change to the control, "
+            "not to this floor, and the floor is not widened here.",
         ),
     ),
     Claim(

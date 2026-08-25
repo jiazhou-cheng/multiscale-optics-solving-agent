@@ -6,7 +6,7 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
-| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 109 |
+| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 112 |
 | **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 4 |
 | **C** | does this exist only to serve the old evaluation design? | delete | 8 |
 
@@ -45,6 +45,7 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `benchmarks/reports/2026-08/ray_and_wave_baselines.md` | The M1 exit report for the archived gen1 ray and wave baselines. | B1 family provenance; the closed forms it verified move into families. |
 | `benchmarks/reports/2026-08/coupler_characterization.md` | Coupler characterization evidence, including the deterministic-limit results. | B2-R2W-EXACT and B2-W2R-STOCH evidence. |
 | `benchmarks/reports/2026-08/ray_to_wave_slice.md` | The M3 slice measurement record. | B3-PSF-SINGLET evidence. |
+| `benchmarks/reports/2026-08/singlet_residual_attribution.md` | CHE-117's write-up: the unmet singlet gate is converged in both sensor pitch and ray count, the weighted and uniform arms converge to the same 2.208e-3, and the backwards negative control is mis-specified rather than the quadrature weight defective. | B3-PSF-SINGLET gate_disposition note and the C_RAY_TO_WAVE claim caveats. |
 | `benchmarks/reports/2026-08/ray_to_wave_slice_exit.md` | The M3 exit report; carries the unmet-gate disposition. | B3-PSF-SINGLET evidence and CHE-117's starting point. |
 | `benchmarks/reports/2026-08/sensor_handoff_convergence.md` | The corrected sensor-side handoff study -- the residual attribution that found the dominant term is per-ray quadrature weighting, not a kernel defect. | B3-PSF-SINGLET residual attribution; B2-R2W-ROUTE error budget. |
 | `benchmarks/reports/2026-08/slice_cleanup_disposition.md` | Item-by-item disposition of the M3 cleanup, including item 3 -- the carried open gate and the prohibition on closing it against another Optiland route. | B3-PSF-SINGLET tolerance basis and oracle-independence constraint. |
@@ -68,6 +69,8 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `benchmarks/probes/psf_oracle_verification.py` | Runs the shipping path against two oracles and reports how far each perturbation moves relative to the residual it must beat. That perturbation-versus-residual framing is the negative-control instrument. | B3-PSF-SINGLET negative_controls and oracle wiring. |
 | `benchmarks/probes/pupil_to_focus_convergence.py` | Three independent discretizations with fitted trends. | B3-PSF-SINGLET convergence (dimension, ladder, fitted exponent). |
 | `benchmarks/probes/quadrature_weight.py` | Attributes the dominant sensor residual to per-ray quadrature weighting (3.84e-3 uniform at 787,969 rays) and carries the DIAGNOSTIC radial-trapezoid weight whose inverted twin is the control that fires backwards. | B3-PSF-SINGLET negative_controls; the starting artifact for CHE-117. |
+| `benchmarks/probes/singlet_residual_grid.py` | CHE-117's sampling arm: holds the 128 um window fixed and refines the sensor pitch over 6.5 to 51.9 pixels per Airy radius. The weighted residual is identical to ten significant figures at every one of them, which is what rules the unmet singlet gate out as a sensor-grid artifact. | B3-PSF-SINGLET evidence and gate_disposition; retires the sampling half of CHE-103's contribution to the residual question. |
+| `benchmarks/probes/singlet_residual_attribution.py` | CHE-117's mechanism arm: extends the ray ladder to 3,148,801 rays and decomposes the quadrature weight's two boundary corrections. Establishes that both arms converge to the same 2.208e-3, that the difference at finite ray count is entirely the outermost ring's half weight, and that the backwards negative control is mis-specified rather than the weight defective. | B3-PSF-SINGLET evidence, gate_disposition note, and the quadrature control's caveat; closes the open item in the frozen tolerance basis. |
 | `benchmarks/probes/sensor_handoff_convergence.py` | The corrected observation-side handoff study; supersedes the exit-pupil formulation and is why the reference plane is where it is. | B2-R2W-EXACT / B3-PSF-SINGLET reference-plane contract. |
 | `benchmarks/probes/slice_feasibility.py` | Derives the per-axis Nyquist bound from marginal ray angles -- the numbers that make an infeasible slice detectable before it is run. | ValidityPredicate PER_AXIS_NYQUIST, with a normalized signed margin. |
 | `benchmarks/probes/slice_summary_figure.py` | Figure generator for the M3 exit report. Not a measurement; every number it plots is recorded elsewhere. | Reporting utility; unchanged. |

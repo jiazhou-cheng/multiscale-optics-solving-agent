@@ -32,6 +32,20 @@ fft_oracle_intensity_relative_l2_basis: >
   unrelated absolute-power N^2 divergence (see accuracy.production.
   absolute_power), does not also improve relative-L2 agreement with O1 on
   this aberrated system.
+  CHE-117 (M4.2) closed that open item. The answer is that the production
+  quadrature weight does not make agreement with O1 worse: both
+  configurations converge to the same 2.208e-3. The weighted arm is flat to
+  0.87% from 49,537 to 3,148,801 rays and identical to ten significant
+  figures across an 8x sensor-pitch refinement at fixed window; the uniform
+  arm descends past it near 181 rings, bottoms out at 7.04e-4 at 362 rings,
+  and climbs back to 1.52e-3 by 1024 rings. The 9.21e-4 above is a point on
+  a transient dip, not a competing converged value. The residual is
+  therefore converged and not attributable to the quadrature weight, and the
+  narrower question that remains is whether an aberration-free paraxial
+  oracle can decide a real traced singlet at the 1e-3 level at all.
+  Evidence: benchmarks/probes/records/singlet_residual_attribution.json and
+  benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold
+  is unchanged.
 
 # A convention error must be caught by an INDEPENDENT oracle, not merely
 # differ from the correct answer -- otherwise a shared bug between the
@@ -60,6 +74,17 @@ quadrature_weight_min_improvement_factor_basis: >
   propagator, as the decisive oracle; that was circular validation and has
   been retired as the gate input, though the O2 number is still reported in
   result.json for characterization.
+  CHE-117 (M4.2) established that this floor, not the weight, is the defect.
+  The comparison is made at ONE ray count with neither arm required to be
+  converged, so its verdict moves with that ray count: 10.7 at 8 rings, 1.79
+  at 128, 1.02 at 181, 0.42 at 512, 0.69 at 1024. The weighted arm is
+  converged from 24 rings; the uniform arm is still moving at 1024 rings,
+  heading back toward the same value. A control whose sign flips with a
+  numerical parameter is measuring where two convergence curves cross rather
+  than whether the weight helps. Respecifying it to require convergence of
+  both arms is a change to the control, not to this floor, which is
+  unchanged at 1.2. Evidence:
+  benchmarks/probes/records/singlet_residual_attribution.json.
 
 # Protocol constant, restated so a change to it shows up in this file's hash.
 no_gate_may_be_satisfied_by_widening: true

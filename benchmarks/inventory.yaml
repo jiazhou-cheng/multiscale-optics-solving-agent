@@ -427,6 +427,15 @@ entries:
     bucket: A
     justification: The M3 slice measurement record.
     destination: B3-PSF-SINGLET evidence.
+  - path: benchmarks/reports/2026-08/singlet_residual_attribution.md
+    bucket: A
+    justification: >-
+      CHE-117's write-up: the unmet singlet gate is converged in both sensor
+      pitch and ray count, the weighted and uniform arms converge to the same
+      2.208e-3, and the backwards negative control is mis-specified rather than
+      the quadrature weight defective.
+    destination: >-
+      B3-PSF-SINGLET gate_disposition note and the C_RAY_TO_WAVE claim caveats.
   - path: benchmarks/reports/2026-08/ray_to_wave_slice_exit.md
     bucket: A
     justification: The M3 exit report; carries the unmet-gate disposition.
@@ -575,6 +584,27 @@ entries:
       weight whose inverted twin is the control that fires backwards.
     destination: >-
       B3-PSF-SINGLET negative_controls; the starting artifact for CHE-117.
+  - path: benchmarks/probes/singlet_residual_grid.py
+    bucket: A
+    justification: >-
+      CHE-117's sampling arm: holds the 128 um window fixed and refines the sensor
+      pitch over 6.5 to 51.9 pixels per Airy radius. The weighted residual is
+      identical to ten significant figures at every one of them, which is what
+      rules the unmet singlet gate out as a sensor-grid artifact.
+    destination: >-
+      B3-PSF-SINGLET evidence and gate_disposition; retires the sampling half of
+      CHE-103's contribution to the residual question.
+  - path: benchmarks/probes/singlet_residual_attribution.py
+    bucket: A
+    justification: >-
+      CHE-117's mechanism arm: extends the ray ladder to 3,148,801 rays and
+      decomposes the quadrature weight's two boundary corrections. Establishes
+      that both arms converge to the same 2.208e-3, that the difference at finite
+      ray count is entirely the outermost ring's half weight, and that the
+      backwards negative control is mis-specified rather than the weight defective.
+    destination: >-
+      B3-PSF-SINGLET evidence, gate_disposition note, and the quadrature control's
+      caveat; closes the open item in the frozen tolerance basis.
   - path: benchmarks/probes/sensor_handoff_convergence.py
     bucket: A
     justification: >-

@@ -127,7 +127,21 @@ _FFT_ORACLE_BASIS = (
     "correctness here. Open item, not closed by this bundle: why the production "
     "quadrature weight, which fixes the unrelated absolute-power N^2 divergence (see "
     "accuracy.production. absolute_power), does not also improve relative-L2 agreement "
-    "with O1 on this aberrated system."
+    "with O1 on this aberrated system. "
+    "CHE-117 (M4.2) closed that open item. The answer is that the production "
+    "quadrature weight does not make agreement with O1 worse: both configurations "
+    "converge to the same 2.208e-3. The weighted arm is flat to 0.87% from 49,537 "
+    "to 3,148,801 rays and identical to ten significant figures across an 8x "
+    "sensor-pitch refinement at fixed window; the uniform arm descends past it "
+    "near 181 rings, bottoms out at 7.04e-4 at 362 rings, and climbs back to "
+    "1.52e-3 by 1024 rings. The 9.21e-4 above is a point on a transient dip, not "
+    "a competing converged value. The residual is therefore converged and not "
+    "attributable to the quadrature weight, and the narrower question that "
+    "remains is whether an aberration-free paraxial oracle can decide a real "
+    "traced singlet at the 1e-3 level at all. Evidence: "
+    "benchmarks/probes/records/singlet_residual_attribution.json and "
+    "benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold "
+    "is unchanged."
 )
 
 _OPL_SIGN_FLIP_BASIS = (
@@ -143,7 +157,18 @@ _QUADRATURE_BASIS = (
     "(improvement_factor_vs_o2_asm = 1.575) used O2, our own custom ASM/RS "
     "propagator, as the decisive oracle; that was circular validation and has been "
     "retired as the gate input, though the O2 number is still reported in result.json "
-    "for characterization."
+    "for characterization. "
+    "CHE-117 (M4.2) established that this floor, not the weight, is the defect. "
+    "The comparison is made at ONE ray count with neither arm required to be "
+    "converged, so its verdict moves with that ray count: 10.7 at 8 rings, 1.79 "
+    "at 128, 1.02 at 181, 0.42 at 512, 0.69 at 1024. The weighted arm is "
+    "converged from 24 rings; the uniform arm is still moving at 1024 rings, "
+    "heading back toward the same value. A control whose sign flips with a "
+    "numerical parameter is measuring where two convergence curves cross rather "
+    "than whether the weight helps. Respecifying it to require convergence of "
+    "both arms is a change to the control, not to this floor, which is unchanged "
+    "at 1.2. Evidence: "
+    "benchmarks/probes/records/singlet_residual_attribution.json."
 )
 
 
@@ -207,8 +232,10 @@ B3_PSF_SINGLET = register(
             RepresentationParameter(
                 "quadrature_weight",
                 "uniform per-ray weights, or the production radial-trapezoid weight. It "
-                "should not change the answer; it changes the residual by 2.4x, in the "
-                "direction nobody has explained",
+                "should not change the answer; at the frozen 512 rings it changes the "
+                "residual by 2.4x. CHE-117 attributed that: the two arms converge to "
+                "the same 2.208e-3 and the difference at any finite ray count is the "
+                "uniform arm's slower convergence, not the weight",
                 domain=("uniform", "weighted"),
                 default="weighted",
             ),
@@ -354,7 +381,8 @@ B3_PSF_SINGLET = register(
                     "the control that fires BACKWARDS. Adding the production weight is "
                     "required to improve agreement with O1 by at least 1.2x, and it "
                     "measures 0.42 -- the uniform configuration is CLOSER to the oracle "
-                    "than the weighted one"
+                    "than the weighted one. CHE-117 found the control, not the weight, "
+                    "to be at fault: see the caveat"
                 ),
                 mutation=(
                     "compare the weighted configuration's O1 residual against the "
@@ -405,12 +433,21 @@ B3_PSF_SINGLET = register(
             evidence=(
                 "benchmarks/physics/L2-PSF-01/tolerances.yaml",
                 "benchmarks/probes/records/m3_quadrature_weight.json",
+                "benchmarks/probes/records/singlet_residual_grid.json",
+                "benchmarks/probes/records/singlet_residual_attribution.json",
                 "benchmarks/reports/2026-08/ray_to_wave_slice_exit.md",
             ),
             note=(
                 "Carried forward unwidened. The 1.0e-3 gate has been frozen since M3.2 "
                 "and re-affirmed through M3.8 and M3.9R; the production configuration "
-                "measures 2.21e-3 at 787,969 rays. CHE-117 attributes the residual. "
+                "measures 2.21e-3 at 787,969 rays. CHE-117 attributed it: the "
+                "residual is CONVERGED -- flat to 0.87% from 49,537 to 3,148,801 rays "
+                "and invariant to ten significant figures across a 8x sensor-pitch "
+                "refinement -- and it is not caused by the quadrature weight, because "
+                "the uniform arm converges to the same number from below after passing "
+                "through a 7.0e-4 minimum at 362 rings. What remains open is narrower: "
+                "whether an aberration-free paraxial oracle can decide a real traced "
+                "singlet at the 1e-3 level at all. "
                 "This gate must NOT be closed against another Optiland PSF route: "
                 "FFTPSF and HuygensPSF share one Wavefront/OPD front end and are one "
                 "oracle, not two (PB7/CHE-58 finding F2)."
@@ -428,6 +465,8 @@ B3_PSF_SINGLET = register(
             "benchmarks/physics/L2-PSF-01/tolerances.yaml",
             "benchmarks/physics/L2-PSF-01/README.md",
             "benchmarks/probes/records/m3_quadrature_weight.json",
+            "benchmarks/probes/records/singlet_residual_grid.json",
+            "benchmarks/probes/records/singlet_residual_attribution.json",
             "benchmarks/reports/2026-08/slice_cleanup_disposition.md",
         ),
         notes=(
