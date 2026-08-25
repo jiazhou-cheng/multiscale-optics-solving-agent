@@ -33,18 +33,30 @@ migration, because two things differ by construction:
 
 1. **Ray count.** This graph traces 256 hexapolar rings; the frozen
    configuration is 512 rings, 787,969 rays.
-2. **The window, and this is the larger difference.** The frozen gate is a
-   *radial-profile* residual over a 5-Airy-radius disc, implemented as
-   ``_profile_residual`` inside ``benchmarks/probes/psf_oracle_verification.py``.
-   This proof uses ``metrics.central_relative_l2_intensity`` over a centred half
-   window, because reimplementing the profile residual here would fork it --
-   which is the exact drift ``verification/metrics.py`` exists to stop.
+2. **The window, and this is the larger difference.** This proof uses
+   ``metrics.central_relative_l2_intensity`` over a centred half window. The
+   frozen gate is a peak-normalized, disc-masked relative L2 over a
+   5-Airy-radius disc -- a different normalization and a different window.
 
-So the honest statement is: **the loop closes and the fingerprint is not yet
-reproduced.** Doing that needs the frozen 512-ring configuration *and* the
-5-Airy-radius radial-profile residual promoted into ``verification/metrics.py``
-as a named definition. Both are the rest of CHE-115, and re-recording this
-number as the singlet's would be the thing M3.3 explicitly forbids.
+CHE-115 has since promoted the frozen computation into
+``verification/metrics.py`` as ``disc_relative_l2_intensity``, together with the
+``disc_mask`` window it is evaluated over, so reproducing the fingerprint no
+longer requires forking anything. **This file has not yet been switched to it**,
+and that is the remaining step along with the 512-ring configuration.
+
+A correction worth recording, because this docstring asserted the opposite and
+the next reader would have promoted the wrong function: the frozen gate is NOT
+the radial-profile residual in
+``benchmarks/probes/psf_oracle_verification.py::_profile_residual``. The
+committed ``2.2072391812867093e-3`` is produced by
+``benchmarks/probes/sensor_handoff_convergence.py::_relative_l2`` -- pixelwise,
+peak-normalized, disc-masked. The radial-profile residual is the oracle
+verification's measurement and answers a different question. Both are now named
+definitions in ``verification/metrics.py``; they are not interchangeable.
+
+So the honest statement is unchanged: **the loop closes and the fingerprint is
+not yet reproduced.** Re-recording this number as the singlet's would be the
+thing M3.3 explicitly forbids.
 """
 
 from __future__ import annotations

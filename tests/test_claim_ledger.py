@@ -370,7 +370,7 @@ PACK_PATHS = {
     "M_WAVE_CHROMATIX": ("solver", "knowledge/solvers/chromatix"),
     "C_RAY_TO_WAVE": ("coupler", "knowledge/couplers/ray_to_wave"),
     "C_WAVE_TO_RAY": ("coupler", "knowledge/couplers/wave_to_ray"),
-    "C_PLANAR_DOE_STEP": ("coupler", None),
+    "C_PLANAR_DOE_STEP": ("coupler", "knowledge/couplers/planar_doe_step"),
     "C_PATCH_WFT": ("coupler", None),
 }
 
@@ -395,10 +395,14 @@ def test_an_existing_knowledge_pack_is_complete(component: str) -> None:
 def test_a_missing_knowledge_pack_is_filed_as_a_gap(component: str) -> None:
     """The audit's finding, pinned so it cannot be forgotten rather than fixed.
 
-    `C_PLANAR_DOE_STEP` and `C_PATCH_WFT` are the two couplers that HAVE graph
-    nodes, and they are the two with no card, conventions, failure guide or
-    theory. Implementation is M2.3 (CHE-111); this test fails when the pack
-    appears, which is the prompt to move it into the completeness check above.
+    `C_PLANAR_DOE_STEP` and `C_PATCH_WFT` were the two couplers that HAVE graph
+    nodes and had no card, conventions, failure guide or theory. M2.3 wrote the
+    first and deliberately deferred the second: C_PATCH_WFT's estimator contract
+    is being rewritten by CHE-120, so a pack written now would be wrong on
+    landing.
+
+    This test fails when the remaining pack appears, which is the prompt to move
+    it into the completeness check above and close its gap-list entry.
     """
     _, relative = PACK_PATHS[component]
     assert relative is None
@@ -407,13 +411,12 @@ def test_a_missing_knowledge_pack_is_filed_as_a_gap(component: str) -> None:
         f"{component} has no knowledge pack and no gap entry saying so"
     )
 
-    for candidate in ("planar_doe_step", "patch_wft"):
-        directory = ROOT / "knowledge" / "couplers" / candidate
-        assert not directory.exists(), (
-            f"{directory.relative_to(ROOT)} now exists. Move {component} into "
-            "PACK_PATHS with its real path so the completeness check applies to it, "
-            "and close the gap-list entry."
-        )
+    directory = ROOT / "knowledge" / "couplers" / "patch_wft"
+    assert not directory.exists(), (
+        f"{directory.relative_to(ROOT)} now exists. Move {component} into "
+        "PACK_PATHS with its real path so the completeness check applies to it, "
+        "and close the gap-list entry."
+    )
 
 
 # ---------------------------------------------------------------------------

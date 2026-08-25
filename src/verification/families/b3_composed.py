@@ -272,7 +272,7 @@ B3_PSF_SINGLET = register(
         metrics=(
             Metric(
                 name="fft_oracle_intensity_relative_l2",
-                definition="central_relative_l2_intensity",
+                definition="disc_relative_l2_intensity",
                 description=(
                     "relative L2 of the reconstructed sensor-plane intensity against O1 "
                     "over the 5-Airy-radius gate disc"
@@ -287,7 +287,7 @@ B3_PSF_SINGLET = register(
             ),
             Metric(
                 name="o2_asm_intensity_relative_l2",
-                definition="central_relative_l2_intensity",
+                definition="disc_relative_l2_intensity",
                 description=(
                     "the same comparison against O2, our own float64 ASM/RS propagator. "
                     "CHARACTERIZATION ONLY"

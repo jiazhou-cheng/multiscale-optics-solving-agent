@@ -1303,12 +1303,17 @@ GAPS: tuple[Gap, ...] = (
             "nothing checks the estimator anyone would actually run."
         ),
     ),
+    # C_PLANAR_DOE_STEP's pack gap is CLOSED: knowledge/couplers/planar_doe_step
+    # exists with all four required files, is registered in knowledge/README.md,
+    # and is held to the standard by tests/test_planar_doe_step_pack.py. The
+    # C_PATCH_WFT half of M2.3 is still open, below.
     Gap(
-        component="C_PLANAR_DOE_STEP",
+        component="C_PATCH_WFT",
         kind=ClaimKind.CONVENTION,
         gap=(
             "No knowledge pack at all: no card, no conventions, no failure guide, no "
-            "theory. This is one of only two couplers that HAS a graph node."
+            "theory. It is now the ONLY coupler with a graph node and no pack -- "
+            "C_PLANAR_DOE_STEP's was written and this one was deliberately not."
         ),
         blocks=("agent use of this coupler", "M6's planner", "M3.2's discovery API"),
         severity="medium",
@@ -1317,17 +1322,12 @@ GAPS: tuple[Gap, ...] = (
             "A usability gap, not a correctness one: nothing here makes a number "
             "wrong. It does mean an agent asked to build a graph through this node "
             "has nothing to read about its conventions, and the conventions are "
-            "exactly what a coupler gets wrong."
+            "exactly what a coupler gets wrong. Deferred rather than forgotten: this "
+            "coupler's estimator contract -- the centre density, the unbiasedness "
+            "weights, the measured variance reduction -- is being rewritten by "
+            "CHE-120, so a pack written against the current state would be wrong on "
+            "landing. Write it once that lands."
         ),
-    ),
-    Gap(
-        component="C_PATCH_WFT",
-        kind=ClaimKind.CONVENTION,
-        gap="No knowledge pack at all. Same shape as C_PLANAR_DOE_STEP.",
-        blocks=("agent use of this coupler", "M6's planner", "M3.2's discovery API"),
-        severity="medium",
-        owner="M2.3 (CHE-111)",
-        rationale="Same as C_PLANAR_DOE_STEP: a usability gap, not a correctness one.",
     ),
     Gap(
         component="M_WAVE_CHROMATIX",

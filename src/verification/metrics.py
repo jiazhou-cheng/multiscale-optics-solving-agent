@@ -183,9 +183,182 @@ def central_relative_l2_intensity(a: Any, b: Any, *, fraction: float = 0.5) -> f
     return relative_l2_intensity(x[window], y[window])
 
 
+def peak_normalized_masked_relative_l2(
+    measured: Any, reference: Any, *, mask: Any | None = None
+) -> float:
+    """Peak-normalized intensity residual over a mask. M3.9's metric, unchanged.
+
+    Promoted here from ``benchmarks/probes/sensor_handoff_convergence.py`` by
+    CHE-115. **This is the computation the frozen ``B3-PSF-SINGLET`` gate is
+    defined on** -- ``fft_oracle_intensity_relative_l2 = 2.2072e-3`` against a
+    ``1.0e-3`` threshold is this function over a 5-Airy-radius disc -- and it
+    lived in a probe, which is why the substrate proof had to substitute a
+    different metric and could not reproduce the frozen number.
+
+    Each pattern is divided by **its own peak** before the difference. That is
+    the frozen M3 normalization and it has a consequence worth stating plainly:
+    a power loss is invisible here. Two patterns differing by a constant factor
+    score zero. Whatever measures conservation must sit beside this, not inside
+    it.
+
+    Returns ``nan`` rather than a number when either peak is non-positive or the
+    reference has no norm inside the mask, because a relative residual against
+    nothing is undefined and ``0.0`` would read as perfect agreement.
+    """
+    a = np.asarray(measured, dtype=np.float64)
+    b = np.asarray(reference, dtype=np.float64)
+    if a.shape != b.shape:
+        raise ValueError(f"shapes differ: {a.shape} and {b.shape}")
+    peak_a, peak_b = float(np.max(a)), float(np.max(b))
+    if peak_a <= 0.0 or peak_b <= 0.0:
+        return float("nan")
+    selector = Ellipsis if mask is None else np.asarray(mask)
+    difference = (a / peak_a - b / peak_b)[selector]
+    denominator = float(np.linalg.norm((b / peak_b)[selector]))
+    return float(np.linalg.norm(difference) / denominator) if denominator else float("nan")
+
+
+def disc_mask(shape: tuple[int, int], sample_pitch_m: float, radius_m: float) -> Any:
+    """Boolean mask of the pixels within ``radius_m`` of the grid centre.
+
+    Promoted alongside :func:`peak_normalized_masked_relative_l2` because the
+    gate is the pair: the metric and the window it is evaluated over. Leaving
+    the window in a probe is how a second caller comes to evaluate "the same"
+    metric over a square.
+
+    The centre is ``n // 2``, matching the FFT convention the reconstructions
+    use, so an even grid's centre is half a pixel off geometric centre -- the
+    same half pixel every other centred quantity in this repository carries.
+    """
+    n_y, n_x = shape
+    y = (np.arange(n_y, dtype=np.float64) - n_y // 2) * sample_pitch_m
+    x = (np.arange(n_x, dtype=np.float64) - n_x // 2) * sample_pitch_m
+    return np.hypot(y[:, None], x[None, :]) <= radius_m
+
+
+def disc_relative_l2_intensity(
+    measured: Any, reference: Any, *, sample_pitch_m: float, max_radius_m: float
+) -> float:
+    """:func:`peak_normalized_masked_relative_l2` over a centred disc.
+
+    The frozen ``B3-PSF-SINGLET`` gate, callable as one thing. The disc radius
+    is required and has no default: 5 Airy radii is that family's choice, not a
+    property of the metric, and a metric that guessed a window would let two
+    benchmarks report "the same" number over different regions.
+    """
+    a = np.asarray(measured)
+    if a.ndim != 2:
+        raise ValueError("a disc window needs a 2-D pattern")
+    return peak_normalized_masked_relative_l2(
+        measured,
+        reference,
+        mask=disc_mask((a.shape[0], a.shape[1]), sample_pitch_m, max_radius_m),
+    )
+
+
+def radial_profile_residuals(
+    measured: Any,
+    reference: Any,
+    *,
+    measured_pitch: tuple[float, float],
+    reference_pitch: tuple[float, float],
+    max_radius_m: float,
+    measured_center_m: tuple[float, float] = (0.0, 0.0),
+    reference_center_m: tuple[float, float] = (0.0, 0.0),
+    radial_samples: int = 400,
+    azimuthal_samples: int = 256,
+) -> dict[str, Any]:
+    """Compare two PSFs sampled differently, on a common radial grid.
+
+    Promoted here from ``benchmarks/probes/psf_oracle_verification.py`` by
+    CHE-115. It is the measurement the frozen ``B3-PSF-SINGLET`` gate is defined
+    on -- a radial-profile residual over a 5-Airy-radius disc -- and it lived in
+    a probe, so anything else that needed it had to fork it. A second copy of a
+    gate's own metric is the drift this module exists to stop.
+
+    Both patterns are **peak-normalized** first, which is the frozen M3 oracle
+    normalization, and both are azimuthally averaged about a **stated centre**.
+
+    The centre is a parameter rather than the grid origin, and that is not
+    generality for its own sake: an azimuthal average is only meaningful for a
+    pattern rotationally symmetric *about that centre*. Since CHE-41 the
+    off-axis PSF forms 114 pixels off axis, and averaging it about the origin
+    turns an Airy pattern into a smeared annulus whose profile is nearly
+    invariant under anything a control can do to it. That is measured, not
+    feared: with the centre left at the origin, all six off-axis controls score
+    a margin within 2.6x of 1.0 -- including an x/y transpose that visibly moves
+    the peak.
+
+    The two patterns may be sampled on different pitches; each is profiled on
+    its own grid and the reference is interpolated onto the measured radii.
+    """
+    from verification.psf_oracles import azimuthal_profile
+
+    measured_array = np.asarray(measured, dtype=np.float64)
+    reference_array = np.asarray(reference, dtype=np.float64)
+    measured_peak = float(np.max(measured_array))
+    reference_peak = float(np.max(reference_array))
+    if measured_peak <= 0.0 or reference_peak <= 0.0:
+        raise ValueError(
+            "a peak-normalized profile needs a positive peak in both patterns; "
+            f"got {measured_peak} and {reference_peak}"
+        )
+
+    radii_m, profile_m = azimuthal_profile(
+        measured_array / measured_peak,
+        sample_pitch_m=measured_pitch,
+        center_m=measured_center_m,
+        max_radius_m=max_radius_m,
+        radial_samples=radial_samples,
+        azimuthal_samples=azimuthal_samples,
+    )
+    radii_r, profile_r = azimuthal_profile(
+        reference_array / reference_peak,
+        sample_pitch_m=reference_pitch,
+        center_m=reference_center_m,
+        max_radius_m=max_radius_m,
+        radial_samples=radial_samples,
+        azimuthal_samples=azimuthal_samples,
+    )
+    common = np.interp(radii_m, radii_r, profile_r)
+    difference = profile_m - common
+    denominator = float(np.linalg.norm(common))
+    return {
+        "max_abs_profile_residual": float(np.max(np.abs(difference))),
+        "rms_profile_residual": float(np.sqrt(np.mean(difference**2))),
+        "relative_l2_profile_residual": (
+            float(np.linalg.norm(difference) / denominator) if denominator else None
+        ),
+        "radial_samples": int(radii_m.size),
+        "max_radius_m": float(max_radius_m),
+    }
+
+
+def radial_profile_relative_l2(a: Any, b: Any, **kwargs: Any) -> float:
+    """The gate quantity out of :func:`radial_profile_residuals`, as a float.
+
+    ``relative_l2_profile_residual`` is ``None`` only when the reference profile
+    is identically zero, which is not a small residual but an absent reference;
+    it is raised rather than returned as a good-looking number.
+    """
+    residuals = radial_profile_residuals(a, b, **kwargs)
+    value = residuals["relative_l2_profile_residual"]
+    if value is None:
+        raise ValueError(
+            "the reference profile has zero norm over this disc, so a relative "
+            "residual is undefined rather than zero"
+        )
+    return float(value)
+
+
 # ---------------------------------------------------------------------------
 # The register
 # ---------------------------------------------------------------------------
+
+
+#: The regions a metric may be evaluated over. Which one a number came from
+#: changes what it can see, so the vocabulary is closed rather than free text.
+SUPPORTS = frozenset({"whole_array", "centred_window", "centred_disc"})
 
 
 @dataclass(frozen=True)
@@ -199,10 +372,15 @@ class MetricDefinition:
     #: What it cannot see. Required, and the most-read field here.
     blind_to: tuple[str, ...]
     unit: str | None = None
-    #: Whether the metric is evaluated over the whole array or a centred window.
+    #: Whether the metric is evaluated over the whole array or a centred region.
     #: CHE-44: a centred metric cannot see an off-axis error, and which one a
     #: number came from must not be something a reader has to guess.
     support: str = "whole_array"
+    #: Keyword arguments the metric cannot be called without. A metric that needs
+    #: geometry -- a pitch, a disc radius -- has no meaningful default for it, and
+    #: inventing one would let a caller get a number for the wrong window without
+    #: saying so. Declared so a caller can see the requirement before calling.
+    required_kwargs: tuple[str, ...] = ()
     #: The value a perfect agreement takes, so a reader knows which direction is
     #: better without inferring it from the name.
     ideal: float = 0.0
@@ -212,6 +390,12 @@ class MetricDefinition:
             raise ValueError(f"{self.name}: state what this metric cannot see")
         if not self.answers.strip():
             raise ValueError(f"{self.name}: state which physical question it answers")
+        if self.support not in SUPPORTS:
+            raise ValueError(
+                f"{self.name}: support {self.support!r} is not one of {sorted(SUPPORTS)}. "
+                "A new kind of support is a real distinction and must be declared here, "
+                "not spelled freely at each call site."
+            )
 
     def __call__(self, a: Any, b: Any, **kwargs: Any) -> float:
         return float(self.fn(a, b, **kwargs))
@@ -319,6 +503,57 @@ METRICS: Mapping[str, MetricDefinition] = {
                 "phase, as the full-array intensity metric is",
             ),
             support="centred_window",
+        ),
+        MetricDefinition(
+            name="radial_profile_relative_l2",
+            fn=radial_profile_relative_l2,
+            answers=(
+                "does the azimuthally averaged radial profile match the oracle's, "
+                "over a stated disc, when the two are sampled on different grids?"
+            ),
+            blind_to=(
+                "everything azimuthal, by construction. An astigmatic or coma-like "
+                "pattern with the right radial average scores as agreement, which is "
+                "the price paid for comparing two different samplings on a common grid",
+                "EVERYTHING OUTSIDE max_radius_m -- for the frozen singlet gate that is "
+                "5 Airy radii, so a scattered halo beyond it is invisible",
+                "absolute scale: both patterns are peak-normalized first, so a power "
+                "loss cannot be seen here and must be measured by power_ratio beside it",
+                "any error in the declared centre. Averaging an off-axis pattern about "
+                "the origin smears it into an annulus that is nearly invariant under "
+                "the controls -- measured at CHE-41, where all six off-axis controls "
+                "then scored within 2.6x of 1.0",
+                "phase, as every intensity metric here is",
+            ),
+            support="centred_disc",
+            required_kwargs=("measured_pitch", "reference_pitch", "max_radius_m"),
+        ),
+        MetricDefinition(
+            name="disc_relative_l2_intensity",
+            fn=disc_relative_l2_intensity,
+            answers=(
+                "how far is the peak-normalized intensity from the oracle's, inside the "
+                "disc the gate is defined over?"
+            ),
+            blind_to=(
+                "ABSOLUTE SCALE. Each pattern is divided by its own peak first, so two "
+                "patterns differing by a constant factor score zero and a power loss is "
+                "invisible. power_ratio must be reported beside it, not instead of it",
+                "the DIFFERENCE outside max_radius_m -- for the frozen singlet gate that "
+                "is 5 Airy radii, so a faint halo beyond it does not appear. But the "
+                "NORMALIZATION is not windowed: each pattern is divided by its GLOBAL "
+                "maximum, so a bright enough pixel outside the disc becomes the peak and "
+                "rescales everything inside it. A stray 5x pixel in the corner takes an "
+                "otherwise exact agreement to 0.8. The window bounds what is compared, "
+                "not what the comparison is normalized by",
+                "where inside the disc the error is: a large error on the first ring and "
+                "a spread-out one produce the same norm",
+                "any error in the peak location -- the normalization uses each pattern's "
+                "own maximum, so a shifted pattern is normalized to its own shifted peak",
+                "phase, as every intensity metric here is",
+            ),
+            support="centred_disc",
+            required_kwargs=("sample_pitch_m", "max_radius_m"),
         ),
     )
 }

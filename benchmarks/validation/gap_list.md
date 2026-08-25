@@ -94,20 +94,13 @@ jax_enable_x64 is process-global and nothing checks it at the boundary that depe
 * **why high** CHE-103 established this caused a real, undetected change in committed evidence. It is CHE-102's rule -- check process-global solver state at the boundary, do not set it earlier and hope -- applied to the wave solver.
 * **blocks** reproducibility of any wave-side record, M3's executor
 
-## medium (3)
-
-### `C_PLANAR_DOE_STEP` / convention -- M2.3 (CHE-111)
-
-No knowledge pack at all: no card, no conventions, no failure guide, no theory. This is one of only two couplers that HAS a graph node.
-
-* **why medium** A usability gap, not a correctness one: nothing here makes a number wrong. It does mean an agent asked to build a graph through this node has nothing to read about its conventions, and the conventions are exactly what a coupler gets wrong.
-* **blocks** agent use of this coupler, M6's planner, M3.2's discovery API
+## medium (2)
 
 ### `C_PATCH_WFT` / convention -- M2.3 (CHE-111)
 
-No knowledge pack at all. Same shape as C_PLANAR_DOE_STEP.
+No knowledge pack at all: no card, no conventions, no failure guide, no theory. It is now the ONLY coupler with a graph node and no pack -- C_PLANAR_DOE_STEP's was written and this one was deliberately not.
 
-* **why medium** Same as C_PLANAR_DOE_STEP: a usability gap, not a correctness one.
+* **why medium** A usability gap, not a correctness one: nothing here makes a number wrong. It does mean an agent asked to build a graph through this node has nothing to read about its conventions, and the conventions are exactly what a coupler gets wrong. Deferred rather than forgotten: this coupler's estimator contract -- the centre density, the unbiasedness weights, the measured variance reduction -- is being rewritten by CHE-120, so a pack written against the current state would be wrong on landing. Write it once that lands.
 * **blocks** agent use of this coupler, M6's planner, M3.2's discovery API
 
 ### `C_RAY_TO_WAVE` / device_parity -- M0.4 (CHE-105) for measurement, M1.3 (CHE-108) for the gate
@@ -134,7 +127,7 @@ No verified derivative across the ray->wave boundary; forward_only.
 | M1.1 (CHE-106) | 1 (worst: critical) |
 | M1.2 (CHE-107) | 1 (worst: critical) |
 | M2.1 (CHE-109) | 2 (worst: critical) |
-| M2.3 (CHE-111) | 4 (worst: critical) |
+| M2.3 (CHE-111) | 3 (worst: critical) |
 | M3.1 (CHE-113) | 1 (worst: high) |
 | M4.2 (CHE-117) | 1 (worst: high) |
 | deferred beyond this project phase | 1 (worst: low) |
