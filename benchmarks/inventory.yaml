@@ -923,6 +923,21 @@ entries:
       hexapolar ring membership, declared planarity, Fresnel number, paraxial
       field angle.
     destination: Family validity tuples.
+  - path: src/verification/families/b1_ray.py
+    bucket: A
+    justification: >-
+      The five B1 ray-primitive families (CHE-106): EFL/BFL, plane-parallel
+      plate, Snell with the TIR boundary as a validity predicate, the Lagrange
+      invariant, and the off-axis pupil OPL whose omitted
+      n_object * (d0 . r_launch) term recovered only 0.13% of the required tilt.
+    destination: The ray half of the B1 evidence layer.
+  - path: src/verification/families/b1_wave.py
+    bucket: A
+    justification: >-
+      The seven B1 wave-primitive families (CHE-107), including B1-WAVE-ASM-VALIDITY,
+      whose entire subject is behaviour near the sampling boundary and which is what
+      forces the validity margin to be signed and normalized.
+    destination: The wave half of the B1 evidence layer.
   - path: src/verification/families/projection.py
     bucket: A
     justification: >-

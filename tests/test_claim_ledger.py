@@ -473,11 +473,14 @@ def test_a_family_and_a_legacy_row_cannot_describe_the_same_cell() -> None:
     from verification.claim_ledger import _LEGACY_CLAIMS
     from verification.families.projection import claims_from_families
 
-    legacy_cells = {(c.component, c.kind) for c in _LEGACY_CLAIMS}
+    # Keyed on the metric as well as the cell: a component can legitimately have
+    # several forward-accuracy claims about different quantities, and C_RAY_TO_WAVE
+    # already does. What must not happen is two rows about the SAME measurement.
+    legacy_cells = {(c.component, c.kind, c.metric) for c in _LEGACY_CLAIMS}
     collisions = sorted(
-        f"{c.component}/{c.kind.value}"
+        f"{c.component}/{c.kind.value}/{c.metric}"
         for c in claims_from_families()
-        if (c.component, c.kind) in legacy_cells
+        if (c.component, c.kind, c.metric) in legacy_cells
     )
     assert not collisions, (
         "a registered family and a hand-written claim occupy the same cell:\n  "
@@ -487,16 +490,21 @@ def test_a_family_and_a_legacy_row_cannot_describe_the_same_cell() -> None:
     )
 
 
-def test_no_claim_kind_cell_is_claimed_twice_within_the_projection() -> None:
-    """Two families making the same claim about the same component is two
-    families that disagree with each other eventually."""
+def test_no_metric_is_claimed_twice_within_the_projection() -> None:
+    """Two families measuring the same quantity on the same component is two
+    families that disagree with each other eventually.
+
+    Keyed on the metric rather than the cell, because several B1 families
+    legitimately make forward-accuracy claims about one solver -- they just
+    measure different things.
+    """
     from verification.families.projection import claims_from_families
 
-    seen: dict[tuple[str, object], str] = {}
+    seen: dict[tuple[str, object, object], str] = {}
     for claim in claims_from_families():
-        key = (claim.component, claim.kind)
+        key = (claim.component, claim.kind, claim.metric)
         assert key not in seen, (
-            f"{claim.component}/{claim.kind.value} is claimed by two families: "
-            f"{seen[key]!r} and {claim.claim!r}"
+            f"{claim.component}/{claim.kind.value}/{claim.metric} is claimed by two "
+            f"families: {seen[key]!r} and {claim.claim!r}"
         )
         seen[key] = claim.claim

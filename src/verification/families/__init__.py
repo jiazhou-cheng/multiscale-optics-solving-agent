@@ -6,6 +6,11 @@ were already measured before this package existed. ``registry`` is the one place
 that knows which families exist.
 """
 
+# Importing the family modules is what registers them. Explicit rather than
+# discovered, for the reason core/capabilities.py gives about its own table: a
+# source of truth that is discovered agrees with itself by construction,
+# including about which entries exist at all.
+from verification.families import b1_ray, b1_wave  # noqa: F401
 from verification.families.registry import (
     FAMILIES,
     families_for_category,

@@ -66,7 +66,6 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
     the measurements.
     """
     gating = fam.gating_tolerances
-    tol = gating[0] if gating else None
     disposition = fam.gate_disposition
 
     if disposition is not None:
@@ -77,6 +76,21 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
         status = GateStatus.CHARACTERIZED_NO_GATE
         observed = None
         evidence = fam.evidence
+
+    # A threshold with nothing measured against it is a claim with no content --
+    # ``tests/test_claim_ledger.py`` has enforced that since M0.3. So the ledger
+    # cell carries the tolerance only once something has been measured against
+    # it; until then the declared threshold stays on the family, which is the
+    # source of truth for it, and appears below as a caveat so it is still
+    # visible to a reader of the coverage view.
+    tol = gating[0] if (gating and observed is not None) else None
+    # The metric NAME is what the family measures and is known whether or not a
+    # number exists yet; only the threshold waits for a measurement.
+    metric_name = (
+        gating[0].metric
+        if gating
+        else (disposition.metric if disposition is not None else None)
+    )
 
     devices = sorted(str(d) for d in fam.execution_policy.devices)
     dtypes = sorted(str(d) for d in fam.execution_policy.dtypes)
@@ -91,6 +105,12 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
         caveats.append(
             f"oracle {fam.oracle.kind.value} / {fam.oracle.independence.value} cannot "
             "decide correctness, so nothing here gates."
+        )
+    if gating and observed is None:
+        thresholds = ", ".join(f"{t.metric} <= {t.threshold:g}" for t in gating)
+        caveats.append(
+            f"gating tolerance declared and nothing measured against it yet: {thresholds}. "
+            f"The threshold and its basis live on {fam.family_id}."
         )
     for control in fam.negative_controls:
         if control.expectation.value != "must_fail":
@@ -107,7 +127,7 @@ def claims_from_family(fam: BenchmarkFamily) -> tuple[Claim, ...]:
             oracle=fam.oracle.kind,
             oracle_independence=fam.oracle.independence,
             evidence=tuple(evidence),
-            metric=tol.metric if tol else (disposition.metric if disposition else None),
+            metric=metric_name,
             tolerance=tol.threshold if tol else None,
             tolerance_basis=tol.basis if tol else None,
             observed=observed,
