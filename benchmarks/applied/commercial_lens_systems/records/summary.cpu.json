@@ -1,0 +1,69 @@
+{
+  "benchmark": "CHE-139 / M1.1.5 commercial catalog lens systems",
+  "tag": "cpu",
+  "requested_execution": {
+    "backend": "numpy",
+    "device": "cpu",
+    "dtype": "float64"
+  },
+  "environment": {
+    "python_version": "3.12.14",
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+    "logical_cpus": 80,
+    "thread_env": {},
+    "container_image": "agent_solver",
+    "gpu_name": null,
+    "gpu_driver": null,
+    "gpu_count": null,
+    "visible_devices": null,
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "torch": "2.13.0+cpu",
+      "optiland": "0.6.0",
+      "chromatix": "0.6.0"
+    },
+    "sha256": "8a536c6653510329b7cd2da8eb9da82cb94e8a2a420ab4765315dbd8684313ad"
+  },
+  "observed_execution_environment": {
+    "container_image_label_caveat": "environment.container_image comes from MOA_IMAGE, which run.sh --gpu does not set; trust the torch build and per-trace actual device below",
+    "torch_version": "2.13.0+cpu",
+    "torch_cuda_build": null,
+    "torch_cuda_available": false,
+    "visible_cuda_device_count": 0,
+    "cuda_device_names": []
+  },
+  "systems": [
+    "S4_PAC052_KBX058_TANDEM"
+  ],
+  "systems_run": [
+    {
+      "system_key": "S4_PAC052_KBX058_TANDEM",
+      "role": "case",
+      "component_count": 2,
+      "is_multi_component": true,
+      "assembly_survived": true,
+      "traces_succeeded": 4,
+      "traces_attempted": 4,
+      "actual_execution": {
+        "dtype": "float64",
+        "device": "cpu",
+        "namespace": "numpy"
+      },
+      "effective_focal_length_mm": 62.78182867709601,
+      "back_focal_length_mm": 26.45214057266065,
+      "catalog_comparisons": [],
+      "on_axis_primary": {
+        "wavelength_um": 0.589,
+        "rms_spot_radius_mm": 0.053217044188804,
+        "max_spot_radius_mm": 0.09665594249010698,
+        "surviving_ray_count": 817
+      },
+      "result_fingerprint": "ca00b76be280a51a31c7ca6112032193bd7e1fffc6cc8323c983826c5e15766e"
+    }
+  ],
+  "negative_controls": []
+}

@@ -1,0 +1,992 @@
+{
+  "benchmark": "CHE-139 / M1.1.5 commercial catalog lens systems",
+  "system_key": "S5_TANDEM_REVERSED_ACHROMAT",
+  "title": "S4 with the achromat installed backwards (negative control)",
+  "question": "Does the orientation the benchmark claims to represent actually reach the built system? Installing the achromat against its manufacturer instruction must degrade the spot; if it does not, the orientation plumbing is inert.",
+  "description": "Identical to S4 -- same components, same 50.0 mm air gap, same pupil, same fields, same wavelength, same ray count, same image-plane rule -- except that the PAC052 achromat is reversed, putting its shallow flint face (R = +133.104 after reversal) toward the infinite conjugate instead of the steep crown face the product page instructs. Its own paraxial focus is used, so the control is defocus-free and isolates orientation alone.",
+  "role": "negative_control",
+  "control_of": "S4_PAC052_KBX058_TANDEM",
+  "tag": "gpu",
+  "construction": {
+    "question": "A. Could the commercial components be constructed?",
+    "part_numbers": [
+      "PAC052",
+      "KBX058"
+    ],
+    "source_urls": [
+      "https://api.p1.mks.com/medias/sys_master/images/images/h2a/hcb/8797131145246/KBX058-ZEMAX.zip",
+      "https://api.p1.mks.com/medias/sys_master/images/images/h56/h66/8797231284254/PAC052-ZEMAX.zip",
+      "https://www.newport.com/p/KBX058",
+      "https://www.newport.com/p/PAC052"
+    ],
+    "all_components_constructed": true,
+    "note": "the full catalog provenance for every component, including the one this benchmark refused to build, is in components.json beside this record"
+  },
+  "assembly": {
+    "question": "B. Could multiple components be assembled into a real optical system?",
+    "component_count": 2,
+    "is_multi_component": true,
+    "definition": {
+      "object_configuration": {
+        "object_distance_mm": null,
+        "meaning": "object at infinity (collimated input)",
+        "source": "assembly_choice",
+        "basis": "every catalog EFL/BFL in this benchmark is published for an infinite conjugate, so an infinite object is what makes the comparison meaningful"
+      },
+      "image_configuration": {
+        "rule": "paraxial_focus",
+        "image_distance_from_last_vertex_mm": 27.3372411550794,
+        "source": "derived",
+        "basis": "paraxial back focus of the assembled prescription, from the solver's own paraxial analysis; no catalog publishes a system-level BFL for an assembly the customer makes. It is a closed-form paraxial quantity, not a spot-size search."
+      },
+      "entrance_pupil": {
+        "value": 22.86,
+        "unit": "mm",
+        "source": "catalog",
+        "basis": "identical to S4 by construction, from the same catalog value"
+      },
+      "pupil_rings": {
+        "value": 16,
+        "unit": "hexapolar rings",
+        "source": "assembly_choice",
+        "basis": "the Optiland adapter's own default ring count, giving 817 rays per field per wavelength (1 + 3N(N+1)); dense enough for a readable spot diagram and an RMS estimate, cheap enough to run the whole matrix on one GPU"
+      },
+      "stop": {
+        "component_index": 0,
+        "surface_index_within_component": 0,
+        "source": "catalog",
+        "basis": "every vendor Zemax file in this benchmark marks STOP on its first surface, so the assembly puts the stop on the first surface of the first component"
+      },
+      "field_angles_deg": [
+        0.0,
+        1.0,
+        2.0,
+        3.0
+      ],
+      "field_basis": "four fields out to 3 deg. The tandem's paraxial focal length is near 60 mm, so 3 deg lands the image about 3.1 mm off axis -- enough field dependence to see in a spot diagram, small enough that the beam stays inside both components' clear apertures (measured, see aperture_clearance)",
+      "wavelengths_um": [
+        0.589
+      ],
+      "primary_wavelength_um": 0.589,
+      "wavelength_basis": "the 589 nm design wavelength shared by both components' product pages. The chromatic characterization lives in S2, where the achromat is alone and the dispersion is attributable; holding the tandem monochromatic is what keeps S5 a single-variable control",
+      "placement_plan": [
+        {
+          "part_number": "PAC052",
+          "orientation": "reversed",
+          "air_gap_after_mm": 50.0,
+          "air_gap_source": "assembly_choice",
+          "air_gap_basis": "no manufacturer publishes a spacing for a system the customer assembles, so this is the benchmark's declared choice: a round 50.0 mm, roughly half the achromat's 96.5 mm back focal length, chosen so the converging beam reaches the second component at about half the entrance pupil radius and stays well inside its clear aperture. It was fixed before any trace ran and was NOT tuned against a spot size -- this is a forward-modelling benchmark, and the aperture_clearance block of the record reports the resulting footprint so the claim is measured rather than asserted.",
+          "note": "DELIBERATELY WRONG: violates the PAC052 product page's stated orientation. This is the negative control, not a modelling choice.",
+          "resolved_air_gap_after_mm": 50.0
+        },
+        {
+          "part_number": "KBX058",
+          "orientation": "as_specified",
+          "air_gap_after_mm": null,
+          "air_gap_source": null,
+          "air_gap_basis": "",
+          "note": "",
+          "resolved_air_gap_after_mm": 27.3372411550794
+        }
+      ],
+      "component_spans": [
+        {
+          "order": 0,
+          "component_name": "PAC052 (reversed)",
+          "orientation": "reversed",
+          "first_surface_index": 0,
+          "last_surface_index": 2,
+          "surface_count": 3,
+          "first_vertex_z_mm": 0.0,
+          "last_vertex_z_mm": 7.17,
+          "axial_thickness_mm": 7.17,
+          "air_gap_after_mm": 50.0,
+          "clear_aperture_mm": 22.86,
+          "note": "DELIBERATELY WRONG: violates the PAC052 product page's stated orientation. This is the negative control, not a modelling choice."
+        },
+        {
+          "order": 1,
+          "component_name": "KBX058",
+          "orientation": "as_specified",
+          "first_surface_index": 3,
+          "last_surface_index": 4,
+          "surface_count": 2,
+          "first_vertex_z_mm": 57.17,
+          "last_vertex_z_mm": 62.272000000000006,
+          "axial_thickness_mm": 5.102,
+          "air_gap_after_mm": 27.3372411550794,
+          "clear_aperture_mm": 22.86,
+          "note": ""
+        }
+      ]
+    },
+    "image_plane": {
+      "rule": "paraxial_focus",
+      "image_distance_mm": 27.3372411550794,
+      "provenance": {
+        "source": "derived",
+        "url": null,
+        "basis": "paraxial back focus of the assembled prescription (last-surface thickness + Optiland Paraxial.F2), measured from two far-apart placeholder image distances and required to agree; a closed-form paraxial solve, not a spot-size search"
+      },
+      "placeholder_independence_check": {
+        "probes": [
+          {
+            "placeholder_image_distance_mm": 10.0,
+            "rear_focal_point_from_image_surface_mm": 17.3372411550794,
+            "back_focal_length_mm": 27.3372411550794,
+            "effective_focal_length_mm": 61.61096779844361
+          },
+          {
+            "placeholder_image_distance_mm": 200.0,
+            "rear_focal_point_from_image_surface_mm": -172.6627588449206,
+            "back_focal_length_mm": 27.337241155079397,
+            "effective_focal_length_mm": 61.61096779844361
+          }
+        ],
+        "spread_mm": 3.552713678800501e-15,
+        "tolerance_mm": 1e-09,
+        "independent": true
+      }
+    },
+    "assembled_prescription": {
+      "spec_version": "optical-system-spec/1",
+      "fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+      "surface_count": 5,
+      "surface_table": [
+        {
+          "index": 0,
+          "geometry_kind": "spherical",
+          "radius_mm": 133.104,
+          "conic": 0.0,
+          "thickness_mm": 2.17,
+          "vertex_z_mm": 0.0,
+          "material_kind": "catalog",
+          "material_name": "N-SF5",
+          "refractive_index": null,
+          "is_stop": true,
+          "comment": "PAC052 flint outer face"
+        },
+        {
+          "index": 1,
+          "geometry_kind": "spherical",
+          "radius_mm": 44.71,
+          "conic": 0.0,
+          "thickness_mm": 5.0,
+          "vertex_z_mm": 2.17,
+          "material_kind": "catalog",
+          "material_name": "N-BK7",
+          "refractive_index": null,
+          "is_stop": false,
+          "comment": "PAC052 cemented crown/flint interface"
+        },
+        {
+          "index": 2,
+          "geometry_kind": "spherical",
+          "radius_mm": -60.741,
+          "conic": 0.0,
+          "thickness_mm": 50.0,
+          "vertex_z_mm": 7.17,
+          "material_kind": "air",
+          "material_name": null,
+          "refractive_index": null,
+          "is_stop": false,
+          "comment": "PAC052 crown outer face"
+        },
+        {
+          "index": 3,
+          "geometry_kind": "spherical",
+          "radius_mm": 77.265,
+          "conic": 0.0,
+          "thickness_mm": 5.102,
+          "vertex_z_mm": 57.17,
+          "material_kind": "catalog",
+          "material_name": "N-BK7",
+          "refractive_index": null,
+          "is_stop": false,
+          "comment": "KBX058 first convex face"
+        },
+        {
+          "index": 4,
+          "geometry_kind": "spherical",
+          "radius_mm": -77.265,
+          "conic": 0.0,
+          "thickness_mm": 27.3372411550794,
+          "vertex_z_mm": 62.272000000000006,
+          "material_kind": "air",
+          "material_name": null,
+          "refractive_index": null,
+          "is_stop": false,
+          "comment": "KBX058 second convex face"
+        }
+      ]
+    },
+    "built_system_readback": {
+      "surfaces": [
+        {
+          "prescription": {
+            "index": 0,
+            "geometry_kind": "spherical",
+            "radius_mm": 133.104,
+            "conic": 0.0,
+            "thickness_mm": 2.17,
+            "vertex_z_mm": 0.0,
+            "material_kind": "catalog",
+            "material_name": "N-SF5",
+            "refractive_index": null,
+            "is_stop": true,
+            "comment": "PAC052 flint outer face"
+          },
+          "built": {
+            "built_index": 1,
+            "radius_mm": 133.104,
+            "conic": 0.0,
+            "vertex_z_mm": 0.0,
+            "is_stop": true,
+            "surface_type": "standard",
+            "refractive_index_after": 1.6725563922535207,
+            "comment": "PAC052 flint outer face"
+          },
+          "radius_abs_delta_mm": 0.0,
+          "vertex_z_abs_delta_mm": 0.0,
+          "conic_abs_delta": 0.0
+        },
+        {
+          "prescription": {
+            "index": 1,
+            "geometry_kind": "spherical",
+            "radius_mm": 44.71,
+            "conic": 0.0,
+            "thickness_mm": 5.0,
+            "vertex_z_mm": 2.17,
+            "material_kind": "catalog",
+            "material_name": "N-BK7",
+            "refractive_index": null,
+            "is_stop": false,
+            "comment": "PAC052 cemented crown/flint interface"
+          },
+          "built": {
+            "built_index": 2,
+            "radius_mm": 44.71,
+            "conic": 0.0,
+            "vertex_z_mm": 2.17,
+            "is_stop": false,
+            "surface_type": "standard",
+            "refractive_index_after": 1.5167401204613524,
+            "comment": "PAC052 cemented crown/flint interface"
+          },
+          "radius_abs_delta_mm": 0.0,
+          "vertex_z_abs_delta_mm": 0.0,
+          "conic_abs_delta": 0.0
+        },
+        {
+          "prescription": {
+            "index": 2,
+            "geometry_kind": "spherical",
+            "radius_mm": -60.741,
+            "conic": 0.0,
+            "thickness_mm": 50.0,
+            "vertex_z_mm": 7.17,
+            "material_kind": "air",
+            "material_name": null,
+            "refractive_index": null,
+            "is_stop": false,
+            "comment": "PAC052 crown outer face"
+          },
+          "built": {
+            "built_index": 3,
+            "radius_mm": -60.741,
+            "conic": 0.0,
+            "vertex_z_mm": 7.17,
+            "is_stop": false,
+            "surface_type": "standard",
+            "refractive_index_after": 1.0,
+            "comment": "PAC052 crown outer face"
+          },
+          "radius_abs_delta_mm": 0.0,
+          "vertex_z_abs_delta_mm": 0.0,
+          "conic_abs_delta": 0.0
+        },
+        {
+          "prescription": {
+            "index": 3,
+            "geometry_kind": "spherical",
+            "radius_mm": 77.265,
+            "conic": 0.0,
+            "thickness_mm": 5.102,
+            "vertex_z_mm": 57.17,
+            "material_kind": "catalog",
+            "material_name": "N-BK7",
+            "refractive_index": null,
+            "is_stop": false,
+            "comment": "KBX058 first convex face"
+          },
+          "built": {
+            "built_index": 4,
+            "radius_mm": 77.265,
+            "conic": 0.0,
+            "vertex_z_mm": 57.17,
+            "is_stop": false,
+            "surface_type": "standard",
+            "refractive_index_after": 1.5167401204613524,
+            "comment": "KBX058 first convex face"
+          },
+          "radius_abs_delta_mm": 0.0,
+          "vertex_z_abs_delta_mm": 0.0,
+          "conic_abs_delta": 0.0
+        },
+        {
+          "prescription": {
+            "index": 4,
+            "geometry_kind": "spherical",
+            "radius_mm": -77.265,
+            "conic": 0.0,
+            "thickness_mm": 27.3372411550794,
+            "vertex_z_mm": 62.272000000000006,
+            "material_kind": "air",
+            "material_name": null,
+            "refractive_index": null,
+            "is_stop": false,
+            "comment": "KBX058 second convex face"
+          },
+          "built": {
+            "built_index": 5,
+            "radius_mm": -77.265,
+            "conic": 0.0,
+            "vertex_z_mm": 62.272000000000006,
+            "is_stop": false,
+            "surface_type": "standard",
+            "refractive_index_after": 1.0,
+            "comment": "KBX058 second convex face"
+          },
+          "radius_abs_delta_mm": 0.0,
+          "vertex_z_abs_delta_mm": 0.0,
+          "conic_abs_delta": 0.0
+        }
+      ],
+      "mismatches": [],
+      "ordering_orientation_and_spacing_survived": true
+    },
+    "aperture_clearance": {
+      "checked": true,
+      "why": "optical-system-spec/1 cannot express a per-surface aperture, so the built system has no rims and clipping by one cannot occur. The constraint is therefore verified by measuring the footprint at each downstream component's first vertex instead of being assumed.",
+      "checks": [
+        {
+          "downstream_part_number": "KBX058",
+          "declared_air_gap_mm": 50.0,
+          "truncated_prescription_fingerprint": "33066f6562c7dc1c3dfe4215e48010b8102223cf9258b7df25d3c7c165206e3f",
+          "clear_aperture_mm": 22.86,
+          "clear_aperture_provenance": "published clear aperture of the downstream component; see the construction block for its verbatim source text",
+          "per_field": [
+            {
+              "field_angle_deg": 0.0,
+              "status": "succeeded",
+              "max_ray_radius_mm": 5.310227068371823,
+              "clear_aperture_semi_diameter_mm": 11.43,
+              "margin_mm": 6.119772931628177,
+              "inside_clear_aperture": true
+            },
+            {
+              "field_angle_deg": 1.0,
+              "status": "succeeded",
+              "max_ray_radius_mm": 6.278712151352296,
+              "clear_aperture_semi_diameter_mm": 11.43,
+              "margin_mm": 5.151287848647704,
+              "inside_clear_aperture": true
+            },
+            {
+              "field_angle_deg": 2.0,
+              "status": "succeeded",
+              "max_ray_radius_mm": 7.241554290639371,
+              "clear_aperture_semi_diameter_mm": 11.43,
+              "margin_mm": 4.188445709360629,
+              "inside_clear_aperture": true
+            },
+            {
+              "field_angle_deg": 3.0,
+              "status": "succeeded",
+              "max_ray_radius_mm": 8.199341309626202,
+              "clear_aperture_semi_diameter_mm": 11.43,
+              "margin_mm": 3.2306586903737973,
+              "inside_clear_aperture": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "execution": {
+    "question": "C. Did the ray trace execute correctly?",
+    "requested": {
+      "backend": "torch",
+      "device": "cuda",
+      "dtype": "float64"
+    },
+    "traces_attempted": 4,
+    "traces_succeeded": 4,
+    "silent_fallback_performed": false,
+    "traces": [
+      {
+        "label": "f0_w0.589",
+        "field_angle_deg": 0.0,
+        "normalized_field_hy": 0.0,
+        "wavelength_um": 0.589,
+        "status": "succeeded",
+        "wall_time_s": 0.07479161501396447,
+        "actual_execution": {
+          "requested": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "device": "cuda",
+            "namespace": null,
+            "bridge_policy": "safe"
+          },
+          "resolved": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "compute_dtypes": [
+              "float64"
+            ],
+            "device": "cuda",
+            "namespace": "torch",
+            "bridge_policy": "safe",
+            "evidence": "optiland 0.6.0 set_precision is Literal['float32','float64'] and set_device raises BackendCapabilityError on the numpy backend (benchmarks/probes/precision/optiland_capability.py, agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)"
+          },
+          "applied_to_optiland": {
+            "set_backend": "torch",
+            "set_precision": "float64",
+            "set_device": "cuda",
+            "get_device": "cuda",
+            "get_precision_raw": 64,
+            "get_precision": "float64"
+          },
+          "actual": {
+            "dtype": "float64",
+            "device": "cuda:0",
+            "namespace": "torch"
+          },
+          "mismatches": [],
+          "artifact_framework": "pytorch",
+          "artifact_device": "gpu",
+          "artifact_dtype": "float64"
+        },
+        "ray_survival": {
+          "launched_ray_count": 817,
+          "launched_ray_count_basis": "Optiland's hexapolar pupil sampler produces 1 + 3N(N+1) rays for N rings (solvers.optiland.cost_model.hexapolar_ray_count)",
+          "surviving_ray_count": 817,
+          "clipped_ray_count": 0,
+          "clipped_ray_fraction": 0.0,
+          "clipped_power_proxy": 2.327764118362893,
+          "clipped_power_proxy_caveat": "a proxy, not a measurement: it assumes every launched ray carried unit intensity, which Optic.trace does not report for rays it dropped. optical-system-spec/1 also has no per-surface aperture, so nothing here is rim vignetting -- a non-zero clipped count means a ray missed a surface or was totally internally reflected.",
+          "unit_launch_intensity_evidenced": false
+        },
+        "spot": {
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -4.756157388235065e-17,
+          "centroid_y_mm": 3.3021321295460594e-17,
+          "rms_spot_radius_mm": 0.19243314161390715,
+          "max_spot_radius_mm": 0.3536805036360449,
+          "spot_radius_definition": "radial distance from the centroid of the traced intercepts on the image surface; RMS is sqrt(mean(r^2)), unweighted by intensity and unweighted by pupil area. What it is blind to: because hexapolar samples are equally weighted but not equal-area, this RMS depends on the ring count -- the KPX094 on-axis spot measures 97.5 um at 8 rings and 90.1 um at the 16 rings this benchmark uses. It is a comparable metric ACROSS systems at a fixed ring count, which is how it is used here, and it is not an energy-weighted RMS spot size.",
+          "image_surface_z_mm": 89.6092411550794,
+          "image_surface_z_spread_mm": 0.0,
+          "surviving_intensity_sum": 814.6722358816371,
+          "surviving_intensity_min": 0.9970356393012813,
+          "surviving_intensity_max": 0.9972503270778847
+        },
+        "provenance": {
+          "prescription_fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+          "prescription_source": "config['prescription']",
+          "prescription_spec_version": "optical-system-spec/1",
+          "scientific_array_sha256": "cf07037be4ac245139326bead3137e9211183d006656b622705c92a307f3a560",
+          "rays_npz": "S5_TANDEM_REVERSED_ACHROMAT/f0_w0.589/rays.npz",
+          "rays_npz_sha256": "0c1d766fe63bd8bb4272dff084a45a5e2fea8d65e6c64b0d68e22e8b3344b941",
+          "optiland_version": "0.6.0",
+          "seed": 20260811
+        },
+        "adapter_warnings": [
+          "RealRays.opd is preserved in Optiland-native values. CHE-30 established the convention -- absolute accumulated optical path in the geometry unit (mm), index-weighted, referenced to the ray launch state -- but for an infinite object that launch plane is aperture-dependent, so the exported value is a piston of order 1e4 waves plus the wavefront. It must not be read as a phase without subtracting a declared reference; see conventions.opd_reference.",
+          "Output port 'wavefront' registry metadata declares ['amplitude', 'polarization', 'pupil_mask'] but optiland.rays.real_rays.RealRays exposes neither a polarization state nor a pupil mask (only x, y, z, L, M, N, i, opd, w). These metadata keys are intentionally left unpopulated rather than fabricated (repository scientific-contract requirements)."
+        ]
+      },
+      {
+        "label": "f1_w0.589",
+        "field_angle_deg": 1.0,
+        "normalized_field_hy": 0.3333333333333333,
+        "wavelength_um": 0.589,
+        "status": "succeeded",
+        "wall_time_s": 0.07360131898894906,
+        "actual_execution": {
+          "requested": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "device": "cuda",
+            "namespace": null,
+            "bridge_policy": "safe"
+          },
+          "resolved": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "compute_dtypes": [
+              "float64"
+            ],
+            "device": "cuda",
+            "namespace": "torch",
+            "bridge_policy": "safe",
+            "evidence": "optiland 0.6.0 set_precision is Literal['float32','float64'] and set_device raises BackendCapabilityError on the numpy backend (benchmarks/probes/precision/optiland_capability.py, agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)"
+          },
+          "applied_to_optiland": {
+            "set_backend": "torch",
+            "set_precision": "float64",
+            "set_device": "cuda",
+            "get_device": "cuda",
+            "get_precision_raw": 64,
+            "get_precision": "float64"
+          },
+          "actual": {
+            "dtype": "float64",
+            "device": "cuda:0",
+            "namespace": "torch"
+          },
+          "mismatches": [],
+          "artifact_framework": "pytorch",
+          "artifact_device": "gpu",
+          "artifact_dtype": "float64"
+        },
+        "ray_survival": {
+          "launched_ray_count": 817,
+          "launched_ray_count_basis": "Optiland's hexapolar pupil sampler produces 1 + 3N(N+1) rays for N rings (solvers.optiland.cost_model.hexapolar_ray_count)",
+          "surviving_ray_count": 817,
+          "clipped_ray_count": 0,
+          "clipped_ray_fraction": 0.0,
+          "clipped_power_proxy": 2.325848846874578,
+          "clipped_power_proxy_caveat": "a proxy, not a measurement: it assumes every launched ray carried unit intensity, which Optic.trace does not report for rays it dropped. optical-system-spec/1 also has no per-surface aperture, so nothing here is rim vignetting -- a non-zero clipped count means a ray missed a surface or was totally internally reflected.",
+          "unit_launch_intensity_evidenced": false
+        },
+        "spot": {
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -6.52273013243666e-17,
+          "centroid_y_mm": 1.089282897364312,
+          "rms_spot_radius_mm": 0.1945853346414045,
+          "max_spot_radius_mm": 0.3837881547473767,
+          "spot_radius_definition": "radial distance from the centroid of the traced intercepts on the image surface; RMS is sqrt(mean(r^2)), unweighted by intensity and unweighted by pupil area. What it is blind to: because hexapolar samples are equally weighted but not equal-area, this RMS depends on the ring count -- the KPX094 on-axis spot measures 97.5 um at 8 rings and 90.1 um at the 16 rings this benchmark uses. It is a comparable metric ACROSS systems at a fixed ring count, which is how it is used here, and it is not an energy-weighted RMS spot size.",
+          "image_surface_z_mm": 89.6092411550794,
+          "image_surface_z_spread_mm": 0.0,
+          "surviving_intensity_sum": 814.6741511531254,
+          "surviving_intensity_min": 0.9970371314209796,
+          "surviving_intensity_max": 0.9972824529622981
+        },
+        "provenance": {
+          "prescription_fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+          "prescription_source": "config['prescription']",
+          "prescription_spec_version": "optical-system-spec/1",
+          "scientific_array_sha256": "1542a01f19c62b6d78214f9525a6fbdea8872a8a4ce5b4a8b7691a9b83b06814",
+          "rays_npz": "S5_TANDEM_REVERSED_ACHROMAT/f1_w0.589/rays.npz",
+          "rays_npz_sha256": "4b633f051b45f1273135b5355da1ba5b6f45d51cf033c89bac78e81b20661590",
+          "optiland_version": "0.6.0",
+          "seed": 20260811
+        },
+        "adapter_warnings": [
+          "RealRays.opd is preserved in Optiland-native values. CHE-30 established the convention -- absolute accumulated optical path in the geometry unit (mm), index-weighted, referenced to the ray launch state -- but for an infinite object that launch plane is aperture-dependent, so the exported value is a piston of order 1e4 waves plus the wavefront. It must not be read as a phase without subtracting a declared reference; see conventions.opd_reference.",
+          "Output port 'wavefront' registry metadata declares ['amplitude', 'polarization', 'pupil_mask'] but optiland.rays.real_rays.RealRays exposes neither a polarization state nor a pupil mask (only x, y, z, L, M, N, i, opd, w). These metadata keys are intentionally left unpopulated rather than fabricated (repository scientific-contract requirements)."
+        ]
+      },
+      {
+        "label": "f2_w0.589",
+        "field_angle_deg": 2.0,
+        "normalized_field_hy": 0.6666666666666666,
+        "wavelength_um": 0.589,
+        "status": "succeeded",
+        "wall_time_s": 0.07346025999868289,
+        "actual_execution": {
+          "requested": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "device": "cuda",
+            "namespace": null,
+            "bridge_policy": "safe"
+          },
+          "resolved": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "compute_dtypes": [
+              "float64"
+            ],
+            "device": "cuda",
+            "namespace": "torch",
+            "bridge_policy": "safe",
+            "evidence": "optiland 0.6.0 set_precision is Literal['float32','float64'] and set_device raises BackendCapabilityError on the numpy backend (benchmarks/probes/precision/optiland_capability.py, agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)"
+          },
+          "applied_to_optiland": {
+            "set_backend": "torch",
+            "set_precision": "float64",
+            "set_device": "cuda",
+            "get_device": "cuda",
+            "get_precision_raw": 64,
+            "get_precision": "float64"
+          },
+          "actual": {
+            "dtype": "float64",
+            "device": "cuda:0",
+            "namespace": "torch"
+          },
+          "mismatches": [],
+          "artifact_framework": "pytorch",
+          "artifact_device": "gpu",
+          "artifact_dtype": "float64"
+        },
+        "ray_survival": {
+          "launched_ray_count": 817,
+          "launched_ray_count_basis": "Optiland's hexapolar pupil sampler produces 1 + 3N(N+1) rays for N rings (solvers.optiland.cost_model.hexapolar_ray_count)",
+          "surviving_ray_count": 817,
+          "clipped_ray_count": 0,
+          "clipped_ray_fraction": 0.0,
+          "clipped_power_proxy": 2.320094610055662,
+          "clipped_power_proxy_caveat": "a proxy, not a measurement: it assumes every launched ray carried unit intensity, which Optic.trace does not report for rays it dropped. optical-system-spec/1 also has no per-surface aperture, so nothing here is rim vignetting -- a non-zero clipped count means a ray missed a surface or was totally internally reflected.",
+          "unit_launch_intensity_evidenced": false
+        },
+        "spot": {
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -2.9895846440334694e-17,
+          "centroid_y_mm": 2.178455608399297,
+          "rms_spot_radius_mm": 0.20101608375279245,
+          "max_spot_radius_mm": 0.4202269457307213,
+          "spot_radius_definition": "radial distance from the centroid of the traced intercepts on the image surface; RMS is sqrt(mean(r^2)), unweighted by intensity and unweighted by pupil area. What it is blind to: because hexapolar samples are equally weighted but not equal-area, this RMS depends on the ring count -- the KPX094 on-axis spot measures 97.5 um at 8 rings and 90.1 um at the 16 rings this benchmark uses. It is a comparable metric ACROSS systems at a fixed ring count, which is how it is used here, and it is not an energy-weighted RMS spot size.",
+          "image_surface_z_mm": 89.6092411550794,
+          "image_surface_z_spread_mm": 0.0,
+          "surviving_intensity_sum": 814.6799053899443,
+          "surviving_intensity_min": 0.9970406124016211,
+          "surviving_intensity_max": 0.9973194861375503
+        },
+        "provenance": {
+          "prescription_fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+          "prescription_source": "config['prescription']",
+          "prescription_spec_version": "optical-system-spec/1",
+          "scientific_array_sha256": "6b55c357180fc71988016e7b00af86442bacfb490df6e443ec9d51a86289fc4c",
+          "rays_npz": "S5_TANDEM_REVERSED_ACHROMAT/f2_w0.589/rays.npz",
+          "rays_npz_sha256": "b436cb5a0dfe30e166ad4ecd821d98dfd6b7b3617e77d63b85136f26389f2826",
+          "optiland_version": "0.6.0",
+          "seed": 20260811
+        },
+        "adapter_warnings": [
+          "RealRays.opd is preserved in Optiland-native values. CHE-30 established the convention -- absolute accumulated optical path in the geometry unit (mm), index-weighted, referenced to the ray launch state -- but for an infinite object that launch plane is aperture-dependent, so the exported value is a piston of order 1e4 waves plus the wavefront. It must not be read as a phase without subtracting a declared reference; see conventions.opd_reference.",
+          "Output port 'wavefront' registry metadata declares ['amplitude', 'polarization', 'pupil_mask'] but optiland.rays.real_rays.RealRays exposes neither a polarization state nor a pupil mask (only x, y, z, L, M, N, i, opd, w). These metadata keys are intentionally left unpopulated rather than fabricated (repository scientific-contract requirements)."
+        ]
+      },
+      {
+        "label": "f3_w0.589",
+        "field_angle_deg": 3.0,
+        "normalized_field_hy": 1.0,
+        "wavelength_um": 0.589,
+        "status": "succeeded",
+        "wall_time_s": 0.07348520800587721,
+        "actual_execution": {
+          "requested": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "device": "cuda",
+            "namespace": null,
+            "bridge_policy": "safe"
+          },
+          "resolved": {
+            "component": "M_RAY_OPTILAND",
+            "precision": "fp64",
+            "compute_dtypes": [
+              "float64"
+            ],
+            "device": "cuda",
+            "namespace": "torch",
+            "bridge_policy": "safe",
+            "evidence": "optiland 0.6.0 set_precision is Literal['float32','float64'] and set_device raises BackendCapabilityError on the numpy backend (benchmarks/probes/precision/optiland_capability.py, agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)"
+          },
+          "applied_to_optiland": {
+            "set_backend": "torch",
+            "set_precision": "float64",
+            "set_device": "cuda",
+            "get_device": "cuda",
+            "get_precision_raw": 64,
+            "get_precision": "float64"
+          },
+          "actual": {
+            "dtype": "float64",
+            "device": "cuda:0",
+            "namespace": "torch"
+          },
+          "mismatches": [],
+          "artifact_framework": "pytorch",
+          "artifact_device": "gpu",
+          "artifact_dtype": "float64"
+        },
+        "ray_survival": {
+          "launched_ray_count": 817,
+          "launched_ray_count_basis": "Optiland's hexapolar pupil sampler produces 1 + 3N(N+1) rays for N rings (solvers.optiland.cost_model.hexapolar_ray_count)",
+          "surviving_ray_count": 817,
+          "clipped_ray_count": 0,
+          "clipped_ray_fraction": 0.0,
+          "clipped_power_proxy": 2.310476024860236,
+          "clipped_power_proxy_caveat": "a proxy, not a measurement: it assumes every launched ray carried unit intensity, which Optic.trace does not report for rays it dropped. optical-system-spec/1 also has no per-surface aperture, so nothing here is rim vignetting -- a non-zero clipped count means a ray missed a surface or was totally internally reflected.",
+          "unit_launch_intensity_evidenced": false
+        },
+        "spot": {
+          "surviving_ray_count": 817,
+          "centroid_x_mm": 3.8049259105880516e-17,
+          "centroid_y_mm": 3.26740491819927,
+          "rms_spot_radius_mm": 0.21165636884934017,
+          "max_spot_radius_mm": 0.46303540624425343,
+          "spot_radius_definition": "radial distance from the centroid of the traced intercepts on the image surface; RMS is sqrt(mean(r^2)), unweighted by intensity and unweighted by pupil area. What it is blind to: because hexapolar samples are equally weighted but not equal-area, this RMS depends on the ring count -- the KPX094 on-axis spot measures 97.5 um at 8 rings and 90.1 um at the 16 rings this benchmark uses. It is a comparable metric ACROSS systems at a fixed ring count, which is how it is used here, and it is not an energy-weighted RMS spot size.",
+          "image_surface_z_mm": 89.6092411550794,
+          "image_surface_z_spread_mm": 0.0,
+          "surviving_intensity_sum": 814.6895239751398,
+          "surviving_intensity_min": 0.9970471757601611,
+          "surviving_intensity_max": 0.9973614126867077
+        },
+        "provenance": {
+          "prescription_fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+          "prescription_source": "config['prescription']",
+          "prescription_spec_version": "optical-system-spec/1",
+          "scientific_array_sha256": "8cb681e336be260fd3b044862c59c6350e13773935e20a8270fb969983252635",
+          "rays_npz": "S5_TANDEM_REVERSED_ACHROMAT/f3_w0.589/rays.npz",
+          "rays_npz_sha256": "f348d431c093cad4cbd67d7c4751088dab06a85621152fb17b8601a288e1e409",
+          "optiland_version": "0.6.0",
+          "seed": 20260811
+        },
+        "adapter_warnings": [
+          "RealRays.opd is preserved in Optiland-native values. CHE-30 established the convention -- absolute accumulated optical path in the geometry unit (mm), index-weighted, referenced to the ray launch state -- but for an infinite object that launch plane is aperture-dependent, so the exported value is a piston of order 1e4 waves plus the wavefront. It must not be read as a phase without subtracting a declared reference; see conventions.opd_reference.",
+          "Output port 'wavefront' registry metadata declares ['amplitude', 'polarization', 'pupil_mask'] but optiland.rays.real_rays.RealRays exposes neither a polarization state nor a pupil mask (only x, y, z, L, M, N, i, opd, w). These metadata keys are intentionally left unpopulated rather than fabricated (repository scientific-contract requirements)."
+        ]
+      }
+    ]
+  },
+  "characterization": {
+    "question": "D. Does the resulting optical system behave plausibly?",
+    "paraxial": {
+      "measured_on": {
+        "backend": "numpy",
+        "dtype": "float64",
+        "why": "paraxial quantities are properties of the prescription, not of the trace; measuring them on the host at float64 keeps a GPU record's catalog comparison independent of the GPU"
+      },
+      "effective_focal_length_mm": 61.61096779844361,
+      "front_focal_length_mm": -61.610967798443625,
+      "rear_focal_point_from_image_surface_mm": 3.4200957509635594e-15,
+      "back_focal_length_mm": 27.337241155079404,
+      "declared_image_distance_from_last_vertex_mm": 27.3372411550794,
+      "principal_plane_2_mm": -61.61096779844361,
+      "entrance_pupil_diameter_mm": 22.86,
+      "entrance_pupil_location_mm": 0.0,
+      "exit_pupil_diameter_mm": 93.56829159370783,
+      "exit_pupil_location_from_image_surface_mm": -252.17992127451075,
+      "f_number_on_entrance_pupil": 2.695142948313369,
+      "image_plane_z_mm": 89.6092411550794,
+      "built_surface_readback": [
+        {
+          "built_index": 0,
+          "radius_mm": null,
+          "conic": 0.0,
+          "vertex_z_mm": null,
+          "is_stop": false,
+          "surface_type": "None",
+          "refractive_index_after": 1.0,
+          "comment": ""
+        },
+        {
+          "built_index": 1,
+          "radius_mm": 133.104,
+          "conic": 0.0,
+          "vertex_z_mm": 0.0,
+          "is_stop": true,
+          "surface_type": "standard",
+          "refractive_index_after": 1.6725563922535207,
+          "comment": "PAC052 flint outer face"
+        },
+        {
+          "built_index": 2,
+          "radius_mm": 44.71,
+          "conic": 0.0,
+          "vertex_z_mm": 2.17,
+          "is_stop": false,
+          "surface_type": "standard",
+          "refractive_index_after": 1.5167401204613524,
+          "comment": "PAC052 cemented crown/flint interface"
+        },
+        {
+          "built_index": 3,
+          "radius_mm": -60.741,
+          "conic": 0.0,
+          "vertex_z_mm": 7.17,
+          "is_stop": false,
+          "surface_type": "standard",
+          "refractive_index_after": 1.0,
+          "comment": "PAC052 crown outer face"
+        },
+        {
+          "built_index": 4,
+          "radius_mm": 77.265,
+          "conic": 0.0,
+          "vertex_z_mm": 57.17,
+          "is_stop": false,
+          "surface_type": "standard",
+          "refractive_index_after": 1.5167401204613524,
+          "comment": "KBX058 first convex face"
+        },
+        {
+          "built_index": 5,
+          "radius_mm": -77.265,
+          "conic": 0.0,
+          "vertex_z_mm": 62.272000000000006,
+          "is_stop": false,
+          "surface_type": "standard",
+          "refractive_index_after": 1.0,
+          "comment": "KBX058 second convex face"
+        },
+        {
+          "built_index": 6,
+          "radius_mm": null,
+          "conic": 0.0,
+          "vertex_z_mm": 89.6092411550794,
+          "is_stop": false,
+          "surface_type": "standard",
+          "refractive_index_after": 1.0,
+          "comment": ""
+        }
+      ]
+    },
+    "catalog_comparisons": [],
+    "on_axis_primary": {
+      "wavelength_um": 0.589,
+      "rms_spot_radius_mm": 0.19243314161390715,
+      "max_spot_radius_mm": 0.3536805036360449,
+      "surviving_ray_count": 817
+    },
+    "field_dependence": [
+      {
+        "field_angle_deg": 0.0,
+        "wavelength_um": 0.589,
+        "rms_spot_radius_mm": 0.19243314161390715,
+        "max_spot_radius_mm": 0.3536805036360449,
+        "centroid_y_mm": 3.3021321295460594e-17,
+        "paraxial_image_height_mm": 0.0,
+        "chief_ray_displacement_mm": 3.3021321295460594e-17,
+        "relative_displacement": null
+      },
+      {
+        "field_angle_deg": 1.0,
+        "wavelength_um": 0.589,
+        "rms_spot_radius_mm": 0.1945853346414045,
+        "max_spot_radius_mm": 0.3837881547473767,
+        "centroid_y_mm": 1.089282897364312,
+        "paraxial_image_height_mm": 1.075423443212156,
+        "chief_ray_displacement_mm": 0.013859454152155948,
+        "relative_displacement": 0.012887439119570875
+      },
+      {
+        "field_angle_deg": 2.0,
+        "wavelength_um": 0.589,
+        "rms_spot_radius_mm": 0.20101608375279245,
+        "max_spot_radius_mm": 0.4202269457307213,
+        "centroid_y_mm": 2.178455608399297,
+        "paraxial_image_height_mm": 2.1515024046529416,
+        "chief_ray_displacement_mm": 0.02695320374635557,
+        "relative_displacement": 0.012527619624344963
+      },
+      {
+        "field_angle_deg": 3.0,
+        "wavelength_um": 0.589,
+        "rms_spot_radius_mm": 0.21165636884934017,
+        "max_spot_radius_mm": 0.46303540624425343,
+        "centroid_y_mm": 3.26740491819927,
+        "paraxial_image_height_mm": 3.228894001795392,
+        "chief_ray_displacement_mm": 0.038510916403877715,
+        "relative_displacement": 0.011926968300125098
+      }
+    ],
+    "chromatic": null,
+    "spot_diagram": {
+      "path": "benchmarks/applied/commercial_lens_systems/figures/S5_TANDEM_REVERSED_ACHROMAT.gpu.png",
+      "sha256": "228d93153491c97644d879994e09e190c83b489d2c78af16aa8f157188a01958",
+      "determinism": "PNG metadata is suppressed (Software=None), so no generator string or timestamp enters the file and the sha256 is stable across re-runs"
+    }
+  },
+  "reproducibility": {
+    "scientific_result": {
+      "prescription_fingerprint": "3097396151ba5eddb81a8364a4e9fbe18094060873d68f25d68581d7d450f9e9",
+      "image_distance_mm": 27.3372411550794,
+      "paraxial": {
+        "effective_focal_length_mm": 61.61096779844361,
+        "back_focal_length_mm": 27.337241155079404,
+        "rear_focal_point_from_image_surface_mm": 3.4200957509635594e-15,
+        "entrance_pupil_diameter_mm": 22.86,
+        "exit_pupil_diameter_mm": 93.56829159370783,
+        "f_number_on_entrance_pupil": 2.695142948313369,
+        "image_plane_z_mm": 89.6092411550794
+      },
+      "traces": [
+        {
+          "label": "f0_w0.589",
+          "field_angle_deg": 0.0,
+          "wavelength_um": 0.589,
+          "scientific_array_sha256": "cf07037be4ac245139326bead3137e9211183d006656b622705c92a307f3a560",
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -4.756157388235065e-17,
+          "centroid_y_mm": 3.3021321295460594e-17,
+          "rms_spot_radius_mm": 0.19243314161390715,
+          "max_spot_radius_mm": 0.3536805036360449
+        },
+        {
+          "label": "f1_w0.589",
+          "field_angle_deg": 1.0,
+          "wavelength_um": 0.589,
+          "scientific_array_sha256": "1542a01f19c62b6d78214f9525a6fbdea8872a8a4ce5b4a8b7691a9b83b06814",
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -6.52273013243666e-17,
+          "centroid_y_mm": 1.089282897364312,
+          "rms_spot_radius_mm": 0.1945853346414045,
+          "max_spot_radius_mm": 0.3837881547473767
+        },
+        {
+          "label": "f2_w0.589",
+          "field_angle_deg": 2.0,
+          "wavelength_um": 0.589,
+          "scientific_array_sha256": "6b55c357180fc71988016e7b00af86442bacfb490df6e443ec9d51a86289fc4c",
+          "surviving_ray_count": 817,
+          "centroid_x_mm": -2.9895846440334694e-17,
+          "centroid_y_mm": 2.178455608399297,
+          "rms_spot_radius_mm": 0.20101608375279245,
+          "max_spot_radius_mm": 0.4202269457307213
+        },
+        {
+          "label": "f3_w0.589",
+          "field_angle_deg": 3.0,
+          "wavelength_um": 0.589,
+          "scientific_array_sha256": "8cb681e336be260fd3b044862c59c6350e13773935e20a8270fb969983252635",
+          "surviving_ray_count": 817,
+          "centroid_x_mm": 3.8049259105880516e-17,
+          "centroid_y_mm": 3.26740491819927,
+          "rms_spot_radius_mm": 0.21165636884934017,
+          "max_spot_radius_mm": 0.46303540624425343
+        }
+      ]
+    },
+    "result_fingerprint": "1ea6b0c9e72ed05975f35970af19828bd833c5d63b1a9f26771ecb3c49e2541f",
+    "basis": "sha256 over the canonical JSON of the assembled prescription fingerprint, the paraxial readout and every trace's scientific array hash and derived scalars. Host, clock, wall time and filesystem paths are excluded. A re-run with the same --device/--backend/--dtype must reproduce this exactly; a different precision or device legitimately will not, because the traced arrays themselves differ."
+  },
+  "environment": {
+    "python_version": "3.12.14",
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "cpu_model": "Intel(R) Xeon(R) Gold 6242R CPU @ 3.10GHz",
+    "logical_cpus": 80,
+    "thread_env": {},
+    "container_image": "agent_solver",
+    "gpu_name": "NVIDIA RTX A6000",
+    "gpu_driver": "550.163.01",
+    "gpu_count": 1,
+    "visible_devices": null,
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "torch": "2.13.0+cu126",
+      "optiland": "0.6.0",
+      "chromatix": "0.6.0"
+    },
+    "sha256": "fb66d7be8b4ad129b5e05807f3af88645c4e8aff3559a03e6d76914ed0d29f11"
+  }
+}

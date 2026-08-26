@@ -1,0 +1,733 @@
+{
+  "question": "A. Could the commercial components be constructed from published data?",
+  "components_considered": 4,
+  "components_constructed": 3,
+  "components_refused": 1,
+  "components": [
+    {
+      "part_number": "KPX094",
+      "vendor": "Newport (MKS Instruments)",
+      "summary": "Plano-convex singlet, N-BK7, 25.4 mm diameter, 100 mm EFL, uncoated",
+      "supported": true,
+      "sources": [
+        {
+          "key": "product_page",
+          "kind": "product_page",
+          "url": "https://www.newport.com/p/KPX094",
+          "retrieved_utc": "2026-08-26",
+          "note": "Newport (MKS) specification table: 'Technical Specs' section"
+        },
+        {
+          "key": "vendor_zemax_file",
+          "kind": "vendor_zemax_file",
+          "url": "https://api.p1.mks.com/medias/sys_master/images/images/hb8/h05/8797167124510/KPX094-ZEMAX.zip",
+          "retrieved_utc": "2026-08-26",
+          "note": "'KPX094_ZEMAX' under Resources & Downloads on the product page; KPX094.ZMX, UNIT MM, surface 1 CURV 1.934984520123839800E-002 (radius 51.68000 mm) DISZ 4.585 GLAS BK7, surface 2 plane, ENPD 2.286E+1, STOP on surface 1"
+        }
+      ],
+      "published": {
+        "bfl_mm": {
+          "value": 96.97,
+          "unit": "mm",
+          "verbatim": "Back Focal Length (BFL) | 96.97 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "center_thickness_mm": {
+          "value": 4.585,
+          "unit": "mm",
+          "verbatim": "Center Thickness (Tc) | 4.585 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "clear_aperture_mm": {
+          "value": 22.86,
+          "unit": "mm",
+          "verbatim": "Clear Aperture | >=central 90% of diameter",
+          "source_key": "product_page",
+          "derivation": "0.90 x the published 25.4 mm diameter = 22.86 mm; independently equal to the vendor Zemax file's own ENPD of 2.286E+1 mm"
+        },
+        "design_wavelength_um": {
+          "value": 0.589,
+          "unit": "um",
+          "verbatim": "Design Wavelength | 589 nm",
+          "source_key": "product_page",
+          "derivation": "589 nm expressed in the schema's micrometre wavelength unit"
+        },
+        "diameter_mm": {
+          "value": 25.4,
+          "unit": "mm",
+          "verbatim": "Diameter | 25.4 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "edge_thickness_mm": {
+          "value": 3.0,
+          "unit": "mm",
+          "verbatim": "Edge Thickness (Te) | 3.0 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "efl_mm": {
+          "value": 100.0,
+          "unit": "mm",
+          "verbatim": "Effective Focal Length (EFL) | 100 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "entrance_pupil_diameter_mm": {
+          "value": 22.86,
+          "unit": "mm",
+          "verbatim": "ENPD 2.286E+1",
+          "source_key": "vendor_zemax_file",
+          "derivation": "the vendor's own design file traces this part at 22.86 mm, which is exactly the 90% clear aperture the product page states; the benchmark uses the vendor's value rather than choosing its own pupil"
+        },
+        "f_number": {
+          "value": 3.9,
+          "unit": "",
+          "verbatim": "F/# | 3.9",
+          "source_key": "product_page",
+          "derivation": "the vendor's F/# is EFL / full diameter (100 / 25.4 = 3.94), not EFL / entrance pupil diameter; recorded so a simulated F-number is compared on a stated basis rather than assumed comparable"
+        },
+        "lens_shape": {
+          "value": "plano-convex",
+          "unit": "",
+          "verbatim": "Lens Shape | Plano-Convex",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "material": {
+          "value": "N-BK7",
+          "unit": "",
+          "verbatim": "Lens Material | N-BK7",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "principal_plane_2_mm": {
+          "value": -3.02,
+          "unit": "mm",
+          "verbatim": "Principal Plane 2 (P2) | -3.02 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "radius_1_mm": {
+          "value": 51.68,
+          "unit": "mm",
+          "verbatim": "Radius of Curvature (R) | 51.680 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        }
+      },
+      "source_disagreements": [
+        {
+          "parameter": "glass_names",
+          "readings": [
+            "product_page: N-BK7",
+            "vendor_zemax_file: BK7"
+          ],
+          "resolution": "product page (N-BK7)",
+          "basis": "the product page is the vendor's current statement about the part on sale; measured on the pinned Optiland 0.6.0 catalog, both spellings resolve to the same glass/schott/*.yml file with similarity_score 0, so the choice does not change the built material on this install"
+        },
+        {
+          "parameter": "image_distance_from_last_vertex_mm",
+          "readings": [
+            "product_page BFL: 96.97 mm at the stated 589 nm design wavelength",
+            "vendor_zemax_file last air distance: 96.61074751007 mm, whose primary wavelength (PWAV) is 546.1 nm"
+          ],
+          "resolution": "product page BFL (96.97 mm)",
+          "basis": "the benchmark traces the product page's stated design wavelength, so the image plane and the trace wavelength come from one document; the file's shorter distance is the expected direction for a shorter primary wavelength in a normally dispersive glass, not a conflict"
+        }
+      ],
+      "unrepresentable_parameters": [
+        {
+          "parameter": "clear_aperture",
+          "published": "Clear Aperture: >= central 90% of diameter",
+          "reason": "optical-system-spec/1 has no per-surface aperture field, so the built system carries no physical rim; adding one would change the canonical normalization and move every recorded prescription fingerprint in the repository, which is far outside this benchmark's scope",
+          "consequence": "no ray is vignetted by a component rim, so a reported clipped-ray count reflects trace failure (a missed or totally internally reflected surface) only, never aperture vignetting. The benchmark instead keeps the entrance pupil inside the clear aperture and measures the ray footprint at each downstream component vertex, so the constraint is checked rather than assumed -- see the aperture_clearance block of each multi-lens record."
+        }
+      ],
+      "normalized_component": {
+        "spec_version": "optical-component-spec/1",
+        "name": "KPX094",
+        "geometries": [
+          {
+            "kind": "spherical",
+            "radius_mm": 51.68,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          },
+          {
+            "kind": "plane"
+          }
+        ],
+        "internal_thicknesses_mm": [
+          4.585
+        ],
+        "internal_materials": [
+          {
+            "kind": "catalog",
+            "name": "N-BK7",
+            "catalog": null,
+            "expected_catalog_file": "glass/schott/N-BK7.yml",
+            "require_exact_match": true
+          }
+        ],
+        "clear_aperture_mm": 22.86,
+        "surface_comments": [
+          "KPX094 curved face",
+          "KPX094 plane face"
+        ],
+        "description": "Newport KPX094 plano-convex singlet. Surface order is the vendor's own: the curved face (R = +51.680 mm, convex toward the object) first, the plane second -- confirmed by KPX094.ZMX, whose surface 1 carries the curvature and surface 2 is flat. This is also the low-aberration orientation for an infinite conjugate."
+      },
+      "transcription_check": {
+        "radius_keys": [
+          "radius_1_mm",
+          ""
+        ],
+        "thickness_keys": [
+          "center_thickness_mm"
+        ],
+        "enforced": "every built radius and internal thickness is required at import time to equal the published value it cites, by exact float equality; see CatalogComponent._check_transcription"
+      },
+      "construction_refusal": null
+    },
+    {
+      "part_number": "KBX058",
+      "vendor": "Newport (MKS Instruments)",
+      "summary": "Equiconvex singlet, N-BK7, 25.4 mm diameter, 75.6 mm EFL, uncoated",
+      "supported": true,
+      "sources": [
+        {
+          "key": "product_page",
+          "kind": "product_page",
+          "url": "https://www.newport.com/p/KBX058",
+          "retrieved_utc": "2026-08-26",
+          "note": "Newport (MKS) specification table: 'Technical Specs' section"
+        },
+        {
+          "key": "vendor_zemax_file",
+          "kind": "vendor_zemax_file",
+          "url": "https://api.p1.mks.com/medias/sys_master/images/images/h2a/hcb/8797131145246/KBX058-ZEMAX.zip",
+          "retrieved_utc": "2026-08-26",
+          "note": "'KBX058_ZEMAX' under Resources & Downloads on the product page; KBX058.ZMX, UNIT MM, surface 1 CURV 1.294247071766000200E-002 (radius +77.26500 mm) DISZ 5.102 GLAS N-BK7, surface 2 CURV -1.294247071766000200E-002 (radius -77.265 mm, held by a scale -1 pickup solve on surface 1), ENPD 1.143E+1, STOP on surface 1"
+        }
+      ],
+      "published": {
+        "bfl_mm": {
+          "value": 73.89,
+          "unit": "mm",
+          "verbatim": "Back Focal Length (BFL) | 73.89 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "center_thickness_mm": {
+          "value": 5.102,
+          "unit": "mm",
+          "verbatim": "Center Thickness (Tc) | 5.102 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "clear_aperture_mm": {
+          "value": 22.86,
+          "unit": "mm",
+          "verbatim": "Clear Aperture | >=central 90% of diameter",
+          "source_key": "product_page",
+          "derivation": "0.90 x the published 25.4 mm diameter = 22.86 mm"
+        },
+        "design_wavelength_um": {
+          "value": 0.589,
+          "unit": "um",
+          "verbatim": "Design Wavelength | 589 nm",
+          "source_key": "product_page",
+          "derivation": "589 nm expressed in the schema's micrometre wavelength unit"
+        },
+        "diameter_mm": {
+          "value": 25.4,
+          "unit": "mm",
+          "verbatim": "Diameter | 25.4 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "edge_thickness_mm": {
+          "value": 3.0,
+          "unit": "mm",
+          "verbatim": "Edge Thickness (Te) | 3.0 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "efl_mm": {
+          "value": 75.6,
+          "unit": "mm",
+          "verbatim": "Effective Focal Length (EFL) | 75.6 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "entrance_pupil_diameter_mm": {
+          "value": 11.43,
+          "unit": "mm",
+          "verbatim": "ENPD 1.143E+1",
+          "source_key": "vendor_zemax_file",
+          "derivation": "the vendor's own design file traces this part at 11.43 mm, half its clear aperture; the benchmark uses the vendor's value rather than choosing its own pupil for this component"
+        },
+        "f_number": {
+          "value": 2.9,
+          "unit": "",
+          "verbatim": "F/# | 2.9",
+          "source_key": "product_page",
+          "derivation": "EFL / full diameter (75.6 / 25.4 = 2.98); the vendor Zemax file instead traces this part at ENPD 11.43 mm, i.e. f/6.6"
+        },
+        "lens_shape": {
+          "value": "bi-convex",
+          "unit": "",
+          "verbatim": "Lens Shape | Bi-Convex",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "material": {
+          "value": "N-BK7",
+          "unit": "",
+          "verbatim": "Lens Material | N-BK7",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "principal_plane_1_mm": {
+          "value": 1.7,
+          "unit": "mm",
+          "verbatim": "Principal Plane 1 (P1) | 1.70 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "principal_plane_2_mm": {
+          "value": -1.7,
+          "unit": "mm",
+          "verbatim": "Principal Plane 2 (P2) | -1.70 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "radius_1_mm": {
+          "value": 77.265,
+          "unit": "mm",
+          "verbatim": "Radius of Curvature (R) | 77.265 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "radius_2_mm": {
+          "value": -77.265,
+          "unit": "mm",
+          "verbatim": "CURV -1.294247071766000200E-002 (surface 2, pickup solve '4 1 -1.')",
+          "source_key": "vendor_zemax_file",
+          "derivation": "the product page quotes ONE radius for a bi-convex part, which does not by itself say the second surface is its exact negative. The vendor Zemax file does: surface 2's curvature is held equal to surface 1's with scale -1, i.e. R2 = -R1 = -77.265 mm exactly. This value is read from the manufacturer's file, not inferred from the word 'bi-convex'."
+        }
+      },
+      "source_disagreements": [
+        {
+          "parameter": "image_distance_from_last_vertex_mm",
+          "readings": [
+            "product_page BFL: 73.89 mm at the stated 589 nm design wavelength",
+            "vendor_zemax_file last air distance: 72.94560765611 mm, whose primary wavelength (PWAV) is 546.1 nm"
+          ],
+          "resolution": "product page BFL (73.89 mm)",
+          "basis": "the benchmark traces the product page's stated design wavelength, so the image plane and the trace wavelength come from one document; the file's shorter distance is the expected direction for a shorter primary wavelength in a normally dispersive glass, not a conflict"
+        }
+      ],
+      "unrepresentable_parameters": [
+        {
+          "parameter": "clear_aperture",
+          "published": "Clear Aperture: >= central 90% of diameter",
+          "reason": "optical-system-spec/1 has no per-surface aperture field, so the built system carries no physical rim; adding one would change the canonical normalization and move every recorded prescription fingerprint in the repository, which is far outside this benchmark's scope",
+          "consequence": "no ray is vignetted by a component rim, so a reported clipped-ray count reflects trace failure (a missed or totally internally reflected surface) only, never aperture vignetting. The benchmark instead keeps the entrance pupil inside the clear aperture and measures the ray footprint at each downstream component vertex, so the constraint is checked rather than assumed -- see the aperture_clearance block of each multi-lens record."
+        }
+      ],
+      "normalized_component": {
+        "spec_version": "optical-component-spec/1",
+        "name": "KBX058",
+        "geometries": [
+          {
+            "kind": "spherical",
+            "radius_mm": 77.265,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          },
+          {
+            "kind": "spherical",
+            "radius_mm": -77.265,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          }
+        ],
+        "internal_thicknesses_mm": [
+          5.102
+        ],
+        "internal_materials": [
+          {
+            "kind": "catalog",
+            "name": "N-BK7",
+            "catalog": null,
+            "expected_catalog_file": "glass/schott/N-BK7.yml",
+            "require_exact_match": true
+          }
+        ],
+        "clear_aperture_mm": 22.86,
+        "surface_comments": [
+          "KBX058 first convex face",
+          "KBX058 second convex face"
+        ],
+        "description": "Newport KBX058 equiconvex singlet, R1 = +77.265 mm and R2 = -77.265 mm (the second radius taken from KBX058.ZMX's pickup solve, not inferred). Equiconvex, so the part is symmetric under reversal up to floating-point sign -- which makes it a useful second element in an assembly where only the FIRST component's orientation is meant to matter."
+      },
+      "transcription_check": {
+        "radius_keys": [
+          "radius_1_mm",
+          "radius_2_mm"
+        ],
+        "thickness_keys": [
+          "center_thickness_mm"
+        ],
+        "enforced": "every built radius and internal thickness is required at import time to equal the published value it cites, by exact float equality; see CatalogComponent._check_transcription"
+      },
+      "construction_refusal": null
+    },
+    {
+      "part_number": "PAC052",
+      "vendor": "Newport (MKS Instruments)",
+      "summary": "Cemented achromatic doublet, N-BK7 / N-SF5, 25.4 mm diameter, 100 mm EFL, 400-700 nm AR coated",
+      "supported": true,
+      "sources": [
+        {
+          "key": "product_page",
+          "kind": "product_page",
+          "url": "https://www.newport.com/p/PAC052",
+          "retrieved_utc": "2026-08-26",
+          "note": "Newport (MKS) specification table: 'Technical Specs' section"
+        },
+        {
+          "key": "vendor_zemax_file",
+          "kind": "vendor_zemax_file",
+          "url": "https://api.p1.mks.com/medias/sys_master/images/images/h56/h66/8797231284254/PAC052-ZEMAX.zip",
+          "retrieved_utc": "2026-08-26",
+          "note": "'PAC052_ZEMAX' under Resources & Downloads on the product page; PAC052.ZMX, UNIT MM, surface 1 CURV 1.646334436377409900E-002 (radius 60.74100 mm) DISZ 5.0 GLAS BK7, surface 2 CURV -2.236636099306639800E-002 (radius -44.71000 mm) DISZ 2.17 GLAS SF5, surface 3 CURV -7.512922226229099700E-003 (radius -133.10400 mm), WAVM 4.861E-1 / 5.461E-1 / 6.563E-1 with PWAV 2, ENPD 2.286E+1, STOP on surface 1"
+        }
+      ],
+      "published": {
+        "bfl_mm": {
+          "value": 96.5,
+          "unit": "mm",
+          "verbatim": "Back Focal Length (BFL) | 96.5 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "center_thickness_1_mm": {
+          "value": 5.0,
+          "unit": "mm",
+          "verbatim": "Thickness, Center 1 | 5.0 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "center_thickness_2_mm": {
+          "value": 2.17,
+          "unit": "mm",
+          "verbatim": "Thickness, Center 2 | 2.17 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "center_thickness_total_mm": {
+          "value": 7.17,
+          "unit": "mm",
+          "verbatim": "Center Thickness (Tc) | 7.17 mm",
+          "source_key": "product_page",
+          "derivation": "published independently of the two element thicknesses; it equals their sum (5.0 + 2.17), which is a consistency check on the transcription rather than an input"
+        },
+        "chromatic_wavelength_long_um": {
+          "value": 0.6563,
+          "unit": "um",
+          "verbatim": "WAVM 3 6.563E-1",
+          "source_key": "vendor_zemax_file",
+          "derivation": ""
+        },
+        "chromatic_wavelength_short_um": {
+          "value": 0.4861,
+          "unit": "um",
+          "verbatim": "WAVM 1 4.861E-1",
+          "source_key": "vendor_zemax_file",
+          "derivation": "the vendor's own design file evaluates this achromat at 486.1 / 546.1 / 656.3 nm; the benchmark's chromatic characterization uses the vendor's short and long lines rather than lines of its own"
+        },
+        "clear_aperture_mm": {
+          "value": 22.86,
+          "unit": "mm",
+          "verbatim": "Diameter | 25.4 mm (PAC-series page states no separate clear aperture)",
+          "source_key": "product_page",
+          "derivation": "the PAC052 page does NOT publish a clear-aperture line. The 90% figure is carried over from Newport's singlet pages, so it is an assumption about this part rather than a published value for it -- which is why the benchmark uses the vendor Zemax file's ENPD of 22.86 mm as the pupil and treats this number only as the footprint-clearance reference it is compared against."
+        },
+        "design_wavelength_um": {
+          "value": 0.589,
+          "unit": "um",
+          "verbatim": "Design Wavelengths | 589 nm",
+          "source_key": "product_page",
+          "derivation": "589 nm expressed in the schema's micrometre wavelength unit"
+        },
+        "diameter_mm": {
+          "value": 25.4,
+          "unit": "mm",
+          "verbatim": "Diameter | 25.4 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "edge_thickness_mm": {
+          "value": 5.2,
+          "unit": "mm",
+          "verbatim": "Edge Thickness (Te) | 5.2 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "efl_mm": {
+          "value": 100.0,
+          "unit": "mm",
+          "verbatim": "Effective Focal Length (EFL) | 100 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "entrance_pupil_diameter_mm": {
+          "value": 22.86,
+          "unit": "mm",
+          "verbatim": "ENPD 2.286E+1",
+          "source_key": "vendor_zemax_file",
+          "derivation": ""
+        },
+        "f_number": {
+          "value": 3.9,
+          "unit": "",
+          "verbatim": "F/# | 3.9",
+          "source_key": "product_page",
+          "derivation": "EFL / full diameter (100 / 25.4 = 3.94)"
+        },
+        "lens_type": {
+          "value": "achromatic doublet",
+          "unit": "",
+          "verbatim": "Lens Type | Achromatic Doublet",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "material": {
+          "value": "N-BK7/N-SF5",
+          "unit": "",
+          "verbatim": "Lens Material | N-BK7/N-SF5",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "orientation": {
+          "value": "steepest convex surface faces the infinite conjugate",
+          "unit": "",
+          "verbatim": "Orientation | Steepest convex surface should face the infinite conjugate",
+          "source_key": "product_page",
+          "derivation": "of the two outer surfaces, R1 = +60.741 mm and R3 = -133.104 mm are both convex outward and |R1| < |R3|, so the crown face R1 is the steepest convex surface and faces infinity. The vendor Zemax file lists the surfaces in exactly that order, so the reading is confirmed by a second manufacturer document rather than argued from the wording alone."
+        },
+        "radius_1_mm": {
+          "value": 60.741,
+          "unit": "mm",
+          "verbatim": "Radius of Curvature (R) | 60.741 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "radius_2_mm": {
+          "value": -44.71,
+          "unit": "mm",
+          "verbatim": "Radius 2 | -44.710 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "radius_3_mm": {
+          "value": -133.104,
+          "unit": "mm",
+          "verbatim": "Radius 3 | -133.104 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        }
+      },
+      "source_disagreements": [
+        {
+          "parameter": "glass_names",
+          "readings": [
+            "product_page: N-BK7/N-SF5",
+            "vendor_zemax_file: BK7/SF5"
+          ],
+          "resolution": "product page (N-BK7/N-SF5)",
+          "basis": "the product page is the vendor's current statement about the part on sale; measured on the pinned Optiland 0.6.0 catalog, both spellings resolve to the same glass/schott/*.yml file with similarity_score 0, so the choice does not change the built material on this install"
+        }
+      ],
+      "unrepresentable_parameters": [
+        {
+          "parameter": "clear_aperture",
+          "published": "Clear Aperture: >= central 90% of diameter",
+          "reason": "optical-system-spec/1 has no per-surface aperture field, so the built system carries no physical rim; adding one would change the canonical normalization and move every recorded prescription fingerprint in the repository, which is far outside this benchmark's scope",
+          "consequence": "no ray is vignetted by a component rim, so a reported clipped-ray count reflects trace failure (a missed or totally internally reflected surface) only, never aperture vignetting. The benchmark instead keeps the entrance pupil inside the clear aperture and measures the ray footprint at each downstream component vertex, so the constraint is checked rather than assumed -- see the aperture_clearance block of each multi-lens record."
+        }
+      ],
+      "normalized_component": {
+        "spec_version": "optical-component-spec/1",
+        "name": "PAC052",
+        "geometries": [
+          {
+            "kind": "spherical",
+            "radius_mm": 60.741,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          },
+          {
+            "kind": "spherical",
+            "radius_mm": -44.71,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          },
+          {
+            "kind": "spherical",
+            "radius_mm": -133.104,
+            "curvature_per_mm": null,
+            "conic": 0.0
+          }
+        ],
+        "internal_thicknesses_mm": [
+          5.0,
+          2.17
+        ],
+        "internal_materials": [
+          {
+            "kind": "catalog",
+            "name": "N-BK7",
+            "catalog": null,
+            "expected_catalog_file": "glass/schott/N-BK7.yml",
+            "require_exact_match": true
+          },
+          {
+            "kind": "catalog",
+            "name": "N-SF5",
+            "catalog": null,
+            "expected_catalog_file": "glass/schott/N-SF5.yml",
+            "require_exact_match": true
+          }
+        ],
+        "clear_aperture_mm": 22.86,
+        "surface_comments": [
+          "PAC052 crown outer face",
+          "PAC052 cemented crown/flint interface",
+          "PAC052 flint outer face"
+        ],
+        "description": "Newport PAC052 cemented achromatic doublet: N-BK7 crown (R1 = +60.741, 5.0 mm) cemented to an N-SF5 flint (R2 = -44.710, 2.17 mm) with an outer flint face R3 = -133.104. Written in the manufacturer's stated orientation -- steepest convex surface (R1) facing the infinite conjugate. There is no air inside the part: the cemented interface is one surface with glass on both sides."
+      },
+      "transcription_check": {
+        "radius_keys": [
+          "radius_1_mm",
+          "radius_2_mm",
+          "radius_3_mm"
+        ],
+        "thickness_keys": [
+          "center_thickness_1_mm",
+          "center_thickness_2_mm"
+        ],
+        "enforced": "every built radius and internal thickness is required at import time to equal the published value it cites, by exact float equality; see CatalogComponent._check_transcription"
+      },
+      "construction_refusal": null
+    },
+    {
+      "part_number": "M-10X",
+      "vendor": "Newport (MKS Instruments)",
+      "summary": "10x, 0.25 NA microscope objective -- prescription not published",
+      "supported": false,
+      "sources": [
+        {
+          "key": "product_page",
+          "kind": "product_page",
+          "url": "https://www.newport.com/p/M-10X",
+          "retrieved_utc": "2026-08-26",
+          "note": "Newport (MKS) specification table. Resources & Downloads offers 3D CAD, a 2D dimension drawing and RoHS certificates -- and NO optical-design file, unlike every KPX/KBX/PAC part in this benchmark."
+        }
+      ],
+      "published": {
+        "clear_aperture_mm": {
+          "value": 7.5,
+          "unit": "mm",
+          "verbatim": "Clear Aperture | 7.5 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "efl_mm": {
+          "value": 16.5,
+          "unit": "mm",
+          "verbatim": "Effective Focal Length (EFL) | 16.5 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "magnification": {
+          "value": "10x",
+          "unit": "",
+          "verbatim": "Magnification | 10x",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "numerical_aperture": {
+          "value": 0.25,
+          "unit": "",
+          "verbatim": "Numerical Aperture | 0.25",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "objective_type": {
+          "value": "microscope",
+          "unit": "",
+          "verbatim": "Objective Type | Microscope",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "tube_length_mm": {
+          "value": 160.0,
+          "unit": "mm",
+          "verbatim": "Tube Length | 160 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "wavelength_range_nm": {
+          "value": "400-700",
+          "unit": "nm",
+          "verbatim": "Wavelength Range | 400-700 nm",
+          "source_key": "product_page",
+          "derivation": ""
+        },
+        "working_distance_mm": {
+          "value": 5.5,
+          "unit": "mm",
+          "verbatim": "Working Distance | 5.5 mm",
+          "source_key": "product_page",
+          "derivation": ""
+        }
+      },
+      "source_disagreements": [],
+      "unrepresentable_parameters": [],
+      "normalized_component": null,
+      "transcription_check": {
+        "radius_keys": [],
+        "thickness_keys": [],
+        "enforced": "every built radius and internal thickness is required at import time to equal the published value it cites, by exact float equality; see CatalogComponent._check_transcription"
+      },
+      "construction_refusal": {
+        "code": "CATALOG_PRESCRIPTION_NOT_PUBLISHED",
+        "message": "M-10X is a multi-element microscope objective whose internal prescription Newport does not publish, and whose product page links no optical-design file. Every parameter optical-component-spec/1 requires is absent: how many elements there are, where their surfaces are, how curved they are, what they are made of, and how far apart they sit. A 10x/0.25 NA objective with a 16.5 mm EFL could be modelled as a thin lens or as an arbitrary invented doublet that happens to hit those numbers, and either would trace and produce a plausible-looking spot diagram while representing an optical system that does not exist. This component is therefore refused rather than approximated. Two of its published numbers -- EFL and NA -- would have been enough to fabricate something, which is exactly why the refusal is keyed on the missing geometry and not on the absence of a focal length.",
+        "missing_parameters": [
+          "element_count",
+          "surface_radii",
+          "surface_conics",
+          "element_center_thicknesses",
+          "element_glasses",
+          "internal_air_spacings",
+          "surface_order"
+        ],
+        "published_but_insufficient": [
+          "magnification 10x",
+          "numerical_aperture 0.25",
+          "effective_focal_length 16.5 mm",
+          "working_distance 5.5 mm",
+          "tube_length 160 mm",
+          "clear_aperture 7.5 mm",
+          "wavelength_range 400-700 nm"
+        ]
+      }
+    }
+  ]
+}
