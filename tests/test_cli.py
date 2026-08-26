@@ -19,9 +19,11 @@ source tree.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 from cli import app
@@ -31,10 +33,30 @@ GRAPHS = ROOT / "examples" / "graphs"
 
 
 @pytest.fixture(scope="module")
-def runner() -> CliRunner:
-    # A wide terminal so Rich does not truncate an id mid-word and turn a
-    # content assertion into a layout assertion.
-    return CliRunner(env={"COLUMNS": "200"})
+def runner() -> Iterator[CliRunner]:
+    """A wide terminal, so Rich cannot truncate an id mid-word and turn a content
+    assertion into a layout assertion.
+
+    CHE-140: ``env={"COLUMNS": ...}`` alone does not do that. ``cli`` builds its
+    ``Console`` at module scope, so the width is decided when this file imports
+    ``cli`` -- before any environment the runner sets for an ``invoke`` call. The
+    width therefore came from whatever the *importing* process was attached to,
+    which is why this test passed for a year: a developer shell and ``./run.sh``
+    with a tty both give Rich a wide terminal. Sharding the suite removed it --
+    a pytest-xdist worker has no tty, Rich falls back to 80 columns, and
+    ``M_WAVE_CHROMATIX`` renders as ``M_WAVE_CHROMATI…`` in a 15-column cell.
+
+    So the console is replaced rather than configured, and the assertions below
+    now mean the same thing on a tty, in a worker, and in CI.
+    """
+    import cli as cli_module
+
+    original = cli_module.console
+    cli_module.console = Console(width=200)
+    try:
+        yield CliRunner(env={"COLUMNS": "200"})
+    finally:
+        cli_module.console = original
 
 
 def test_list_models_names_every_registered_model(runner: CliRunner) -> None:

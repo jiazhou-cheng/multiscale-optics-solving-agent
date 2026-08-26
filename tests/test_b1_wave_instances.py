@@ -332,6 +332,135 @@ def test_the_talbot_configuration_keeps_its_orders_paraxial(runs) -> None:
     assert measured < dephasing
 
 
+def test_the_talbot_tolerance_basis_leads_with_the_non_paraxial_term(runs) -> None:
+    """The basis names the physics that dominates, not the numerics that do not.
+
+    This is a regression guard on a specific wrong derivation, not a spell check.
+    The first version of this tolerance rested on finite-window truncation "the
+    larger of the two" contributions plus the complex64 floor, and both claims
+    are false on this configuration: truncation is designed out by the
+    exact-integer periodicity (a paraxial kernel on the same grid returns 3e-24)
+    and complex64 accounts for 1.9e-5 of a 2.18e-4 residual. What sets the floor
+    is the m^4 non-paraxial dephasing, and a basis that omits it cannot explain
+    why the ORIGINAL configuration was unrehabilitable by any precision argument.
+    """
+    tolerance = runs["B1-WAVE-TALBOT-01"].family.tolerance_for("talbot_revival_relative_l2")
+    assert tolerance is not None
+    basis = tolerance.basis
+
+    # The dominant term, named as dominant.
+    assert "non-paraxial" in basis
+    assert "m^4" in basis
+    assert "(pi/2) m^4 (lambda/d)^2" in basis
+    assert "k_z = k sqrt(1 - (m lambda / d)^2)" in basis
+    assert basis.index("DOMINANT") < basis.index("SECONDARY")
+    # m_max is what the dephasing is set by, and it comes from the sampling.
+    assert "m_max = samples_per_period / 2" in basis
+
+    # The two numerical terms survive as secondary, and truncation is explicitly
+    # demoted rather than silently dropped -- a reader of the old basis has to be
+    # able to find out that it was wrong.
+    secondary = basis[basis.index("SECONDARY") :]
+    assert "complex64" in secondary
+    assert "truncation" in secondary
+    assert "DESIGNED OUT" in secondary
+    assert "truncation" not in basis[: basis.index("SECONDARY")]
+
+    # The threshold did not move.
+    assert tolerance.threshold == 5e-3
+    # And the invalid configuration is named as a thing this gate rejects.
+    assert "8 um / 32 samples-per-period" in tolerance.rejects
+
+
+def test_the_talbot_residual_is_the_non_paraxial_term_and_not_truncation(runs) -> None:
+    """The decomposition, recomputed from the run rather than read off prose.
+
+    Three numbers on the same grating and the same grid: a float64 paraxial
+    kernel, a float64 exact angular spectrum, and the shipping complex64 path.
+    A paraxial propagator revives exactly, so the paraxial arm IS the
+    finite-window truncation term and it is at float64 round-off -- there is no
+    truncation to budget. The exact float64 arm accounts for the measurement to
+    within ten percent, which is what makes the non-paraxial term the model of
+    this residual rather than a plausible story about it. Both diagnostic
+    kernels are ours, and neither gates anything.
+    """
+    run = runs["B1-WAVE-TALBOT-01"]
+    detail = next(
+        d["detail"] for d in run.record.diagnostics if d["code"] == "NON_PARAXIAL_DEPHASING_BUDGET"
+    )
+    measured = _metric(run, "talbot_revival_relative_l2").measured.value
+
+    budget = _driver()._talbot_non_paraxial_budget(
+        period_um=float(run.instance.parameters["period_um"]),
+        wavelength_um=float(run.instance.parameters["wavelength_um"]),
+        duty=float(run.instance.parameters["duty_cycle"]),
+        periods=int(run.instance.parameters["periods_across_grid"]),
+        samples_per_period=int(run.instance.parameters["samples_per_period"]),
+        order=int(run.instance.parameters["talbot_order"]),
+    )
+
+    truncation = budget["paraxial_kernel_intensity_l2_float64"]
+    non_paraxial = budget["exact_kernel_intensity_l2_float64"]
+
+    # Truncation is not a contribution. This is the assertion that fails if the
+    # grating ever stops being an exact integer number of samples and periods.
+    assert truncation < 1e-12, f"truncation is supposed to be designed out, got {truncation:.3e}"
+    assert truncation < non_paraxial / 1e9
+
+    # The non-paraxial term explains the measurement.
+    assert non_paraxial == pytest.approx(measured, rel=0.15), (non_paraxial, measured)
+    # ... and complex64 is what is left over, an order below it.
+    complex64_floor = abs(measured - non_paraxial)
+    assert complex64_floor < non_paraxial / 5.0, complex64_floor
+
+    # The order bookkeeping: at 50% duty only odd orders carry amplitude, so the
+    # order that dominates is not the highest one the grid admits.
+    dominant = budget["dominant_carried_order"]
+    assert budget["m_max_admitted_by_grid"] == 4
+    assert dominant["m"] == 3
+    assert dominant["dephasing_rad"] < budget["dephasing_at_m_max_rad"]
+
+    # And the record says all of it, so this is checkable off the committed JSON.
+    assert "designed out" in detail and "DIAGNOSTIC ONLY" in detail
+
+
+def test_the_talbot_configuration_cannot_regress_to_the_invalid_one(runs) -> None:
+    """d = 8 um at 32 samples per period is measured-invalid, and three things stop it.
+
+    The old configuration admitted m = 16, whose dephasing after one Talbot
+    distance is 455 rad -- a hundred thousand times the 0.0352 rad the current
+    one carries. It measured 2.4e-1 against a 5e-3 gate and no precision or
+    windowing argument could have rescued it. So the guard is not just "the
+    instance says 8": the family DEFAULT is the good value, because an instance
+    omitting the parameter inherits it, and the parameter is no longer declared
+    as a refinement direction, because refining it is what breaks this family.
+    """
+    family = runs["B1-WAVE-TALBOT-01"].family
+    parameters = runs["B1-WAVE-TALBOT-01"].instance.parameters
+    assert int(parameters["samples_per_period"]) == 8
+    assert float(parameters["period_um"]) == 32.0
+
+    samples = next(p for p in family.parameters if p.name == "samples_per_period")
+    assert samples.default == 8, "an instance that omits this inherits the default"
+    assert samples.refines_toward is None, (
+        "raising samples_per_period admits higher orders and degrades the metric as "
+        "its fourth power, so it is not a direction along which this family converges"
+    )
+    # periods_across_grid is the genuine refinement dimension, so the family still
+    # owes one and the schema rule is satisfied for the right reason.
+    assert [p.name for p in family.refinement_dimensions] == ["periods_across_grid"]
+
+    def dephasing(period_um: float, samples_per_period: int) -> float:
+        m_max = samples_per_period // 2
+        return (math.pi / 2.0) * m_max**4 * (0.532 / period_um) ** 2
+
+    old = dephasing(8.0, 32)
+    current = dephasing(float(parameters["period_um"]), int(parameters["samples_per_period"]))
+    assert old == pytest.approx(455.0, rel=0.01), old
+    assert current == pytest.approx(0.111, rel=0.01), current
+    assert old / current > 4000.0
+
+
 def test_the_grating_is_exactly_periodic_on_the_grid(runs) -> None:
     """Otherwise the residual is the wrap discontinuity, not the propagator."""
     p = runs["B1-WAVE-TALBOT-01"].instance.parameters
@@ -484,6 +613,9 @@ def test_a_cuda_request_is_refused_rather_than_run_on_the_host() -> None:
     who asked for CUDA, with no error raised -- so a requested device must never
     be reported as an actual one. Here the request is refused before anything
     runs, and the CPU row's placement is read off the output array.
+
+    The executed-on-CUDA half of the criterion is in ``tests/test_b1_wave_gpu.py``,
+    which needs a device. This file owns the refusal.
     """
     observation = _driver().device_observation()
     rows = {row["requested_device"]: row for row in observation["rows"]}
@@ -500,6 +632,68 @@ def test_a_cuda_request_is_refused_rather_than_run_on_the_host() -> None:
     assert cuda["outcome"] == "refused"
     assert "no silent fallback" in cuda["detail"]
     assert "gpu" in cuda["detail"] or "cuda" in cuda["detail"]
+
+
+def test_the_placement_comes_from_the_live_array_and_not_the_persisted_copy() -> None:
+    """The regression guard for a defect a CPU session cannot otherwise see.
+
+    On the host both candidate sources agree -- ``jax``/``cpu`` from the live array
+    and ``numpy``/``cpu`` from the ``.npy`` -- so reading the wrong one is
+    invisible here and costs nothing. On a device it is the whole answer: the
+    persisted copy is host bytes because ``np.save`` requires them, so a CUDA run
+    observed through the file reports a downgrade. This driver did read the file,
+    and the identical mistake on the ray side reported a genuine ``cuda:0`` trace
+    as ``honoured_device: false``.
+
+    So the CPU suite pins the SOURCE rather than the value: the row must carry the
+    live-array observation and the persisted placement as two separate readings,
+    and must say which is which. That fails the moment someone collapses them,
+    without needing a GPU to notice.
+    """
+    rows = {r["requested_device"]: r for r in _driver().device_observation()["rows"]}
+    cpu = rows["cpu"]
+
+    assert "array_state" in cpu["observation_source"]
+    assert "before jax.device_get" in cpu["observation_source"]
+    assert "not the request" in cpu["observation_source"]
+
+    # Two readings, kept apart. They agree on this host, and that is the point:
+    # the assertion is about which field the driver populated from where.
+    assert cpu["observed"]["namespace"] == "jax", (
+        "the observation must come off the live JAX array, so its namespace is jax"
+    )
+    assert cpu["persisted"]["namespace"] == "numpy", (
+        "the persisted copy must be recorded separately and is numpy by construction"
+    )
+    assert cpu["observed"]["dtype"] == cpu["persisted"]["dtype"] == "complex64"
+    # And the adapter's own stamp on the boundary artifact is a third reading.
+    assert cpu["artifact"]["device"] == "cpu"
+    assert cpu["artifact"]["framework"] == "jax"
+    # jax.default_backend() is recorded and is NOT what honoured is computed from.
+    assert "jax_default_backend" in cpu
+
+
+def test_a_host_produced_output_is_never_labelled_cuda() -> None:
+    """Mechanically, on the image that cannot produce a CUDA array at all.
+
+    The complement of the refusal test: nothing in a host-only session may report
+    CUDA anywhere -- not in a row's observation, not in the agreement, not in the
+    summary flag. A cross-device agreement in particular must report UNAVAILABLE
+    with the reason rather than defaulting to agreement, because "the arms matched"
+    and "there was only one arm" are the same number of failures otherwise.
+    """
+    observation = _driver().device_observation()
+    assert observation["cuda_executed"] is False
+    for row in observation["executed"]:
+        assert not row["observed"]["device"].startswith("cuda"), row
+        assert not row["artifact"]["device"].startswith(("cuda", "gpu")), row
+    agreement = observation["agreement"]
+    assert agreement["status"] == "unavailable"
+    assert "cpu" in agreement["reason"] and "cuda" not in agreement["reason"]
+    assert "met" not in agreement, (
+        "an unavailable comparison must not carry a verdict; that is how an "
+        "unmeasured claim becomes a passing one"
+    )
 
 
 def test_no_run_claims_a_device_it_did_not_use(runs) -> None:

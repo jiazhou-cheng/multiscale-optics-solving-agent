@@ -41,6 +41,7 @@ from __future__ import annotations
 import importlib.util
 import math
 import sys
+from collections.abc import Mapping
 
 import pytest
 
@@ -49,6 +50,16 @@ from verification.result import NegativeControlOutcome
 from verification.status import VerificationStatus
 
 pytestmark = [pytest.mark.integration, pytest.mark.coupler]
+
+# CHE-140: twenty of the tests below additionally carry `slow`, so the default
+# suite does not run them. They are exactly the ones that read a `B2-W2R-STOCH`
+# run out of `runs` -- identified by measurement, not by section heading, which is
+# why `test_no_round_trip_is_accepted_without_a_failing_twin` is among them and
+# sits under B2-ROUNDTRIP. That family's evidence is a single 61 s body of
+# compute (see `_LazyRuns`); nothing about it was made cheaper or weaker here,
+# and `make test-slow` runs it. What stays per-PR is the twenty-one items that
+# never touch it: the four-conventions gate, the whole R2W route budget, and the
+# round-trip directions with their failing twins.
 
 
 def _driver():
@@ -64,9 +75,51 @@ def _driver():
     return module
 
 
+class _LazyRuns(Mapping):
+    """``run_all()``, except an instance is executed when it is first looked up.
+
+    CHE-140. ``run_all()`` is a comprehension over ``run_instance``, so this is
+    the same mapping -- but eagerly building it made every test in this file pay
+    for every family. Measured per instance: ``B2-W2R-STOCH-01`` is 60.8 s and
+    each of the other twenty-four is under 0.6 s, because the stochastic family
+    computes one shared body of evidence (a six-point convergence ladder to
+    N=80000, an eight-seed unbiasedness ensemble, a five-control battery and a
+    two-spectrum variance study) and the remaining seven STOCH instances read it
+    back out of the driver's own cache.
+
+    So the 60 s was being charged to the twenty-two tests in this file that never
+    touch a STOCH run -- the four-conventions gate, the whole route budget and
+    the whole round-trip family, all of which are the cheap ones. Those keep
+    running per-PR; the nineteen that do need the sweep carry ``slow`` and are
+    selected by ``make test-slow``.
+
+    ``keys()`` deliberately does not execute anything, which is what lets
+    ``test_every_declared_instance_was_executed`` stay a coverage check on the
+    *declaration* rather than a reason to run the sweep.
+    """
+
+    def __init__(self, driver):
+        self._driver = driver
+        self._ids = tuple(driver.declared_instance_ids())
+        self._cache: dict[str, object] = {}
+
+    def __getitem__(self, instance_id: str):
+        if instance_id not in self._ids:
+            raise KeyError(instance_id)
+        if instance_id not in self._cache:
+            self._cache[instance_id] = self._driver.run_instance(instance_id)
+        return self._cache[instance_id]
+
+    def __iter__(self):
+        return iter(self._ids)
+
+    def __len__(self) -> int:
+        return len(self._ids)
+
+
 @pytest.fixture(scope="module")
 def runs():
-    return _driver().run_all()
+    return _LazyRuns(_driver())
 
 
 def _metric(run, name):
@@ -87,6 +140,7 @@ def test_every_declared_instance_was_executed(runs) -> None:
     assert len(runs) == 25, sorted(runs)
 
 
+@pytest.mark.slow
 def test_all_four_families_are_covered(runs) -> None:
     assert {run.family.family_id for run in runs.values()} == {
         "B2-R2W-EXACT",
@@ -312,6 +366,7 @@ def test_the_route_budget_does_not_claim_the_paper_scale_numbers(runs) -> None:
 # --------------------------------------------------------------------------- #
 
 
+@pytest.mark.slow
 def test_the_four_evidence_kinds_are_present_in_order(runs) -> None:
     """And the ORDER is enforced by construction rather than documented.
 
@@ -336,12 +391,14 @@ def test_the_four_evidence_kinds_are_present_in_order(runs) -> None:
     assert detail.index("3 fitted exponent") < detail.index("4 variance advantage")
 
 
+@pytest.mark.slow
 def test_the_exactness_limit_comes_first_and_is_exact(runs) -> None:
     metric = _metric(runs["B2-W2R-STOCH-01"], "enumeration_limit_relative_l2")
     assert metric.met is True
     assert metric.measured.value < 1e-14
 
 
+@pytest.mark.slow
 def test_unbiasedness_is_gated_against_the_measured_standard_error(runs) -> None:
     """Not against a chosen field-space constant.
 
@@ -362,6 +419,7 @@ def test_unbiasedness_is_gated_against_the_measured_standard_error(runs) -> None
     assert stochastic.ensemble_standard_error is not None
 
 
+@pytest.mark.slow
 def test_the_convergence_exponent_is_fitted_over_six_points(runs) -> None:
     convergence = runs["B2-W2R-STOCH-01"].result.convergence
     assert len(convergence.ladder) >= 6
@@ -373,6 +431,7 @@ def test_the_convergence_exponent_is_fitted_over_six_points(runs) -> None:
     assert exponent.uncertainty is not None
 
 
+@pytest.mark.slow
 def test_the_variance_advantage_is_reported_as_a_size(runs) -> None:
     """Not as a pass. Magnitude sampling exploits concentration and is merely
     comparable to uniform without it, and the SIZE of that difference is the
@@ -389,6 +448,7 @@ def test_the_variance_advantage_is_reported_as_a_size(runs) -> None:
     )
 
 
+@pytest.mark.slow
 def test_the_negative_control_battery_is_five_deep(runs) -> None:
     """M2.2 asks for at least five, each with a passing unperturbed arm.
 
@@ -408,6 +468,7 @@ def test_the_negative_control_battery_is_five_deep(runs) -> None:
     assert unperturbed.value < 3.0, f"the control arm is itself biased at {unperturbed.value}"
 
 
+@pytest.mark.slow
 def test_two_controls_needed_their_own_configuration_to_be_observable(runs) -> None:
     """The blind-spot lesson applied to the battery, not an exception to it.
 
@@ -423,6 +484,7 @@ def test_two_controls_needed_their_own_configuration_to_be_observable(runs) -> N
     assert "lambda/3" in (evanescent.mutated.note if evanescent.mutated else "")
 
 
+@pytest.mark.slow
 def test_the_kn_sign_control_is_a_refusal_rather_than_a_number(runs) -> None:
     """The strongest outcome a control can have.
 
@@ -437,6 +499,7 @@ def test_the_kn_sign_control_is_a_refusal_rather_than_a_number(runs) -> None:
     assert "REFUSED" in (control.mutated.note if control.mutated else "")
 
 
+@pytest.mark.slow
 def test_the_three_blind_spots_are_measured(runs) -> None:
     """Each one a number, because the claim is quantitative: THIS configuration
     cannot see THAT term."""
@@ -457,6 +520,7 @@ def test_the_three_blind_spots_are_measured(runs) -> None:
         ),
     ],
 )
+@pytest.mark.slow
 def test_each_blind_spot_states_what_it_makes_unprovable(runs, code: str, phrase: str) -> None:
     detail = next(
         d["detail"] for d in runs["B2-W2R-STOCH-01"].record.diagnostics if d["code"] == code
@@ -469,6 +533,7 @@ def test_each_blind_spot_states_what_it_makes_unprovable(runs, code: str, phrase
                for part in detail.replace(",", " ").split()), detail
 
 
+@pytest.mark.slow
 def test_blind_spot_c_shows_the_weight_becoming_a_pure_scale(runs) -> None:
     """Under uniform sampling p is constant, so omitting 1/p multiplies the field
     by that constant and nothing else -- and after rescaling the two agree to
@@ -487,6 +552,7 @@ def test_blind_spot_c_shows_the_weight_becoming_a_pure_scale(runs) -> None:
     )
 
 
+@pytest.mark.slow
 def test_the_evanescent_power_ledger_is_reported(runs) -> None:
     invariant = next(
         i
@@ -498,6 +564,7 @@ def test_the_evanescent_power_ledger_is_reported(runs) -> None:
     assert "REPORTED rather than absorbed" in metric.measured.note
 
 
+@pytest.mark.slow
 def test_reproducibility_is_labelled_reproducibility(runs) -> None:
     """And is deliberately NOT one of the four evidence kinds.
 
@@ -512,6 +579,7 @@ def test_reproducibility_is_labelled_reproducibility(runs) -> None:
     assert "not evidence of accuracy" in detail
 
 
+@pytest.mark.slow
 def test_the_surrogate_bias_is_measured_and_nothing_is_certified(runs) -> None:
     """``derivative.verified`` stays false, which is the deliverable.
 
@@ -554,6 +622,7 @@ def test_both_round_trip_directions_return_the_input(runs) -> None:
         assert metric.measured.value < 1e-14
 
 
+@pytest.mark.slow
 def test_no_round_trip_is_accepted_without_a_failing_twin(runs) -> None:
     """The schema rule, and the reason for it.
 
@@ -665,6 +734,7 @@ def test_the_phase_reference_invariant_holds_on_the_enumerated_arm(runs) -> None
 # --------------------------------------------------------------------------- #
 
 
+@pytest.mark.slow
 def test_every_reported_number_carries_an_uncertainty_and_a_basis(runs) -> None:
     from verification.result import UncertaintyBasis
 
@@ -681,6 +751,7 @@ def test_every_reported_number_carries_an_uncertainty_and_a_basis(runs) -> None:
                 )
 
 
+@pytest.mark.slow
 def test_every_record_is_keyed_to_its_instance(runs) -> None:
     for instance_id, run in runs.items():
         assert run.record.instance_id == instance_id
@@ -688,6 +759,7 @@ def test_every_record_is_keyed_to_its_instance(runs) -> None:
         assert run.result.provenance.fingerprint_matched
 
 
+@pytest.mark.slow
 def test_the_family_gates_agree_with_what_was_measured(runs) -> None:
     """A gate recorded as MET whose instance measures worse than its tolerance is
     the failure mode a hand-maintained disposition always eventually has.
@@ -717,6 +789,7 @@ def test_the_family_gates_agree_with_what_was_measured(runs) -> None:
         assert [r for r in disposition.evidence if "::" in r], family_id
 
 
+@pytest.mark.slow
 def test_the_declared_stochastic_minimum_seeds_are_actually_used(runs) -> None:
     """One realization is never an accuracy result -- for an instance that samples.
 

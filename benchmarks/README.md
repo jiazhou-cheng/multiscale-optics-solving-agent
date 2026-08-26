@@ -16,8 +16,9 @@ BenchmarkFamily / BenchmarkInstance
   -> fixed evaluation, generated evaluation, agent scoring
 ```
 
-`AGENTS.md`'s "Current Phase" section defines the B0–B4 categories and the four
-separations they enforce. This page says where the files are.
+[`docs/benchmark_design.md`](../docs/benchmark_design.md) defines the B0–B4
+categories, the four separations they enforce, and what a family must declare.
+This page says where the files are.
 
 ## What is here
 
@@ -25,7 +26,7 @@ separations they enforce. This page says where the files are.
 | -- | -- |
 | **Inventory** | [`inventory.yaml`](inventory.yaml) / [`INVENTORY.md`](INVENTORY.md) — every artifact in this tree classified as reusable evidence, candidate canonical case, or retired task layer, with the destination for each. `tests/test_benchmark_inventory.py` fails if a file in the tree is missing from it. |
 | **Manifest** | [`manifest.yaml`](manifest.yaml) — the `characterizations:` block, which records which scientific tasks **cannot** become validation targets and why. The `levels:` block is gone; see the note in the file for where each piece of its content went. |
-| **Protocols** | `protocols/` — frozen contracts holding tolerance derivations and the per-axis Nyquist and reference-plane decisions. They move to `protocols/archive/` only once M1/M2/M4 have expressed their content executably in families. |
+| **Protocols** | `protocols/` — frozen contracts holding tolerance derivations and the per-axis Nyquist and reference-plane decisions. They go only once the families express their content executably: CHE-106 (M1.1) deleted the M1 baseline protocol (`M1-BASELINE-CPU-V1`/`V2`) on exactly that ground, and `inventory.yaml`'s `deleted:` block records where each of its parts went. The M2 and M3 contracts remain. |
 | **Probes** | `probes/` — one-off executable evidence behind card claims, and `probes/records/` the outputs. Records are **provenance, never oracles**; `probes/records/REGISTER.yaml` tracks which are provenance-stamped. |
 | **Performance** | `perf/` — the M0.4 cost harness and its committed baselines, destined for the `B4-COST` family. |
 | **Reports** | `reports/` — the milestone record. Historical, and their numbers stand; where a report names a retired task identifier it is describing what was run at the time. |

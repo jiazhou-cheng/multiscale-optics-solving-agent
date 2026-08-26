@@ -549,8 +549,19 @@ def test_the_b1_families_show_up_in_the_ledger_as_the_states_they_declare() -> N
     # that disagreed with a family would be two sources of truth.
     assert by_metric["efl_relative_error"].gate_status is GateStatus.MET
     assert by_metric["launch_tilt_fraction_recovered"].gate_status is GateStatus.MET
-    assert by_metric["lagrange_invariant_relative_drift"].gate_status is GateStatus.NOT_MET
     assert by_metric["talbot_revival_relative_l2"].gate_status is GateStatus.MET
+    # B1-RAY-LAGRANGE's disposition MOVED, and the projection is what makes that
+    # checkable in one place. It gated on `lagrange_invariant_relative_drift` at
+    # NOT_MET; the oracle was corrected to the differential symplectic invariant,
+    # and the ledger names the new metric because the ledger projects
+    # `gate_disposition.metric` rather than a list somebody maintains. The old
+    # metric is retained on the family as a non-gating characterization, and a
+    # non-gating metric is exactly what must NOT appear here -- otherwise a
+    # threshold nobody is allowed to decide by would read as an open gate.
+    assert (
+        by_metric["symplectic_invariant_relative_residual"].gate_status is GateStatus.MET
+    )
+    assert "lagrange_invariant_relative_drift" not in by_metric
 
 
 def test_an_unmeasured_family_does_not_project_a_tolerance_it_has_not_met() -> None:

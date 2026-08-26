@@ -152,10 +152,10 @@ instances:
     the answer is obvious.
 - instance_id: B1-RAY-LAGRANGE-01
   family_id: B1-RAY-LAGRANGE
-  family_version: 1.0.0
+  family_version: 2.0.0
   tier: required
   split_tag: test_heldout
-  fingerprint: 3cec5f4fa30fc60fcf0541af9b72ad1788d8acb1e2ba870ba2b17ad62e6e15b9
+  fingerprint: b12f4d75e5f7f5e0dcb548af546b69f4f5c7cddf0627992a1ac034d88e976382
   validity_status: inside
   expected_status: ok
   justification: three surfaces rather than one, because a conservation law through a single

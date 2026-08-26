@@ -192,6 +192,12 @@ def test_end_to_end_a_breach_terminates_the_session_with_a_nonzero_exit(
             "--swap-guard-kib=-1",
             "-p",
             "no:cacheprovider",
+            # CHE-140: `-n 0` because addopts now shards by default and this
+            # plugin refuses to run sharded (see pytest_configure). Without it the
+            # subprocess inherits `-n 12` and the assertions below fail on the
+            # refusal rather than on the escalation path they are about.
+            "-n",
+            "0",
             "-k",
             "not end_to_end",
             str(target),
@@ -222,3 +228,45 @@ def test_end_to_end_a_breach_terminates_the_session_with_a_nonzero_exit(
     # guard fires on the first boundary check, so nothing should have finished.
     assert breach["completed_tests_before_breach"] == 0
     assert "passed" not in result.stdout.splitlines()[-1]
+
+
+def test_the_guard_refuses_a_sharded_session_rather_than_degrading_in_one(
+    tmp_path: Path,
+) -> None:
+    """CHE-140. The escalation path is `os.kill(os.getpid(), SIGINT)`, which under
+    pytest-xdist kills the worker instead of failing the session -- the guard
+    trips, one worker goes down, and the run reports "worker crashed" with no
+    banner and no diagnosis. A resource stop-condition that reports a confusing
+    unrelated failure is worse than one that refuses to start.
+
+    `addopts` carries `-n 12` since CHE-140, so this is reachable by forgetting a
+    flag rather than by trying.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "scripts.pytest_resource_profile",
+            f"--resource-profile={tmp_path / 'profile.json'}",
+            "--swap-guard",
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "2",
+            "--co",
+            str(ROOT / "tests" / "test_resource_profile_guard.py"),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    assert result.returncode != 0, "a sharded profiling run must not be allowed to start"
+    combined = result.stdout + result.stderr
+    assert "cannot run under pytest-xdist" in combined, combined[-2000:]
+    # The remedy has to be in the message: the operator hitting this did not
+    # choose `-n`, addopts did.
+    assert "-n 0" in combined, combined[-2000:]

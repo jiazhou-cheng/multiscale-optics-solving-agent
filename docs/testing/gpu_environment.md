@@ -37,11 +37,34 @@ GPU image.
 ## Usage
 
 ```bash
-./run.sh --gpu --rebuild pytest -q -m gpu          # first time (builds the image)
-./run.sh --gpu pytest -q -m gpu                    # subsequently
-MOA_GPUS=device=3 ./run.sh --gpu python probe.py   # choose a device
-MOA_GPUS=device=0,1 ./run.sh --gpu pytest -q -m gpu
+./run.sh --gpu --rebuild pytest -q -o addopts="-ra" -m gpu   # first time (builds the image)
+MOA_GPUS=device=6 make test-gpu                             # subsequently
+MOA_GPUS=device=3 ./run.sh --gpu python probe.py            # choose a device
 ```
+
+### The GPU suite must not be sharded (CHE-140 / CHE-107)
+
+`make test-gpu` is `./run.sh --gpu pytest -q -o addopts="-ra" -m gpu`, and the
+`-o addopts=` is load-bearing. CHE-140 put `-n 12 --dist loadfile` in
+`pyproject.toml`'s `addopts`, which is right for the CPU gate and wrong here for
+two independent reasons:
+
+* **One device, twelve processes.** Each xdist worker imports jax and opens its
+  own CUDA context, and JAX preallocates a large fraction of device memory per
+  process. The second worker OOMs on a GPU the first is holding. AGENTS.md's
+  shared-server policy already settles this — one workload per GPU, stability
+  ahead of throughput — so this is not a tuning choice. It is the same class of
+  defect CHE-140 found in the swap guard, which tripped inside a worker and
+  reported `worker 'gw0' crashed` instead of its diagnosis.
+* **The plugin is not in this image.** `pytest-xdist==3.8.0` is pinned in
+  `docker/requirements.txt`, but the built `agent_solver_gpu` predates that pin,
+  so `-n` is an *unrecognized argument* there rather than a slow default: a bare
+  `./run.sh --gpu pytest -q -m gpu` exits 4 before collecting anything. Replacing
+  `addopts` fixes both cases at once, and keeps working either way after the next
+  `--rebuild`.
+
+Measured 2026-08-26 with `MOA_GPUS=device=6`: **66 passed, 2555 deselected,
+75.0 s.**
 
 `MOA_GPUS` defaults to `device=0`. Per the GPU server resource policy in
 `AGENTS.md`, `run.sh` **rejects** `MOA_GPUS=all` and any selection naming more

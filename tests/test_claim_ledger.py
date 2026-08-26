@@ -102,7 +102,27 @@ def collected_node_ids() -> frozenset[str]:
     order is not a citation anyone can follow.
     """
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "--collect-only", "-q", "--no-header", "tests"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "--no-header",
+            # CHE-140: this subprocess must not inherit the default *selection*.
+            # `addopts` now carries `-m "not slow"`, and with it inherited the
+            # question this fixture asks silently changed from "can pytest find
+            # this node" to "is this node in the default run" -- so eleven
+            # perfectly valid ledger citations, all of them to tests that carry
+            # `slow`, were reported as uncollectible. An empty `-m` clears the
+            # expression; `-n 0` turns the sharding off, since a collect-only run
+            # has nothing to parallelize and xdist changes how the ids print.
+            "-m",
+            "",
+            "-n",
+            "0",
+            "tests",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,

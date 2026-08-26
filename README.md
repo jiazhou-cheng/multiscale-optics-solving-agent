@@ -113,6 +113,8 @@ loudly instead of silently serving someone else's.
 | -- | -- |
 | What are the rules for working here? | `AGENTS.md` — the single canonical instruction source |
 | How do the layers fit together? | `docs/architecture/solver_layering.md` |
+| When does a change need a scientific oracle? | `docs/scientific_verification.md` |
+| How is a benchmark family designed? | `docs/benchmark_design.md` |
 | Why is dtype not the same as precision? | `docs/precision/precision_device_policy.md` |
 | How do I use Optiland / Chromatix correctly? | `knowledge/solvers/<name>/` |
 | What does a coupler assume? | `knowledge/couplers/<name>/` |

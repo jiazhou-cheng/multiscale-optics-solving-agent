@@ -442,5 +442,30 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    if config.getoption("resource_profile") or config.getoption("swap_guard"):
-        config.pluginmanager.register(ResourceProfiler(config), "che64-resource-profiler")
+    if not (config.getoption("resource_profile") or config.getoption("swap_guard")):
+        return
+
+    # CHE-140: refuse a sharded run rather than degrade in it.
+    #
+    # Both halves of this plugin assume one process owns the session. The profile
+    # is per-process, so under `-n` it measures a worker and attributes a fraction
+    # of the run; worse, escalation is `os.kill(os.getpid(), SIGINT)`, which in a
+    # worker kills the *worker*. Measured: the guard tripped, gw0 went down, and
+    # the run reported "worker crashed while running ..." with no SWAP GUARD
+    # TRIPPED banner and no operator-facing diagnosis -- exactly the silent
+    # degradation AGENTS.md forbids for a resource stop-condition.
+    #
+    # This is reachable by accident now that addopts carries `-n 12`, so it is a
+    # usage error rather than a warning. `-n 0` is the fix and is what the
+    # substantial runs this plugin exists for should be using anyway.
+    if getattr(config, "workerinput", None) is None and (
+        config.getoption("numprocesses", None) or getattr(config.option, "dist", "no") != "no"
+    ):
+        raise pytest.UsageError(
+            "--resource-profile/--swap-guard cannot run under pytest-xdist: the "
+            "profile would describe one worker, and the swap guard's SIGINT "
+            "escalation would kill that worker instead of failing the session. "
+            "Re-run with `-n 0`."
+        )
+
+    config.pluginmanager.register(ResourceProfiler(config), "che64-resource-profiler")

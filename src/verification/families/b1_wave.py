@@ -1183,10 +1183,16 @@ _B1_WAVE_TALBOT = BenchmarkFamily(
             ),
             NumericalParameter(
                 "samples_per_period",
-                "sampling of one period",
+                "sampling of one period. Deliberately NOT declared as a refinement "
+                "direction, and the sign of that is this family's main finding: the "
+                "grid admits diffraction orders up to m_max = samples_per_period / 2, "
+                "and order m dephases from the paraxial revival by "
+                "(pi/2) m^4 (lambda/d)^2, so raising this DEGRADES the metric as its "
+                "fourth power. 8 samples -> m_max 4 -> 2.2e-4; 32 samples -> m_max 16 "
+                "-> 2.4e-1. The default is the measured-good value, because an "
+                "instance that omits this parameter inherits it",
                 domain=(4, 256),
-                default=32,
-                refines_toward=1,
+                default=8,
             ),
         ),
         validity=(
@@ -1247,19 +1253,46 @@ _B1_WAVE_TALBOT = BenchmarkFamily(
                 metric="talbot_revival_relative_l2",
                 threshold=5e-3,
                 basis=(
-                    "the revival is exact for an infinite periodic field; the admissible "
-                    "residual is the finite-window truncation plus the complex64 floor. "
-                    "At 32 periods the truncation is the larger of the two and scales as "
-                    "1/N_periods, so 5e-3 is roughly an order above the expected 1.5e-3 "
-                    "and is a bound to be measured against rather than a fitted value"
+                    "DOMINANT TERM, non-paraxial order dephasing. The revival at "
+                    "z_T = 2 d^2 / lambda is a PARAXIAL result and Chromatix's angular "
+                    "spectrum is not paraxial, so the leading admissible residual is "
+                    "that difference and nothing else here is close to it. Order m of "
+                    "the grating propagates with k_z = k sqrt(1 - (m lambda / d)^2); "
+                    "the first term the paraxial expansion drops contributes "
+                    "(1/8) k z (m lambda / d)^4, which at z = z_T is "
+                    "delta_phi_m = (pi/2) m^4 (lambda/d)^2 -- independent of z, and set "
+                    "entirely by the highest order the grid admits, "
+                    "m_max = samples_per_period / 2. At d = 32 um and 8 samples per "
+                    "period m_max = 4 (0.111 rad); at 50% duty only odd orders carry "
+                    "amplitude, so m = 3 dominates at 0.0352 rad. Because the grating "
+                    "is real and even and delta_phi_m is even in m, the first-order "
+                    "intensity perturbation cancels and the INTENSITY L2 goes as the "
+                    "SQUARE of the amplitude-weighted dephasing -- which is why 0.035 "
+                    "rad of order-3 phase error reads 2.0e-4 here and 9.1e-3 on the "
+                    "field metric. 5e-3 is a bound set 23x above that predicted "
+                    "2.0e-4, not a fitted value. "
+                    "SECONDARY, both far below it: the complex64 floor, which is the "
+                    "1.9e-5 gap between the float64 exact-ASM prediction (1.99e-4) and "
+                    "the measured complex64 run (2.18e-4); and finite-window "
+                    "truncation, which is DESIGNED OUT rather than budgeted -- the "
+                    "window holds an exact integer number of periods and each period an "
+                    "exact integer number of samples, and the same grating through a "
+                    "paraxial kernel on the same grid returns 3e-24. An earlier version "
+                    "of this basis named truncation as the larger of the two "
+                    "contributions; it is not a contribution at all"
                 ),
                 basis_kind=ToleranceBasis.ANALYTIC_DERIVATION,
                 may_gate=True,
                 rejects=(
                     "a frequency-grid scale error, which moves the revival distance by "
                     "the square of the scale factor and produces a field with no "
-                    "resemblance to the input at the nominal z_T; and z_T/2, the "
-                    "half-Talbot shifted image, which is anticorrelated with the input"
+                    "resemblance to the input at the nominal z_T; z_T/2, the "
+                    "half-Talbot shifted image, which is anticorrelated with the input; "
+                    "and the d = 8 um / 32 samples-per-period configuration this family "
+                    "was first written with, which admits m = 16 at 455 rad and "
+                    "measures 2.4e-1 -- a configuration in which no correct propagator "
+                    "could pass, which is why the configuration moved and the threshold "
+                    "did not"
                 ),
             ),
         ),
@@ -1312,11 +1345,25 @@ _B1_WAVE_TALBOT = BenchmarkFamily(
                 "samples per period m_max is 4, the dephasing is 0.111 rad, and the "
                 "residual is 2.2e-4. The tolerance did not move; the configuration in "
                 "which the claim is true was found.\n\n"
-                "The tolerance's basis names finite-window truncation and the complex64 "
-                "floor and does NOT name the order dephasing, which is the term that "
-                "actually dominates. Completing that derivation is follow-up work; the "
-                "threshold is unaffected because the measured residual is an order below "
-                "it either way.\n\n"
+                "The tolerance basis now leads with that dephasing, which is the term "
+                "that dominates, and the decomposition is executable rather than "
+                "asserted: the driver runs the same grating through a float64 EXACT-ASM "
+                "kernel and a float64 PARAXIAL kernel on the same grid and records both "
+                "(NON_PARAXIAL_DEPHASING_BUDGET). The paraxial arm returns 3e-24, so "
+                "finite-window truncation is not a contribution to budget -- it is "
+                "designed out by the exact-integer periodicity -- and the earlier basis, "
+                "which called truncation the larger of the two terms, was wrong about "
+                "which physics sets the floor. The exact arm returns 1.99e-4 against the "
+                "2.18e-4 measured through the shipping complex64 path, which leaves the "
+                "complex64 floor as a 1.9e-5 secondary term. The threshold did not move "
+                "and is not affected: 5e-3 sits 23x above the predicted residual either "
+                "way.\n\n"
+                "One consequence is recorded on the parameter rather than only here: "
+                "samples_per_period is NOT a refinement direction for this family. "
+                "Raising it admits higher orders and degrades the metric as its fourth "
+                "power, so declaring refines_toward=+1 on it -- as this family "
+                "originally did -- would have been a false statement about which way "
+                "the answer converges. periods_across_grid remains the genuine one.\n\n"
                 "The half-Talbot control is the right control for a revival claim and "
                 "not merely a convenient one: at z_T/2 the pattern revives SHIFTED by "
                 "half a period, so it looks exactly as much like a grating as the "

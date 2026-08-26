@@ -267,3 +267,127 @@ def test_the_tutorial_suite_is_selectable_as_a_whole() -> None:
             f"(found {sorted(markers)}), so `-m tutorial` would miss its "
             "non-parametrized tests"
         )
+
+
+# --------------------------------------------------------------------------- #
+# CHE-140: the fourth boundary -- what the default *selection* excludes
+# --------------------------------------------------------------------------- #
+#
+# The three boundaries above are about directories. This one is about `addopts`,
+# and it drifts the same way for a worse reason: the failure is invisible in both
+# directions. Drop `-m "not slow"` and the PR gate silently goes back to six
+# minutes; drop the `slow` marker off a test and 60 s of convergence sweep
+# silently rejoins every run. Neither announces itself, and both were the actual
+# state of this repository before CHE-140 -- `slow` was declared, documented and
+# applied to 19 tests, and then selected anyway.
+
+
+def test_the_default_selection_excludes_the_slow_marker(pytest_config: dict[str, Any]) -> None:
+    """The deselection is the single largest thing keeping the gate under a minute.
+
+    Measured (CHE-140): 151 s of the 375 s baseline was tests already carrying
+    `slow`, plus 61 s more once the B2 stochastic transitions were marked. What
+    `slow` means here is "expensive numerical characterization or convergence
+    measurement", not "less important" -- see `test_the_slow_suite_has_a_command`.
+    """
+    addopts = pytest_config["addopts"]
+    assert "not slow" in addopts, (
+        "addopts no longer deselects `slow`. That marker is declared in this same "
+        "file and applied to ~39 tests; without the deselection it is decoration "
+        "and the default suite is back to ~6 minutes. If slow tests must run by "
+        "default, delete the marker rather than leaving it selected -- a marker "
+        "that filters nothing is worse than none."
+    )
+
+
+def test_the_default_selection_shards_by_file_and_not_finer(
+    pytest_config: dict[str, Any],
+) -> None:
+    """`--dist loadfile` is a correctness requirement, not a tuning choice.
+
+    About forty files in this suite use a module-scoped fixture that executes a
+    benchmark driver or builds a solver system once for the whole file. pytest-xdist
+    scopes fixtures per worker, so under a finer distribution two tests from one
+    file can land on two workers and each re-runs that fixture. For
+    `tests/test_b2_transition_instances.py` that fixture is a 61 s stochastic
+    sweep, so the finer mode is both slower and a silent multiplication of real
+    solver compute.
+    """
+    addopts = pytest_config["addopts"]
+    assert "-n" in addopts.split(), (
+        "addopts no longer shards the suite. Serial, this suite is ~165 s; the "
+        "sharding is what puts it under a minute."
+    )
+    assert "--dist loadfile" in addopts, (
+        "addopts must pin `--dist loadfile`. xdist's default distribution splits "
+        "per test, which re-runs every module-scoped fixture on every worker that "
+        "receives one of that file's tests -- including the 61 s B2 stochastic "
+        "sweep. Use `-n 0` to run serially instead."
+    )
+
+
+def test_the_slow_suite_has_a_command(pytest_config: dict[str, Any]) -> None:
+    """Nothing is allowed to leave the default suite without a way back in.
+
+    A deselected test with no documented command is a deleted test that still
+    shows up in the file count, which is the worst of both. `slow` covers the
+    coupler gradient-bias characterization, the Monte-Carlo convergence fits and
+    the B2 stochastic-transition benchmark -- all of them exit gates for the
+    couplers, none of them per-PR.
+    """
+    makefile = (ROOT / "Makefile").read_text()
+    assert "test-slow:" in makefile, (
+        "`make test-slow` is gone. It is the only way the ~39 slow tests get run "
+        "at all now that addopts deselects them."
+    )
+    assert '-m "slow"' in makefile or "-m slow" in makefile, (
+        "`make test-slow` no longer selects by the marker, so it and addopts can "
+        "disagree about what the slow suite is"
+    )
+
+
+def test_the_gpu_suite_has_a_command_and_is_not_sharded(pytest_config: dict[str, Any]) -> None:
+    """`addopts` reaches invocations the CPU gate never sees, and the GPU is one.
+
+    CHE-107 found this: `-n 12 --dist loadfile` is right for the default gate and
+    wrong on a host with one device, where twelve workers each open their own CUDA
+    context and JAX preallocates a large fraction of device memory per process.
+    AGENTS.md's shared-server policy settles it -- one workload per GPU -- so this
+    is a correctness and resource-safety constraint, not tuning. It is the same
+    shape as the swap-guard finding: a resource mechanism degrading silently
+    because a default reached it.
+
+    So `make test-gpu` must exist, must select the marker, and must NOT inherit
+    the sharding. Asserted on the Makefile rather than on a run, because the run
+    needs hardware and this boundary drifts on a laptop.
+    """
+    makefile = (ROOT / "Makefile").read_text()
+    assert "test-gpu:" in makefile, (
+        "`make test-gpu` is gone. A bare `./run.sh --gpu pytest -q -m gpu` "
+        "inherits addopts and is not a correct GPU invocation."
+    )
+    recipe = next(
+        line for line in makefile.splitlines() if "pytest" in line and "--gpu" in line
+    )
+    assert "-m gpu" in recipe or '-m "gpu"' in recipe, recipe
+    assert "-o addopts=" in recipe, (
+        f"the GPU recipe does not override addopts, so it inherits the sharding "
+        f"the default gate needs and one device cannot survive: {recipe}"
+    )
+    assert "-n 12" not in recipe and "--dist" not in recipe, recipe
+    assert "gpu" in {entry.split(":", 1)[0] for entry in pytest_config["markers"]}, (
+        "the `gpu` marker lost its declaration, so `-m gpu` would match nothing "
+        "and the GPU suite would report a clean pass having run none of it"
+    )
+
+
+def test_the_slow_marker_is_still_declared(pytest_config: dict[str, Any]) -> None:
+    """`--strict-markers` is not set, so an unregistered marker silently matches
+    nothing -- and `-m "not slow"` would then select everything while looking
+    correct."""
+    declared = {entry.split(":", 1)[0] for entry in pytest_config["markers"]}
+    assert "slow" in declared, (
+        "the `slow` marker lost its declaration. addopts filters on it, and an "
+        "undeclared marker name is not an error here -- it just quietly stops "
+        "matching, which would put the whole slow suite back into every run."
+    )

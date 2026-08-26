@@ -9,7 +9,7 @@
       }
     ],
     "observed_parameters": {
-      "wave.output_dir": "/tmp/b1-wave-rwbgwwtr",
+      "wave.output_dir": "/tmp/b1-wave-gs_vx3vl",
       "wave.pad_width": 0,
       "wave.propagation": "angular_spectrum",
       "wave.propagation_method": "asm_propagate",
@@ -36,7 +36,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "32abf6a1eb329ca64db5d256da50c037b10cb6e0a58fc2d9b04073e9a0befa38",
+      "combined_sha256": "177c20b383060f2114a156fd3e8dcba01103a2778cb5fb8c16155eb059b51d3a",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -84,12 +84,12 @@
         "src/solvers/registry.py": "38e22edc91cfc775f1f3b25ee6b13a787a6b4e28988acaec6f2029adb7208088",
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
-        "src/verification/claim_ledger.py": "a4e656ed2fc52982d2016cbf3154b91adc466c321b87a85aa88c408c374fc28e",
+        "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
         "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
         "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
         "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "d9959ae2e34cd293b398a2081ace8ebf63274bcebdd1e1a99a30edfaf3a95c3a",
-        "src/verification/families/b1_wave.py": "900d1997af63aaaa2e734f23a144c3a96a578366a06582d5d7c0c178421dcd7b",
+        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
+        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
         "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
         "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
         "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
@@ -121,8 +121,8 @@
     },
     "probe": "instances/b1_wave",
     "schema_version": 2,
-    "source_commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
-    "timestamp_utc": "2026-08-25T23:02:00.730037+00:00",
+    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
+    "timestamp_utc": "2026-08-26T06:20:46.813809+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -234,18 +234,18 @@
         "scipy": "1.15.3",
         "torch": "2.13.0+cpu"
       },
-      "run_id": "run-2900b56e3781",
+      "run_id": "run-afd8c57f4ca7",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": {
       "device": "cpu",
       "estimate": null,
-      "peak_memory_bytes": 782499840,
-      "solver_seconds": 0.11006118901423179,
-      "wall_seconds": 0.1481847710092552
+      "peak_memory_bytes": 838066176,
+      "solver_seconds": 0.0989818149828352,
+      "wall_seconds": 0.13801256401347928
     },
-    "run_id": "run-2900b56e3781",
+    "run_id": "run-afd8c57f4ca7",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

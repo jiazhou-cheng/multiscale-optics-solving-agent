@@ -101,7 +101,10 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 f"gpu tests need a dedicated session; {other_items} non-gpu test(s) are "
                 "also selected. On the GPU image every test in the process computes on "
                 "the GPU, and the non-gpu tolerances were derived on the CPU. "
-                "Run: `./run.sh --gpu pytest -q -m gpu`"
+                "Run: `MOA_GPUS=device=6 make test-gpu`. Not a bare "
+                "`./run.sh --gpu pytest -q -m gpu`: since CHE-140 that inherits "
+                "`-n 12 --dist loadfile` from addopts, and twelve workers on one "
+                "device is a resource-policy violation before it is a test failure."
             )
         )
         for item in gpu_items:

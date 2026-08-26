@@ -1,43 +1,32 @@
 {
-  "execution": {
-    "nodes": [
-      {
-        "component": "M_WAVE_CHROMATIX",
-        "node_id": "wave",
-        "outcome": "executed",
-        "refusal": null
-      }
-    ],
-    "observed_parameters": {
-      "wave.output_dir": "/tmp/b1-wave-6y_nw0g6",
-      "wave.pad_width": 0,
-      "wave.propagation": "angular_spectrum",
-      "wave.propagation_method": "asm_propagate",
-      "wave.refractive_index": 1.0,
-      "wave.z_m": 0.0001
-    },
-    "seeds": [],
-    "status": "succeeded"
+  "agreement": {
+    "identical": false,
+    "measured": 3.3005489967763424e-05,
+    "met": true,
+    "metric": "cpu_vs_cuda_relative_l2_field",
+    "status": "measured",
+    "threshold": 0.0001407921158993958,
+    "threshold_basis": "one float32 epsilon per radian of accumulated phase, eps32 * 2*pi*z/lambda = 1.408e-04 over 1181.0 rad. Chromatix is complex64 on both devices, so this bounds a reassociated FFT reduction and not a precision change"
   },
-  "expected": {
-    "radius_um": 6.039084,
-    "why": "w0 sqrt(1 + (z/zR)^2) is exact for a paraxial Gaussian, and the second moment of the propagated intensity is the estimator. The 2e-2 tolerance rejects the UNPROPAGATED waist, 5.0 um, which is 17% low and is what a run that propagated zero distance returns."
+  "environment": {
+    "cuda_executed": true,
+    "cuda_unavailable_reason": null,
+    "jax": {
+      "available": true,
+      "default_backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "gpu_unavailable_reason": null,
+      "version": "0.6.2"
+    }
   },
-  "family_id": "B1-WAVE-GAUSS",
-  "family_version": "1.0.0",
-  "instance_fingerprint": "51f72c6eaa3616bb2dd227c63c855ae3cf933147f3b7d3c716f22fdfabe323f5",
-  "instance_id": "B1-WAVE-GAUSS-01",
-  "parameters": {
-    "device": "cpu",
-    "distance_um": 100.0,
-    "grid_n": 1024,
-    "sample_pitch_um": 0.25,
-    "waist_um": 5.0,
-    "wavelength_um": 0.532
-  },
+  "measurement_method": "one B1-WAVE-GAUSS-01 propagation per requested device through GraphExecutor; placement taken from artifact.metadata['execution']['actual'], which propagation.py fills from core.arrays.array_state(field_out.u) before jax.device_get. The persisted .npy placement is recorded alongside as a contrast, not as the observation. Cross-device agreement is differenced on the output fields against one float32 epsilon per radian of accumulated phase.",
+  "probe": "instances/b1_wave::write_device_observation_record",
+  "question": "when the Chromatix graph node is asked for a device, is the device it reports read off the array it produced?",
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "177c20b383060f2114a156fd3e8dcba01103a2778cb5fb8c16155eb059b51d3a",
+      "combined_sha256": "0400874ab44e480aea551e8fcafbccc83f178245ea3e02a59dff64cba08a9fcb",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -99,7 +88,6 @@
         "src/verification/families/schema.py": "3d4e5871edb646df6243bffa4add9989b9e0e2a9bf8701b2e07e908c8a462e71",
         "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
         "src/verification/metrics.py": "f75fec1d1cd8b8287f6da6e6bf56838b69604b05511e5567dad851118e575f1b",
-        "src/verification/psf_oracles.py": "56a98b8d894554c6e80ab2638dced1f30aff9598a509d0c299fc8fbee5482629",
         "src/verification/refusals.py": "a05366d0549470b6d02424ac110149ba7a69f9bcdb85eb53b1dd5b02e0f72d46",
         "src/verification/result.py": "2a41d860f9d4bd4dea16e2c3552d2b47bf44fd040a05aadf42fbcc14519d178a",
         "src/verification/status.py": "2cc3bc5c1bd6ae75a6941ecff169955f4bc1f958280ac0be0b4a3bbaf9051c2c",
@@ -108,7 +96,7 @@
     },
     "data_fingerprint": {},
     "environment_fingerprint": {
-      "combined_sha256": "54118fbb8522613f91b8543412783ee46054fa0c904f95ba448e86880b41e12c",
+      "combined_sha256": "4e4d1486b1525368f6a65370de5cfdb8ad5e859b954999e88255c671a024fade",
       "packages": {
         "chromatix": "0.6.0",
         "jax": "0.6.2",
@@ -116,144 +104,98 @@
         "numpy": "2.2.6",
         "optiland": "0.6.0",
         "scipy": "1.15.3",
-        "torch": "2.13.0+cpu"
+        "torch": "2.13.0+cu126"
       },
       "python_version": "3.12.14"
     },
-    "probe": "instances/b1_wave",
+    "probe": "instances/b1_wave::write_device_observation_record",
     "schema_version": 2,
     "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
-    "timestamp_utc": "2026-08-26T06:20:44.481349+00:00",
+    "timestamp_utc": "2026-08-26T06:30:44.602577+00:00",
     "working_tree_dirty": true
   },
-  "runner_version": "1.0.0",
-  "scientific_fingerprint": "572437acec75f31fe505cefcdcaf104efc665d761dc257be3e469567b80ef1ca",
-  "verification": {
-    "category": "B1",
-    "contract_status": {
-      "capability_intersection_empty": false,
-      "codes": [],
-      "refusal_detail": null,
-      "refusal_kind": null,
-      "silent_hazard_ids": []
-    },
-    "convergence": {
-      "converged": null,
-      "dimension": null,
-      "expected_exponent": null,
-      "fitted_exponent": null,
-      "ladder": [],
-      "note": "",
-      "values": []
-    },
-    "device_precision_observation": null,
-    "diagnostics": [
-      {
-        "code": "convergence_not_established",
-        "detail": "the family declares a refinement dimension and this run carries no ladder, so the value is a single point rather than a converged one",
-        "subject": null
-      }
-    ],
-    "family_id": "B1-WAVE-GAUSS",
-    "family_version": "1.0.0",
-    "instance_id": "B1-WAVE-GAUSS-01",
-    "invariant_results": [],
-    "negative_control_results": [
-      {
-        "baseline": {
-          "note": "second-moment 1/e^2 radius 6.040183 um against w0 sqrt(1 + (z/zR)^2) = 6.039084 um. The error bar is the same estimator's bias on the ANALYTIC field over the same grid, 2.805e-16, so the truncation of the Gaussian's tails is visible rather than assumed away.",
-          "uncertainty": 2.805170466280415e-16,
-          "uncertainty_basis": "oracle_error_bound",
-          "unit": null,
-          "value": 0.00018207172683882663
-        },
-        "control_id": "unpropagated-waist",
-        "mutated": {
-          "note": "w0 reported in place of w(z): what a zero-distance run returns",
-          "uncertainty": 2.805170466280415e-16,
-          "uncertainty_basis": "oracle_error_bound",
-          "unit": null,
-          "value": 0.1720598132063471
-        },
-        "note": "the unpropagated waist is 17% low and is the wrong answer this rejects. baseline 0.000182072 -> mutated 0.17206 against a gate of 0.02; detection margin 945.011x",
-        "outcome": "fired",
-        "target_metric": "gaussian_radius_relative_error"
-      }
-    ],
-    "physics_accuracy": [
-      {
-        "blind_to": [
-          "beam quality: a beam that has grown wings while keeping its second moment passes",
-          "the transverse position of the beam -- a radius says nothing about where the beam is, which is what B1-WAVE-TILT is for"
-        ],
-        "measured": {
-          "note": "second-moment 1/e^2 radius 6.040183 um against w0 sqrt(1 + (z/zR)^2) = 6.039084 um. The error bar is the same estimator's bias on the ANALYTIC field over the same grid, 2.805e-16, so the truncation of the Gaussian's tails is visible rather than assumed away.",
-          "uncertainty": 2.805170466280415e-16,
-          "uncertainty_basis": "oracle_error_bound",
-          "unit": null,
-          "value": 0.00018207172683882663
-        },
-        "met": true,
-        "metric": "gaussian_radius_relative_error",
-        "oracle": "analytic_closed_form",
-        "oracle_independence": "independent",
-        "tolerance": 0.02,
-        "tolerance_basis": "the pinned solver's second moment gives 6.040167 um against 6.039084 analytic (1.8e-4 relative) for w0 = 5 um, z = 100 um, lambda = 0.532 um",
-        "tolerance_may_gate": true
-      }
-    ],
-    "provenance": {
-      "family_version": "1.0.0",
-      "fingerprint_matched": true,
-      "instance_fingerprint": "51f72c6eaa3616bb2dd227c63c855ae3cf933147f3b7d3c716f22fdfabe323f5",
-      "package_versions": {
-        "chromatix": "0.6.0",
-        "jax": "0.6.2",
-        "jaxlib": "0.6.2",
-        "numpy": "2.2.6",
-        "optiland": "0.6.0",
-        "scipy": "1.15.3",
-        "torch": "2.13.0+cpu"
+  "rows": [
+    {
+      "artifact": {
+        "device": "cpu",
+        "dtype": "complex64",
+        "framework": "jax"
       },
-      "run_id": "run-8662332430cc",
-      "source_commit": null,
-      "verifier_version": "1.0.0"
+      "device_mismatch": false,
+      "honoured": true,
+      "jax_default_backend": "gpu",
+      "observation_source": "artifact.metadata['execution']['actual'], which propagation.py fills from core.arrays.array_state(field_out.u) before jax.device_get -- not the request, not JAX_PLATFORMS, not jax.default_backend()",
+      "observed": {
+        "device": "cpu",
+        "dtype": "complex64",
+        "namespace": "jax"
+      },
+      "outcome": "executed",
+      "persisted": {
+        "device": "cpu",
+        "dtype": "complex64",
+        "namespace": "numpy"
+      },
+      "requested_device": "cpu",
+      "requested_in_metadata": {
+        "bridge_policy": "safe",
+        "component": "M_WAVE_CHROMATIX",
+        "device": "cpu",
+        "namespace": null,
+        "precision": "fp32"
+      },
+      "resolved": {
+        "bridge_policy": "safe",
+        "component": "M_WAVE_CHROMATIX",
+        "compute_dtypes": [
+          "complex64"
+        ],
+        "device": "cpu",
+        "evidence": "chromatix 0.6.0 @ d24bdf0 ScalarField.__init__ is `jnp.asarray(u, dtype=jnp.complex64)`; Field.build(complex128 array) returns complex64 even under jax_enable_x64=True, and asm_propagate returns complex64 on cuda:0 (benchmarks/probes/precision/chromatix_capability.py, agent_solver_gpu, jax 0.6.2 backend gpu)",
+        "namespace": "jax",
+        "precision": "fp32"
+      }
     },
-    "resource_cost": {
-      "device": "cpu",
-      "estimate": null,
-      "peak_memory_bytes": 475353088,
-      "solver_seconds": 2.5886870070244186,
-      "wall_seconds": 2.6993746230145916
-    },
-    "run_id": "run-8662332430cc",
-    "status": "ok",
-    "stochastic_evidence": {
-      "ensemble_mean": null,
-      "ensemble_standard_error": null,
-      "exactness_limit": null,
-      "fitted_convergence_rate": null,
-      "seeds": [],
-      "trials": 0,
-      "unbiasedness": null,
-      "variance_by_sampling_density": {}
-    },
-    "validity": {
-      "declared": "inside",
-      "drifted_parameters": {},
-      "margins": [
-        {
-          "basis": "asm_sampling",
-          "blind_to": [
-            "the evanescent cut -- this bounds aliasing of the propagating band and says nothing about power lost past the light cone",
-            "the aperture's own bandwidth, which can alias before the kernel does"
-          ],
-          "margin": 0.16875,
-          "predicate_id": "ASM_TF_SAMPLING",
-          "state": "inside"
-        }
-      ],
-      "observed": "inside"
+    {
+      "artifact": {
+        "device": "gpu",
+        "dtype": "complex64",
+        "framework": "jax"
+      },
+      "device_mismatch": false,
+      "honoured": true,
+      "jax_default_backend": "gpu",
+      "observation_source": "artifact.metadata['execution']['actual'], which propagation.py fills from core.arrays.array_state(field_out.u) before jax.device_get -- not the request, not JAX_PLATFORMS, not jax.default_backend()",
+      "observed": {
+        "device": "cuda:0",
+        "dtype": "complex64",
+        "namespace": "jax"
+      },
+      "outcome": "executed",
+      "persisted": {
+        "device": "cpu",
+        "dtype": "complex64",
+        "namespace": "numpy"
+      },
+      "requested_device": "cuda",
+      "requested_in_metadata": {
+        "bridge_policy": "safe",
+        "component": "M_WAVE_CHROMATIX",
+        "device": "cuda",
+        "namespace": null,
+        "precision": "fp32"
+      },
+      "resolved": {
+        "bridge_policy": "safe",
+        "component": "M_WAVE_CHROMATIX",
+        "compute_dtypes": [
+          "complex64"
+        ],
+        "device": "cuda",
+        "evidence": "chromatix 0.6.0 @ d24bdf0 ScalarField.__init__ is `jnp.asarray(u, dtype=jnp.complex64)`; Field.build(complex128 array) returns complex64 even under jax_enable_x64=True, and asm_propagate returns complex64 on cuda:0 (benchmarks/probes/precision/chromatix_capability.py, agent_solver_gpu, jax 0.6.2 backend gpu)",
+        "namespace": "jax",
+        "precision": "fp32"
+      }
     }
-  }
+  ]
 }

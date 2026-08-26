@@ -39,8 +39,10 @@ Run it::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -72,7 +74,13 @@ from verification.metrics import relative_l2_field, relative_l2_intensity
 from verification.result import Measurement, UncertaintyBasis
 from verification.verifier import verify
 
-__all__ = ["declared_instance_ids", "run_all", "run_instance"]
+__all__ = [
+    "declared_instance_ids",
+    "device_observation",
+    "run_all",
+    "run_instance",
+    "write_device_observation_record",
+]
 
 ROOT = repository_root()
 UM_PER_M = 1e6
@@ -804,6 +812,85 @@ def _run_fwdbwd() -> InstanceRun:
 # ---------------------------------------------------------------------------
 
 
+def _talbot_non_paraxial_budget(
+    *,
+    period_um: float,
+    wavelength_um: float,
+    duty: float,
+    periods: int,
+    samples_per_period: int,
+    order: int,
+) -> dict[str, Any]:
+    """Which term sets the Talbot residual, computed rather than asserted.
+
+    The revival at ``z_T = 2 d^2 / lambda`` is a PARAXIAL result; Chromatix's
+    angular spectrum is not paraxial. So the admissible residual is dominated by
+    the phase the paraxial expansion drops, ``(1/8) k z (m lambda/d)^4``, which at
+    ``z_T`` is ``(pi/2) m^4 (lambda/d)^2`` -- independent of ``z`` and set by the
+    highest order the grid admits, ``m_max = samples_per_period / 2``.
+
+    The two other terms the tolerance could plausibly rest on are separated here
+    by construction rather than by argument. Both kernels below are float64 and
+    share the same 1-D grating and the same grid:
+
+    * the PARAXIAL kernel isolates finite-window truncation, because a paraxial
+      propagator revives exactly. It returns ~1e-24, so truncation is not a
+      budget item -- it is designed out by holding an exact integer number of
+      periods per window and samples per period.
+    * the EXACT kernel isolates the non-paraxial term at float64, so the gap
+      between it and the measured complex64 run is the complex64 floor.
+
+    DIAGNOSTIC ONLY, and deliberately so: this is our own numerical code, and the
+    repository's standing rule is that custom propagators do not decide gates.
+    The gate is the analytic revival; this decomposes the residual it leaves.
+    One dimension is enough because the grating varies along one axis only.
+    """
+    n = periods * samples_per_period
+    pitch_um = period_um / samples_per_period
+    z_um = order * 2.0 * period_um**2 / wavelength_um
+    column = ((np.arange(n) % samples_per_period) < round(duty * samples_per_period)).astype(
+        np.float64
+    )
+
+    freq = np.fft.fftfreq(n, d=pitch_um)  # cycles per um
+    under_root = 1.0 - (wavelength_um * freq) ** 2
+    propagating = under_root > 0.0
+    k = 2.0 * np.pi / wavelength_um
+    spectrum = np.fft.fft(column)
+
+    def _residual(kz: np.ndarray) -> float:
+        out = np.fft.ifft(spectrum * np.where(propagating, np.exp(1j * kz * z_um), 0.0))
+        return relative_l2_intensity(out, column)
+
+    exact = _residual(k * np.sqrt(np.where(propagating, under_root, 0.0)))
+    paraxial = _residual(k * (1.0 - 0.5 * (wavelength_um * freq) ** 2))
+
+    m_max = samples_per_period // 2
+    amplitudes = np.abs(spectrum) / n
+    orders = []
+    for m in range(m_max + 1):
+        bin_index = m * periods
+        if bin_index >= n:
+            break
+        orders.append(
+            {
+                "m": m,
+                "amplitude": float(amplitudes[bin_index]),
+                "dephasing_rad": (np.pi / 2.0) * m**4 * (wavelength_um / period_um) ** 2,
+            }
+        )
+    carried = [o for o in orders if o["amplitude"] > 1e-12 and o["m"] > 0]
+    dominant = max(carried, key=lambda o: o["m"]) if carried else None
+    return {
+        "m_max_admitted_by_grid": m_max,
+        "dephasing_at_m_max_rad": (np.pi / 2.0) * m_max**4 * (wavelength_um / period_um) ** 2,
+        "dominant_carried_order": dominant,
+        "orders": orders,
+        "exact_kernel_intensity_l2_float64": exact,
+        "paraxial_kernel_intensity_l2_float64": paraxial,
+    }
+
+
 def _run_talbot() -> InstanceRun:
     instance = _instance(B1_WAVE_TALBOT, "B1-WAVE-TALBOT-01")
     p = instance.parameters
@@ -853,6 +940,14 @@ def _run_talbot() -> InstanceRun:
     scaled_residual = relative_l2_intensity(scaled["field"], grating)
 
     sampling_limit_m = n * pitch_m**2 / wavelength_m
+    budget = _talbot_non_paraxial_budget(
+        period_um=float(p["period_um"]),
+        wavelength_um=float(p["wavelength_um"]),
+        duty=duty,
+        periods=periods,
+        samples_per_period=samples_per_period,
+        order=order,
+    )
     measurements = {
         "talbot_revival_relative_l2": Measurement(
             value=residual,
@@ -926,6 +1021,29 @@ def _run_talbot() -> InstanceRun:
                     f"{sampling_limit_m * UM_PER_M:.4f} um"
                 ),
                 "location": "verification/families/predicates.py::asm_transfer_function_sampling",
+            },
+            {
+                "code": "NON_PARAXIAL_DEPHASING_BUDGET",
+                "detail": (
+                    "which term sets this residual, decomposed rather than argued. The "
+                    "grid admits orders up to m_max = samples_per_period / 2 = "
+                    f"{budget['m_max_admitted_by_grid']}, whose dephasing from the "
+                    "paraxial revival is (pi/2) m^4 (lambda/d)^2 = "
+                    f"{budget['dephasing_at_m_max_rad']:.4f} rad; at duty {duty:g} the "
+                    "highest order actually CARRYING amplitude is m = "
+                    f"{budget['dominant_carried_order']['m']} at "
+                    f"{budget['dominant_carried_order']['dephasing_rad']:.4e} rad. The "
+                    "same grating on the same grid through a float64 PARAXIAL kernel "
+                    f"returns {budget['paraxial_kernel_intensity_l2_float64']:.3e}, so "
+                    "finite-window truncation is designed out by the exact-integer "
+                    "periodicity rather than budgeted; through a float64 EXACT-ASM "
+                    f"kernel it returns {budget['exact_kernel_intensity_l2_float64']:.3e} "
+                    f"against the {residual:.3e} measured through the shipping "
+                    "complex64 path, which leaves the complex64 floor as the difference "
+                    "and a secondary term. Both kernels are DIAGNOSTIC ONLY: our own "
+                    "numerical code does not decide this gate."
+                ),
+                "location": "benchmarks/instances/b1_wave.py::_talbot_non_paraxial_budget",
             },
             {
                 "code": "WHY_A_REVIVAL_IS_A_STRONG_CHECK",
@@ -1215,14 +1333,34 @@ def _verified(
 
 
 def device_observation() -> dict[str, Any]:
-    """What a CUDA request does here, and what the arrays actually say.
+    """Where a Chromatix propagation actually ran, read off the array that ran it.
 
-    Two rows. The CPU row is a real propagation whose placement is read off the
-    output array. The CUDA row is a request this session cannot honour, and the
-    thing being established is that it is REFUSED rather than quietly run on the
-    host -- the registry's note on this is emphatic and correct, because a
-    process-global JAX platform pin produces a successful host run for a caller
-    who asked for CUDA with no error raised.
+    One row per requested device. Each row that EXECUTED carries three
+    independent readings of its placement, kept apart rather than collapsed:
+
+    ``observed``
+        The observation. ``propagation.py`` calls ``core.arrays.array_state`` on
+        ``field_out.u`` *before* ``jax.device_get`` copies anything, and stamps
+        it as ``metadata['execution']['actual']``. This is the only reading taken
+        while the array is still where the computation happened.
+    ``artifact``
+        The same fact as the adapter stamped it on the boundary ``ArtifactRecord``
+        -- a second reading of one observation, which catches the artifact and the
+        metadata disagreeing.
+    ``persisted``
+        The ``.npy`` beside the record, which is host bytes by construction and
+        therefore reports ``numpy``/``cpu`` *however* the run was placed. Carried
+        so the two can be contrasted instead of confused. This used to be the
+        only reading, and on the ray side the identical mistake reported a
+        genuine ``cuda:0`` trace as a host downgrade -- the observation was the
+        defect, not the execution, and it was invisible without a device.
+
+    Why the request is never the answer: a process-global JAX platform pin
+    produces a completely successful host run for a caller who asked for CUDA,
+    with nothing raised. On a CPU-only image the CUDA row is REFUSED instead, and
+    that half of the claim is what ``tests/test_b1_wave_instances.py`` asserts;
+    the executed-on-CUDA half needs a device and lives in
+    ``tests/test_b1_wave_gpu.py``.
     """
     instance = _instance(B1_WAVE_GAUSS, "B1-WAVE-GAUSS-01")
     p = instance.parameters
@@ -1232,6 +1370,7 @@ def device_observation() -> dict[str, Any]:
     field = _gaussian(n, pitch_m, float(p["waist_um"]) / UM_PER_M)
 
     rows: list[dict[str, Any]] = []
+    outputs: dict[str, np.ndarray[Any, Any]] = {}
     for device in ("cpu", "cuda"):
         directory = Path(tempfile.mkdtemp(prefix="b1-wave-device-"))
         source = field_source(
@@ -1283,15 +1422,193 @@ def device_observation() -> dict[str, Any]:
             }
             rows.append(row)
             continue
-        array = np.load(record.artifacts["wave:output_field"].uri)
-        placement = observed_placement(array)
+
+        artifact = record.artifacts["wave:output_field"]
+        execution = dict(artifact.metadata.get("execution") or {})
+        # THE reading, off the live JAX array before the host copy.
+        observed = dict(execution.get("actual") or {})
+        array = np.load(artifact.uri)
         row |= {
             "outcome": "executed",
-            "observed": placement,
-            "honoured": placement["device"].split(":")[0] == device,
+            "observation_source": (
+                "artifact.metadata['execution']['actual'], which propagation.py fills "
+                "from core.arrays.array_state(field_out.u) before jax.device_get -- not "
+                "the request, not JAX_PLATFORMS, not jax.default_backend()"
+            ),
+            "observed": observed,
+            "artifact": {
+                "device": str(artifact.device),
+                "framework": str(artifact.framework),
+                "dtype": str(artifact.dtype),
+            },
+            "persisted": observed_placement(array),
+            "requested_in_metadata": execution.get("requested"),
+            "resolved": execution.get("resolved"),
+            "device_mismatch": execution.get("device_mismatch"),
+            # A process-wide fact that says nothing about where THIS array landed,
+            # recorded precisely so it can be seen not to have been used as the answer.
+            "jax_default_backend": execution.get("jax_default_backend"),
+            "honoured": observed.get("device", "").split(":")[0] == device,
         }
         rows.append(row)
-    return {"rows": tuple(rows)}
+        outputs[device] = array
+
+    executed = tuple(r for r in rows if r["outcome"] == "executed")
+    return {
+        "rows": tuple(rows),
+        "executed": executed,
+        "refused": tuple(r for r in rows if r["outcome"] == "refused"),
+        "cuda_executed": any(
+            r["observed"].get("device", "").startswith("cuda") for r in executed
+        ),
+        "agreement": _device_agreement(outputs),
+        "outputs": outputs,
+    }
+
+
+def _device_agreement(
+    outputs: Mapping[str, np.ndarray[Any, Any]],
+) -> dict[str, Any]:
+    """Do the two devices compute the same field, and is that comparison available.
+
+    A ``cuda`` label on an output nobody compared is a placement claim, not an
+    execution claim: a stub that returned zeros on the device would satisfy every
+    assertion about where it ran. So the two arms are differenced when both exist,
+    against the complex64 floor -- one float32 epsilon per radian of accumulated
+    phase, the same basis B1-WAVE-FWDBWD uses -- and reported as UNAVAILABLE with
+    the reason when they do not, never as agreement by default.
+    """
+    if "cpu" not in outputs or "cuda" not in outputs:
+        return {
+            "status": "unavailable",
+            "reason": f"executed arms: {sorted(outputs)}",
+        }
+    cpu, cuda = outputs["cpu"], outputs["cuda"]
+    if cpu.shape != cuda.shape:
+        return {"status": "unavailable", "reason": f"shapes {cpu.shape} vs {cuda.shape}"}
+    instance = _instance(B1_WAVE_GAUSS, "B1-WAVE-GAUSS-01")
+    accumulated_phase_rad = (
+        2.0
+        * math.pi
+        * float(instance.parameters["distance_um"])
+        / float(instance.parameters["wavelength_um"])
+    )
+    threshold = float(np.finfo(np.float32).eps) * accumulated_phase_rad
+    measured = relative_l2_field(cuda, cpu)
+    return {
+        "status": "measured",
+        "metric": "cpu_vs_cuda_relative_l2_field",
+        "measured": measured,
+        "threshold": threshold,
+        "threshold_basis": (
+            "one float32 epsilon per radian of accumulated phase, "
+            f"eps32 * 2*pi*z/lambda = {threshold:.3e} over "
+            f"{accumulated_phase_rad:.1f} rad. Chromatix is complex64 on both devices, "
+            "so this bounds a reassociated FFT reduction and not a precision change"
+        ),
+        "met": measured <= threshold,
+        "identical": bool(np.array_equal(cpu, cuda)),
+    }
+
+
+def write_device_observation_record(
+    directory: Path | None = None, *, allow_downgrade: bool = False
+) -> Path:
+    """Persist the device observation so it is checkable without a device.
+
+    The point of committing it is that the GPU-positive half of this criterion
+    otherwise exists only in a session nobody can re-open. The GPU test re-measures
+    and compares, so a record that went stale would fail rather than be believed.
+
+    A CPU-only session refuses to overwrite a CUDA-positive record. That is not
+    politeness about file ownership: the CPU run produces a structurally valid
+    record whose CUDA row says "refused", and writing it would delete the only
+    evidence for an acceptance criterion while leaving a file that still looks
+    complete. ``allow_downgrade=True`` is the deliberate way to say the device
+    really did go away.
+    """
+    from verification.evidence import record_provenance
+
+    observation = device_observation()
+    directory = directory or (ROOT / "benchmarks" / "probes" / "records" / "chromatix")
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "b1_wave_device_observation.json"
+
+    if path.is_file() and not observation["cuda_executed"] and not allow_downgrade:
+        existing = json.loads(path.read_text())
+        if existing.get("environment", {}).get("cuda_executed"):
+            raise RuntimeError(
+                f"{path.name} records a CUDA execution and this session has none. "
+                "Refusing to overwrite it with a host-only observation: that would "
+                "delete the evidence for the GPU acceptance criterion and leave a "
+                "file that still looks complete. Re-run under `./run.sh --gpu`, or "
+                "pass allow_downgrade=True if the device is genuinely gone."
+            )
+
+    payload: dict[str, Any] = {
+        "probe": "instances/b1_wave::write_device_observation_record",
+        "question": (
+            "when the Chromatix graph node is asked for a device, is the device it "
+            "reports read off the array it produced?"
+        ),
+        "measurement_method": (
+            "one B1-WAVE-GAUSS-01 propagation per requested device through "
+            "GraphExecutor; placement taken from "
+            "artifact.metadata['execution']['actual'], which propagation.py fills "
+            "from core.arrays.array_state(field_out.u) before jax.device_get. The "
+            "persisted .npy placement is recorded alongside as a contrast, not as "
+            "the observation. Cross-device agreement is differenced on the output "
+            "fields against one float32 epsilon per radian of accumulated phase."
+        ),
+        "environment": {
+            "cuda_executed": observation["cuda_executed"],
+            "cuda_unavailable_reason": (
+                None
+                if observation["cuda_executed"]
+                else next(
+                    (
+                        r.get("detail")
+                        for r in observation["rows"]
+                        if r["requested_device"] == "cuda" and r["outcome"] == "refused"
+                    ),
+                    "no CUDA row refused and none executed",
+                )
+            ),
+            "jax": _jax_build(),
+        },
+        # The rows are JSON-safe as they stand; the output arrays live under
+        # observation["outputs"] and deliberately do not reach the record.
+        "rows": list(observation["rows"]),
+        "agreement": observation["agreement"],
+    }
+    payload["record_provenance"] = record_provenance(
+        probe="instances/b1_wave::write_device_observation_record", root=ROOT
+    )
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
+    return path
+
+
+def _jax_build() -> dict[str, Any]:
+    """Which JAX is installed and whether it can reach a device.
+
+    The default image ships CPU-only jaxlib and the GPU image adds
+    ``jax-cuda12-plugin``; that is the difference between the CUDA row refusing
+    and executing, so it belongs in the record rather than in the operator's
+    memory of which image they used.
+    """
+    try:
+        import jax
+    except ImportError:  # pragma: no cover - jax is pinned in both images
+        return {"available": False}
+    from solvers.chromatix.execution import _jax_gpu_unavailable_reason
+
+    return {
+        "available": True,
+        "version": jax.__version__,
+        "default_backend": jax.default_backend(),
+        "devices": [str(d) for d in jax.devices()],
+        "gpu_unavailable_reason": _jax_gpu_unavailable_reason(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1350,7 +1667,41 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--instance", default=None)
+    parser.add_argument(
+        "--device",
+        action="store_true",
+        help="run the device observation instead of the instances, and write its record",
+    )
     args = parser.parse_args()
+
+    if args.device:
+        observation = device_observation()
+        for row in observation["rows"]:
+            if row["outcome"] == "executed":
+                observed = row["observed"]
+                print(
+                    f"{row['requested_device']:<6} executed  "
+                    f"{observed['namespace']}/{observed['device']}/{observed['dtype']}"
+                    f"  persisted={row['persisted']['namespace']}/{row['persisted']['device']}"
+                    f"  honoured={row['honoured']}"
+                )
+            else:
+                print(f"{row['requested_device']:<6} {row['outcome']:<9} {row.get('code')}")
+        agreement = observation["agreement"]
+        if agreement["status"] == "measured":
+            print(
+                f"\ncpu vs cuda: {agreement['measured']:.4e} against "
+                f"{agreement['threshold']:.4e}  met={agreement['met']}"
+            )
+        else:
+            print(f"\ncpu vs cuda: UNAVAILABLE ({agreement['reason']})")
+        try:
+            path = write_device_observation_record()
+        except RuntimeError as exc:
+            print(f"\nnot written: {exc}")
+            return 1
+        print(f"\n-> {path.relative_to(ROOT)}")
+        return 0
 
     runs = {args.instance: run_instance(args.instance)} if args.instance else run_all()
     for instance_id, run in runs.items():

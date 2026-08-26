@@ -33,14 +33,33 @@ established that ``FFTPSF`` and ``HuygensPSF`` share one ``Wavefront``/OPD front
 end and are not two oracles. Every gate below is a closed form or a conservation
 law, and the schema refuses a ``CROSS_ROUTE`` oracle outside B4 anyway.
 
+One correction worth reading before the declarations
+---------------------------------------------------
+``B1-RAY-LAGRANGE`` gated on the wrong quantity and failed by 1329x for it, and
+the fix was to the oracle rather than to the tolerance. Three things get called
+"the Lagrange invariant": the paraxial form, the same bilinear form evaluated on
+two finite real rays, and the differential symplectic form on tangent vectors.
+Only the third is conserved by a real trace -- refraction at a curved surface is
+symplectic and *not linear*, so the finite form carries an aberration residual
+that is not round-off and never was. The family now gates on the differential
+invariant at 1e-13, three decades TIGHTER than the 1e-10 it replaces, and keeps
+the finite-ray number at its original value and its original threshold as a
+non-gating characterization. See ``_symplectic_invariant`` for the derivation.
+
+The general lesson is about oracle shape rather than about rays: a conservation
+law is the strongest oracle available for a multi-surface system because it needs
+no external reference, and that is not sufficient. The QUANTITY has to be one the
+law is actually about, and a tolerance whose basis cannot bound its own metric is
+invalid whichever side of the threshold the measurement lands on.
+
 Status
 ------
-The three inherited families report ``MEASURED_OFF_GATE``: their result is on
-record and nothing in the required gate re-checks it. The two new families
-(``B1-RAY-SNELL``, ``B1-RAY-LAGRANGE``) and ``B1-RAY-OFFAXIS-OPL``'s tilt gate
-report ``NOT_MEASURED`` -- declared here and not yet executed through the
-substrate. That is the honest state, and it is what CHE-113's executor and
-CHE-115's substrate proof turn into measurements.
+All five families are executed against the shipping adapter by
+``benchmarks/instances/b1_ray.py`` and asserted by
+``tests/test_b1_ray_instances.py``. ``B1-RAY-OFFAXIS-OPL``'s tilt gate, the four
+Snell instances, the two EFL closed forms, the plate shift and the corrected
+Lagrange invariant all report ``MET``. Device and precision agreement is measured
+on real CUDA hardware and persisted; see the RAY-4 section of the driver.
 """
 
 from __future__ import annotations
@@ -69,7 +88,6 @@ from verification.families.schema import (
     Invariant,
     Metric,
     NegativeControl,
-    NegativeControlExpectation,
     NumericalParameter,
     Oracle,
     OracleIndependence,
@@ -729,11 +747,17 @@ _B1_RAY_SNELL = BenchmarkFamily(
 
 
 def _lagrange_invariant(params: Mapping[str, Any]) -> float:
-    """``H = n (u y_bar - u_bar y)``, conserved through any paraxial system.
+    """``H = n (u y_bar - u_bar y)``, the PARAXIAL Lagrange invariant.
 
-    A conservation law rather than a closed-form answer: the oracle value is
-    whatever the invariant is at the object, and the claim is that it does not
-    move.
+    Retained because it is the reference value of the family's characterization
+    metric, and because saying which of three distinct invariants a number is
+    about is the whole content of CHE-106's Lagrange finding. Read
+    :func:`_symplectic_invariant` for the one that gates.
+
+    This form is conserved exactly by a *linear* symplectic map -- the paraxial
+    transfer matrix. It is **not** conserved by a real ray map, and the residual
+    is aberration rather than round-off. That is not a defect in the solver and
+    it is not a numerical artifact; it is what the quantity is.
     """
     n = float(params["index_object_space"])
     u = float(params["marginal_ray_angle_rad"])
@@ -741,6 +765,63 @@ def _lagrange_invariant(params: Mapping[str, Any]) -> float:
     u_bar = float(params["chief_ray_angle_rad"])
     y = float(params["marginal_ray_height_mm"])
     return n * (u * y_bar - u_bar * y)
+
+
+def _symplectic_invariant(params: Mapping[str, Any]) -> float:
+    """The reference value of the DIFFERENTIAL optical invariant: zero drift.
+
+    Three quantities get called "the Lagrange invariant" and only one of them is
+    exactly conserved by a real ray trace. CHE-106 measured 1.33e-7 against a
+    1e-10 gate by evaluating the second on data that only the third can support,
+    and the correction is to state which is which.
+
+    **1. The paraxial invariant.** ``H = n (u y_bar - u_bar y)`` on two chosen
+    rays, with ``u`` a paraxial angle. Conserved exactly by the linear transfer
+    matrix; a statement about the linearized system, not about any ray.
+
+    **2. The finite-real-ray bilinear form.** The same expression evaluated on
+    two real traced rays at finite separation. Conserved by a *linear* symplectic
+    map only. Real refraction at a curved surface is symplectic and **not**
+    linear, so this carries an aberration residual that does not vanish as the
+    two rays approach each other -- because it is not a derivative of anything.
+    ``lagrange_invariant_relative_drift`` is this quantity, and it is measured
+    and reported and does not gate.
+
+    **3. The differential symplectic invariant.** With the transverse position
+    ``q = (x, y)`` on a plane of constant ``z`` and the canonical momentum
+    ``p = n (L, M)`` -- the index-weighted direction cosines, *not* the ray
+    slopes ``M/N`` -- the ray map between two such planes is the flow of a
+    Hamiltonian system in which ``z`` is the evolution parameter. Its tangent map
+    ``J`` therefore satisfies ``J^T Omega J = Omega`` at every point, however
+    nonlinear the map itself is, and consequently
+
+        omega(v_a, v_b) = sum_k (dp_k^a dq_k^b - dp_k^b dq_k^a)
+
+    is conserved **exactly**, for real rays, at any aperture and any field, for
+    any pair of tangent vectors ``v = (dq, dp)``. This is the invariant that a
+    conservation-law gate can legitimately be written against, and it is a
+    strictly stronger claim than (1): it holds where the paraxial statement does
+    not. Luneburg, *Mathematical Theory of Optics*, ch. II; Born & Wolf sec. 3.3;
+    Wolf, *Geometric Optics on Phase Space*, ch. 2.
+
+    The oracle value is zero drift: ``omega`` at the image plane equals
+    ``omega`` at the launch plane. Nothing external is needed and nothing
+    internal decides it -- the same shape the family always had, applied to the
+    quantity that actually has the property.
+
+    What makes it executable on a solver that traces finite rays is that a
+    tangent vector is reachable by extrapolation. Two symmetric secants about a
+    common base ray -- one drawn across the pupil at fixed field, one across the
+    field at fixed pupil -- approximate two linearly independent tangent vectors
+    to ``O(eps^2)``, so the measured residual is a finite-difference truncation
+    error with a known exponent and Richardson extrapolation removes it. Both
+    directions are required: two secants drawn from the same pupil fan are
+    parallel in the ``eps -> 0`` limit, ``omega`` between them is identically
+    zero on the object side, and the ratio is a 0/0 that converges to nothing.
+    That is a declared negative control here, and it is the specific error that
+    produced CHE-106's "converges to 1 + 7.1e-3 and does not approach 1".
+    """
+    return 0.0
 
 
 #: Four incidence angles on one spherical interface, from paraxial to 27 degrees.
@@ -788,11 +869,14 @@ B1_RAY_SNELL = register(
 
 _B1_RAY_LAGRANGE = BenchmarkFamily(
         family_id="B1-RAY-LAGRANGE",
-        family_version="1.0.0",
+        family_version="2.0.0",
         category=BenchmarkCategory.B1,
         question=(
-            "is the Lagrange invariant H = n(u y_bar - u_bar y) conserved surface by "
-            "surface through a multi-element system?"
+            "is the differential optical invariant omega(v_a, v_b) = sum_k "
+            "(dp_k^a dq_k^b - dp_k^b dq_k^a) -- with q the transverse position on a "
+            "plane of constant z and p = n (L, M) the index-weighted direction "
+            "cosines -- conserved by the real ray map through a multi-element "
+            "system? Equivalently: is the traced map symplectic?"
         ),
         components=("M_RAY_OPTILAND",),
         claim_kind=ClaimKind.CONSERVATION,
@@ -831,6 +915,37 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
                 domain=(2, 12),
                 default=3,
             ),
+            NumericalParameter(
+                "perturbation_scale",
+                "normalized half-separation of the coarsest secant pair, as a "
+                "fraction of both the pupil semi-diameter and the declared field "
+                "angle. It moves the achieved accuracy of the tangent vectors and "
+                "NOT the invariant they are evaluated on -- which is the property "
+                "the eps^2 ladder below exists to demonstrate rather than assume",
+                domain=(1e-3, 1.0),
+                default=0.5,
+                refines_toward=-1,
+            ),
+            NumericalParameter(
+                "perturbation_rungs",
+                "halvings of perturbation_scale. Six, because the residual has to "
+                "be shown to be truncation error before it may be extrapolated "
+                "away, and Richardson to the eps^4 column needs three rungs of "
+                "the four the exponent fit already needs",
+                domain=(4, 10),
+                default=6,
+                refines_toward=1,
+            ),
+            NumericalParameter(
+                "richardson_levels",
+                "orders of the finite-difference expansion removed by "
+                "extrapolation. Two -- eps^2 then eps^4 -- because the third "
+                "column already sits at the float64 round-off floor and a fourth "
+                "would only amplify it",
+                domain=(0, 4),
+                default=2,
+                refines_toward=1,
+            ),
         ),
         validity=(
             paraxial_field_angle(angle_key="chief_ray_angle_rad", max_angle_rad=math.radians(5.0)),
@@ -840,18 +955,63 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
             kind=Oracle.CONSERVATION_LAW,
             independence=OracleIndependence.INDEPENDENT,
             description=(
-                "the Lagrange invariant is conserved through any paraxial system; the "
-                "reference value is its own object-space value, so nothing external is "
-                "needed and nothing internal decides it"
+                "the differential optical invariant is conserved by any symplectic "
+                "map, and the ray map with z as the evolution parameter is one. The "
+                "reference value is the invariant's own value at the launch plane, "
+                "so nothing external is needed and nothing internal decides it -- "
+                "and unlike the paraxial form this holds for REAL rays, which is "
+                "what makes a conservation-law tolerance defensible at all"
             ),
-            callable=_lagrange_invariant,
-            reference="paraxial optics; Welford, Aberrations of Optical Systems, eq 2.16",
+            callable=_symplectic_invariant,
+            reference=(
+                "Hamiltonian optics: Luneburg, Mathematical Theory of Optics ch. II; "
+                "Born & Wolf sec. 3.3; Wolf, Geometric Optics on Phase Space ch. 2. "
+                "The paraxial special case is Welford, Aberrations of Optical "
+                "Systems, eq 2.16"
+            ),
         ),
         metrics=(
             Metric(
+                name="symplectic_invariant_relative_residual",
+                description=(
+                    "|omega_image - omega_object| / |omega_object| on two "
+                    "independent tangent vectors at a common base ray, Richardson-"
+                    "extrapolated to zero ray separation over the perturbation "
+                    "ladder"
+                ),
+                unit=None,
+                blind_to=(
+                    "which prescription was traced. EVERY valid ray trace of EVERY "
+                    "valid system is symplectic, so a system built from the wrong "
+                    "radii or the wrong glass conserves this exactly. It says the "
+                    "refraction is implemented as a canonical transformation, not "
+                    "that the system is the one that was asked for -- B1-RAY-EFL, "
+                    "-PLATE and -SNELL are what decide that. Measured, not argued: "
+                    "replacing the second element's index 1.62 by 1.0 leaves the "
+                    "extrapolated residual at 3.5e-15",
+                    "a canonically conjugate compensating error: a map that scaled "
+                    "q by alpha and p by 1/alpha has unit determinant and passes. "
+                    "Scaling either one ALONE is caught, and both directions are "
+                    "declared as controls, but the conjugate pair is not",
+                    "the difference between the canonical momentum n*M and the ray "
+                    "slope M/N at an axial base ray. The two agree to first order "
+                    "there, so substituting the slope -- the previous formulation's "
+                    "own error -- changes nothing in the eps -> 0 limit and shows "
+                    "up only at finite separation. Measured: 1.52e-7 against the "
+                    "canonical 5.48e-7 at the finest rung, 4.1e-16 extrapolated",
+                    "everything aberration. Finite-ray aberration is precisely what "
+                    "the extrapolation removes, and it is reported separately as "
+                    "lagrange_invariant_relative_drift rather than folded in here",
+                ),
+            ),
+            Metric(
                 name="lagrange_invariant_relative_drift",
                 description=(
-                    "max |H_k - H_0| / |H_0| over all surfaces k in the system"
+                    "|H_image - H_object| / |H_object| for the PARAXIAL form "
+                    "H = n(u y_bar - u_bar y) evaluated on two finite real rays: "
+                    "the innermost meridional ray of the on-axis fan and the chief "
+                    "ray of the off-axis fan. A characterization of the paraxial "
+                    "domain, not a conservation statement"
                 ),
                 unit=None,
                 blind_to=(
@@ -859,28 +1019,136 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
                     "reciprocal factors would conserve H while getting both wrong",
                     "everything non-paraxial -- H is a paraxial invariant and says "
                     "nothing about aberration",
+                    "the fact that it is not a conservation statement at all for "
+                    "finite real rays. The bilinear form p_a.q_b - p_b.q_a is "
+                    "preserved by a LINEAR symplectic map; the residual this metric "
+                    "reports is aberration, and it does NOT vanish as the two rays "
+                    "approach one another, because it is not the derivative of "
+                    "anything. Conserved quantities live on tangent vectors, which "
+                    "is what symplectic_invariant_relative_residual measures",
                 ),
             ),
         ),
         tolerances=(
             Tolerance(
+                metric="symplectic_invariant_relative_residual",
+                threshold=1e-13,
+                basis=(
+                    "float64 round-off in the extrapolated invariant, derived and "
+                    "then checked against the measurement rather than fitted to it. "
+                    "Three terms, and no aberration term because the extrapolation "
+                    "removes it: (1) ROUND-OFF. eps = 2.2204e-16. The traced state "
+                    "carries the accumulated round-off of the trace itself, bounded "
+                    "by the same 64*eps the adapter derives for its own direction-"
+                    "norm check (solvers/optiland/execution.py::"
+                    "_direction_norm_tolerance) -- a few operations per surface on "
+                    "quantities of order one, over at most twelve surfaces. Forming "
+                    "omega amplifies that by the measured conditioning of the "
+                    "secants and of the bilinear form, sum|terms| / |omega| = "
+                    "1.0005 and |q| / |dq| = 0.5, i.e. by less than one. Richardson "
+                    "to two levels amplifies it by prod (2^p + 1)/(2^p - 1) for "
+                    "p = 2, 4 = 1.889. So 64 * 2.2204e-16 * 1.0005 * 1.889 = "
+                    "2.7e-14. (2) TRUNCATION of the extrapolation itself, O(eps^6) "
+                    "after two Richardson levels, estimated from the next column at "
+                    "6.1e-17 -- three decades below the round-off term and "
+                    "therefore not what sets this. (3) HEADROOM: one decade, so a "
+                    "deeper system or a slightly worse-conditioned base ray does "
+                    "not need the number moved. 1e-13. This is three decades "
+                    "TIGHTER than the 1e-10 it replaces, and the measured value "
+                    "1.204e-15 sits 83x inside it and 5.4x above the single-"
+                    "operation float64 floor"
+                ),
+                basis_kind=ToleranceBasis.NUMERICAL_PRECISION_FLOOR,
+                may_gate=True,
+                rejects=(
+                    "a refraction implemented as anything other than a canonical "
+                    "transformation. Measured on the shipping trace: a 1e-6 "
+                    "relative non-symplectic scaling of the image-plane momenta "
+                    "reads 1.0000e-6, and the same scaling of the image-plane "
+                    "positions reads 1.0000e-6 -- both seven decades outside this "
+                    "gate, against a baseline of 1.204e-15, a detection margin of "
+                    "8.3e8x. An omitted index factor across an index step would "
+                    "change omega by the index ratio itself, of order 0.5 relative, "
+                    "thirteen decades outside"
+                ),
+            ),
+            Tolerance(
                 metric="lagrange_invariant_relative_drift",
                 threshold=1e-10,
                 basis=(
-                    "conservation to float64 round-off accumulated over at most twelve "
-                    "surfaces. Each surface contributes a few operations on quantities "
-                    "of order 1, so 1e-10 is several orders above the floor and far "
-                    "below any real transfer-matrix error"
+                    "UNCHANGED AT 1e-10 AND NO LONGER GATING, and the reason is a "
+                    "derivation rather than a convenience. Its previously declared "
+                    "basis was CONSERVATION_LAW -- 'conservation to float64 round-"
+                    "off accumulated over at most twelve surfaces' -- and that "
+                    "basis does not apply to this metric. The conservation law it "
+                    "named holds for the paraxial transfer matrix and for tangent "
+                    "vectors; this metric evaluates the bilinear form on two REAL "
+                    "rays at finite separation, where the leading residual is "
+                    "aberration and is many orders above round-off. A tolerance "
+                    "whose basis cannot bound its metric is invalid whichever side "
+                    "of the threshold the measurement lands on, and no threshold "
+                    "derived from float64 could ever have been the right one here. "
+                    "The threshold is therefore left exactly where it was rather "
+                    "than widened to fit the 1.33e-7 that is measured, the metric "
+                    "is retained and reported because the paraxial domain it "
+                    "characterizes is real, and the conservation claim it was "
+                    "standing in for now has its own valid gate on "
+                    "symplectic_invariant_relative_residual. Re-deriving a "
+                    "defensible APPROXIMATION-error bound for the finite form -- "
+                    "third-order aberration theory for this specific stack -- would "
+                    "make this gateable again and is not done here"
                 ),
-                basis_kind=ToleranceBasis.CONSERVATION_LAW,
-                may_gate=True,
+                basis_kind=ToleranceBasis.RECORDED_MEASUREMENT,
+                may_gate=False,
                 rejects=(
-                    "a missing index factor at a refraction, which changes H by the "
-                    "index ratio -- of order 0.5 relative, ten orders outside this"
+                    "nothing it can be trusted to reject, which is the finding. At "
+                    "1.33e-7 it is four decades below a missing index factor and "
+                    "two decades above its own aberration floor, so it separates "
+                    "gross prescription errors from correct ones and cannot "
+                    "separate a correct implementation from a subtly wrong one"
                 ),
             ),
         ),
         negative_controls=(
+            NegativeControl(
+                control_id="non-symplectic-momentum-scale",
+                description=(
+                    "scale the image-plane canonical momenta by 1 + 1e-6 with the "
+                    "positions untouched, so the tangent map's determinant is no "
+                    "longer one"
+                ),
+                mutation="p_image *= 1 + 1e-6",
+                target_metric="symplectic_invariant_relative_residual",
+            ),
+            NegativeControl(
+                control_id="non-symplectic-position-scale",
+                description=(
+                    "the conjugate half of the same test: scale the image-plane "
+                    "positions by 1 + 1e-6 with the momenta untouched. Declared "
+                    "separately because omega is bilinear and a metric sensitive "
+                    "to one factor is not automatically sensitive to the other"
+                ),
+                mutation="q_image *= 1 + 1e-6",
+                target_metric="symplectic_invariant_relative_residual",
+            ),
+            NegativeControl(
+                control_id="degenerate-tangent-pair",
+                description=(
+                    "draw BOTH secants from the pupil fan instead of one from the "
+                    "pupil and one from the field, so the two tangent vectors are "
+                    "parallel in the limit. This is the construction error that "
+                    "produced CHE-106's 'the differential ratio converges to "
+                    "1 + 7.1e-3 and does NOT approach 1', and it is declared as a "
+                    "control because the oracle's requirement of two LINEARLY "
+                    "INDEPENDENT directions has to be executable rather than "
+                    "advisory"
+                ),
+                mutation=(
+                    "replace the field secant by a second pupil secant at twice "
+                    "the separation"
+                ),
+                target_metric="symplectic_invariant_relative_residual",
+            ),
             NegativeControl(
                 control_id="omit-index-at-refraction",
                 description="drop the n factor when transferring across a surface",
@@ -892,46 +1160,100 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
         execution_policy=RAY_EXECUTION,
         stochastic_policy=DETERMINISTIC,
         gate_disposition=GateDisposition(
-            status=GateStatus.NOT_MET,
-            metric="lagrange_invariant_relative_drift",
-            observed=1.32863e-07,
+            status=GateStatus.MET,
+            metric="symplectic_invariant_relative_residual",
+            observed=1.204e-15,
             evidence=(
                 "benchmarks/instances/b1_ray.py",
-                "tests/test_b1_ray_instances.py::test_the_lagrange_gate_is_unmet_and_says_why",
-                "tests/test_b1_ray_instances.py::test_the_lagrange_drift_vanishes_with_the_field",
+                "benchmarks/instances/records/B1-RAY-LAGRANGE-01.json",
+                "tests/test_b1_ray_instances.py::test_the_symplectic_invariant_closes_to_roundoff",
+                "tests/test_b1_ray_instances.py::test_the_symplectic_residual_is_second_order_in_the_separation",
+                "tests/test_b1_ray_instances.py::test_both_non_symplectic_controls_fire",
+                "tests/test_b1_ray_instances.py::test_a_degenerate_tangent_pair_carries_no_invariant",
+                "tests/test_b1_ray_instances.py::test_the_finite_ray_drift_is_reported_and_does_not_gate",
             ),
             note=(
-                "MEASURED AND NOT MET, and the tolerance is left exactly where it is. "
-                "1.33e-7 relative drift at a 0.25-degree field and a 1/64 pupil "
-                "fraction, against a 1e-10 gate.\n\n"
-                "The reason is structural rather than numerical, and it is a finding "
-                "about the tolerance rather than about the solver. The Lagrange "
-                "invariant's two-ray bilinear form p_a.q_b - p_b.q_a is preserved by a "
-                "LINEAR symplectic map. Ray refraction at a curved surface is symplectic "
-                "and not linear, so only the DIFFERENTIAL form is exactly conserved, and "
-                "any finite-real-ray evaluation carries an aberration residual. Measured "
-                "directly while authoring this: the differential ratio between two rays "
-                "of one fan converges to 1 + 7.1e-3 at a 5-degree field and does NOT "
-                "approach 1 as their separation shrinks -- the signature of a "
-                "finite-form residual rather than a numerical one.\n\n"
-                "What the family CAN support is measured and reported: the drift "
-                "vanishes with the field angle over five halvings, with a fitted "
-                "exponent near 2.5. That is the conservation statement -- the invariant "
-                "holds paraxially -- and it is why the drift is 1e-7 rather than 1e-2. "
-                "It was the cheapest unmeasured whole-system check on the ray model and "
-                "it is no longer unmeasured.\n\n"
-                "The tolerance's declared basis is CONSERVATION_LAW, and the "
-                "conservation law it names is paraxial while the measurement is of real "
-                "rays. Re-deriving that basis against the aberration it cannot see is "
-                "follow-up work; widening it to make this green would be exactly what "
-                "AGENTS.md forbids."
+                "MET at 1.204e-15 against a 1e-13 gate, after the ORACLE was "
+                "corrected. The tolerance was not widened; it was re-derived three "
+                "decades TIGHTER than the 1e-10 that preceded it.\n\n"
+                "What was wrong. This family previously measured the two-ray "
+                "bilinear form p_a.q_b - p_b.q_a on two finite real rays and gated "
+                "it at 1e-10 on a basis of 'conservation to float64 round-off'. It "
+                "read 1.328629e-07, 1329x over. The diagnosis recorded at the time "
+                "was already half right -- that form is preserved by a LINEAR "
+                "symplectic map and real refraction at a curved surface is "
+                "symplectic but not linear -- but it drew the wrong conclusion: "
+                "that no finite-ray evaluation can do better, on the strength of a "
+                "measurement that 'the differential ratio between two rays of one "
+                "fan converges to 1 + 7.1e-3 and does NOT approach 1 as their "
+                "separation shrinks'.\n\n"
+                "That measurement was of a DEGENERATE pair. Two rays of one pupil "
+                "fan differ only in pupil coordinate, so as the separation shrinks "
+                "both secants approach the same tangent direction; omega between "
+                "parallel vectors is zero, and on the object side of a collimated "
+                "bundle it is IDENTICALLY zero because every ray shares one "
+                "direction and dp = 0 for both. The ratio was a 0/0. It is now a "
+                "declared negative control, and it reads omega_object = 0.0 exactly "
+                "at all six rungs while omega_image is nonzero -- an infinite "
+                "relative residual, which is the control firing.\n\n"
+                "What is right. With q the transverse position on a plane of "
+                "constant z and p = n(L, M) the index-weighted direction cosines -- "
+                "not the ray slopes M/N -- the ray map is the flow of a Hamiltonian "
+                "system in z, so its TANGENT map is symplectic at every point "
+                "however nonlinear the map is, and omega(v_a, v_b) is conserved "
+                "exactly for real rays at any aperture and any field. Two symmetric "
+                "secants about a common base ray, one across the pupil at fixed "
+                "field and one across the field at fixed pupil, approximate two "
+                "linearly independent tangent vectors to O(eps^2).\n\n"
+                "The measurement, over six halvings on the three-surface stack at "
+                "the canonical instance:\n"
+                "  eps/eps_0   raw residual     eps^2 removed    eps^4 removed\n"
+                "  1           5.61114e-04      -1.0802e-07      +9.6727e-12\n"
+                "  1/2         1.40197e-04      -6.7425e-09      +1.4974e-13\n"
+                "  1/4         3.50443e-05      -4.2126e-10      +2.6448e-15\n"
+                "  1/8         8.76076e-06      -2.6326e-11      -1.2040e-15\n"
+                "  1/16        2.19017e-06      -1.6465e-12\n"
+                "  1/32        5.47541e-07\n"
+                "The raw column fits an exponent of 2.00018 with r^2 = 0.99999999 "
+                "over six points, which is the finite-difference truncation "
+                "signature and not a physical residual: a physical one would not "
+                "have an integer exponent in the SEPARATION. The eps^2 column falls "
+                "by 16x per halving, which is the O(eps^4) remainder behaving as "
+                "predicted. The eps^4 column reaches 1.204e-15, and the next two "
+                "columns sit at 1.27e-15 and 3.2e-16 -- the float64 floor, 5.4 eps. "
+                "The invariant closes to round-off.\n\n"
+                "So the solver was not the defect and neither was the tolerance's "
+                "value. The defect was that a differential invariant was being "
+                "evaluated on finite-separated rays, and the tolerance's declared "
+                "BASIS -- a conservation law -- could not bound the metric it was "
+                "attached to whichever side of 1e-10 the number fell on.\n\n"
+                "What is retained. lagrange_invariant_relative_drift still measures "
+                "1.328629e-07 at a 0.25-degree field, its threshold is still 1e-10, "
+                "and its five-rung field ladder still fits an exponent near 2.5. It "
+                "no longer gates, and its basis now says why: the residual is "
+                "aberration, so a float64 basis was never the right one for it. The "
+                "number is not deleted and not widened.\n\n"
+                "What this gate cannot see is declared on the metric and is real: "
+                "every valid trace of every valid system is symplectic, so this "
+                "says the refraction is a canonical transformation and says nothing "
+                "about whether the prescription is the one that was asked for. "
+                "Measured: replacing the second element's index 1.62 by 1.0 leaves "
+                "the extrapolated residual at 3.5e-15. B1-RAY-EFL, -PLATE and "
+                "-SNELL are the families that decide the prescription, and that "
+                "division of labour is why the omit-index control stays pointed at "
+                "the finite-ray metric, where it does fire."
             ),
         ),
         sampler=None,
         sampler_absent_reason=SamplerAbsentReason.ORACLE_CONSTRUCTION_EXPENSIVE,
         sampler_absent_note=(
             "generating a random multi-surface system that is neither degenerate nor "
-            "aberration-dominated is the work, and it belongs with M9's sampler."
+            "aberration-dominated is the work, and it belongs with M9's sampler. "
+            "Worth noting for whoever writes it: the corrected oracle does not need "
+            "the system to be near-paraxial at all, because the differential "
+            "invariant is exact for real rays -- so its admissible domain is much "
+            "wider than the two paraxial predicates this family still declares for "
+            "the sake of its characterization metric."
         ),
         evidence=(
             "src/registry/prescriptions.py",
@@ -939,9 +1261,18 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
         ),
         notes=(
             "A conservation law is the strongest oracle shape available for a "
-            "multi-surface system, because it needs no external reference at all: the "
-            "system is compared with itself at a different place, not with another "
-            "implementation."
+            "multi-surface system, because it needs no external reference at all: "
+            "the system is compared with itself at a different place, not with "
+            "another implementation. What CHE-106 learned is that the shape is not "
+            "sufficient -- the QUANTITY has to be one the law is actually about. "
+            "Three things are called the Lagrange invariant here (paraxial form, "
+            "finite-real-ray bilinear form, differential symplectic form) and only "
+            "the third is conserved by a real trace; see _symplectic_invariant for "
+            "the distinction written out.\n\n"
+            "The two paraxial validity predicates bound the CHARACTERIZATION metric "
+            "and not the gate. The differential invariant holds outside them, which "
+            "is exactly why it can gate at 1e-13 where the finite form could not "
+            "defensibly gate at all."
         ),
 )
 
@@ -970,15 +1301,16 @@ def _required_launch_tilt_waves(params: Mapping[str, Any]) -> float:
     return n * d * math.sin(theta) / lam
 
 
-#: A three-surface stack, and the family whose gate does NOT close.
+#: A three-surface stack, and the family whose gate closes once the invariant is
+#: the right one.
 #:
-#: The measurement is honest and the tolerance is not achievable, which is a
-#: finding rather than a failure to measure. See the gate disposition: the
-#: Lagrange invariant's finite two-ray form is preserved by a *linear* symplectic
-#: map, and ray refraction at a curved surface is symplectic but not linear, so a
-#: finite-real-ray evaluation carries an aberration residual that no amount of
-#: care removes. The residual is measured, its convergence in the field angle is
-#: fitted, and the tolerance is left exactly where it is.
+#: The gate is the DIFFERENTIAL symplectic invariant, evaluated on two
+#: independent tangent vectors reached by symmetric secants and extrapolated to
+#: zero separation. It closes at 1.204e-15 against a 1e-13 round-off budget.
+#: The finite-real-ray paraxial form is retained as a characterization metric at
+#: its original 1.33e-7 with its original 1e-10 threshold, no longer gating,
+#: because a conservation-law basis cannot bound an aberration residual. See the
+#: gate disposition for the derivation and the six-rung ladder.
 B1_RAY_LAGRANGE = register(
     _B1_RAY_LAGRANGE.with_instances(
         _B1_RAY_LAGRANGE.instantiate(
@@ -990,14 +1322,20 @@ B1_RAY_LAGRANGE = register(
                 "chief_ray_angle_rad": 0.0043633,
                 "chief_ray_height_mm": 0.0,
                 "surface_count": 3,
+                "perturbation_scale": 0.5,
+                "perturbation_rungs": 6,
+                "richardson_levels": 2,
             },
             expected={
+                "symplectic_residual": "0 exactly; float64 round-off in practice",
                 "drift": "0 in the paraxial limit",
                 "known_disposition": (
-                    "NOT_MET. Measured 1.3e-7 relative at 0.25 degrees and a 1/64 "
-                    "pupil fraction, against a 1e-10 gate. The gate's basis is a "
-                    "conservation law that holds paraxially; the measurement is of "
-                    "real rays. Reported rather than accommodated."
+                    "MET. The differential invariant extrapolates to 1.204e-15 "
+                    "against a 1e-13 round-off budget. The finite-real-ray form "
+                    "still reads 1.3e-7 and no longer gates: its basis was a "
+                    "conservation law and its residual is aberration, so the "
+                    "threshold could not bound it either way. Corrected rather "
+                    "than accommodated."
                 ),
             },
         ),

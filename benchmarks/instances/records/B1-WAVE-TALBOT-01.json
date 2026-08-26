@@ -9,7 +9,7 @@
       }
     ],
     "observed_parameters": {
-      "wave.output_dir": "/tmp/b1-wave-n11l53le",
+      "wave.output_dir": "/tmp/b1-wave-698ltt5_",
       "wave.pad_width": 0,
       "wave.propagation": "angular_spectrum",
       "wave.propagation_method": "asm_propagate",
@@ -37,7 +37,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "32abf6a1eb329ca64db5d256da50c037b10cb6e0a58fc2d9b04073e9a0befa38",
+      "combined_sha256": "177c20b383060f2114a156fd3e8dcba01103a2778cb5fb8c16155eb059b51d3a",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -85,12 +85,12 @@
         "src/solvers/registry.py": "38e22edc91cfc775f1f3b25ee6b13a787a6b4e28988acaec6f2029adb7208088",
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
-        "src/verification/claim_ledger.py": "a4e656ed2fc52982d2016cbf3154b91adc466c321b87a85aa88c408c374fc28e",
+        "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
         "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
         "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
         "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "d9959ae2e34cd293b398a2081ace8ebf63274bcebdd1e1a99a30edfaf3a95c3a",
-        "src/verification/families/b1_wave.py": "900d1997af63aaaa2e734f23a144c3a96a578366a06582d5d7c0c178421dcd7b",
+        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
+        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
         "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
         "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
         "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
@@ -122,12 +122,12 @@
     },
     "probe": "instances/b1_wave",
     "schema_version": 2,
-    "source_commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
-    "timestamp_utc": "2026-08-25T23:02:01.330314+00:00",
+    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
+    "timestamp_utc": "2026-08-26T06:20:47.370478+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
-  "scientific_fingerprint": "a34bb9a9bb0588fb50fa4ffeebd5751ad6744c7308a1629dc92a3477b969f61a",
+  "scientific_fingerprint": "9faa872a33f9f9c8d4be496259dfabe185a8bfa9d81aab3ac873989eb800d6e5",
   "verification": {
     "category": "B1",
     "contract_status": {
@@ -218,7 +218,7 @@
         "oracle": "analytic_closed_form",
         "oracle_independence": "independent",
         "tolerance": 0.005,
-        "tolerance_basis": "the revival is exact for an infinite periodic field; the admissible residual is the finite-window truncation plus the complex64 floor. At 32 periods the truncation is the larger of the two and scales as 1/N_periods, so 5e-3 is roughly an order above the expected 1.5e-3 and is a bound to be measured against rather than a fitted value",
+        "tolerance_basis": "DOMINANT TERM, non-paraxial order dephasing. The revival at z_T = 2 d^2 / lambda is a PARAXIAL result and Chromatix's angular spectrum is not paraxial, so the leading admissible residual is that difference and nothing else here is close to it. Order m of the grating propagates with k_z = k sqrt(1 - (m lambda / d)^2); the first term the paraxial expansion drops contributes (1/8) k z (m lambda / d)^4, which at z = z_T is delta_phi_m = (pi/2) m^4 (lambda/d)^2 -- independent of z, and set entirely by the highest order the grid admits, m_max = samples_per_period / 2. At d = 32 um and 8 samples per period m_max = 4 (0.111 rad); at 50% duty only odd orders carry amplitude, so m = 3 dominates at 0.0352 rad. Because the grating is real and even and delta_phi_m is even in m, the first-order intensity perturbation cancels and the INTENSITY L2 goes as the SQUARE of the amplitude-weighted dephasing -- which is why 0.035 rad of order-3 phase error reads 2.0e-4 here and 9.1e-3 on the field metric. 5e-3 is a bound set 23x above that predicted 2.0e-4, not a fitted value. SECONDARY, both far below it: the complex64 floor, which is the 1.9e-5 gap between the float64 exact-ASM prediction (1.99e-4) and the measured complex64 run (2.18e-4); and finite-window truncation, which is DESIGNED OUT rather than budgeted -- the window holds an exact integer number of periods and each period an exact integer number of samples, and the same grating through a paraxial kernel on the same grid returns 3e-24. An earlier version of this basis named truncation as the larger of the two contributions; it is not a contribution at all",
         "tolerance_may_gate": true
       }
     ],
@@ -235,18 +235,18 @@
         "scipy": "1.15.3",
         "torch": "2.13.0+cpu"
       },
-      "run_id": "run-e126c452b610",
+      "run_id": "run-ae270e762a3f",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": {
       "device": "cpu",
       "estimate": null,
-      "peak_memory_bytes": 889446400,
-      "solver_seconds": 0.04839284598710947,
-      "wall_seconds": 0.08559444599086419
+      "peak_memory_bytes": 915439616,
+      "solver_seconds": 0.04886934600654058,
+      "wall_seconds": 0.08769930197740905
     },
-    "run_id": "run-e126c452b610",
+    "run_id": "run-ae270e762a3f",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

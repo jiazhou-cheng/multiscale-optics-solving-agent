@@ -63,7 +63,8 @@ ALLOWED: dict[str, str] = {
     ),
     "benchmarks/protocols": (
         "frozen contracts holding tolerance derivations that exist nowhere else; "
-        "they move to protocols/archive/ once M1/M2/M4 express them executably"
+        "each goes once the families express its content executably, which is what "
+        "CHE-106 did to the M1 baseline protocol. M2 and M3 are still here"
     ),
     "benchmarks/perf/records/l2_psf_01_cpu.json": (
         "a committed cost baseline keyed by the workload it measured"
@@ -235,3 +236,94 @@ def test_the_allowlist_stays_minimal() -> None:
 @pytest.mark.parametrize("prefix", sorted(ALLOWED))
 def test_every_allowlist_entry_states_a_reason(prefix: str) -> None:
     assert len(ALLOWED[prefix]) > 30, f"{prefix}: the reason is too short to be one"
+
+
+#: The retired M1 baseline protocol id, in both its versions.
+M1_PROTOCOL = re.compile(r"\bM1-BASELINE-CPU-V[12]\b")
+
+#: path prefix -> why naming the retired protocol id there is legitimate.
+M1_PROTOCOL_ALLOWED: dict[str, str] = {
+    "benchmarks/reports": (
+        "the milestone record. Those runs really executed under that protocol id, "
+        "and rewriting the report would falsify what was run"
+    ),
+    "benchmarks/inventory.yaml": "the deleted: block has to name what it deleted",
+    "benchmarks/INVENTORY.md": "generated from the triage, so it names the same rows",
+    "benchmarks/README.md": "says which protocol went and on what ground",
+    "benchmarks/protocols/m2_coupler_protocol.md": (
+        "records that M2 used to extend this protocol and that the rules are now "
+        "declared rather than inherited -- the M2 contract's own history"
+    ),
+    "benchmarks/protocols/coupler_protocol.yaml": (
+        "same, in the machine-readable half: the comment where `extends:` used to be"
+    ),
+    "benchmarks/schemas/provenance.schema.json": (
+        "the retired schema whose protocol_id enum is a CHE-133 finding with its "
+        "removal owned by CHE-115; it describes records that were produced under "
+        "these ids, and it is read only by archived tests"
+    ),
+    "src/solvers/optiland/baseline.py": (
+        "docstring citing the contract the standalone runner was built to. Deferred, "
+        "not kept: benchmarks/inventory.yaml carries it as a pending edit, because "
+        "this file is inside every instance record's code_fingerprint and a "
+        "docstring edit would stale all of them"
+    ),
+    "src/solvers/chromatix/baseline.py": "the same deferral, for the wave runner",
+    "tests/test_retired_taxonomy.py": "this file, which has to spell what it bans",
+}
+
+
+def test_the_m1_baseline_protocol_is_gone() -> None:
+    """CHE-106 (M1.1) deleted it once the B1 families expressed its content.
+
+    The condition was written into the artifact's own inventory row -- "moves once
+    M1 expresses its content executably" -- so the deletion is the row being
+    honoured rather than a cleanup. What must not come back is a benchmark
+    declaring a ``protocol_id`` that no file defines: an execution contract that
+    exists only as a string in a result is exactly the unfalsifiable claim the
+    family schema replaced.
+    """
+    assert not (ROOT / "benchmarks/protocols/protocol.yaml").exists()
+    assert not (ROOT / "benchmarks/protocols/m1_baseline_protocol.md").exists()
+
+    offenders = {}
+    for rel in _scanned_files():
+        text = (ROOT / rel).read_text(encoding="utf-8", errors="ignore")
+        if not M1_PROTOCOL.search(text):
+            continue
+        if any(
+            str(rel) == prefix or str(rel).startswith(prefix + "/")
+            for prefix in M1_PROTOCOL_ALLOWED
+        ):
+            continue
+        offenders[str(rel)] = sorted(set(M1_PROTOCOL.findall(text)))
+    assert not offenders, (
+        "these files name the retired M1 baseline protocol and are not on the "
+        f"allowlist in this file: {offenders}\n"
+        "A B0-B4 family declares its own execution policy, tolerances and validity; "
+        "there is no protocol id to inherit."
+    )
+
+
+def test_what_the_m1_protocol_carried_still_exists_somewhere() -> None:
+    """The deletion is only honest if the content it held survives.
+
+    Named here rather than left to the inventory prose, so that moving one of
+    these out from under the deletion fails a test instead of quietly making the
+    ``deleted:`` row wrong.
+    """
+    assert (ROOT / "benchmarks/probes/engine_independence.py").is_file(), (
+        "the engine-independence rule the protocol froze"
+    )
+    assert (ROOT / "benchmarks/probes/records/che12_engine_report.json").is_file(), (
+        "and the record that shows it passed"
+    )
+    for pack in ("optiland", "chromatix"):
+        assert (ROOT / f"knowledge/solvers/{pack}/conventions.md").is_file(), (
+            "the boundary conventions, measured rather than declared"
+        )
+    for module in ("b1_ray", "b1_wave"):
+        source = (ROOT / f"src/verification/families/{module}.py").read_text(encoding="utf-8")
+        assert "ExecutionPolicy(" in source, (
+            f"{module}: the device/dtype half of the protocol is a family policy now"
+        )

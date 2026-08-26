@@ -25,6 +25,8 @@ dev = [
   "mypy>=1.10",
   "pytest>=8.2",
   "pytest-cov>=5.0",
+  # CHE-140: the default suite is sharded; see [tool.pytest.ini_options].addopts.
+  "pytest-xdist>=3.8",
   "ruff>=0.5",
   "types-PyYAML>=6.0.12",
 ]
@@ -114,7 +116,38 @@ norecursedirs = [
   "benchmarks/agents",
   "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
 ]
-addopts = "-ra"
+# CHE-140. Three settings, each with a measured reason. Baseline before this
+# ticket: 374.86 s for 2546 passed / 58 skipped.
+#
+# `-m "not slow"` -- `slow` was already declared, documented and applied, and
+#   then selected anyway, which made it decoration. It is now what it says it is.
+#   39 tests carry it and they were 40% of the suite (151 s of 375 s): the
+#   gradient-bias characterization, the Monte-Carlo convergence-rate fits, the
+#   non-editable-install subprocess, and (added by CHE-140) the twenty B2
+#   stochastic-transition tests. Nothing was made cheaper or weaker to qualify;
+#   `make test-slow` runs them and MUST be run before merging a change to
+#   coupler numerics.
+#
+# `-n 12 --dist loadfile` -- the suite is ~2400 fast tests plus a short tail of
+#   expensive ones, so sharding by file collapses the wall time onto the longest
+#   single file (`test_executor_integration.py`, 31 s of real Optiland ->
+#   Chromatix chain) instead of the sum.
+#
+#   `loadfile` is load-bearing, not a preference: about forty files here use
+#   module-scoped fixtures that execute a benchmark driver or build a solver
+#   system once for the whole file. Under plain `--dist load` pytest-xdist may
+#   send two tests from one file to two workers, and each worker then re-runs
+#   that fixture -- so the finer distribution would make the suite slower and,
+#   worse, would silently multiply real solver work.
+#
+#   12 rather than `auto`: this is a shared 80-core host and AGENTS.md puts
+#   system stability ahead of throughput. Every worker is a separate process that
+#   imports jax, chromatix and optiland, so workers cost RSS, and past ~12 there
+#   is nothing left to win -- the floor is the longest file, not the core count.
+#   A `-n` on the command line overrides this (`./run.sh pytest -q -n 0` is the
+#   serial escape hatch, and is how a suspected cross-test interaction gets
+#   confirmed).
+addopts = "-ra -m \"not slow\" -n 12 --dist loadfile"
 markers = [
   "jax: requires the optional JAX solver environment",
   "torch: requires the optional PyTorch solver environment",

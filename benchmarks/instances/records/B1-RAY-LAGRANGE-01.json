@@ -11,6 +11,9 @@
     "observed_parameters": {
       "chief_ray_angle_rad": 0.004363323129985824,
       "marginal_ray_height_mm": 0.125,
+      "perturbation_rungs": 6,
+      "perturbation_scale": 0.5,
+      "richardson_levels": 2,
       "surface_count": 3
     },
     "seeds": [],
@@ -18,11 +21,12 @@
   },
   "expected": {
     "drift": "0 in the paraxial limit",
-    "known_disposition": "NOT_MET. Measured 1.3e-7 relative at 0.25 degrees and a 1/64 pupil fraction, against a 1e-10 gate. The gate's basis is a conservation law that holds paraxially; the measurement is of real rays. Reported rather than accommodated."
+    "known_disposition": "MET. The differential invariant extrapolates to 1.204e-15 against a 1e-13 round-off budget. The finite-real-ray form still reads 1.3e-7 and no longer gates: its basis was a conservation law and its residual is aberration, so the threshold could not bound it either way. Corrected rather than accommodated.",
+    "symplectic_residual": "0 exactly; float64 round-off in practice"
   },
   "family_id": "B1-RAY-LAGRANGE",
-  "family_version": "1.0.0",
-  "instance_fingerprint": "601a20b0fa74c2917e021d073ed48b0b94310464d6d1a2c716c8ac9ef4e74b0e",
+  "family_version": "2.0.0",
+  "instance_fingerprint": "b2d5df8e7b0a29bbb28a2cbf2ad96b3f49ad8aefd11427ad6483ff4bb34cd64e",
   "instance_id": "B1-RAY-LAGRANGE-01",
   "parameters": {
     "chief_ray_angle_rad": 0.0043633,
@@ -30,11 +34,14 @@
     "index_object_space": 1.0,
     "marginal_ray_angle_rad": 0.0013,
     "marginal_ray_height_mm": 0.125,
+    "perturbation_rungs": 6,
+    "perturbation_scale": 0.5,
+    "richardson_levels": 2,
     "surface_count": 3
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "ae2f076b30369be0a8a66bbb46af8a33e0ae2d2a9ed2d1b77dd597906a36503b",
+      "combined_sha256": "faddc474249316cfb761bc83bb5e0c8ed4970156b6168f6b11a91484e4bbaa9a",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -86,12 +93,12 @@
         "src/solvers/optiland/requests.py": "061e6831139364a9e92c284055df9845076a285666977722e019cae3221442ed",
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
-        "src/verification/claim_ledger.py": "a4e656ed2fc52982d2016cbf3154b91adc466c321b87a85aa88c408c374fc28e",
+        "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
         "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
         "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
         "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "d9959ae2e34cd293b398a2081ace8ebf63274bcebdd1e1a99a30edfaf3a95c3a",
-        "src/verification/families/b1_wave.py": "900d1997af63aaaa2e734f23a144c3a96a578366a06582d5d7c0c178421dcd7b",
+        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
+        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
         "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
         "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
         "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
@@ -121,12 +128,12 @@
     },
     "probe": "instances/b1_ray",
     "schema_version": 2,
-    "source_commit": "7e65ea2e486cf6e346b1b3011678082ddc998d0c",
-    "timestamp_utc": "2026-08-25T23:01:46.504303+00:00",
+    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
+    "timestamp_utc": "2026-08-26T06:20:32.363905+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
-  "scientific_fingerprint": "6efdba4351d1261ed7a35079a5a244bfe95690a4c8800647665121ddbe9f7ab6",
+  "scientific_fingerprint": "732f4b1971e30a4057658d3dda5c9046944bbd86c9d7bbf87d00059f801a54c4",
   "verification": {
     "category": "B1",
     "contract_status": {
@@ -137,59 +144,67 @@
       "silent_hazard_ids": []
     },
     "convergence": {
-      "converged": null,
-      "dimension": "chief_ray_angle_rad",
-      "expected_exponent": null,
+      "converged": true,
+      "dimension": "pupil_half_separation_m",
+      "expected_exponent": 2.0,
       "fitted_exponent": {
-        "note": "log-log least squares over 5 rungs; r^2=0.981672",
-        "uncertainty": 0.19716613345654288,
+        "note": "log-log least squares over 6 rungs; r^2=1.000000",
+        "uncertainty": 7.191902235925404e-05,
         "uncertainty_basis": "fit_standard_error",
         "unit": null,
-        "value": 2.4992949421192168
+        "value": 2.000183464604467
       },
       "ladder": [
-        0.06981317007977318,
-        0.03490658503988659,
-        0.017453292519943295,
-        0.008726646259971648,
-        0.004363323129985824
+        0.002,
+        0.001,
+        0.0005,
+        0.00025,
+        0.000125,
+        6.25e-05
       ],
-      "note": "the drift against the chief-ray field angle, over five halvings. No expected exponent is declared because the measured one is not a clean integer -- it comes out near 2.5 -- and asserting 2 would be asserting the wrong model. That the drift VANISHES with the field is the conservation statement; the exponent is a characterization of how.",
+      "note": "the differential invariant's residual against the secant separation, over six halvings. The exponent is PREDICTED: two symmetric secants approximate two tangent vectors to O(eps^2), so a residual that is truncation error must go as eps^2 and one that is physical has no reason to. Measuring 2.00018 is therefore the evidence that the residual is removable, and the Richardson columns are what remove it: 1.08e-7 after the eps^2 term, 1.20e-15 after the eps^4 term, which is the float64 floor. The five-rung FIELD ladder of the retained paraxial metric is a separate and non-gating measurement; see the PARAXIAL_FIELD_LADDER diagnostic.",
       "values": [
         {
-          "note": "chief_ray_angle_rad=0.0698132",
+          "note": "pupil_half_separation_m=0.002",
           "uncertainty": null,
           "uncertainty_basis": "not_estimated",
           "unit": null,
-          "value": 0.0001617883180248153
+          "value": 0.0005611136946724423
         },
         {
-          "note": "chief_ray_angle_rad=0.0349066",
+          "note": "pupil_half_separation_m=0.001",
           "uncertainty": null,
           "uncertainty_basis": "not_estimated",
           "unit": null,
-          "value": 3.9788086919236205e-05
+          "value": 0.00014019740528216641
         },
         {
-          "note": "chief_ray_angle_rad=0.0174533",
+          "note": "pupil_half_separation_m=0.0005",
           "uncertainty": null,
           "uncertainty_basis": "not_estimated",
           "unit": null,
-          "value": 9.367189942496795e-06
+          "value": 3.504429447247252e-05
         },
         {
-          "note": "chief_ray_angle_rad=0.00872665",
+          "note": "pupil_half_separation_m=0.00025",
           "uncertainty": null,
           "uncertainty_basis": "not_estimated",
           "unit": null,
-          "value": 1.766901024894391e-06
+          "value": 8.760757670496314e-06
         },
         {
-          "note": "chief_ray_angle_rad=0.00436332",
+          "note": "pupil_half_separation_m=0.000125",
           "uncertainty": null,
           "uncertainty_basis": "not_estimated",
           "unit": null,
-          "value": 1.3286293738874953e-07
+          "value": 2.1901696727156153e-06
+        },
+        {
+          "note": "pupil_half_separation_m=6.25e-05",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 5.47541183373268e-07
         }
       ]
     },
@@ -202,13 +217,73 @@
       }
     ],
     "family_id": "B1-RAY-LAGRANGE",
-    "family_version": "1.0.0",
+    "family_version": "2.0.0",
     "instance_id": "B1-RAY-LAGRANGE-01",
     "invariant_results": [],
     "negative_control_results": [
       {
         "baseline": {
-          "note": "at the finest rung of the field ladder, theta = 4.363e-03 rad. The error bar is the change from the previous rung, which is the honest statement of how converged this is.",
+          "note": "Richardson-extrapolated to zero ray separation over 6 halvings, two levels. The error bar is the larger of the extrapolation's own O(eps^6) remainder (6.109e-17, estimated from the next column) and the float64 round-off floor of the extrapolation weights -- because below that floor the two are indistinguishable and quoting the smaller would claim a precision the arithmetic does not have",
+          "uncertainty": 4.196453462051459e-16,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 1.203975191148987e-15
+        },
+        "control_id": "non-symplectic-momentum-scale",
+        "mutated": {
+          "note": "image-plane canonical momenta scaled by 1 + 1e-06 with the positions untouched, so the tangent map's determinant is no longer one. omega is bilinear in p, so the expected residual is the scale factor itself",
+          "uncertainty": 0.0,
+          "uncertainty_basis": "exact",
+          "unit": null,
+          "value": 9.999999988124447e-07
+        },
+        "note": "a map that is not a canonical transformation, by a known amount, and the metric reads that amount back. baseline 1.20398e-15 -> mutated 1e-06 against a gate of 1e-13; detection margin 8.30582e+08x",
+        "outcome": "fired",
+        "target_metric": "symplectic_invariant_relative_residual"
+      },
+      {
+        "baseline": {
+          "note": "Richardson-extrapolated to zero ray separation over 6 halvings, two levels. The error bar is the larger of the extrapolation's own O(eps^6) remainder (6.109e-17, estimated from the next column) and the float64 round-off floor of the extrapolation weights -- because below that floor the two are indistinguishable and quoting the smaller would claim a precision the arithmetic does not have",
+          "uncertainty": 4.196453462051459e-16,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 1.203975191148987e-15
+        },
+        "control_id": "non-symplectic-position-scale",
+        "mutated": {
+          "note": "the conjugate half: image-plane positions scaled by 1 + 1e-06 with the momenta untouched. Declared separately because a metric sensitive to one factor of a bilinear form is not automatically sensitive to the other",
+          "uncertainty": 0.0,
+          "uncertainty_basis": "exact",
+          "unit": null,
+          "value": 9.999999988124447e-07
+        },
+        "note": "the other factor of the bilinear form, and it is not blind to it. baseline 1.20398e-15 -> mutated 1e-06 against a gate of 1e-13; detection margin 8.30582e+08x",
+        "outcome": "fired",
+        "target_metric": "symplectic_invariant_relative_residual"
+      },
+      {
+        "baseline": {
+          "note": "Richardson-extrapolated to zero ray separation over 6 halvings, two levels. The error bar is the larger of the extrapolation's own O(eps^6) remainder (6.109e-17, estimated from the next column) and the float64 round-off floor of the extrapolation weights -- because below that floor the two are indistinguishable and quoting the smaller would claim a precision the arithmetic does not have",
+          "uncertainty": 4.196453462051459e-16,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 1.203975191148987e-15
+        },
+        "control_id": "degenerate-tangent-pair",
+        "mutated": {
+          "note": "both secants drawn from the pupil fan. omega_object is IDENTICALLY zero at every rung -- a collimated bundle gives every ray one launch direction, so dp_object = 0 for both secants -- while omega_image is not, so the relative residual is infinite rather than merely large. This is the construction error behind the earlier 'converges to 1 + 7.1e-3 and does not approach 1'",
+          "uncertainty": 0.0,
+          "uncertainty_basis": "exact",
+          "unit": null,
+          "value": null
+        },
+        "note": "the oracle needs two LINEARLY INDEPENDENT tangent directions, and that requirement is executable rather than advisory. baseline 1.20398e-15 -> mutated inf against a gate of 1e-13; detection margin infx",
+        "outcome": "fired",
+        "target_metric": "symplectic_invariant_relative_residual"
+      },
+      {
+        "baseline": {
+          "note": "at the finest rung of the field ladder, theta = 4.363e-03 rad. The error bar is the change from the previous rung, which is the honest statement of how converged this is. Non-gating: this is the paraxial form on finite real rays and its residual is aberration",
           "uncertainty": 1.6340380875056415e-06,
           "uncertainty_basis": "grid_convergence",
           "unit": null,
@@ -222,7 +297,7 @@
           "unit": null,
           "value": 2.247371442832287e-06
         },
-        "note": "removing an index changes the system, and the invariant follows it. baseline 1.32863e-07 -> mutated 2.24737e-06 against a gate of 1e-10; detection margin 16.915x",
+        "note": "removing an index changes the system, and the paraxial invariant follows it. Pointed at the finite-ray metric deliberately: the symplectic gate is blind to the prescription by construction, and the measured inertness is in the PRESCRIPTION_MUTATION_IS_INERT diagnostic. baseline 1.32863e-07 -> mutated 2.24737e-06 against a gate of 1e-10; detection margin 16.915x",
         "outcome": "fired",
         "target_metric": "lagrange_invariant_relative_drift"
       }
@@ -230,11 +305,34 @@
     "physics_accuracy": [
       {
         "blind_to": [
-          "a compensating error: a system that scaled u and y_bar by reciprocal factors would conserve H while getting both wrong",
-          "everything non-paraxial -- H is a paraxial invariant and says nothing about aberration"
+          "which prescription was traced. EVERY valid ray trace of EVERY valid system is symplectic, so a system built from the wrong radii or the wrong glass conserves this exactly. It says the refraction is implemented as a canonical transformation, not that the system is the one that was asked for -- B1-RAY-EFL, -PLATE and -SNELL are what decide that. Measured, not argued: replacing the second element's index 1.62 by 1.0 leaves the extrapolated residual at 3.5e-15",
+          "a canonically conjugate compensating error: a map that scaled q by alpha and p by 1/alpha has unit determinant and passes. Scaling either one ALONE is caught, and both directions are declared as controls, but the conjugate pair is not",
+          "the difference between the canonical momentum n*M and the ray slope M/N at an axial base ray. The two agree to first order there, so substituting the slope -- the previous formulation's own error -- changes nothing in the eps -> 0 limit and shows up only at finite separation. Measured: 1.52e-7 against the canonical 5.48e-7 at the finest rung, 4.1e-16 extrapolated",
+          "everything aberration. Finite-ray aberration is precisely what the extrapolation removes, and it is reported separately as lagrange_invariant_relative_drift rather than folded in here"
         ],
         "measured": {
-          "note": "at the finest rung of the field ladder, theta = 4.363e-03 rad. The error bar is the change from the previous rung, which is the honest statement of how converged this is.",
+          "note": "Richardson-extrapolated to zero ray separation over 6 halvings, two levels. The error bar is the larger of the extrapolation's own O(eps^6) remainder (6.109e-17, estimated from the next column) and the float64 round-off floor of the extrapolation weights -- because below that floor the two are indistinguishable and quoting the smaller would claim a precision the arithmetic does not have",
+          "uncertainty": 4.196453462051459e-16,
+          "uncertainty_basis": "grid_convergence",
+          "unit": null,
+          "value": 1.203975191148987e-15
+        },
+        "met": true,
+        "metric": "symplectic_invariant_relative_residual",
+        "oracle": "conservation_law",
+        "oracle_independence": "independent",
+        "tolerance": 1e-13,
+        "tolerance_basis": "float64 round-off in the extrapolated invariant, derived and then checked against the measurement rather than fitted to it. Three terms, and no aberration term because the extrapolation removes it: (1) ROUND-OFF. eps = 2.2204e-16. The traced state carries the accumulated round-off of the trace itself, bounded by the same 64*eps the adapter derives for its own direction-norm check (solvers/optiland/execution.py::_direction_norm_tolerance) -- a few operations per surface on quantities of order one, over at most twelve surfaces. Forming omega amplifies that by the measured conditioning of the secants and of the bilinear form, sum|terms| / |omega| = 1.0005 and |q| / |dq| = 0.5, i.e. by less than one. Richardson to two levels amplifies it by prod (2^p + 1)/(2^p - 1) for p = 2, 4 = 1.889. So 64 * 2.2204e-16 * 1.0005 * 1.889 = 2.7e-14. (2) TRUNCATION of the extrapolation itself, O(eps^6) after two Richardson levels, estimated from the next column at 6.1e-17 -- three decades below the round-off term and therefore not what sets this. (3) HEADROOM: one decade, so a deeper system or a slightly worse-conditioned base ray does not need the number moved. 1e-13. This is three decades TIGHTER than the 1e-10 it replaces, and the measured value 1.204e-15 sits 83x inside it and 5.4x above the single-operation float64 floor",
+        "tolerance_may_gate": true
+      },
+      {
+        "blind_to": [
+          "a compensating error: a system that scaled u and y_bar by reciprocal factors would conserve H while getting both wrong",
+          "everything non-paraxial -- H is a paraxial invariant and says nothing about aberration",
+          "the fact that it is not a conservation statement at all for finite real rays. The bilinear form p_a.q_b - p_b.q_a is preserved by a LINEAR symplectic map; the residual this metric reports is aberration, and it does NOT vanish as the two rays approach one another, because it is not the derivative of anything. Conserved quantities live on tangent vectors, which is what symplectic_invariant_relative_residual measures"
+        ],
+        "measured": {
+          "note": "at the finest rung of the field ladder, theta = 4.363e-03 rad. The error bar is the change from the previous rung, which is the honest statement of how converged this is. Non-gating: this is the paraxial form on finite real rays and its residual is aberration",
           "uncertainty": 1.6340380875056415e-06,
           "uncertainty_basis": "grid_convergence",
           "unit": null,
@@ -245,21 +343,21 @@
         "oracle": "conservation_law",
         "oracle_independence": "independent",
         "tolerance": 1e-10,
-        "tolerance_basis": "conservation to float64 round-off accumulated over at most twelve surfaces. Each surface contributes a few operations on quantities of order 1, so 1e-10 is several orders above the floor and far below any real transfer-matrix error",
-        "tolerance_may_gate": true
+        "tolerance_basis": "UNCHANGED AT 1e-10 AND NO LONGER GATING, and the reason is a derivation rather than a convenience. Its previously declared basis was CONSERVATION_LAW -- 'conservation to float64 round-off accumulated over at most twelve surfaces' -- and that basis does not apply to this metric. The conservation law it named holds for the paraxial transfer matrix and for tangent vectors; this metric evaluates the bilinear form on two REAL rays at finite separation, where the leading residual is aberration and is many orders above round-off. A tolerance whose basis cannot bound its metric is invalid whichever side of the threshold the measurement lands on, and no threshold derived from float64 could ever have been the right one here. The threshold is therefore left exactly where it was rather than widened to fit the 1.33e-7 that is measured, the metric is retained and reported because the paraxial domain it characterizes is real, and the conservation claim it was standing in for now has its own valid gate on symplectic_invariant_relative_residual. Re-deriving a defensible APPROXIMATION-error bound for the finite form -- third-order aberration theory for this specific stack -- would make this gateable again and is not done here",
+        "tolerance_may_gate": false
       }
     ],
     "provenance": {
-      "family_version": "1.0.0",
+      "family_version": "2.0.0",
       "fingerprint_matched": true,
-      "instance_fingerprint": "601a20b0fa74c2917e021d073ed48b0b94310464d6d1a2c716c8ac9ef4e74b0e",
+      "instance_fingerprint": "b2d5df8e7b0a29bbb28a2cbf2ad96b3f49ad8aefd11427ad6483ff4bb34cd64e",
       "package_versions": {},
-      "run_id": "probe-bea180bb47d9",
+      "run_id": "probe-d9dcdcd794a0",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-bea180bb47d9",
+    "run_id": "probe-d9dcdcd794a0",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

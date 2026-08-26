@@ -1,4 +1,4 @@
-.PHONY: test test-tutorial test-agent-benchmark agent-benchmark validate list-models list-couplers clean
+.PHONY: test test-slow test-serial test-gpu test-tutorial test-agent-benchmark agent-benchmark validate list-models list-couplers clean
 
 # Every target runs through ./run.sh, which is the only supported entry point
 # (AGENTS.md, "Execution Environment -- Container Only").
@@ -14,9 +14,51 @@
 # underlying command directly; ./run.sh from within a container will not work.
 
 # The default active suite (CHE-67). `testpaths = ["tests"]` is what keeps the
-# on-demand tutorial suite and the archived generations out of this.
+# on-demand tutorial suite and the archived generations out of this. CHE-140 put
+# `-m "not slow" -n 12 --dist loadfile` in pyproject's addopts, so this is ~55 s
+# rather than the ~375 s it was; the reasoning is in that addopts comment.
 test:
 	./run.sh pytest -q
+
+# The `slow` selection: expensive numerical characterization and convergence
+# measurement, deselected from the default gate by CHE-140. ~39 tests, ~3.5 min.
+#
+# Not optional work. These are the coupler exit gates -- the gradient-bias
+# characterization (CHE-28), the wave-to-ray Monte-Carlo convergence fits, and
+# the B2 stochastic-transition benchmark with its five-control battery. Run this
+# before merging any change to coupler numerics, sampling densities, estimator
+# weights or a benchmark family, and say in the PR that you did.
+#
+# `-p no:cacheprovider` is not used here on purpose: a failure in this suite is
+# worth `--lf`.
+test-slow:
+	./run.sh pytest -q -m "slow"
+
+# The whole default tree with nothing deselected and no sharding. The arbiter
+# when a failure is suspected to be a cross-test interaction or a worker
+# artifact rather than a real defect -- if it reproduces here, it is real.
+# ~6 min. Also the honest "everything" command.
+test-serial:
+	./run.sh pytest -q -m "" -n 0
+
+# The opt-in GPU suite. Needs the separately-built `agent_solver_gpu` image and
+# a device; see docs/testing/gpu_environment.md. Select the device with MOA_GPUS
+# (AGENTS.md prefers 6 and 7): `MOA_GPUS=device=6 make test-gpu`.
+#
+# `-o addopts=` replaces the default `-m "not slow" -n 12 --dist loadfile`
+# wholesale, and the sharding is the reason rather than the marker. There is one
+# device: twelve workers would each import jax and open their own CUDA context on
+# it, and JAX preallocates a large fraction of device memory per process, so the
+# second worker OOMs on a GPU the first one is holding. AGENTS.md's shared-server
+# policy is explicit that this is not a throughput decision -- one workload per
+# GPU. This is the same class of defect CHE-140 found in the swap guard, where a
+# resource mechanism degraded silently under sharding.
+#
+# Overriding addopts rather than appending `-n 0` also keeps this runnable on the
+# current `agent_solver_gpu` image, which was built before CHE-140 pinned
+# pytest-xdist and therefore does not have the plugin to accept `-n` at all.
+test-gpu:
+	./run.sh --gpu pytest -q -o addopts="-ra" -m gpu
 
 # The on-demand tutorial suite: ~33 min, 60 reproductions of upstream
 # Optiland/Chromatix tutorials against the pinned installs. A dependency-pin

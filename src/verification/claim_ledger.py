@@ -562,6 +562,58 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
     ),
     Claim(
         component="M_WAVE_CHROMATIX",
+        kind=ClaimKind.DEVICE_PARITY,
+        claim=(
+            "A CUDA propagation through the graph node reports cuda:0 read off the "
+            "output array before any host copy -- never off the request, the platform "
+            "pin or jax.default_backend() -- and a host-only session refuses the "
+            "request instead of serving it from the CPU."
+        ),
+        oracle=Oracle.CROSS_ROUTE,
+        oracle_independence=OracleIndependence.SHARES_CODE,
+        evidence=(
+            _t("test_b1_wave_gpu.py", "test_the_cuda_request_actually_executed_on_the_device"),
+            _t("test_b1_wave_gpu.py", "test_a_cuda_request_cannot_pass_by_executing_on_the_host"),
+            _t(
+                "test_b1_wave_gpu.py",
+                "test_the_observation_source_is_the_live_array_not_the_persisted_npy",
+            ),
+            _t("test_b1_wave_gpu.py", "test_a_host_run_is_not_mislabelled_cuda_on_a_gpu_host"),
+            _t("test_b1_wave_gpu.py", "test_the_two_devices_compute_the_same_field"),
+            _t(
+                "test_b1_wave_instances.py",
+                "test_a_cuda_request_is_refused_rather_than_run_on_the_host",
+            ),
+            _t(
+                "test_b1_wave_instances.py",
+                "test_the_placement_comes_from_the_live_array_and_not_the_persisted_copy",
+            ),
+            "benchmarks/probes/records/chromatix/b1_wave_device_observation.json",
+        ),
+        metric="cpu_vs_cuda_relative_l2_field = 3.30e-5 against a 1.41e-4 complex64 floor",
+        gate_status=GateStatus.MEASURED_OFF_GATE,
+        device="cuda",
+        dtype="complex64",
+        namespace="jax",
+        caveats=(
+            "measured_off_gate, not met: the measurement is real -- RTX A6000, jax "
+            "0.6.2 + jax-cuda12-plugin, `MOA_GPUS=device=6 make test-gpu`, 66 passed -- "
+            "but gpu-marked tests are deselected from the default gate, so nothing "
+            "required re-checks it.",
+            "Agreement is our own two devices agreeing, so it cannot decide "
+            "correctness; it establishes that the device port did not change the "
+            "answer, which is what makes the placement claim about an execution "
+            "rather than about a label. The correctness gate is the analytic Gaussian "
+            "closed form, re-run on the device by "
+            "test_the_gated_gaussian_instance_still_meets_its_tolerance.",
+            "The observation is unavoidably ours to get right: the persisted .npy is "
+            "host bytes, so reading placement from the file reports every CUDA run as "
+            "a downgrade. The driver did exactly that until CHE-107, and only a GPU "
+            "session can tell the two sources apart.",
+        ),
+    ),
+    Claim(
+        component="M_WAVE_CHROMATIX",
         kind=ClaimKind.STRUCTURED_FAILURE,
         claim=(
             "A missing input, an invalid request and a gradient request are each refused "

@@ -62,6 +62,29 @@ pending_edits:
       design. Replace with the family registry / `benchmarks/instances/` layout.
     owner: CHE-133 (M0.5.4)
     why_not_here: This issue changes no behaviour and no repository-wide prose.
+  - path: src/solvers/optiland/baseline.py
+    section: module docstring
+    required_change: >-
+      The docstring says run_standalone implements the frozen
+      "M1-BASELINE-CPU-V2" contract. CHE-106 (M1.1) deleted that protocol, so the
+      id no longer resolves to anything in the tree. The rules the docstring names
+      -- fresh process, no coupler, fixed artifact set, structured blocker instead
+      of a fabricated value -- are still exactly what the function does and should
+      be stated without the retired id.
+    owner: CHE-106 follow-up, not yet filed
+    why_not_here: >-
+      every instance record's code_fingerprint covers this file, so a
+      docstring-only edit makes all committed instance records stale and forces a
+      full driver re-run under tests/test_provenance_fingerprint.py. That is not
+      worth spending inside the change that closes M1.1; batch it with the next
+      edit that touches this module for a scientific reason.
+  - path: src/solvers/chromatix/baseline.py
+    section: module docstring
+    required_change: >-
+      Same as the ray baseline above, for the retired id "M1-BASELINE-CPU-V1".
+    owner: CHE-106 follow-up, not yet filed
+    why_not_here: >-
+      same reason: the file is inside every instance record's code_fingerprint.
 
 # Bucket-C artifacts CHE-133 removed, and where their content survives. Kept as a
 # record rather than as `entries:` rows, because the coverage test refuses a row
@@ -116,7 +139,104 @@ deleted:
       agreements) and src/verification/hazards.py (the two measured traps with
       their numbers), both covered by tests/test_preserved_evidence.py.
 
+  - path: benchmarks/protocols/protocol.yaml
+    count: 1
+    by: CHE-106 (M1.1)
+    survives_as: >-
+      the B1 families, which this row's own destination made the condition for
+      removal. Device, dtype, namespace and the wall-clock/memory envelope are the
+      RAY_EXECUTION and WAVE_EXECUTION ExecutionPolicy objects in
+      src/verification/families/b1_ray.py and b1_wave.py; each tolerance is a
+      family tolerance carrying its own declared basis; the required-provenance
+      key list is core.provenance with the generated
+      schemas/provenance.schema.json, enforced per record by
+      tests/test_provenance_fingerprint.py; the timing recipe -- warmups, repeats,
+      median with minimum and p95 -- is benchmarks/perf/run_baselines.py, which
+      declares where it deviates and why; and the engine-independence rule it
+      froze is the probe benchmarks/probes/engine_independence.py with its record
+      benchmarks/probes/records/che12_engine_report.json. The measurement,
+      artifact and provenance rules M2 inherited are now stated in full in
+      protocols/coupler_protocol.yaml instead of by reference, byte-identical to
+      what M2 ran under.
+  - path: benchmarks/protocols/m1_baseline_protocol.md
+    count: 1
+    by: CHE-106 (M1.1)
+    survives_as: >-
+      knowledge/solvers/optiland/conventions.md and
+      knowledge/solvers/chromatix/conventions.md, which carry the same boundary
+      items -- units, axis order, frame, handedness, phasor sign, amplitude
+      semantics, normalization, sampling, dtype -- measured, with a citing issue,
+      rather than declared with a pending "verification state" column; the B1
+      family question and tolerance-basis text for the items that became gates;
+      and benchmarks/reports/2026-08/ray_and_wave_baselines.md for what the M1
+      runs produced, with the runs themselves in archive/benchmarks/gen1/.
+
 entries:
+
+  # =========================================================================
+  # benchmarks/applied/ -- CHE-139 (M1.1.5), authored after the direction change
+  # =========================================================================
+  # Not old task layer: it was written on the shipping builder and adapter, gates
+  # nothing, and its own README forbids a tolerance. Rows exist because the
+  # coverage test refuses an unclassified file, not because a verdict was in doubt.
+  - path: benchmarks/applied/commercial_lens_systems/README.md
+    bucket: A
+    justification: >-
+      States the chain under test end to end and the rule the benchmark rests on:
+      it decides nothing, carries no tolerance and no verdict, and every
+      comparison it reports names the basis on which it is comparable.
+    destination: >-
+      stays where it is. If this workload ever becomes a family it is B4
+      characterization, never a gate; the README is the text that says why.
+  - path: benchmarks/applied/commercial_lens_systems/catalog_sources.py
+    bucket: A
+    justification: >-
+      The vendor-traceability rule as executable code: every published number
+      carries its manufacturer document, and an unpublished radius, thickness,
+      glass or spacing becomes a ConstructionRefusal rather than an estimate.
+      M-10X is kept precisely because it fails that test.
+    destination: >-
+      the construction-refusal evidence behind the commercial-prescription claims,
+      and the input half of any future B4 characterization of this workload.
+  - path: benchmarks/applied/commercial_lens_systems/benchmark_systems.py
+    bucket: A
+    justification: >-
+      Separates what the manufacturer publishes from what installation adds --
+      ordering, orientation, air gaps, entrance pupil, object and image
+      configuration -- with a ParameterSource on every value, so a catalog number
+      and an assembly choice can never be confused in a result.
+    destination: >-
+      the assembly-provenance pattern (catalog vs assembly_choice) for composed
+      systems built from vendor parts.
+  - path: benchmarks/applied/commercial_lens_systems/run_benchmark.py
+    bucket: A
+    justification: >-
+      Drives the shipping path only: a ModelRunRequest carrying a canonical
+      prescription, no Optic of its own, no ray tracing and no optical physics in
+      the benchmark. That is what makes it evidence about the builder rather than
+      about itself.
+    destination: >-
+      the CPU/GPU comparison and characterization reduction it already writes;
+      superseded by the executor and family runner if this workload is promoted.
+  - path: benchmarks/applied/commercial_lens_systems/records/*.json
+    glob: true
+    bucket: A
+    justification: >-
+      The characterization output actually produced for the four built systems,
+      including the CPU/GPU comparison and the components record that names the
+      refused part. Provenance, never an oracle.
+    destination: >-
+      the recorded evidence behind the commercial-lens construction claims; read
+      as records, not as gates.
+  - path: benchmarks/applied/commercial_lens_systems/figures/*.png
+    glob: true
+    bucket: A
+    justification: >-
+      The per-system diagnostic figures the runs emitted, including the reversed
+      achromat that the benchmark reports as installed backwards.
+    destination: >-
+      illustration attached to the records above; nothing reads them
+      programmatically.
 
   # =========================================================================
   # benchmarks/agents/ -- the V1 agent suite
@@ -286,9 +406,16 @@ entries:
       run by tests/test_b1_ray_instances.py in the default gate.
     note: >-
       Also carries the device/precision matrix (RAY-4) and the unsupported-request
-      probe (RAY-5). One family's gate does NOT close and says so:
-      B1-RAY-LAGRANGE measures 1.3e-7 against a 1e-10 tolerance whose basis is a
-      paraxial conservation law, and the tolerance is left alone.
+      probe (RAY-5). B1-RAY-LAGRANGE's gate was NOT_MET at 1.3e-7 against 1e-10
+      and is now MET at 1.2e-15 against 1e-13, because the ORACLE was corrected
+      rather than the tolerance widened: the finite-real-ray bilinear form is
+      preserved only by a LINEAR symplectic map, so the gate is now the
+      DIFFERENTIAL invariant on two independent tangent vectors, extrapolated to
+      zero ray separation. The 1.3e-7 finite-ray number is retained as a
+      non-gating characterization metric at its original 1e-10 threshold. The
+      device/precision matrix's CPU-vs-CUDA agreement is measured on real
+      hardware and persisted at
+      benchmarks/probes/records/optiland/b1_ray_device_precision.json.
   - path: benchmarks/instances/b1_wave.py
     bucket: B
     justification: >-
@@ -304,9 +431,18 @@ entries:
       B1-WAVE-GAUSS / -AIRY / -TILT / -PLANEPHASE / -FWDBWD / -TALBOT /
       -ASM-VALIDITY canonical instances, run by tests/test_b1_wave_instances.py.
     note: >-
-      Also carries the device observation (WAVE-3). The complex64 accuracy cost
-      (WAVE-2) is measured once, by B0-DTYPE-01, against the independent float64
-      angular spectrum rather than twice.
+      Also carries the device observation (WAVE-3), whose CUDA arm is measured on
+      real hardware and persisted at
+      benchmarks/probes/records/chromatix/b1_wave_device_observation.json: the
+      placement is read from array_state on the live JAX array before
+      jax.device_get, and the persisted .npy placement is recorded beside it as a
+      contrast because host bytes report cpu for every run. Asserted by
+      tests/test_b1_wave_gpu.py. The complex64 accuracy cost (WAVE-2) is measured
+      once, by B0-DTYPE-01, against the independent float64 angular spectrum
+      rather than twice. TALBOT's tolerance basis is the m^4 non-paraxial order
+      dephasing (pi/2) m^4 (lambda/d)^2, and the driver decomposes it against a
+      paraxial and an exact float64 kernel on the same grid rather than asserting
+      it.
   - path: benchmarks/instances/b2_transitions.py
     bucket: B
     justification: >-
@@ -366,14 +502,6 @@ entries:
   # =========================================================================
   # benchmarks/protocols/ -- frozen contracts holding tolerance derivations
   # =========================================================================
-  - path: benchmarks/protocols/protocol.yaml
-    bucket: A
-    justification: >-
-      The M1 baseline contract: declared tolerances, sampling, device and dtype
-      for the ray and wave node baselines.
-    destination: >-
-      B1 ray/wave family execution_policy and tolerance bases. Moves to
-      protocols/archive/ only once M1 expresses its content executably.
   - path: benchmarks/protocols/coupler_protocol.yaml
     bucket: A
     justification: >-
@@ -390,10 +518,6 @@ entries:
     destination: >-
       ValidityPredicate bases (per-axis Nyquist from marginal ray angles;
       declared planarity) and B3-PSF-SINGLET execution_policy.
-  - path: benchmarks/protocols/m1_baseline_protocol.md
-    bucket: A
-    justification: Prose contract for the M1 baselines; carries the tolerance reasoning.
-    destination: B1 family question/basis text.
   - path: benchmarks/protocols/m2_coupler_protocol.md
     bucket: A
     justification: Prose contract for the coupler benchmarks.

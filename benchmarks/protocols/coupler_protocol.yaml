@@ -1,6 +1,11 @@
 schema_version: 1
 protocol_id: M2-COUPLER-CPU-V1
-extends: M1-BASELINE-CPU-V1
+# This protocol used to declare `extends: M1-BASELINE-CPU-V1`. CHE-106 (M1.1)
+# retired that protocol once the B1 ray and wave families expressed its content
+# executably, so nothing is inherited any more: the execution, artifact,
+# result-section, failure and provenance rules below are this protocol's own and
+# are stated in full. They are byte-identical to what M2 ran under; the only
+# change is that they are declared here rather than by reference.
 scope:
   benchmark_ids: [L2-COUPLER-01]
   execution: single_process_coupler_core

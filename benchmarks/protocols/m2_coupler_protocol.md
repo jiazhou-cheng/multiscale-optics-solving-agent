@@ -3,8 +3,10 @@
 CHE-21 freezes `M2-COUPLER-CPU-V1`, the execution and reporting contract for
 `L2-COUPLER-01`, before any coupler physics is written — mirroring what CHE-12
 did for the M1 baselines. The machine-readable form is
-[`coupler_protocol.yaml`](coupler_protocol.yaml); it extends, and does not
-replace, [`protocol.yaml`](protocol.yaml).
+[`coupler_protocol.yaml`](coupler_protocol.yaml). It used to extend the M1
+baseline protocol; CHE-106 (M1.1) retired that protocol once the B1 families
+expressed its content executably, so the rules this contract once inherited are
+now declared in full in `coupler_protocol.yaml` itself, unchanged.
 
 The scientific source of truth is Cheng, Gao, Shao, Mao, Milster and Fan,
 *A Differentiable Ray–Wave Framework for Hybrid Refractive–Diffractive System
@@ -128,13 +130,16 @@ direction and parameter at a time.
 
 ## Measurement, artifacts, and failure
 
-Measurement rules are inherited from `M1-BASELINE-CPU-V1` unchanged: `./run.sh`
-only, two untimed warmups, seven timed repeats, median as the primary statistic
-with minimum and p95, recorded CPU affinity and thread counts with no claim of
-isolation, and `resource.getrusage` peak memory with a structured `unsupported`
-diagnostic when unavailable. The M2 seed is `20260812`.
+Measurement rules are the M1 baseline rules unchanged, and since CHE-106 (M1.1)
+retired that protocol they are declared directly in `coupler_protocol.yaml`
+rather than inherited: `./run.sh` only, two untimed warmups, seven timed
+repeats, median as the primary statistic with minimum and p95, recorded CPU
+affinity and thread counts with no claim of isolation, and
+`resource.getrusage` peak memory with a structured `unsupported` diagnostic when
+unavailable. The M2 seed is `20260812`.
 
-Beyond the M1 artifact set, a completed run emits `convergence.json` and
+Beyond the base artifact set — `result.json`, `provenance.json`, `arrays.npz`,
+`plot.png`, `tolerances.yaml`, `README.md` — a completed run emits `convergence.json` and
 `ensemble_statistics.json`. The scientific fingerprint reuses the
 `m1_bundle` volatile-key stripping, including the M1.8 lesson that per-case
 wall-clock must never enter the hash: ensemble means over a fixed seed sequence
