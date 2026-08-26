@@ -35,6 +35,69 @@ Categories are defined by *what may decide them*:
 | **B3** | a composed chain whose correctness is still decidable | analytic form, a genuinely independent route, or intermediate invariant evidence |
 | **B4** | characterization: convergence, cost, variance, reproducibility, cross-route consistency | **nothing — B4 never gates, by construction** |
 
+## The layer axis
+
+Orthogonal to the categories. B0–B4 classify **what may decide correctness**;
+the layer classifies **what scientific question is being asked**. Both are
+required on every family, and neither implies the other — `B3-PSF-SINGLET` and
+`B3-DUALROUTE` share a category, and one is a statement about an optical system
+while the other compares two numerical realizations of the same one.
+
+| layer | what is being claimed | examples |
+| -- | -- | -- |
+| **A — qualification** | is this operator the thing it claims to be? Conventions: OPL, phasor sign, projection factor, power accounting, off-axis reference, round trips, estimator exactness and unbiasedness | all of B0 and B1; `B2-R2W-EXACT`, `B2-W2R-STOCH`, `B2-EQUIV`, `B2-ROUNDTRIP` |
+| **B — numerical realization and validity** | does a choice that should *not* move the answer stay inside its declared budget, and where does it stop? Convergence, oversampling, grid parity, patch granularity, cost | `B2-R2W-ROUTE`, `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` |
+| **C — system** | is a physically meaningful end-to-end optical system modelled correctly? | `B3-PSF-SINGLET`, `B3-DEMO2`, `B4-DEMO3` |
+
+`BenchmarkLayer` is required on `BenchmarkFamily` and has **no default**. That
+is the point: a family cannot be authored without stating whether it qualifies a
+primitive, characterizes a numerical realization, or claims a system.
+
+Three consistency rules follow, and each is enforced in
+`BenchmarkFamily.__post_init__` rather than written down here and hoped for:
+
+- a **layer-C** family must declare a `topology` of at least three stages and at
+  least two distinct metrics. Three stages because two is a representation
+  transition, which is layer A or B; two metrics because **no system collapses
+  to a single threshold** — one scalar is blind to whatever it is blind to, and
+  NCC alone has already certified a route that lost 1.7% of the power. A
+  topology declared at layer A or B is refused as a contradiction;
+- a **layer-B** family must declare a refinement dimension — a parameter with
+  `refines_toward` set. Characterizing a numerical realization with no declared
+  direction of refinement is a comparison, not a convergence study;
+- a **layer-A** family must declare at least one negative control. A convention
+  check that has only ever been shown to agree has not been shown to be able to
+  disagree.
+
+### Numerical realization choices are never a family axis
+
+`RAMP_SUM` and `KSPACE_SPLAT`, FFT padding, oversampling, patch size, sampling
+density and streaming strategy are **numerical realization choices**. They are
+characterized at layer B, against a declared error budget, and they do not
+define a physics benchmark. "Exact route versus fast route" is not a benchmark
+family axis: the exactness question is layer A and belongs to the operator, the
+route question is layer B and belongs to the realization.
+
+`B2-R2W-EXACT` and `B2-R2W-ROUTE` still carry the retired vocabulary in their
+identifiers. Once they carry `QUALIFICATION` and `NUMERICAL` respectively the
+ontological problem is gone and the names are cosmetic, so **they are not
+renamed**: a family identifier change stales every committed instance record for
+that family, and renaming without regenerating is not an option. Nine records —
+`B2-R2W-EXACT-01`, the four `ONNODE` and four `OFFNODE` route records — would be
+regenerated to express a taxonomy change the layer field already expresses.
+Recorded here as a decision rather than left to drift.
+
+### Where layer-C artifacts live
+
+`benchmarks/systems/` is the home for layer-C specs, drivers and records
+authored from M2.7 onward. Existing evidence is **re-homed by classification,
+not moved on disk**: `B3-PSF-SINGLET`, `B3-DEMO2` and `B4-DEMO3` became layer C
+by acquiring a field, and physically relocating committed records to express
+that would invalidate every fingerprint for no scientific gain. The generated
+layer view in `benchmarks/INVENTORY.md` and
+`benchmarks/validation/coverage_matrix.md` is what makes the grouping legible
+without reading source.
+
 ## The four separations
 
 Each is enforced by code rather than convention.

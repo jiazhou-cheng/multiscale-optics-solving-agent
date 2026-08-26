@@ -78,6 +78,7 @@ from verification.families.predicates import fractional_margin, paraxial_field_a
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -154,6 +155,7 @@ _B1_RAY_EFL = BenchmarkFamily(
         family_id="B1-RAY-EFL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does a traced thick plano-convex singlet in air reproduce the paraxial "
             "closed forms R/(n-1) for the effective focal length and EFL - t/n for the "
@@ -368,6 +370,7 @@ _B1_RAY_PLATE = BenchmarkFamily(
         family_id="B1-RAY-PLATE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does a plane-parallel plate in a converging beam move the focus by "
             "t(1 - 1/n), AWAY from the plate?"
@@ -582,6 +585,7 @@ _B1_RAY_SNELL = BenchmarkFamily(
         family_id="B1-RAY-SNELL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does refraction at a single planar interface satisfy "
             "n1 sin(theta1) = n2 sin(theta2) across the incidence range, and is total "
@@ -871,6 +875,7 @@ _B1_RAY_LAGRANGE = BenchmarkFamily(
         family_id="B1-RAY-LAGRANGE",
         family_version="2.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "is the differential optical invariant omega(v_a, v_b) = sum_k "
             "(dp_k^a dq_k^b - dp_k^b dq_k^a) -- with q the transverse position on a "
@@ -1347,6 +1352,7 @@ _B1_RAY_OFFAXIS_OPL = BenchmarkFamily(
         family_id="B1-RAY-OFFAXIS-OPL",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does the pupil OPL declared from an Optiland trace carry the full "
             "convergence tilt an off-axis field requires, including the object-space "

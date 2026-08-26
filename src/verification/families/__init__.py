@@ -27,6 +27,7 @@ from verification.families.registry import (
 )
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     BenchmarkInstance,
     ExecutionParameter,
@@ -57,6 +58,7 @@ from verification.families.schema import (
 __all__ = [
     "FAMILIES",
     "BenchmarkCategory",
+    "BenchmarkLayer",
     "BenchmarkFamily",
     "BenchmarkInstance",
     "ExecutionParameter",

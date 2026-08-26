@@ -82,6 +82,7 @@ __all__ = [
     "BenchmarkCategory",
     "BenchmarkFamily",
     "BenchmarkInstance",
+    "BenchmarkLayer",
     "ExecutionParameter",
     "ExecutionPolicy",
     "FamilyOracle",
@@ -134,6 +135,36 @@ class BenchmarkCategory(StrEnum):
     @property
     def may_gate(self) -> bool:
         return self is not BenchmarkCategory.B4
+
+
+# ---------------------------------------------------------------------------
+# Layer
+# ---------------------------------------------------------------------------
+
+
+class BenchmarkLayer(StrEnum):
+    """What scientific question is being asked, orthogonal to the category.
+
+    :class:`BenchmarkCategory` classifies what *decides* correctness. This
+    classifies what is being *claimed*, and the two are genuinely independent:
+    ``B3-PSF-SINGLET`` and ``B3-DUALROUTE`` share a category, and one is a
+    statement about an optical system while the other compares two numerical
+    realizations. Before this axis existed the taxonomy could not tell them
+    apart, so a convergence study and an end-to-end system claim read as the
+    same kind of result.
+    """
+
+    #: Primitive qualification. Are the conventions right -- OPL, phasor sign,
+    #: projection, power accounting, round trips? Answers "is this operator the
+    #: thing it claims to be", not "does this system work".
+    QUALIFICATION = "A"
+    #: Numerical realization and validity. Convergence, oversampling, grid
+    #: parity, patch granularity, cost. Characterizes a choice that should
+    #: *not* move the answer beyond a declared budget.
+    NUMERICAL = "B"
+    #: An end-to-end optical system. The only layer that may claim a physical
+    #: system is modelled correctly, and the only one that declares a topology.
+    SYSTEM = "C"
 
 
 # ---------------------------------------------------------------------------
@@ -824,6 +855,11 @@ class BenchmarkFamily:
     family_id: str
     family_version: str
     category: BenchmarkCategory
+    #: What is being claimed, as opposed to what decides it. Required and with
+    #: no default on purpose: a family cannot be authored without stating
+    #: whether it qualifies a primitive, characterizes a numerical realization,
+    #: or claims an optical system is modelled correctly.
+    layer: BenchmarkLayer
     #: The physical question, in a sentence a reader can disagree with.
     question: str
     #: Which registry components this family makes a statement about. A family
@@ -838,6 +874,10 @@ class BenchmarkFamily:
     metrics: tuple[Metric, ...]
     execution_policy: ExecutionPolicy
     stochastic_policy: StochasticPolicy
+    #: The propagation topology, stage by stage, for a ``SYSTEM`` family. This
+    #: is what makes a family a system claim rather than a transition check, so
+    #: it is required at layer C and refused everywhere else.
+    topology: tuple[str, ...] = ()
     validity: tuple[ValidityPredicate, ...] = ()
     invariants: tuple[Invariant, ...] = ()
     tolerances: tuple[Tolerance, ...] = ()
@@ -902,6 +942,60 @@ class BenchmarkFamily:
                     f"{fid}: negative control {control.control_id} targets "
                     f"{control.target_metric!r}, which is not a declared metric"
                 )
+
+        # -- the layer rules, structurally --------------------------------
+        # One rule per layer, each one a thing this repository has been able to
+        # get wrong: a system benchmark that never said what it propagated
+        # through, a convergence study with nothing to converge in, and a
+        # qualification check that has only ever been shown to agree.
+        for stage in self.topology:
+            if not stage.strip():
+                raise ValueError(f"{fid}: a topology stage cannot be blank")
+
+        if self.layer is BenchmarkLayer.SYSTEM:
+            if not self.topology:
+                raise ValueError(
+                    f"{fid}: a SYSTEM family must declare its propagation topology. "
+                    "A system claim whose chain is not written down cannot be checked "
+                    "against the system it claims to model."
+                )
+            if len(self.topology) < 3:
+                raise ValueError(
+                    f"{fid}: a SYSTEM topology needs at least 3 stages, got "
+                    f"{len(self.topology)}. Two stages is a representation transition, "
+                    "which is layer A or B."
+                )
+            if len({m.name for m in self.metrics}) < 2:
+                raise ValueError(
+                    f"{fid}: a SYSTEM family must declare at least 2 distinct "
+                    "observables. No system collapses to a single threshold -- one "
+                    "scalar is blind to whatever it is blind to, and NCC alone has "
+                    "already certified a route that lost 1.7% of the power."
+                )
+        elif self.topology:
+            raise ValueError(
+                f"{fid}: declares a topology at layer {self.layer.value}, which is a "
+                "contradiction. A topology is what makes a family a system claim, so "
+                "either the layer or the topology is wrong, and guessing which is not "
+                "the schema's job."
+            )
+
+        if self.layer is BenchmarkLayer.NUMERICAL and not any(
+            p.refines_toward is not None for p in self.parameters
+        ):
+            raise ValueError(
+                f"{fid}: a NUMERICAL family must declare a refinement dimension -- a "
+                "parameter with refines_toward set. Characterizing a numerical "
+                "realization with no declared direction of refinement is a comparison, "
+                "not a convergence study."
+            )
+
+        if self.layer is BenchmarkLayer.QUALIFICATION and not self.negative_controls:
+            raise ValueError(
+                f"{fid}: a QUALIFICATION family must declare at least one negative "
+                "control. A convention check that has only ever been shown to agree "
+                "has not been shown to be able to disagree."
+            )
 
         # -- the oracle-independence rules, structurally ------------------
         gating = tuple(t for t in self.tolerances if t.may_gate)

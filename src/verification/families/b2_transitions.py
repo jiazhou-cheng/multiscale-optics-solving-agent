@@ -58,6 +58,7 @@ from verification.families.predicates import (
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -152,6 +153,7 @@ _B2_R2W_EXACT = BenchmarkFamily(
         family_id="B2-R2W-EXACT",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "in the enumeration limit -- every term the estimator would sample, "
             "visited -- does C_RAY_TO_WAVE reduce to the reference field exactly?"
@@ -241,11 +243,17 @@ _B2_R2W_EXACT = BenchmarkFamily(
                     "a global phase common to the whole field, which the relative L2 on "
                     "the complex field DOES see but which a reader comparing this to an "
                     "intensity residual would not -- stated so the two are not confused",
-                    "any convention error that is inert on THIS bundle. A collimated "
-                    "on-axis bundle has projection factor exactly 1 and no oblique "
-                    "ramp, so the four terms this comparison pins are pinned in the "
-                    "configuration run and not in general -- B2-W2R-STOCH measures "
-                    "those three blind spots explicitly",
+                    "any convention error that is inert on THIS bundle. The bundle is "
+                    "collimated but TILTED -- three k-bins, sin(theta) = 9.697e-3, "
+                    "theta = 0.556 deg -- which is what keeps the oblique ramp and the "
+                    "projection factor live: 1 - cos(theta) = 4.702e-05, and that is "
+                    "exactly the residual the projection-factor removal produces. So "
+                    "all four terms are pinned by the run rather than by assertion. "
+                    "What stays blind is the SIZE of the tilt: at 0.556 deg the "
+                    "projection factor is the weakest of the four removals by four "
+                    "orders of magnitude, so a projection error whose effect scales "
+                    "faster than 1 - cos(theta) would show here as a smaller residual "
+                    "than it would at a realistic numerical aperture",
                 ),
             ),
             Metric(
@@ -438,6 +446,7 @@ _B2_R2W_ROUTE = BenchmarkFamily(
         family_id="B2-R2W-ROUTE",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
+        layer=BenchmarkLayer.NUMERICAL,
         question=(
             "how much does the reconstruction route -- a parameter that should not "
             "change the answer -- actually change it, and at what cost?"
@@ -688,6 +697,7 @@ _B2_W2R_STOCH = BenchmarkFamily(
         family_id="B2-W2R-STOCH",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "is the wave-to-ray estimator exact in the enumeration limit, unbiased, "
             "converging at the expected rate, and at a variance the required ray count "
@@ -1064,6 +1074,7 @@ _B2_EQUIV = BenchmarkFamily(
         family_id="B2-EQUIV",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does decomposing an aperture into patches and reassembling it give the "
             "same field as treating it globally, and how does the answer depend on "
@@ -1456,6 +1467,7 @@ _B2_ROUNDTRIP = BenchmarkFamily(
         family_id="B2-ROUNDTRIP",
         family_version="1.0.0",
         category=BenchmarkCategory.B2,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "what survives a round trip through two representations, and -- the part "
             "that gives the answer meaning -- does the deliberately broken twin fail?"

@@ -34,6 +34,8 @@ from verification.claim_ledger import (  # noqa: E402
     claims_for,
     open_gates,
 )
+from verification.families import BenchmarkLayer  # noqa: E402
+from verification.families.registry import FAMILIES  # noqa: E402
 
 OUTPUT_DIR = ROOT / "benchmarks" / "validation"
 
@@ -81,6 +83,73 @@ def _cell(component: str, kind: ClaimKind) -> str:
     return " / ".join(marks)
 
 
+#: CHE-141 (M2.5). Read from the family registry rather than from the ledger:
+#: ``layer`` is a required field on ``BenchmarkFamily`` and the ledger's Claim
+#: has no such field, so projecting it through would have been a second copy of
+#: one fact. The generator can read both sources; only one of them owns this.
+_LAYER_TITLE = {
+    BenchmarkLayer.QUALIFICATION: "A — qualification",
+    BenchmarkLayer.NUMERICAL: "B — numerical realization and validity",
+    BenchmarkLayer.SYSTEM: "C — system",
+}
+
+_LAYER_ORDER = (
+    BenchmarkLayer.QUALIFICATION,
+    BenchmarkLayer.NUMERICAL,
+    BenchmarkLayer.SYSTEM,
+)
+
+
+def _layer_coverage() -> list[str]:
+    """Component x layer, and the layer-C gates spelled out.
+
+    The matrix above says what *decides* each claim. This says what each claim
+    is *about*, which is the question "what supports this system claim" — and
+    the shape it exists to make visible is a layer-C gate resting on a component
+    that nothing qualifies at layer A.
+    """
+    families = sorted(FAMILIES.values(), key=lambda f: f.family_id)
+    lines = [
+        "## Coverage by layer — CHE-141 (M2.5)",
+        "",
+        "Generated from `src/verification/families/`. The B0-B4 category says "
+        "what may *decide* a family; the layer says what is being *claimed*. "
+        "Layer C is the only layer at which a claim about an optical system may "
+        "be made; layers A and B are the evidence underneath it. See "
+        "`docs/benchmark_design.md`.",
+        "",
+        "| Component | " + " | ".join(_LAYER_TITLE[x] for x in _LAYER_ORDER) + " |",
+        "| -- | -- | -- | -- |",
+    ]
+    for component in LEDGER_COMPONENTS:
+        cells = []
+        for layer in _LAYER_ORDER:
+            ids = [f.family_id for f in families if f.layer is layer and component in f.components]
+            cells.append(", ".join(f"`{i}`" for i in ids) if ids else "--")
+        lines.append(f"| `{component}` | " + " | ".join(cells) + " |")
+
+    lines += [
+        "",
+        "### Layer-C gates",
+        "",
+        "Where the system claims currently stand. An unmet gate is a first-class "
+        "state and is reported here rather than left in a note.",
+        "",
+        "| family | gate | metric | observed |",
+        "| -- | -- | -- | -- |",
+    ]
+    for fam in families:
+        if fam.layer is not BenchmarkLayer.SYSTEM:
+            continue
+        gate = fam.gate_disposition
+        status = f"`{gate.status.value}`" if gate else "not declared"
+        metric = f"`{gate.metric}`" if gate and gate.metric else "--"
+        observed = f"{gate.observed:.4g}" if gate and gate.observed is not None else "--"
+        lines.append(f"| `{fam.family_id}` | {status} | {metric} | {observed} |")
+    lines.append("")
+    return lines
+
+
 def coverage_matrix() -> str:
     kinds = list(ClaimKind)
     lines = [
@@ -94,8 +163,7 @@ def coverage_matrix() -> str:
         "| `**ind**` | gate met, decided by an oracle that shares no code with the thing tested |",
         "| `char` | measured and reported, no pass/fail threshold declared. Not a pass |",
         "| `self` | checked only against our own implementation. May not decide a gate |",
-        "| `off-gate` | executed, result on record, but the required gate never "
-        "re-checks it |",
+        "| `off-gate` | executed, result on record, but the required gate never re-checks it |",
         "| `declared` | asserted in the registry or capability table, never executed |",
         "| `**FAIL**` | gate declared and not met |",
         "| `n/a` | no oracle applies (structured-failure and convention-plumbing claims) |",
@@ -110,6 +178,7 @@ def coverage_matrix() -> str:
         "",
         f"{len(CLAIMS)} claims over {len(LEDGER_COMPONENTS)} components.",
         "",
+        *_layer_coverage(),
         "## The cells that should be read first",
         "",
         "* `M_WAVE_CHROMATIX` forward accuracy is `self`. The ASM is checked against our",

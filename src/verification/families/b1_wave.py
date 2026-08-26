@@ -67,6 +67,7 @@ from verification.families.predicates import (
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -205,6 +206,7 @@ _B1_WAVE_GAUSS = BenchmarkFamily(
         family_id="B1-WAVE-GAUSS",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does a propagated Gaussian beam's 1/e^2 intensity radius follow "
             "w(z) = w0 sqrt(1 + (z/zR)^2)?"
@@ -361,6 +363,7 @@ _B1_WAVE_AIRY = BenchmarkFamily(
         family_id="B1-WAVE-AIRY",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does the first dark ring of a focused circular aperture land at "
             "0.61 lambda / NA?"
@@ -538,6 +541,7 @@ _B1_WAVE_TILT = BenchmarkFamily(
         family_id="B1-WAVE-TILT",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does a tilted collimated beam walk off by z tan(theta), with the right "
             "SIGN, under a kykx-parameterized propagation?"
@@ -757,6 +761,7 @@ _B1_WAVE_PLANEPHASE = BenchmarkFamily(
         family_id="B1-WAVE-PLANEPHASE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does propagating a plane wave a distance z advance its phase by exactly "
             "k_z z, with the sign the repository's phasor convention declares?"
@@ -953,6 +958,7 @@ _B1_WAVE_FWDBWD = BenchmarkFamily(
         family_id="B1-WAVE-FWDBWD",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does propagating a field forward by z and then backward by z return the "
             "input to the dtype's round-off floor?"
@@ -1145,6 +1151,7 @@ _B1_WAVE_TALBOT = BenchmarkFamily(
         family_id="B1-WAVE-TALBOT",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "does a periodic field revive itself at the Talbot distance "
             "z_T = 2 d^2 / lambda?"
@@ -1444,6 +1451,7 @@ _B1_WAVE_ASM_VALIDITY = BenchmarkFamily(
         family_id="B1-WAVE-ASM-VALIDITY",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "where does the angular-spectrum method stop being trustworthy on this "
             "grid, and does crossing that boundary produce a plausible-looking wrong "

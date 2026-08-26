@@ -36,6 +36,7 @@ from core.precision import DeviceKind, DType
 from verification.claim_ledger import ClaimKind, Oracle, OracleIndependence
 from verification.families import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ExecutionPolicy,
     FamilyOracle,
@@ -108,11 +109,24 @@ RAY_FLOOR = ValidityPredicate(
 )
 
 
+#: The default probe family is layer A, so it owes a control: a qualification
+#: benchmark that has only ever been shown to agree has not been shown to be able
+#: to disagree. It is left NOT_RUN by default, which is the state most of these
+#: tests are about.
+PHASOR_FLIP = NegativeControl(
+    control_id="phasor-sign-flip",
+    description="conjugate the phasor and require the residual to grow",
+    mutation="exp(+ikz) -> exp(-ikz) before the coherent sum",
+    target_metric="relative_l2",
+)
+
+
 def make_family(**overrides) -> BenchmarkFamily:
     kwargs = dict(
         family_id="B1-RAY-VERIFY-PROBE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
         question="does the traced wavefront match the closed form?",
         components=("M_RAY_OPTILAND",),
         claim_kind=ClaimKind.FORWARD_ACCURACY,
@@ -138,6 +152,7 @@ def make_family(**overrides) -> BenchmarkFamily:
             observed=1e-5,
             evidence=("tests/test_verifier.py",),
         ),
+        negative_controls=(PHASOR_FLIP,),
         sampler_absent_reason=SamplerAbsentReason.SETUP_IS_THE_CERTIFICATE,
     )
     kwargs.update(overrides)
@@ -491,8 +506,21 @@ def test_a_control_that_was_never_run_does_not_leave_the_gate_trustworthy() -> N
 
 
 def test_a_family_with_no_controls_at_all_is_not_trustworthy() -> None:
-    """There is nothing to be trusted on."""
-    family = make_family()
+    """There is nothing to be trusted on.
+
+    Built at layer B, because CHE-141 makes a layer-A family with zero controls
+    unconstructible -- which is the point of that rule. The verifier's behaviour
+    when a family declares no control at all still has to be pinned, and layer B
+    is where such a family can legitimately exist.
+    """
+    family = make_family(
+        layer=BenchmarkLayer.NUMERICAL,
+        parameters=(
+            PhysicalParameter("radius_m", "surface radius", unit="m"),
+            NumericalParameter("ray_count", "rays traced", refines_toward=1),
+        ),
+        negative_controls=(),
+    )
     instance = make_instance(family)
     result = verify(family, instance, make_record(), measurements={"relative_l2": measured(1e-5)})
     assert result.negative_control_results == []

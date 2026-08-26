@@ -184,11 +184,36 @@ couplers:
     # its negative controls are measured, and a stochastic estimator cannot be
     # `validated` by a single realization in any case.
     #
-    # Scope note: this coupler is a **library API, not a graph node.** It is
-    # registered because it is a real cross-representation handoff with declared
-    # conventions, and callers use it directly; no graph edge executes it, and
-    # nothing here implies one does. C_RAY_TO_WAVE and C_PLANAR_DOE_STEP are the
-    # couplers with graph nodes.
+    # Scope note: this coupler is a **library API, not a graph node**, and
+    # CHE-110 (M2.2) settled that rather than inheriting it. It is registered
+    # because it is a real cross-representation handoff with declared
+    # conventions, and callers use it directly.
+    #
+    # The decision, and why it went this way. A registered coupler with no node
+    # is something an agent can select and cannot run, so "no node" is only
+    # defensible if the executor SAYS so. It now does: a graph edge naming
+    # C_WAVE_TO_RAY is refused before anything runs, with the reason and the
+    # working alternatives, instead of validating and then dying in a resolver
+    # partway through
+    # (tests/test_executor.py::
+    #  test_a_coupler_with_no_graph_node_is_refused_before_anything_runs).
+    #
+    # The topology that would need a wave->ray edge -- rays in, diffractive
+    # interaction, rays back out to a downstream refractive trace -- is served
+    # by C_PLANAR_DOE_STEP and C_PATCH_WFT, which DO have graph nodes and which
+    # already emit rays from a spectrum. C_PLANAR_DOE_STEP calls this module
+    # directly (couplers/cascade.py imports decompose, draw_indices and
+    # spectrum_to_rays); C_PATCH_WFT carries its own per-patch decomposition
+    # that matches decompose term for term rather than calling it, which is a
+    # duplication worth knowing about and is not the same statement.
+    #
+    # A bare C_WAVE_TO_RAY edge would be a
+    # representation transition with no interaction attached, which is not a
+    # stage any system in the M2 ladder has. If one ever does, the node is a
+    # small change and this note is what has to change with it.
+    #
+    # C_RAY_TO_WAVE, C_PATCH_WFT and C_PLANAR_DOE_STEP are the couplers with
+    # graph nodes.
     maturity: characterized
     tags: [ray_wave, angular_spectrum, monte_carlo, stochastic]
 

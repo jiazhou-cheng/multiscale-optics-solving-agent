@@ -6,7 +6,7 @@ Every artifact under `benchmarks`, `src/agent`, `src/verification` classified in
 
 | bucket | test | action | rows |
 | -- | -- | -- | -- |
-| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 119 |
+| **A** | would this still be true and useful if no agent and no benchmark task existed? | preserve; name the destination | 120 |
 | **B** | is this a specific physical setup whose result is worth freezing? | a positive justification is required | 9 |
 | **C** | does this exist only to serve the old evaluation design? | delete | 8 |
 
@@ -41,6 +41,7 @@ Coverage is enforced by `tests/test_benchmark_inventory.py`: it enumerates the s
 | `benchmarks/roadmap.md`<br>*the removed-solver findings and the independent-validation standard* | FMMAX's unresolved phase/sign convention against a reflectance magnitude matched to ~1e-7; fdtdx's two failed gradient paths (jax.grad w.r.t. source wavelength returning exactly 0.0, and ConcretizationTypeError from place_objects); jax-fem's PyPI-BSD-versus-actual-GPLv3 mismatch and its unconditional petsc4py import. Plus the standard the L3 tasks were written against: independent final validation, multiple initializations, held-out perturbations, equal compute budgets, gradient checks, and a full accounting of solver calls -- which still applies to whatever replaces them. | Retired-component register (keeps living in roadmap.md), and the independence standard becomes the oracle-independence rules the family schema enforces structurally. |
 | `benchmarks/roadmap.md`<br>*the C_FIELD_TO_PSF paragraph* | Records that C_FIELD_TO_PSF was retired on a definitional argument -- extracting \|U\|^2 from a terminal field is a measurement, not a cross-representation handoff -- and names the test that pins it. Nothing in this migration reopens it. | Unchanged in place; tests/test_graph_validation.py::test_field_to_psf_is_not_a_registered_coupler stays as its executable form. |
 | `benchmarks/roadmap_source_catalog.yaml` | Source catalog for the roadmap's claims -- which paper or probe each retired component's finding came from. | Retired-component register provenance. |
+| `benchmarks/systems/README.md` | CHE-141 (M2.5). The declared home for layer-C specs, drivers and records, and the written form of the decision that existing layer-C evidence is re-homed BY CLASSIFICATION AND NOT MOVED ON DISK. B3-PSF-SINGLET, B3-DEMO2 and B4-DEMO3 became layer C by acquiring a field; relocating 58 committed records to express that would invalidate every fingerprint for no scientific gain. A directory whose emptiness is a stated position rather than an omission is worth a row. | Where the M2.7-onward system ladder is authored. The layer view generated into INVENTORY.md and coverage_matrix.md is what makes the grouping readable without this directory having to hold the files. |
 | `benchmarks/validation/coverage_matrix.md` | Generated from src/verification/claim_ledger.py by scripts/generate_validation_coverage.py. A view, not a second truth. | Regenerated as a view over the family registry once CLAIMS becomes a projection of it (M0.5.2). |
 | `benchmarks/validation/gap_list.md` | Generated view of GAPS with the ranking criterion. The gap list is what M1/M2/M4 owe, so it is the work list for the families being authored. | Same generator, sourced from the family registry. |
 | `benchmarks/validation/open_gates.md` | Generated view of the claims whose gate_status is NOT_MET. | Same generator, sourced from the family registry. |
@@ -180,6 +181,62 @@ Kept here rather than as table rows: the coverage test refuses a row that matche
 | `src/agent/benchmark_suite.py A1 task definitions` | 6 | CHE-133 (M0.5.4) | src/verification/analytic.py (five closed forms with their measured agreements) and src/verification/hazards.py (the two measured traps with their numbers), both covered by tests/test_preserved_evidence.py. |
 | `benchmarks/protocols/protocol.yaml` | 1 | CHE-106 (M1.1) | the B1 families, which this row's own destination made the condition for removal. Device, dtype, namespace and the wall-clock/memory envelope are the RAY_EXECUTION and WAVE_EXECUTION ExecutionPolicy objects in src/verification/families/b1_ray.py and b1_wave.py; each tolerance is a family tolerance carrying its own declared basis; the required-provenance key list is core.provenance with the generated schemas/provenance.schema.json, enforced per record by tests/test_provenance_fingerprint.py; the timing recipe -- warmups, repeats, median with minimum and p95 -- is benchmarks/perf/run_baselines.py, which declares where it deviates and why; and the engine-independence rule it froze is the probe benchmarks/probes/engine_independence.py with its record benchmarks/probes/records/che12_engine_report.json. The measurement, artifact and provenance rules M2 inherited are now stated in full in protocols/coupler_protocol.yaml instead of by reference, byte-identical to what M2 ran under. |
 | `benchmarks/protocols/m1_baseline_protocol.md` | 1 | CHE-106 (M1.1) | knowledge/solvers/optiland/conventions.md and knowledge/solvers/chromatix/conventions.md, which carry the same boundary items -- units, axis order, frame, handedness, phasor sign, amplitude semantics, normalization, sampling, dtype -- measured, with a citing issue, rather than declared with a pending "verification state" column; the B1 family question and tolerance-basis text for the items that became gates; and benchmarks/reports/2026-08/ray_and_wave_baselines.md for what the M1 runs produced, with the runs themselves in archive/benchmarks/gen1/. |
+
+## Families by layer — CHE-141 (M2.5)
+
+Generated from `src/verification/families/`, not from `benchmarks/inventory.yaml`. The B0-B4 category says what may *decide* a family; the layer says what is being *claimed*, and the two are independent — `B3-PSF-SINGLET` and `B3-DUALROUTE` share a category, and one is a statement about an optical system while the other compares two numerical realizations of it.
+
+Layer-C artifacts authored from M2.7 onward live in `benchmarks/systems/`. Existing layer-C evidence is **re-homed by classification, not moved on disk** — see `benchmarks/systems/README.md` for why, and `docs/benchmark_design.md` for the axis and its three consistency rules.
+
+The instance counts below are the instances declared **on the family object**. B3 and B4 families construct theirs in their `benchmarks/instances/` drivers instead, so a zero there is a fact about where the instances are built and not an absence of evidence — `benchmarks/instances/records/` is the committed record set.
+
+### Layer A — qualification
+
+is this operator the thing it claims to be? Conventions, invariants, estimator exactness. Every family here owes a negative control. 20 families, 50 canonical instances declared on the family.
+
+| family | category | components | what it claims |
+| -- | -- | -- | -- |
+| `B0-CONTRACT` | B0 | `M_RAY_OPTILAND`, `M_WAVE_CHROMATIX`, `C_RAY_TO_WAVE`, `C_PATCH_WFT` | when a component is asked for something it cannot do, does it refuse with a code, a reason and a remedy -- and does the refusal say WHICH of the five negative outcomes it is? |
+| `B0-DTYPE` | B0 | `M_WAVE_CHROMATIX` | when a precision request cannot be honoured, is the loss refused, or recorded as a MEASURED NUMBER -- and never performed silently? |
+| `B0-UNITS` | B0 | `M_RAY_OPTILAND`, `M_WAVE_CHROMATIX` | can the substrate tell 'it executed' from 'it is right'? Both instances run perfectly, every boundary check passes, the contract status is ok, and the physics is wrong. |
+| `B0-VALIDITY` | B0 | `C_PATCH_WFT` | when an instance crosses a declared validity bound, is that reported as OUT OF VALIDITY -- distinct from unsupported and from a malformed request? |
+| `B1-RAY-EFL` | B1 | `M_RAY_OPTILAND` | does a traced thick plano-convex singlet in air reproduce the paraxial closed forms R/(n-1) for the effective focal length and EFL - t/n for the back focal length from the rear vertex? |
+| `B1-RAY-LAGRANGE` | B1 | `M_RAY_OPTILAND` | is the differential optical invariant omega(v_a, v_b) = sum_k (dp_k^a dq_k^b - dp_k^b dq_k^a) -- with q the transverse position on a plane of constant z and p = n (L, M) the index-weighted direction cosines -- conserved by the real ray map through a multi-element system? Equivalently: is the traced map symplectic? |
+| `B1-RAY-OFFAXIS-OPL` | B1 | `M_RAY_OPTILAND` | does the pupil OPL declared from an Optiland trace carry the full convergence tilt an off-axis field requires, including the object-space term n_object * (d0 . r_launch)? |
+| `B1-RAY-PLATE` | B1 | `M_RAY_OPTILAND` | does a plane-parallel plate in a converging beam move the focus by t(1 - 1/n), AWAY from the plate? |
+| `B1-RAY-SNELL` | B1 | `M_RAY_OPTILAND` | does refraction at a single planar interface satisfy n1 sin(theta1) = n2 sin(theta2) across the incidence range, and is total internal reflection reported as a validity boundary rather than as a numerical failure? |
+| `B1-WAVE-AIRY` | B1 | `M_WAVE_CHROMATIX` | does the first dark ring of a focused circular aperture land at 0.61 lambda / NA? |
+| `B1-WAVE-ASM-VALIDITY` | B1 | `M_WAVE_CHROMATIX` | where does the angular-spectrum method stop being trustworthy on this grid, and does crossing that boundary produce a plausible-looking wrong field rather than an exception? |
+| `B1-WAVE-FWDBWD` | B1 | `M_WAVE_CHROMATIX` | does propagating a field forward by z and then backward by z return the input to the dtype's round-off floor? |
+| `B1-WAVE-GAUSS` | B1 | `M_WAVE_CHROMATIX` | does a propagated Gaussian beam's 1/e^2 intensity radius follow w(z) = w0 sqrt(1 + (z/zR)^2)? |
+| `B1-WAVE-PLANEPHASE` | B1 | `M_WAVE_CHROMATIX` | does propagating a plane wave a distance z advance its phase by exactly k_z z, with the sign the repository's phasor convention declares? |
+| `B1-WAVE-TALBOT` | B1 | `M_WAVE_CHROMATIX` | does a periodic field revive itself at the Talbot distance z_T = 2 d^2 / lambda? |
+| `B1-WAVE-TILT` | B1 | `M_WAVE_CHROMATIX` | does a tilted collimated beam walk off by z tan(theta), with the right SIGN, under a kykx-parameterized propagation? |
+| `B2-EQUIV` | B2 | `C_PATCH_WFT`, `C_PLANAR_DOE_STEP` | does decomposing an aperture into patches and reassembling it give the same field as treating it globally, and how does the answer depend on patch granularity? |
+| `B2-R2W-EXACT` | B2 | `C_RAY_TO_WAVE` | in the enumeration limit -- every term the estimator would sample, visited -- does C_RAY_TO_WAVE reduce to the reference field exactly? |
+| `B2-ROUNDTRIP` | B2 | `C_RAY_TO_WAVE`, `C_WAVE_TO_RAY` | what survives a round trip through two representations, and -- the part that gives the answer meaning -- does the deliberately broken twin fail? |
+| `B2-W2R-STOCH` | B2 | `C_WAVE_TO_RAY` | is the wave-to-ray estimator exact in the enumeration limit, unbiased, converging at the expected rate, and at a variance the required ray count can reach? Four questions, and they fail independently. |
+
+### Layer B — numerical realization and validity
+
+does a choice that should not move the answer stay inside its budget, and where does it stop? Every family here owes a refinement dimension. 4 families, 8 canonical instances declared on the family.
+
+| family | category | components | what it claims |
+| -- | -- | -- | -- |
+| `B2-R2W-ROUTE` | B2 | `C_RAY_TO_WAVE` | how much does the reconstruction route -- a parameter that should not change the answer -- actually change it, and at what cost? |
+| `B3-DUALROUTE` | B3 | `C_RAY_TO_WAVE`, `M_RAY_OPTILAND` | on the Cooke triplet, do the ray-only and ray->coupler->wave PSF routes each conserve the traced bundle's power end to end? |
+| `B4-COST` | B4 | `M_RAY_OPTILAND`, `M_WAVE_CHROMATIX`, `C_RAY_TO_WAVE`, `C_PATCH_WFT` | what does each node and each route cost, and how much of a run is framework overhead rather than physics? |
+| `B4-DUALROUTE-AGREEMENT` | B4 | `M_RAY_OPTILAND`, `C_RAY_TO_WAVE` | how far apart are the three PSF routes on the Cooke triplet, and what accounts for the gap? NOT: which of them is right -- all three are our own code. |
+
+### Layer C — system
+
+is a physically meaningful end-to-end optical system modelled correctly? Every family here owes a topology and two observables. 3 families, 0 canonical instances declared on the family.
+
+| family | category | components | what it claims |
+| -- | -- | -- | -- |
+| `B3-DEMO2` | B3 | `C_RAY_TO_WAVE`, `C_PATCH_WFT` | **topology:** coherent plane-wave illumination → C_PATCH_WFT → free-space ray propagation to the sensor plane → C_RAY_TO_WAVE → sensor-plane intensity<br>**observables:** demo2_ncc, demo2_relative_l2, patch_handoff_power_ratio |
+| `B3-PSF-SINGLET` | B3 | `C_RAY_TO_WAVE` | **topology:** M_RAY_OPTILAND → C_RAY_TO_WAVE → M_WAVE_CHROMATIX → sensor-plane intensity<br>**observables:** fft_oracle_intensity_relative_l2, handoff_power_ratio, o2_asm_intensity_relative_l2 |
+| `B4-DEMO3` | B4 | `C_PATCH_WFT`, `C_RAY_TO_WAVE` | **topology:** coherent plane-wave illumination → C_PATCH_WFT → M_RAY_OPTILAND → C_RAY_TO_WAVE → sensor-plane intensity<br>**observables:** ncc_vs_ray_count_slope, route_agreement_ncc, seed_to_seed_ncc, stage_power_ratio |
 
 ## Edits this triage requires but does not make
 

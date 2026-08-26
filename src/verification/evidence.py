@@ -458,6 +458,16 @@ def write_instance_record(
             "status": str(run.record.status),
             "seeds": list(run.record.seeds),
             "observed_parameters": dict(run.record.observed_parameters),
+            # CHE-109. These were computed by every driver, attached to the
+            # ExecutionRecord, and then dropped on write -- so a measured number
+            # existed at runtime and did not survive into the committed record.
+            # B2-R2W-ROUTE is where it was caught: the family's own error-budget
+            # table and its on_node_fraction are emitted as diagnostics, and the
+            # acceptance criterion asks for on_node_fraction to be *reported*.
+            # They are not fingerprinted -- result_fingerprint covers the
+            # VerificationResult only -- so persisting them adds evidence
+            # without moving any scientific claim.
+            "diagnostics": [dict(d) for d in run.record.diagnostics],
             "nodes": [
                 {
                     "node_id": node.node_id,

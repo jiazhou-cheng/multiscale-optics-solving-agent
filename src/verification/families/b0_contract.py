@@ -47,6 +47,7 @@ from verification.families.predicates import (
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -118,6 +119,7 @@ _B0_CONTRACT = BenchmarkFamily(
         family_id="B0-CONTRACT",
         family_version="1.0.0",
         category=BenchmarkCategory.B0,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "when a component is asked for something it cannot do, does it refuse with "
             "a code, a reason and a remedy -- and does the refusal say WHICH of the "
@@ -445,6 +447,7 @@ _B0_DTYPE = BenchmarkFamily(
         family_id="B0-DTYPE",
         family_version="1.0.0",
         category=BenchmarkCategory.B0,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "when a precision request cannot be honoured, is the loss refused, or "
             "recorded as a MEASURED NUMBER -- and never performed silently?"
@@ -674,6 +677,7 @@ _B0_VALIDITY = BenchmarkFamily(
         family_id="B0-VALIDITY",
         family_version="1.0.0",
         category=BenchmarkCategory.B0,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "when an instance crosses a declared validity bound, is that reported as "
             "OUT OF VALIDITY -- distinct from unsupported and from a malformed request?"
@@ -869,6 +873,7 @@ _B0_UNITS = BenchmarkFamily(
         family_id="B0-UNITS",
         family_version="1.0.0",
         category=BenchmarkCategory.B0,
+        layer=BenchmarkLayer.QUALIFICATION,
         question=(
             "can the substrate tell 'it executed' from 'it is right'? Both instances "
             "run perfectly, every boundary check passes, the contract status is ok, and "

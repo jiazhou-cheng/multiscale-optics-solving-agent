@@ -48,6 +48,7 @@ from verification.families.predicates import (
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -177,6 +178,13 @@ B3_PSF_SINGLET = register(
         family_id="B3-PSF-SINGLET",
         family_version="1.0.0",
         category=BenchmarkCategory.B3,
+        layer=BenchmarkLayer.SYSTEM,
+        topology=(
+            "M_RAY_OPTILAND",
+            "C_RAY_TO_WAVE",
+            "M_WAVE_CHROMATIX",
+            "sensor-plane intensity",
+        ),
         question=(
             "on the diffraction-limited M3-SINGLET-REF system, does "
             "M_RAY_OPTILAND -> C_RAY_TO_WAVE -> M_WAVE_CHROMATIX reproduce the "
@@ -488,6 +496,14 @@ B3_DEMO2 = register(
         family_id="B3-DEMO2",
         family_version="1.0.0",
         category=BenchmarkCategory.B3,
+        layer=BenchmarkLayer.SYSTEM,
+        topology=(
+            "coherent plane-wave illumination",
+            "C_PATCH_WFT",
+            "free-space ray propagation to the sensor plane",
+            "C_RAY_TO_WAVE",
+            "sensor-plane intensity",
+        ),
         question=(
             "does the composed ray-wave reproduction of the paper's demo2 hologram "
             "match the published figure at the paper's own Table S2 ray budget?"
@@ -734,6 +750,7 @@ B3_DUALROUTE = register(
         family_id="B3-DUALROUTE",
         family_version="1.0.0",
         category=BenchmarkCategory.B3,
+        layer=BenchmarkLayer.NUMERICAL,
         question=(
             "on the Cooke triplet, do the ray-only and ray->coupler->wave PSF routes "
             "each conserve the traced bundle's power end to end?"

@@ -235,6 +235,7 @@ def test_the_route_comparison_could_not_have_been_a_b3_family() -> None:
                     field: getattr(B4_DUALROUTE_AGREEMENT, field)
                     for field in (
                         "family_version",
+                        "layer",
                         "question",
                         "components",
                         "claim_kind",

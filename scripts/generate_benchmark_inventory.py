@@ -19,6 +19,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from core.paths import repository_root
+from verification.families import FAMILIES, BenchmarkLayer
 
 __all__ = ["main", "render"]
 
@@ -26,6 +27,30 @@ BUCKET_TITLE = {
     "A": "A — reusable scientific infrastructure or evidence",
     "B": "B — candidate canonical case",
     "C": "C — obsolete task layer",
+}
+
+#: CHE-141 (M2.5). The layer axis is orthogonal to the B0-B4 categories, so the
+#: inventory needs its own grouping by it: a reader asking "what supports this
+#: system claim" should not have to open six family modules to find out.
+LAYER_TITLE = {
+    BenchmarkLayer.QUALIFICATION: "A — qualification",
+    BenchmarkLayer.NUMERICAL: "B — numerical realization and validity",
+    BenchmarkLayer.SYSTEM: "C — system",
+}
+
+LAYER_QUESTION = {
+    BenchmarkLayer.QUALIFICATION: (
+        "is this operator the thing it claims to be? Conventions, invariants, "
+        "estimator exactness. Every family here owes a negative control."
+    ),
+    BenchmarkLayer.NUMERICAL: (
+        "does a choice that should not move the answer stay inside its budget, "
+        "and where does it stop? Every family here owes a refinement dimension."
+    ),
+    BenchmarkLayer.SYSTEM: (
+        "is a physically meaningful end-to-end optical system modelled "
+        "correctly? Every family here owes a topology and two observables."
+    ),
 }
 
 
@@ -40,6 +65,74 @@ def _artifact(entry: dict) -> str:
     path = f"`{entry['path']}`"
     part = entry.get("part")
     return f"{path}<br>*{_cell(part)}*" if part else path
+
+
+def _layer_view() -> list[str]:
+    """The families grouped by layer, read from the registry and not from YAML.
+
+    Deliberately sourced from ``src/verification/families/`` rather than from
+    ``inventory.yaml``: ``layer`` is a required field with no default on
+    ``BenchmarkFamily``, so a table generated from the families themselves
+    cannot drift from them, whereas a hand-maintained copy in the YAML would be
+    a second place for one fact and therefore one place for them to disagree.
+    """
+    families = sorted(FAMILIES.values(), key=lambda f: f.family_id)
+    lines = [
+        "## Families by layer — CHE-141 (M2.5)",
+        "",
+        "Generated from `src/verification/families/`, not from "
+        "`benchmarks/inventory.yaml`. The B0-B4 category says what may *decide* "
+        "a family; the layer says what is being *claimed*, and the two are "
+        "independent — `B3-PSF-SINGLET` and `B3-DUALROUTE` share a category, "
+        "and one is a statement about an optical system while the other "
+        "compares two numerical realizations of it.",
+        "",
+        "Layer-C artifacts authored from M2.7 onward live in "
+        "`benchmarks/systems/`. Existing layer-C evidence is **re-homed by "
+        "classification, not moved on disk** — see "
+        "`benchmarks/systems/README.md` for why, and "
+        "`docs/benchmark_design.md` for the axis and its three consistency "
+        "rules.",
+        "",
+        "The instance counts below are the instances declared **on the family "
+        "object**. B3 and B4 families construct theirs in their "
+        "`benchmarks/instances/` drivers instead, so a zero there is a fact "
+        "about where the instances are built and not an absence of evidence — "
+        "`benchmarks/instances/records/` is the committed record set.",
+        "",
+    ]
+    for layer in (
+        BenchmarkLayer.QUALIFICATION,
+        BenchmarkLayer.NUMERICAL,
+        BenchmarkLayer.SYSTEM,
+    ):
+        rows = [f for f in families if f.layer is layer]
+        instances = sum(len(f.canonical_instances) for f in rows)
+        lines += [
+            f"### Layer {LAYER_TITLE[layer]}",
+            "",
+            f"{LAYER_QUESTION[layer]} {len(rows)} families, "
+            f"{instances} canonical instances declared on the family.",
+            "",
+            "| family | category | components | what it claims |",
+            "| -- | -- | -- | -- |",
+        ]
+        for fam in rows:
+            claim = fam.question
+            if layer is BenchmarkLayer.SYSTEM:
+                claim = (
+                    "**topology:** "
+                    + " → ".join(fam.topology)
+                    + "<br>**observables:** "
+                    + ", ".join(sorted({m.name for m in fam.metrics}))
+                )
+            lines.append(
+                f"| `{fam.family_id}` | {fam.category.value} | "
+                + ", ".join(f"`{c}`" for c in fam.components)
+                + f" | {_cell(claim)} |"
+            )
+        lines.append("")
+    return lines
 
 
 def render(inventory: dict) -> str:
@@ -121,6 +214,8 @@ def render(inventory: dict) -> str:
             for d in deleted
         ]
         lines.append("")
+
+    lines += _layer_view()
 
     lines += ["## Edits this triage requires but does not make", ""]
     lines += [

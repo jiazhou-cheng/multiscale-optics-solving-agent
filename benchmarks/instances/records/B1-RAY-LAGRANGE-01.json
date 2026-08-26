@@ -1,5 +1,52 @@
 {
   "execution": {
+    "diagnostics": [
+      {
+        "code": "SEPARATION_LADDER",
+        "detail": "eps=2.0000e-03 resid=5.61114e-04; eps=1.0000e-03 resid=1.40197e-04; eps=5.0000e-04 resid=3.50443e-05; eps=2.5000e-04 resid=8.76076e-06; eps=1.2500e-04 resid=2.19017e-06; eps=6.2500e-05 resid=5.47541e-07",
+        "location": "benchmarks/instances/b1_ray.py::_symplectic_residual"
+      },
+      {
+        "code": "RICHARDSON_TABLEAU",
+        "detail": "L0: +5.6111e-04 +1.4020e-04 +3.5044e-05 +8.7608e-06 +2.1902e-06 +5.4754e-07 | L1: -1.0802e-07 -6.7425e-09 -4.2126e-10 -2.6326e-11 -1.6465e-12 | L2: +9.6727e-12 +1.4974e-13 +2.6448e-15 -1.2040e-15",
+        "location": "benchmarks/instances/b1_ray.py::_richardson_tableau"
+      },
+      {
+        "code": "CONVERGENCE_FIT",
+        "detail": "exponent in the secant separation 2.000183 against a predicted 2 (O(eps^2) truncation of a symmetric secant); r^2 = 0.99999999 over 6 rungs; asymptotic residual 1.203975e-15 with an extrapolation remainder of 6.1092e-17. The exponent's own standard error is on the convergence report's fitted exponent; it is a prediction here rather than a description, which is what makes the residual removable",
+        "location": "benchmarks/instances/b1_ray.py::_symplectic_residual"
+      },
+      {
+        "code": "ROUNDOFF_BUDGET",
+        "detail": "eps=2.2204e-16; measured max conditioning sum|terms|/|omega| = 1.000543; Richardson weight amplification 1.8889; the adapter's own derived trace round-off constant is 64*eps (solvers/optiland/execution.py::_direction_norm_tolerance), so the budget is 64*eps*conditioning*amplification = 2.6857e-14; the extrapolation's own O(eps^6) truncation is 6.1092e-17",
+        "location": "src/verification/families/b1_ray.py::B1_RAY_LAGRANGE"
+      },
+      {
+        "code": "REFERENCE_PLANES",
+        "detail": "launch plane z=-8.000000e-03 m, image plane z=1.030000e-01 m with a measured z spread of 0.000e+00 m across the fan. Both ends are planes of constant z, which is what makes q a transverse coordinate and z the evolution parameter; the adapter checks the launch plane's flatness itself before offering the launch direction at all",
+        "location": "benchmarks/instances/b1_ray.py::_phase_point"
+      },
+      {
+        "code": "SLOPE_MOMENTUM_IS_INERT_IN_THE_LIMIT",
+        "detail": "substituting the ray slope u = M/N for the canonical momentum p = n*M -- the previous formulation's own error -- reads 1.51946e-07 at the finest rung against the canonical 5.47541e-07, and extrapolates to 4.0955e-16. It is INERT at the gated value, because at an axial base ray M/N and M agree to first order and the two therefore give the same tangent map. Recorded as a diagnostic rather than declared as a control: a control whose verdict is decided by which of two round-off numbers is larger is a coin flip, not evidence",
+        "location": "benchmarks/instances/b1_ray.py::_slope_momentum_residual"
+      },
+      {
+        "code": "PRESCRIPTION_MUTATION_IS_INERT",
+        "detail": "the declared blind spot, measured: replacing the second element's index 1.62 by 1.0 leaves the extrapolated symplectic residual at 3.5108e-15. Every valid ray trace of every valid system is symplectic, so this gate says the refraction is implemented as a canonical transformation and says nothing about whether the prescription is the one that was asked for. That is what B1-RAY-EFL, -PLATE and -SNELL decide, and it is why the omit-index control stays pointed at the finite-ray metric, where the same mutation moves the drift to 2.2474e-06",
+        "location": "benchmarks/instances/b1_ray.py::_symplectic_residual_with_index"
+      },
+      {
+        "code": "PARAXIAL_FIELD_LADDER",
+        "detail": "theta=6.981317e-02 drift=1.6179e-04; theta=3.490659e-02 drift=3.9788e-05; theta=1.745329e-02 drift=9.3672e-06; theta=8.726646e-03 drift=1.7669e-06; theta=4.363323e-03 drift=1.3286e-07",
+        "location": "benchmarks/instances/b1_ray.py::_lagrange_drift"
+      },
+      {
+        "code": "WHICH_INVARIANT_THE_GATE_IS_ABOUT",
+        "detail": "the gate is the DIFFERENTIAL symplectic invariant, and the 1.328629e-07 that this family used to report is the finite-real-ray PARAXIAL form, retained here as a non-gating metric at its original 1e-10 threshold. The two-ray bilinear form p_a.q_b - p_b.q_a is preserved by a LINEAR symplectic map; real refraction at a curved surface is symplectic and not linear, so only the DIFFERENTIAL form -- omega on TANGENT vectors, with p the canonical momentum n*(L,M) and not the slope M/N -- is exactly conserved. The earlier conclusion that no finite-ray evaluation can recover it rested on a differential ratio measured between two rays of ONE fan; those two secants are parallel in the limit and their omega_object is identically zero for a collimated bundle, so that ratio was a 0/0. It is now the degenerate-tangent-pair control. With one secant across the pupil and one across the field the residual is O(eps^2) truncation and extrapolates to 1.2040e-15, i.e. to float64 round-off",
+        "location": "src/verification/families/b1_ray.py::_symplectic_invariant"
+      }
+    ],
     "nodes": [
       {
         "component": "M_RAY_OPTILAND",
@@ -41,7 +88,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "faddc474249316cfb761bc83bb5e0c8ed4970156b6168f6b11a91484e4bbaa9a",
+      "combined_sha256": "32e966eed76952a927bcd68170eee45cf8aa5a59dc19e2f534bfa9e1e7cde645",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -94,17 +141,17 @@
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
         "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
-        "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
-        "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
-        "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
-        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
-        "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
-        "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
-        "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
+        "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
+        "src/verification/families/__init__.py": "202429171b8f96522d886d600e9c9b46cf4fa514fbfe7a4f0f7bc74c8803faee",
+        "src/verification/families/b0_contract.py": "fd67c683f551336cfc23037c23d923040189cb97c0ba169e947b08b1017fe168",
+        "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
+        "src/verification/families/b1_wave.py": "f193f441e119f9ec877701aa90b9586dfb7ae5e56cb7f70920c84992c9e466a3",
+        "src/verification/families/b2_transitions.py": "691cdf27aa55a8195a864fae792cc60bb3e08545a289622acbc78778bda51b35",
+        "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
+        "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "072f21001dff481a9337a44c57d09688deeb39db8f937718ca4c07150c07eb8d",
         "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
-        "src/verification/families/schema.py": "3d4e5871edb646df6243bffa4add9989b9e0e2a9bf8701b2e07e908c8a462e71",
+        "src/verification/families/schema.py": "6e8cc7c00137ad54b156641d3133d75fdb9ab3ee28c6727a0b8e12393f5f3b16",
         "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
         "src/verification/refusals.py": "a05366d0549470b6d02424ac110149ba7a69f9bcdb85eb53b1dd5b02e0f72d46",
         "src/verification/result.py": "2a41d860f9d4bd4dea16e2c3552d2b47bf44fd040a05aadf42fbcc14519d178a",
@@ -128,8 +175,8 @@
     },
     "probe": "instances/b1_ray",
     "schema_version": 2,
-    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
-    "timestamp_utc": "2026-08-26T06:20:32.363905+00:00",
+    "source_commit": "ee1ca92f408769ed975b2946d689c5140109cec2",
+    "timestamp_utc": "2026-08-26T18:03:32.988425+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -352,12 +399,12 @@
       "fingerprint_matched": true,
       "instance_fingerprint": "b2d5df8e7b0a29bbb28a2cbf2ad96b3f49ad8aefd11427ad6483ff4bb34cd64e",
       "package_versions": {},
-      "run_id": "probe-d9dcdcd794a0",
+      "run_id": "probe-777718a9db6d",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-d9dcdcd794a0",
+    "run_id": "probe-777718a9db6d",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

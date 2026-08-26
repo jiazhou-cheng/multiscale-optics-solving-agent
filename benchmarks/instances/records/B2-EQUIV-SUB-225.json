@@ -1,5 +1,27 @@
 {
   "execution": {
+    "diagnostics": [
+      {
+        "code": "CONVERGENCE_LADDER_WITH_ITS_ORACLE_PAD",
+        "detail": "oracle: angular_spectrum_float64 at pad 0. 4 patches -> 1.570226e+00; 16 patches -> 8.059787e-01; 64 patches -> 4.270195e-01; 225 patches -> 1.932496e-01",
+        "location": "benchmarks/instances/b2_equiv.py::_sub_aperture"
+      },
+      {
+        "code": "APODIZATION_BREAKS_THE_CONVERGENCE",
+        "detail": "a raised-cosine taper, same ladder: 4 -> 9.625472e-01; 16 -> 9.061802e-01; 64 -> 8.278602e-01; 225 -> 8.078783e-01. Any window below 1 removes field that no other patch replaces, so the partition-of-unity argument behind the convergence relation is exactly what a taper breaks -- which is why the step carries no apodization.",
+        "location": "src/registry/couplers.yaml#C_PATCH_WFT.validity.warnings"
+      },
+      {
+        "code": "WHERE_THE_EQUIVALENCE_HOLDS_AND_WHERE_IT_STOPS",
+        "detail": "measured, and it is the most useful finding in this family. The enumerated sub-aperture sum reproduces the field AT THE DOE PLANE to 1.7e-15 and disagrees with the independent ASM AT z = 1.26 mm at 0.84 -- and neither number is a defect in either implementation. A sub-aperture patch's modes live on its own pad-21 grid, which is not commensurate with the 15-px reconstruction grid, so the ray sum is the NON-periodic propagated field while the ASM is the periodic one, and they differ by the wrapped contributions. At full aperture with pad_factor 1 the two mode sets coincide exactly, which is why the anchor reads 1.4e-12 and this comparison cannot. It is the CHE-96 oracle-padding lesson in a third coordinate: a score is not defined until the oracle's grid is.",
+        "location": "knowledge/couplers/patch_wft/failure_guide.md"
+      },
+      {
+        "code": "COVERAGE_IS_NOT_ONE_HERE",
+        "detail": "coverage 14.440000000 at 225 patches. The full-aperture anchor has coverage exactly 1, so it cannot see the correction; this instance can.",
+        "location": "src/couplers/patch.py::plan_patches"
+      }
+    ],
     "nodes": [
       {
         "component": "C_PATCH_WFT + C_PLANAR_DOE_STEP",
@@ -35,7 +57,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "8f2ed33b351c24be68baae92c72b2f39e17fabc1f15f958e40e9a0bce6777cd8",
+      "combined_sha256": "d1e9d5a19a97f02dc4bbb8a43fc277d92a82c3dc13ffa537d99383b02ae23aa8",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -73,17 +95,17 @@
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
         "src/verification/asm_oracle.py": "c35820a5f6b7cdbf84f6d0e3a3f017f888c09e0927be48dfd1ce8f3ec6ddd237",
         "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
-        "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
-        "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
-        "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
-        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
-        "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
-        "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
-        "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
+        "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
+        "src/verification/families/__init__.py": "202429171b8f96522d886d600e9c9b46cf4fa514fbfe7a4f0f7bc74c8803faee",
+        "src/verification/families/b0_contract.py": "fd67c683f551336cfc23037c23d923040189cb97c0ba169e947b08b1017fe168",
+        "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
+        "src/verification/families/b1_wave.py": "f193f441e119f9ec877701aa90b9586dfb7ae5e56cb7f70920c84992c9e466a3",
+        "src/verification/families/b2_transitions.py": "691cdf27aa55a8195a864fae792cc60bb3e08545a289622acbc78778bda51b35",
+        "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
+        "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "072f21001dff481a9337a44c57d09688deeb39db8f937718ca4c07150c07eb8d",
         "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
-        "src/verification/families/schema.py": "3d4e5871edb646df6243bffa4add9989b9e0e2a9bf8701b2e07e908c8a462e71",
+        "src/verification/families/schema.py": "6e8cc7c00137ad54b156641d3133d75fdb9ab3ee28c6727a0b8e12393f5f3b16",
         "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
         "src/verification/metrics.py": "f75fec1d1cd8b8287f6da6e6bf56838b69604b05511e5567dad851118e575f1b",
         "src/verification/refusals.py": "a05366d0549470b6d02424ac110149ba7a69f9bcdb85eb53b1dd5b02e0f72d46",
@@ -108,8 +130,8 @@
     },
     "probe": "instances/b2_equiv",
     "schema_version": 2,
-    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
-    "timestamp_utc": "2026-08-26T06:20:55.957923+00:00",
+    "source_commit": "ee1ca92f408769ed975b2946d689c5140109cec2",
+    "timestamp_utc": "2026-08-26T18:03:56.449695+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -287,12 +309,12 @@
       "fingerprint_matched": true,
       "instance_fingerprint": "0b05e43351cce0ffe545445d70d57c6d721ec728e877fa8e91c25829162a04fc",
       "package_versions": {},
-      "run_id": "probe-d0d9d31d1785",
+      "run_id": "probe-becc289325aa",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-d0d9d31d1785",
+    "run_id": "probe-becc289325aa",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

@@ -37,6 +37,7 @@ from verification.families import (
     FamilyOracle,
     InstanceOrigin,
     Metric,
+    BenchmarkLayer,
     NegativeControl,
     NumericalParameter,
     Parameter,
@@ -83,11 +84,31 @@ METRIC = Metric(
 )
 
 
+OTHER_METRIC = Metric(
+    name="power_ratio",
+    description="transmitted power over incident power",
+    unit=None,
+    blind_to=("where the power went, only how much of it survived",),
+)
+
+#: The default builder is a layer-A family, so it carries the control that layer
+#: requires. A qualification benchmark that has only ever been shown to agree has
+#: not been shown to be able to disagree, and CHE-141 makes that structural.
+CONTROL = NegativeControl(
+    control_id="RADIUS_SIGN_FLIP",
+    description="flip the sign of the surface radius",
+    mutation="negate radius_m before constructing the surface",
+    target_metric="relative_error",
+)
+
+
 def make_family(**overrides) -> BenchmarkFamily:
     kwargs = dict(
         family_id="B1-RAY-EXAMPLE",
         family_version="1.0.0",
         category=BenchmarkCategory.B1,
+        layer=BenchmarkLayer.QUALIFICATION,
+        negative_controls=(CONTROL,),
         question="does the traced focal length match R/(n-1)?",
         components=("M_RAY_OPTILAND",),
         claim_kind=ClaimKind.FORWARD_ACCURACY,
@@ -213,10 +234,21 @@ def test_a_cross_route_family_in_b4_cannot_carry_a_gating_tolerance() -> None:
             family_id="B4-DUALROUTE-EXAMPLE",
             family_version="1.0.0",
             category=BenchmarkCategory.B4,
+            layer=BenchmarkLayer.NUMERICAL,
             question="do the two Optiland PSF routes agree?",
             components=("M_RAY_OPTILAND",),
             claim_kind=ClaimKind.FORWARD_ACCURACY,
-            parameters=(PhysicalParameter("wavelength_m", "wavelength", unit="m"),),
+            parameters=(
+                PhysicalParameter("wavelength_m", "wavelength", unit="m"),
+                # A route comparison is a layer-B family, so it owes a refinement
+                # dimension. Present so that this test trips the gating rule it is
+                # about, rather than the layer rule it is not.
+                NumericalParameter(
+                    "pupil_rings",
+                    "pupil sampling rings per route",
+                    refines_toward=1,
+                ),
+            ),
             oracle=FamilyOracle(
                 kind=Oracle.CROSS_ROUTE,
                 independence=OracleIndependence.SHARES_CODE,
@@ -757,3 +789,103 @@ def test_every_registered_family_projects_into_the_ledger() -> None:
     projected = claims_from_families()
     expected = sum(len(f.components) for f in FAMILIES)
     assert len(projected) == expected
+
+
+# --------------------------------------------------------------------------- #
+# The layer axis (CHE-141)
+# --------------------------------------------------------------------------- #
+
+
+def test_every_registered_family_declares_a_layer() -> None:
+    """The point of a required field with no default.
+
+    Not a tautology: it is what stops a family being authored without saying
+    whether it qualifies a primitive, characterizes a numerical realization, or
+    makes a claim about an optical system.
+    """
+    from verification.families.registry import FAMILIES
+
+    assert FAMILIES.values(), "no families registered; the layer check is vacuous"
+    for fam in FAMILIES.values():
+        assert isinstance(fam.layer, BenchmarkLayer), fam.family_id
+
+
+def test_the_layer_is_orthogonal_to_the_category() -> None:
+    """Both axes have to be populated, or one of them is decoration.
+
+    B3 is the case that proves it: ``B3-PSF-SINGLET`` is a system claim and
+    ``B3-DUALROUTE`` is a comparison of two numerical realizations, and before
+    CHE-141 the taxonomy could not tell them apart.
+    """
+    from verification.families.registry import FAMILIES
+
+    pairs = {(f.category, f.layer) for f in FAMILIES.values()}
+    layers = {layer for _, layer in pairs}
+    assert layers == set(BenchmarkLayer), f"unpopulated layer: {set(BenchmarkLayer) - layers}"
+    b3_layers = {f.layer for f in FAMILIES.values() if f.category is BenchmarkCategory.B3}
+    assert len(b3_layers) > 1, "one category maps onto one layer; the axis adds nothing"
+
+
+def test_a_system_family_must_declare_its_topology() -> None:
+    with pytest.raises(ValueError, match="must declare its propagation topology"):
+        make_family(layer=BenchmarkLayer.SYSTEM, metrics=(METRIC, OTHER_METRIC))
+
+
+def test_a_two_stage_topology_is_a_transition_not_a_system() -> None:
+    with pytest.raises(ValueError, match="at least 3 stages"):
+        make_family(
+            layer=BenchmarkLayer.SYSTEM,
+            metrics=(METRIC, OTHER_METRIC),
+            topology=("M_RAY_OPTILAND", "C_RAY_TO_WAVE"),
+        )
+
+
+def test_a_system_family_cannot_collapse_to_one_observable() -> None:
+    """The "no single NCC threshold" rule, executable."""
+    with pytest.raises(ValueError, match="at least 2 distinct observables"):
+        make_family(
+            layer=BenchmarkLayer.SYSTEM,
+            topology=("M_RAY_OPTILAND", "C_RAY_TO_WAVE", "sensor-plane intensity"),
+        )
+
+
+def test_a_well_formed_system_family_constructs() -> None:
+    fam = make_family(
+        layer=BenchmarkLayer.SYSTEM,
+        metrics=(METRIC, OTHER_METRIC),
+        topology=("M_RAY_OPTILAND", "C_RAY_TO_WAVE", "sensor-plane intensity"),
+    )
+    assert fam.layer is BenchmarkLayer.SYSTEM
+    assert len(fam.topology) == 3
+
+
+def test_a_topology_outside_layer_c_is_a_contradiction() -> None:
+    """A topology is what makes a family a system claim.
+
+    Declaring one at layer A or B means either the layer or the topology is
+    wrong, and guessing which is not the schema's job.
+    """
+    with pytest.raises(ValueError, match="declares a topology at layer"):
+        make_family(topology=("M_RAY_OPTILAND", "C_RAY_TO_WAVE", "sensor"))
+
+
+def test_a_numerical_family_must_declare_a_refinement_dimension() -> None:
+    with pytest.raises(ValueError, match="must declare a refinement dimension"):
+        make_family(
+            layer=BenchmarkLayer.NUMERICAL,
+            parameters=(PhysicalParameter("radius_m", "surface radius", unit="m"),),
+        )
+
+
+def test_a_qualification_family_must_declare_a_negative_control() -> None:
+    with pytest.raises(ValueError, match="must declare at least one negative control"):
+        make_family(negative_controls=())
+
+
+def test_a_blank_topology_stage_is_refused() -> None:
+    with pytest.raises(ValueError, match="topology stage cannot be blank"):
+        make_family(
+            layer=BenchmarkLayer.SYSTEM,
+            metrics=(METRIC, OTHER_METRIC),
+            topology=("M_RAY_OPTILAND", "  ", "sensor-plane intensity"),
+        )

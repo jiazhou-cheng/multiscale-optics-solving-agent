@@ -31,6 +31,7 @@ from verification.families.predicates import fractional_margin
 from verification.families.registry import register
 from verification.families.schema import (
     BenchmarkCategory,
+    BenchmarkLayer,
     BenchmarkFamily,
     ClaimKind,
     ExecutionParameter,
@@ -106,6 +107,14 @@ B4_DEMO3 = register(
         family_id="B4-DEMO3",
         family_version="1.0.0",
         category=BenchmarkCategory.B4,
+        layer=BenchmarkLayer.SYSTEM,
+        topology=(
+            "coherent plane-wave illumination",
+            "C_PATCH_WFT",
+            "M_RAY_OPTILAND",
+            "C_RAY_TO_WAVE",
+            "sensor-plane intensity",
+        ),
         question=(
             "what does the patch-route hologram plus refractive lens "
             "(C_PATCH_WFT -> M_RAY_OPTILAND -> C_RAY_TO_WAVE) cost to converge, and how "
@@ -352,6 +361,7 @@ B4_COST = register(
         family_id="B4-COST",
         family_version="1.0.0",
         category=BenchmarkCategory.B4,
+        layer=BenchmarkLayer.NUMERICAL,
         question=(
             "what does each node and each route cost, and how much of a run is framework "
             "overhead rather than physics?"
@@ -538,6 +548,7 @@ B4_DUALROUTE_AGREEMENT = register(
         family_id="B4-DUALROUTE-AGREEMENT",
         family_version="1.0.0",
         category=BenchmarkCategory.B4,
+        layer=BenchmarkLayer.NUMERICAL,
         question=(
             "how far apart are the three PSF routes on the Cooke triplet, and what "
             "accounts for the gap? NOT: which of them is right -- all three are our own "

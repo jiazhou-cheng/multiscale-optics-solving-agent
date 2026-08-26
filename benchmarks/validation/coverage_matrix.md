@@ -28,6 +28,29 @@ Components x claim kinds. What each cell means:
 
 69 claims over 6 components.
 
+## Coverage by layer — CHE-141 (M2.5)
+
+Generated from `src/verification/families/`. The B0-B4 category says what may *decide* a family; the layer says what is being *claimed*. Layer C is the only layer at which a claim about an optical system may be made; layers A and B are the evidence underneath it. See `docs/benchmark_design.md`.
+
+| Component | A — qualification | B — numerical realization and validity | C — system |
+| -- | -- | -- | -- |
+| `M_RAY_OPTILAND` | `B0-CONTRACT`, `B0-UNITS`, `B1-RAY-EFL`, `B1-RAY-LAGRANGE`, `B1-RAY-OFFAXIS-OPL`, `B1-RAY-PLATE`, `B1-RAY-SNELL` | `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | -- |
+| `M_WAVE_CHROMATIX` | `B0-CONTRACT`, `B0-DTYPE`, `B0-UNITS`, `B1-WAVE-AIRY`, `B1-WAVE-ASM-VALIDITY`, `B1-WAVE-FWDBWD`, `B1-WAVE-GAUSS`, `B1-WAVE-PLANEPHASE`, `B1-WAVE-TALBOT`, `B1-WAVE-TILT` | `B4-COST` | -- |
+| `C_RAY_TO_WAVE` | `B0-CONTRACT`, `B2-R2W-EXACT`, `B2-ROUNDTRIP` | `B2-R2W-ROUTE`, `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | `B3-DEMO2`, `B3-PSF-SINGLET`, `B4-DEMO3` |
+| `C_WAVE_TO_RAY` | `B2-ROUNDTRIP`, `B2-W2R-STOCH` | -- | -- |
+| `C_PLANAR_DOE_STEP` | `B2-EQUIV` | -- | -- |
+| `C_PATCH_WFT` | `B0-CONTRACT`, `B0-VALIDITY`, `B2-EQUIV` | `B4-COST` | `B3-DEMO2`, `B4-DEMO3` |
+
+### Layer-C gates
+
+Where the system claims currently stand. An unmet gate is a first-class state and is reported here rather than left in a note.
+
+| family | gate | metric | observed |
+| -- | -- | -- | -- |
+| `B3-DEMO2` | `measured_off_gate` | `demo2_ncc` | 0.9994 |
+| `B3-PSF-SINGLET` | `not_met` | `fft_oracle_intensity_relative_l2` | 0.002207 |
+| `B4-DEMO3` | `characterized_no_gate` | -- | -- |
+
 ## The cells that should be read first
 
 * `M_WAVE_CHROMATIX` forward accuracy is `self`. The ASM is checked against our

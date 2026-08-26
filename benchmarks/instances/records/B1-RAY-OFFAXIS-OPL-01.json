@@ -1,5 +1,27 @@
 {
   "execution": {
+    "diagnostics": [
+      {
+        "code": "THE_SLOPE_IS_THE_CLAIM",
+        "detail": "d(OPL)/dy = 0.104592287128 against the required n_object*sin(theta) = 0.104528463268, with sin(theta) = 0.104528463 READ off the record's chief direction. Declared field 0.104719755 rad gives sin = 0.104528463; the two agree, which is the check that the instance and the trace describe the same field.",
+        "location": "couplers/handoff.py::_object_space_reference"
+      },
+      {
+        "code": "DECLARED_VERSUS_REALIZED_PUPIL",
+        "detail": "the instance declares pupil_diameter_m = 3.000000000e-04 and the trace realized 3.000000000e-04 as the peak-to-valley of its LAUNCH y. The radial extreme is 6.466281915e-04, inflated by the field offset (mean launch y is -0.173 mm here), and using it as a diameter reads 0.6556 -- a 34% apparent shortfall in a term that is exact. That is the trap this measurement fell into first.",
+        "location": "benchmarks/instances/b1_ray.py::_launch_tilt"
+      },
+      {
+        "code": "WITH_AND_WITHOUT_THE_TERM",
+        "detail": "with n_object*(d0.r_launch): 57.050338 waves peak-to-valley; without it: 0.034813; required 57.015525. Slope fractions 1.000611 and 0.000611.",
+        "location": "couplers/handoff.py::_object_space_reference"
+      },
+      {
+        "code": "ON_AXIS_IS_BLIND_TO_IT",
+        "detail": "the SAME omission on the on-axis trace: 0.000000000 waves with the term and 0.000000000 without, term span 0.000000000 waves. On axis the term is a constant across the pupil and the chief-ray subtraction removes it exactly, which is why the defect survived CHE-30, CHE-32 and CHE-33 -- every one of them looked on axis.",
+        "location": "couplers/handoff.py::_object_space_reference"
+      }
+    ],
     "nodes": [
       {
         "component": "M_RAY_OPTILAND",
@@ -35,7 +57,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "faddc474249316cfb761bc83bb5e0c8ed4970156b6168f6b11a91484e4bbaa9a",
+      "combined_sha256": "32e966eed76952a927bcd68170eee45cf8aa5a59dc19e2f534bfa9e1e7cde645",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -88,17 +110,17 @@
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
         "src/verification/claim_ledger.py": "6a5133462ea1b46dcae3788df03d6953ed20a7e3d0094ee28622d238ad22cde9",
-        "src/verification/evidence.py": "8975dd2476d3ef807a223220653c81611f000884c89dd14ea91c3c5c934052c4",
-        "src/verification/families/__init__.py": "37ca8bd730b5501086779c369f0c8c77135d08059a58a784558f7b598a0cb5bf",
-        "src/verification/families/b0_contract.py": "4c471bf4b257c9c0bddf85046dbe9f305c89cd1e1499eda895d074cffeff9b73",
-        "src/verification/families/b1_ray.py": "3159101697f07691146ada54a53b9e6fc48d647574ae7f01486450231a005c72",
-        "src/verification/families/b1_wave.py": "75061017cb097eae844df8a51c1db03a4f05d9a98e5d0b04b3cd0f57a36e6d70",
-        "src/verification/families/b2_transitions.py": "9c9668f2129de5bff75cca08a73efff46a6765908266ae3b6537d163dca36738",
-        "src/verification/families/b3_composed.py": "1648dc5dc91c9abb35e7615c11712303e839c52341a74c49539e332d101afd3e",
-        "src/verification/families/b4_characterization.py": "d0c5ff7feface0bf7bfe18a18a3406ae8b5b676e19f0930373b0bce1089cc03c",
+        "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
+        "src/verification/families/__init__.py": "202429171b8f96522d886d600e9c9b46cf4fa514fbfe7a4f0f7bc74c8803faee",
+        "src/verification/families/b0_contract.py": "fd67c683f551336cfc23037c23d923040189cb97c0ba169e947b08b1017fe168",
+        "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
+        "src/verification/families/b1_wave.py": "f193f441e119f9ec877701aa90b9586dfb7ae5e56cb7f70920c84992c9e466a3",
+        "src/verification/families/b2_transitions.py": "691cdf27aa55a8195a864fae792cc60bb3e08545a289622acbc78778bda51b35",
+        "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
+        "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "072f21001dff481a9337a44c57d09688deeb39db8f937718ca4c07150c07eb8d",
         "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
-        "src/verification/families/schema.py": "3d4e5871edb646df6243bffa4add9989b9e0e2a9bf8701b2e07e908c8a462e71",
+        "src/verification/families/schema.py": "6e8cc7c00137ad54b156641d3133d75fdb9ab3ee28c6727a0b8e12393f5f3b16",
         "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
         "src/verification/refusals.py": "a05366d0549470b6d02424ac110149ba7a69f9bcdb85eb53b1dd5b02e0f72d46",
         "src/verification/result.py": "2a41d860f9d4bd4dea16e2c3552d2b47bf44fd040a05aadf42fbcc14519d178a",
@@ -122,8 +144,8 @@
     },
     "probe": "instances/b1_ray",
     "schema_version": 2,
-    "source_commit": "85af9c16e0647e46df43c60c87341fafa823c6e9",
-    "timestamp_utc": "2026-08-26T06:20:33.100740+00:00",
+    "source_commit": "ee1ca92f408769ed975b2946d689c5140109cec2",
+    "timestamp_utc": "2026-08-26T18:03:33.722401+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -213,12 +235,12 @@
       "fingerprint_matched": true,
       "instance_fingerprint": "9f64f09181d1bd8e1361583f3fb9441c9435a037e7d66ede12e267a882295732",
       "package_versions": {},
-      "run_id": "probe-6aa5a3e141fa",
+      "run_id": "probe-91cfcdb111e0",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-6aa5a3e141fa",
+    "run_id": "probe-91cfcdb111e0",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

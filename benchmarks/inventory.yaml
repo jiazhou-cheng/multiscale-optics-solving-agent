@@ -600,6 +600,20 @@ entries:
   # =========================================================================
   # benchmarks/validation/ -- generated views of the claim ledger
   # =========================================================================
+  - path: benchmarks/systems/README.md
+    bucket: A
+    justification: >-
+      CHE-141 (M2.5). The declared home for layer-C specs, drivers and records,
+      and the written form of the decision that existing layer-C evidence is
+      re-homed BY CLASSIFICATION AND NOT MOVED ON DISK. B3-PSF-SINGLET,
+      B3-DEMO2 and B4-DEMO3 became layer C by acquiring a field; relocating 58
+      committed records to express that would invalidate every fingerprint for
+      no scientific gain. A directory whose emptiness is a stated position
+      rather than an omission is worth a row.
+    destination: >-
+      Where the M2.7-onward system ladder is authored. The layer view generated
+      into INVENTORY.md and coverage_matrix.md is what makes the grouping
+      readable without this directory having to hold the files.
   - path: benchmarks/validation/coverage_matrix.md
     bucket: A
     justification: >-
