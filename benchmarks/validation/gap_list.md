@@ -94,7 +94,7 @@ jax_enable_x64 is process-global and nothing checks it at the boundary that depe
 * **why high** CHE-103 established this caused a real, undetected change in committed evidence. It is CHE-102's rule -- check process-global solver state at the boundary, do not set it earlier and hope -- applied to the wave solver.
 * **blocks** reproducibility of any wave-side record, M3's executor
 
-## medium (1)
+## medium (2)
 
 ### `C_RAY_TO_WAVE` / device_parity -- M0.4 (CHE-105) for measurement, M1.3 (CHE-108) for the gate
 
@@ -102,6 +102,13 @@ No CUDA execution of the composed ray->wave path is covered by the default gate.
 
 * **why medium** Declared in the capability table and extrapolated from CPU.
 * **blocks** any GPU performance or accuracy claim on this edge
+
+### `C_GENERALIZED_SNELL` / convergence -- a dedicated FIXED_V1-enrollment follow-up to M2.10 (CHE-146)
+
+M2.10 (CHE-146) delivered the sweep this gap called for: family B1-GSL-VALIDITY (src/verification/families/b1_gsl_validity.py, 12 instances, driver benchmarks/instances/b1_gsl_validity.py) against the analytic grating equation, over spatial frequency, duty cycle and incidence angle, with smooth-limit agreement and a demonstrated breakdown both on record. What remains: no instance in that family carries split_tag=HELDOUT, so verification.fixed_suite's success metric S1 (every capability-table component appears in a REQUIRED FIXED_V1 instance with an independent oracle) still does not hold for this component.
+
+* **why medium** Not critical: what exists (the analytic grating-equation oracle, gated, plus the sweep) is loudly checked, not silently assumed. Medium because a real repository-wide invariant (S1) is unsatisfied for a real, registered, characterized component. Tagging a HELDOUT instance is a src/verification/fixed_suite.py edit -- a shared, default-gate-enrolled file -- and M2.10's acceptance criteria did not ask for it.
+* **blocks** verification.fixed_suite success metric S1
 
 ## low (1)
 
@@ -123,4 +130,5 @@ No verified derivative across the ray->wave boundary; forward_only.
 | M2.3 (CHE-111) | 2 (worst: critical) |
 | M3.1 (CHE-113) | 1 (worst: high) |
 | M4.2 (CHE-117) | 1 (worst: high) |
+| a dedicated FIXED_V1-enrollment follow-up to M2.10 (CHE-146) | 1 (worst: medium) |
 | deferred beyond this project phase | 1 (worst: low) |

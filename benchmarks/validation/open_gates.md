@@ -11,6 +11,22 @@ prose as the queryable form; the prose remains as the narrative.
 No gate here has been widened. That is the rule the repository operates under,
 and a register of unmet gates is what makes it checkable rather than aspirational.
 
+## `M_WAVE_CHROMATIX` -- order_power_relative_l2
+
+* **observed** `0.179240407985276` against a gate of `1e-06` -- 179240.41x over a ceiling
+* **claim** does an ideal, aberration-free FFT-based 4f relay -- FT, Fourier-plane modulation, inverse FT -- reproduce the analytic Fourier-optics diffraction-order prediction for a periodic phase modulation, and where does finite-grid sampling stop matching the continuous analytic theory?
+* **oracle** analytic_closed_form, independent
+* **measured in** cpu / complex128
+* **tolerance basis** B3-4F-IDEAL-SIN-01 (sinusoidal_phase, samples_per_period=16, grid_n=512) measures 2.99e-14, and B3-4F-IDEAL-CARRIER-SNAPPED measures 4.8e-33; the residual at coarser sampling is not float64 round-off but the mask's own Fourier tail aliasing back onto the checked orders, and it is exactly accounted for: at samples_per_period=8 the checked order n=1 measures 0.5579120236816821, and J_1(1.5) + sum_k J_{1+8k}(1.5) over the neighbouring aliases reproduces it to 2.2e-16, while J_1(1.5) alone is off by 2.4e-5 -- the same aliasing mechanism this predicate's blind_to names, confirmed against scipy.special.jv while authoring this family. 1e-6 sits between the round-off floor and the smallest aliasing effect this sweep resolves, so it rejects a wrong closed form or a real aliasing fold rather than absorbing one. It is NOT met at every declared-INSIDE instance -- B3-4F-IDEAL-SIN-02 (samples_per_period=8) measures 7.6e-5 and B3-4F-IDEAL-SIN-03 (samples_per_period=4) measures 0.179, both comfortably inside the fundamental-only FFT_GRID_NYQUIST bound -- which is the family's own observed answer to CHE-144's question of where sampling stops matching the continuous theory: considerably sooner than the naive Nyquist wall, and depending on the modulation depth. See the family's gate_disposition
+* **evidence**
+  * `benchmarks/systems/records/B3-4F-IDEAL-SIN-01.json`
+  * `benchmarks/systems/records/B3-4F-IDEAL-SIN-02.json`
+  * `benchmarks/systems/records/B3-4F-IDEAL-SIN-03.json`
+  * `benchmarks/systems/records/B3-4F-IDEAL-BIN-01.json`
+  * `benchmarks/systems/records/B3-4F-IDEAL-CARRIER-SNAPPED.json`
+* **notes**
+  * carried forward unwidened, not hidden. The deepest-inside instances (B3-4F-IDEAL-SIN-01 at samples_per_period=16, B3-4F-IDEAL-CARRIER-SNAPPED) meet 1e-6 to the float64 floor. Two instances this family itself declares INSIDE by FFT_GRID_NYQUIST do not: B3-4F-IDEAL-SIN-02 (samples_per_period=8) measures 7.6e-5 and B3-4F-IDEAL-SIN-03 (samples_per_period=4) measures 0.179 -- both fully attributed to the mask's own Fourier tail aliasing back onto the checked orders (confirmed against scipy.special.jv; see FFT_GRID_NYQUIST's blind_to), not to a defect. B3-4F-IDEAL-BIN-01 (binary_phase, also declared INSIDE) measures 1.05e-2, because a discontinuous mask's Fourier series decays as O(1/n) rather than the sinusoidal grating's superexponential Bessel decay, so its aliasing tail is far larger at the same samples_per_period and does not fall under 1e-6 anywhere in this family's declared domain (checked up to samples_per_period=256; still 1.3e-3 there). This IS CHE-144's own requested answer to 'where does the system stop being modelled correctly' -- the real boundary is modulation-dependent and considerably tighter than the naive Nyquist wall this family's single validity predicate declares.
+
 ## `C_RAY_TO_WAVE` -- fft_oracle_intensity_relative_l2
 
 * **observed** `0.0022072391812867093` against a gate of `0.001` -- 2.21x over a ceiling

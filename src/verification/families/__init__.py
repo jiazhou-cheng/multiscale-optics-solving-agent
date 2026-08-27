@@ -12,9 +12,11 @@ that knows which families exist.
 # including about which entries exist at all.
 from verification.families import (  # noqa: F401
     b0_contract,
+    b1_gsl_validity,
     b1_ray,
     b1_wave,
     b2_transitions,
+    b3_4f_ideal,
     b3_composed,
     b4_characterization,
 )

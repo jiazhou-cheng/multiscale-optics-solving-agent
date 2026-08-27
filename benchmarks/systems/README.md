@@ -12,12 +12,22 @@ system claim whose chain is not written down cannot be checked against the
 system it claims to model, and because no system collapses to a single
 threshold.
 
-## Nothing is here yet, and that is the correct state
+## What is here
 
-The system ladder is authored from M2.7 onward — the ideal 4f relay, the
-canonical refractive→wave boundary, the aberrated 4f relay, the terminal-DOE
-hybrid, the embedded diffractive system, the conformal metasurface, and the SLM
-relay. M2.5 installs the axis and the destination; it authors no system family.
+`B3-4F-IDEAL` (CHE-144, M2.8) is the first rung of the system ladder: an ideal,
+aberration-free FFT-based 4f relay, checked against a hand-derived analytic
+Fourier-optics reference (Jacobi-Anger for a sinusoidal phase grating, the
+two-level Fourier series for a binary phase grating, the trivial single-term
+series for a pure carrier). Its family lives in
+[`src/verification/families/b3_4f_ideal.py`](../../src/verification/families/b3_4f_ideal.py),
+its driver at [`b3_4f_ideal.py`](b3_4f_ideal.py) in this directory, and its nine
+canonical instances' records in [`records/`](records/). Run it::
+
+    ./run.sh python benchmarks/systems/b3_4f_ideal.py --write
+
+The remaining rungs are authored M2.9 onward — the canonical refractive→wave
+boundary, the aberrated 4f relay, the terminal-DOE hybrid, the embedded
+diffractive system, the conformal metasurface, and the SLM relay.
 
 ## Existing layer-C evidence is re-homed by classification, not moved on disk
 

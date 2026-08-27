@@ -8,7 +8,7 @@ and nanophotonic simulation: compose existing physics solvers through explicit,
 testable couplers, driven by compact versioned knowledge packs. Forward
 simulation is the priority; inverse design is a future extension. The supported
 core is the Optiland ray model, the Chromatix scalar-wave model, and the
-repository ray/wave couplers.
+repository ray/wave couplers.``
 
 **Sources of truth**, in precedence order: the Linear issue's scope and
 acceptance criteria; this file; executable claims (`src/registry/`,

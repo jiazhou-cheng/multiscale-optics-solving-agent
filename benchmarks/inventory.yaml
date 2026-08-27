@@ -443,6 +443,26 @@ entries:
       dephasing (pi/2) m^4 (lambda/d)^2, and the driver decomposes it against a
       paraxial and an exact float64 kernel on the same grid rather than asserting
       it.
+  - path: benchmarks/instances/b1_gsl_validity.py
+    bucket: B
+    justification: >-
+      POSITIVE: the 12 B1-GSL-VALIDITY instances executed against the shipping
+      GENERALIZED_SNELL coupler, the smooth-limit agreement (float64 round-off
+      over 9-45 samples/period) and the demonstrated period-axis and
+      duty-cycle breakdowns this family exists to find. Also the place a
+      genuine, pre-existing limitation of single_order_dominance's off-axis
+      target direction and a non-monotonic reading of the coupler's own
+      local-gradient-smoothness margin past its first refusal point were
+      found and are recorded rather than silently worked around.
+    destination: >-
+      B1-GSL-VALIDITY-PERIOD-{01..08}, -DUTY-{01..03} and -OFFAXIS-01
+      canonical instances.
+    note: >-
+      The three DUTY instances and PERIOD-06 refuse at the per-ray level
+      (MISSING_DECLARATION) by design -- a genuinely discontinuous edge
+      breaks the coupler's local-gradient estimate regardless of duty cycle
+      -- and single_order_dominance is measured directly, bypassing that
+      gate, so the family still records a graded signal on those instances.
   - path: benchmarks/instances/b2_transitions.py
     bucket: B
     justification: >-
@@ -498,6 +518,33 @@ entries:
       It does NOT yet reproduce the 2.21e-3 frozen number, and does not claim to:
       256 rings rather than 512, and a centred-half-window metric rather than the
       5-Airy-radius radial-profile residual. Both differences are declared.
+
+  # =========================================================================
+  # benchmarks/systems/ -- layer-C specs, drivers and records, CHE-141 (M2.5)
+  # onward. B3-4F-IDEAL (CHE-144, M2.8) is the first system authored here.
+  # =========================================================================
+  - path: benchmarks/systems/b3_4f_ideal.py
+    bucket: B
+    justification: >-
+      POSITIVE: the ideal 4f relay driver -- fft2/mask/ifft2 realized directly
+      with numpy, since no M_WAVE_CHROMATIX capability implements an ideal
+      lens's Fourier-transforming property. Runs, measures and verifies all
+      nine canonical instances and demonstrates every declared negative
+      control firing on at least one of them.
+    destination: The nine B3-4F-IDEAL-* canonical instances.
+    note: >-
+      Confirmed the order-n sign convention (x0_n = -n / Lf) and the
+      finite-samples_per_period aliasing tail against scipy.special.jv while
+      authoring; both are recorded in the family module's docstring rather than
+      only in this driver.
+  - path: benchmarks/systems/records/*.json
+    glob: true
+    bucket: B
+    justification: >-
+      POSITIVE: the nine B3-4F-IDEAL-* instance records -- the sweep across
+      samples_per_period from deep inside to far outside the declared
+      FFT_GRID_NYQUIST bound, plus the grid-snapped/off-grid carrier pair.
+    destination: B3-4F-IDEAL-{SIN-01..05,BIN-01,BIN-02,CARRIER-SNAPPED,CARRIER-OFFGRID}.
 
   # =========================================================================
   # benchmarks/protocols/ -- frozen contracts holding tolerance derivations
@@ -1308,6 +1355,17 @@ entries:
       whose entire subject is behaviour near the sampling boundary and which is what
       forces the validity margin to be signed and normalized.
     destination: The wave half of the B1 evidence layer.
+  - path: src/verification/families/b1_gsl_validity.py
+    bucket: A
+    justification: >-
+      B1-GSL-VALIDITY (CHE-146, M2.10): the smooth-to-diffractive validity
+      envelope for GENERALIZED_SNELL, against the analytic grating equation
+      as the primary (gating) oracle and FULL_FIELD as CROSS_ROUTE diagnostic
+      evidence only. Declares GRATING_ORDER_PROPAGATES (new) and reuses
+      GENERALIZED_SNELL_SINGLE_ORDER_DOMINANCE and a measured wrapper around
+      the coupler's own local-gradient-smoothness margin, rather than
+      re-deriving M2.7's physics.
+    destination: The diffractive-interaction half of the B1 evidence layer.
   - path: src/verification/families/b2_transitions.py
     bucket: A
     justification: >-
@@ -1326,6 +1384,18 @@ entries:
       external published reference; B3-DUALROUTE gates on an intermediate
       invariant because no independent PSF route exists for the Cooke triplet.
     destination: The composed half of the validated evidence layer.
+  - path: src/verification/families/b3_4f_ideal.py
+    bucket: A
+    justification: >-
+      B3-4F-IDEAL (CHE-144, M2.8): the first layer-C system-ladder family. The
+      independent oracle is a hand-derived Fourier-plane mask series (Bessel
+      for the sinusoidal grating, the two-level square-wave series for the
+      binary grating), sharing no code with the driver's fft2/ifft2 relay. The
+      gate is carried NOT_MET and unwidened: two declared-INSIDE instances fail
+      it, fully attributed to the mask's own Fourier-tail aliasing rather than
+      a defect -- CHE-144's own requested characterization of where sampling
+      stops matching the continuous theory.
+    destination: The system half of the validated evidence layer.
   - path: src/verification/families/b4_characterization.py
     bucket: A
     justification: >-

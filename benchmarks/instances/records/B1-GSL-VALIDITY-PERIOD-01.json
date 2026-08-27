@@ -1,0 +1,311 @@
+{
+  "execution": {
+    "diagnostics": [
+      {
+        "code": "M2_7_PREDICATE_MARGINS",
+        "detail": "propagating_order_margin=+0.998264, gradient_smoothness_margin=+0.933333, single_order_dominance_margin=+0.627324",
+        "location": "src/couplers/generalized_snell.py::GeneralizedSnellDiagnostics"
+      }
+    ],
+    "nodes": [
+      {
+        "component": "C_GENERALIZED_SNELL",
+        "node_id": "gsl_validity_sweep",
+        "outcome": "executed",
+        "refusal": null
+      }
+    ],
+    "observed_parameters": {
+      "measured_gradient_smoothness_margin": 0.9333333333333332,
+      "single_order_dominance": 0.813662219344531
+    },
+    "seeds": [],
+    "status": "succeeded"
+  },
+  "expected": {
+    "analytic_direction_cosine": 0.041666666666666664,
+    "why": "the grating equation, exact and independent of both diffractive-interaction models -- what deflection_angle_worst_error_rad is measured against"
+  },
+  "family_id": "B1-GSL-VALIDITY",
+  "family_version": "1.0.0",
+  "instance_fingerprint": "6181ba03b67c64e82eb3836486ba7f4baa3262a9199bb777f22bd864618967e9",
+  "instance_id": "B1-GSL-VALIDITY-PERIOD-01",
+  "parameters": {
+    "duty_cycle": 0.5,
+    "incidence_angle_rad": 0.0,
+    "index_incident": 1.0,
+    "index_transmitted": 1.0,
+    "measured_gradient_smoothness_margin": 1.0,
+    "order": 1,
+    "patch_px": 65,
+    "period_m": 1.2e-05,
+    "phase_depth_rad": 0.0,
+    "profile_kind": "blazed_ramp",
+    "single_order_dominance": 1.0,
+    "wavelength_m": 5e-07
+  },
+  "record_provenance": {
+    "code_fingerprint": {
+      "combined_sha256": "e7e5da7fc0f6a5ef3357fbbf501ca296aacb2fb153f097c549da8f4b2e56f255",
+      "files": {
+        "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
+        "src/core/artifacts.py": "a148747d386f3ef1cd19f32a4f5a2b97505fa0a78309002015728dbbd7558187",
+        "src/core/boundary.py": "668c87a23eb0d601b52aa0961c30ab851cf87458e20953a708ab22d4fcfeb9f0",
+        "src/core/capabilities.py": "d6e07118a029b6ca67375bc174252c779e39f03b222884416aa3f522c1fcb612",
+        "src/core/errors.py": "038539bfda88ea4fb9083a6b833afaa0cf572361d0731458799aa270edbd0a5f",
+        "src/core/execution.py": "aced44b147250e3ddfb24a8469f8277b593b62c173d4ffa73afca99a1bf7b1e4",
+        "src/core/execution_record.py": "e7c4d934d978addb6eb94056f932bfcc52f8b56cc5cd5579e3178d8dbabdd9a1",
+        "src/core/graph.py": "eb75ec23d8586dde3fdb2dcf5af536c3695fa0336a99730ad2389a93662c6e2e",
+        "src/core/paths.py": "99a400531c4fdc68bf2567d834be75e896c62af0bf0046f7afa82ce49a519b82",
+        "src/core/performance.py": "0ba833c00705e3cfa8e36c209af3dce4a737462fc4c02668a8bda7b9f628becb",
+        "src/core/precision.py": "cba7f2fd4164f6564c9f68d78ada6bede53995125d849620a010f1c25b840e29",
+        "src/core/provenance.py": "49d0029e918bd68dcd90d94f458b2468fca3d5b76add1a0ba97182130700c69c",
+        "src/core/resources.py": "b17120b6e59c89ce15df90cb5e643be459743a5a826d80e8631428f9a6ad946c",
+        "src/core/specs.py": "25dd87c8adc60c0698ca11c9fa53010a5197a1d09c59c4e592070a3fc72b02b3",
+        "src/couplers/__init__.py": "82eb16c1a09d2e21c030a87afe9ee1b956c0f9ae776bdaa65c8e092d38861c0e",
+        "src/couplers/base.py": "e3510c6b93d3f2acd92eeabf48507c8b489dd7e4fb09c802eeffbc208f1cefa0",
+        "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
+        "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
+        "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
+        "src/couplers/generalized_snell.py": "3a17d319366f7e2e0cf19eb390aba5ae33acd634a8ee43d35cfe38669192c07e",
+        "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
+        "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
+        "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+        "src/couplers/ontology.py": "c6bbbb14c8a09aa7efe71bc0d15a5418e73084fbcb7167a76a260598688cfea4",
+        "src/couplers/patch.py": "699e7270bebc7e03dbd0bf1a0a61606dd534ec717bbf038fb5871527af0b1aa9",
+        "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
+        "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
+        "src/couplers/propagation.py": "08d99bcabf57e72b2766b8ba5f1c6ba4fe4bf2921653b56b7a095a00502f7ebd",
+        "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+        "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
+        "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
+        "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
+        "src/runtime/__init__.py": "181d1e8f9755456d0b479093a7ab0c5ecbf8f62e1eb854a8c566a95fc8ebd10d",
+        "src/runtime/executor.py": "434be27f14c266155f2b92a9123e8ffcac0d0b1f191fe08f0e0b19c1463de228",
+        "src/runtime/instance_runner.py": "ea2aae347e10b0770800a2afb038bf09d7733943c80ae50718edbc3b24288815",
+        "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
+        "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
+        "src/verification/claim_ledger.py": "df0b93330e66a1c5528897d2f26a77f53a34ef8f57e74172a77af9375aedc638",
+        "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
+        "src/verification/families/__init__.py": "391812ff6ca5a7bd6b273cd453de3578f4df6ad576287265359b9de43e8d4381",
+        "src/verification/families/b0_contract.py": "adcaea59b365cf9d4b81889b7daf9a0b8c4d80e2b2a7be8852794b4475355542",
+        "src/verification/families/b1_gsl_validity.py": "3d5b6c70a9247a71cf55e663f417c7ef0db4cb83b395bbc016d65b5f1d7e2494",
+        "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
+        "src/verification/families/b1_wave.py": "f193f441e119f9ec877701aa90b9586dfb7ae5e56cb7f70920c84992c9e466a3",
+        "src/verification/families/b2_transitions.py": "70cc8dab2c1612352e7123df2e7e34eace5c7f3feb5a6d6af3a9bee4d5acf62e",
+        "src/verification/families/b3_4f_ideal.py": "dcddc8a8ad364e93f9293fae24fca51683e50a2e8597c35cf1eb94565fdf8710",
+        "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
+        "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
+        "src/verification/families/predicates.py": "21a64e2d17f2098787cece75bfec879e92785f0084bcfc12638f84f5e959c4f7",
+        "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
+        "src/verification/families/schema.py": "a45998ade63dffe9c0ef0352b87036cba8ef455c2b7fdfb4a13e6aad0415c1e4",
+        "src/verification/hazards.py": "25e70a892932f1dbf4dbe8834e41711a5d21242bc700f4902e661cb5a1e8ad64",
+        "src/verification/refusals.py": "c6ba7b03ab537a883b4f1c74bc346ff81d6cdb9d5440ddcfe66a3f96e6d2aafd",
+        "src/verification/result.py": "2a41d860f9d4bd4dea16e2c3552d2b47bf44fd040a05aadf42fbcc14519d178a",
+        "src/verification/status.py": "2cc3bc5c1bd6ae75a6941ecff169955f4bc1f958280ac0be0b4a3bbaf9051c2c",
+        "src/verification/verifier.py": "8227cb41a7ebc83a94a160bac0142ed9bd2f5ad5df221726f3243906091cb928"
+      }
+    },
+    "data_fingerprint": {},
+    "environment_fingerprint": {
+      "combined_sha256": "54118fbb8522613f91b8543412783ee46054fa0c904f95ba448e86880b41e12c",
+      "packages": {
+        "chromatix": "0.6.0",
+        "jax": "0.6.2",
+        "jaxlib": "0.6.2",
+        "numpy": "2.2.6",
+        "optiland": "0.6.0",
+        "scipy": "1.15.3",
+        "torch": "2.13.0+cpu"
+      },
+      "python_version": "3.12.14"
+    },
+    "probe": "instances/b1_gsl_validity",
+    "schema_version": 2,
+    "source_commit": "ccbf8034bdb5f098f8238a620fe8acfb54c0599a",
+    "timestamp_utc": "2026-08-27T01:37:20.690012+00:00",
+    "working_tree_dirty": true
+  },
+  "runner_version": "1.0.0",
+  "scientific_fingerprint": "fa9115bf2ec7c49f19b105acbb172b8c9f05d3f190d95490cfd61be567d1d6ed",
+  "verification": {
+    "category": "B1",
+    "contract_status": {
+      "capability_intersection_empty": false,
+      "codes": [],
+      "refusal_detail": null,
+      "refusal_kind": null,
+      "silent_hazard_ids": []
+    },
+    "convergence": {
+      "converged": null,
+      "dimension": null,
+      "expected_exponent": null,
+      "fitted_exponent": null,
+      "ladder": [],
+      "note": "",
+      "values": []
+    },
+    "device_precision_observation": null,
+    "diagnostics": [
+      {
+        "code": "parameter_drifted_during_execution",
+        "detail": "the run realized parameter values other than the instance's: measured_gradient_smoothness_margin, single_order_dominance",
+        "subject": "measured_gradient_smoothness_margin,single_order_dominance"
+      },
+      {
+        "code": "no_uncertainty_estimated",
+        "detail": "deflection_angle_worst_error_rad is reported without an uncertainty estimate, so nothing here bounds how far the value could be from the truth",
+        "subject": "deflection_angle_worst_error_rad"
+      },
+      {
+        "code": "no_uncertainty_estimated",
+        "detail": "full_field_dominance_agreement is reported without an uncertainty estimate, so nothing here bounds how far the value could be from the truth",
+        "subject": "full_field_dominance_agreement"
+      },
+      {
+        "code": "negative_control_not_run",
+        "detail": "period-past-evanescent-boundary was not exercised",
+        "subject": "period-past-evanescent-boundary"
+      },
+      {
+        "code": "negative_control_not_run",
+        "detail": "order-the-profile-does-not-carry was not exercised",
+        "subject": "order-the-profile-does-not-carry"
+      },
+      {
+        "code": "convergence_not_established",
+        "detail": "the family declares a refinement dimension and this run carries no ladder, so the value is a single point rather than a converged one",
+        "subject": null
+      }
+    ],
+    "family_id": "B1-GSL-VALIDITY",
+    "family_version": "1.0.0",
+    "instance_id": "B1-GSL-VALIDITY-PERIOD-01",
+    "invariant_results": [],
+    "negative_control_results": [
+      {
+        "baseline": null,
+        "control_id": "period-past-evanescent-boundary",
+        "mutated": null,
+        "note": "declared by the family and not exercised in this run",
+        "outcome": "not_run",
+        "target_metric": "deflection_angle_worst_error_rad"
+      },
+      {
+        "baseline": null,
+        "control_id": "order-the-profile-does-not-carry",
+        "mutated": null,
+        "note": "declared by the family and not exercised in this run",
+        "outcome": "not_run",
+        "target_metric": "deflection_angle_worst_error_rad"
+      }
+    ],
+    "physics_accuracy": [
+      {
+        "blind_to": [
+          "the spatial pattern of the disagreement within the period -- a worst-case scalar cannot say whether the error is one outlier ray near a discontinuity or a uniform bias"
+        ],
+        "measured": {
+          "note": "worst of 9 rays spread across one period against the analytic grating angle asin(0.041667). single_order_dominance=0.813662 (margin +0.6273), gradient-smoothness margin +0.9333, propagating-order margin +0.9983.",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 6.245004513516506e-17
+        },
+        "met": true,
+        "metric": "deflection_angle_worst_error_rad",
+        "oracle": "analytic_closed_form",
+        "oracle_independence": "independent",
+        "tolerance": 0.001,
+        "tolerance_basis": "the smooth-limit instances (period >> pitch, blazed ramp) measure worst-case error at or below float64 round-off through asin and the local finite-difference stencil; 1e-3 rad is set well above that floor and below the multi-radian-fraction errors the near-Nyquist and high-duty-cycle-discontinuity instances show. Basis completed after executing the family, per the B2-EQUIV precedent: a threshold is not well defined before the family that owes it has run",
+        "tolerance_may_gate": true
+      },
+      {
+        "blind_to": [
+          "which model is closer to the analytic grating angle -- this metric only says whether the two routes' own order-concentration readings agree, never which one (if either) is right"
+        ],
+        "measured": {
+          "note": "GENERALIZED_SNELL dominance 0.813662 vs FULL_FIELD principal-order power fraction 0.787236",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 0.026426355114510525
+        },
+        "met": true,
+        "metric": "full_field_dominance_agreement",
+        "oracle": "analytic_closed_form",
+        "oracle_independence": "independent",
+        "tolerance": 1.0,
+        "tolerance_basis": "diagnostic only: the threshold is the metric's own maximum possible value, so this tolerance can never gate and exists only so the metric can be reported through the same machinery as a gating one",
+        "tolerance_may_gate": false
+      }
+    ],
+    "provenance": {
+      "family_version": "1.0.0",
+      "fingerprint_matched": true,
+      "instance_fingerprint": "6181ba03b67c64e82eb3836486ba7f4baa3262a9199bb777f22bd864618967e9",
+      "package_versions": {},
+      "run_id": "probe-5a79e8c5fe75",
+      "source_commit": null,
+      "verifier_version": "1.0.0"
+    },
+    "resource_cost": null,
+    "run_id": "probe-5a79e8c5fe75",
+    "status": "ok",
+    "stochastic_evidence": {
+      "ensemble_mean": null,
+      "ensemble_standard_error": null,
+      "exactness_limit": null,
+      "fitted_convergence_rate": null,
+      "seeds": [],
+      "trials": 0,
+      "unbiasedness": null,
+      "variance_by_sampling_density": {}
+    },
+    "validity": {
+      "declared": "inside",
+      "drifted_parameters": {
+        "measured_gradient_smoothness_margin": {
+          "declared": 1.0,
+          "observed": 0.9333333333333332
+        },
+        "single_order_dominance": {
+          "declared": 1.0,
+          "observed": 0.813662219344531
+        }
+      },
+      "margins": [
+        {
+          "basis": "generalized_snell_propagating_order",
+          "blind_to": [
+            "everything about the order except whether it exists at all"
+          ],
+          "margin": 0.9583333333333334,
+          "predicate_id": "GRATING_ORDER_PROPAGATES",
+          "state": "inside"
+        },
+        {
+          "basis": "generalized_snell_gradient_smoothness",
+          "blind_to": [
+            "a uniformly aliased gradient -- see couplers.generalized_snell.local_gradient_smoothness_margin's own note"
+          ],
+          "margin": 0.9333333333333332,
+          "predicate_id": "MEASURED_LOCAL_GRADIENT_SMOOTHNESS",
+          "state": "inside"
+        },
+        {
+          "basis": "generalized_snell_single_order_dominance",
+          "blind_to": [
+            "amplitude modulation -- only the phase's own order content is measured"
+          ],
+          "margin": 0.627324438689062,
+          "predicate_id": "GENERALIZED_SNELL_SINGLE_ORDER_DOMINANCE",
+          "state": "inside"
+        }
+      ],
+      "observed": "inside"
+    }
+  }
+}
