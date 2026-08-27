@@ -19,15 +19,15 @@ Components x claim kinds. What each cell means:
 
 | Component | forward_accuracy | convention | conservation | convergence | round_trip | structured_failure | gradient | device_parity | cost |
 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
-| `M_RAY_OPTILAND` | **ind** / **ind** / n/a / self / **ind** | **ind** / **ind** / **ind** / **ind** | **ind** / declared | **ind** | -- | **ind** / n/a | -- | n/a | n/a |
+| `M_RAY_OPTILAND` | **ind** / **ind** / n/a / n/a / self / **ind** | **ind** / **ind** / **ind** / **ind** / **ind** | **ind** / declared | **ind** | -- | **ind** / n/a | -- | n/a | n/a |
 | `M_WAVE_CHROMATIX` | **ind** / **ind** / **ind** / **FAIL** / self | **ind** / **ind** / **ind** / n/a | -- | **ind** | **ind** | **ind** / n/a | -- | **ind** / off-gate | n/a |
-| `C_RAY_TO_WAVE` | **ind** / off-gate / **FAIL** / n/a / self / **ind** / **FAIL** | **FAIL** / **ind** | declared / **ind** | **ind** / **ind** / n/a / char | **ind** / self | **ind** / n/a | declared | off-gate | n/a |
+| `C_RAY_TO_WAVE` | **ind** / off-gate / **FAIL** / n/a / n/a / self / **ind** / **FAIL** | **ind** / **FAIL** / **ind** | declared / **ind** | **ind** / **ind** / n/a / char | **ind** / self | **ind** / n/a | declared | off-gate | n/a |
 | `C_WAVE_TO_RAY` | n/a / **ind** | **ind** | -- | **ind** / **ind** | **ind** / **ind** | n/a | char | -- | -- |
 | `C_PLANAR_DOE_STEP` | **ind** / **ind** / n/a / **ind** | -- | -- | **ind** | -- | n/a | -- | self | -- |
 | `C_PATCH_WFT` | **ind** / off-gate / **ind** | **ind** | -- | n/a | -- | **ind** / **ind** / n/a | -- | -- | n/a |
-| `C_GENERALIZED_SNELL` | **ind** / **ind** | **ind** | -- | -- | -- | n/a | -- | -- | -- |
+| `C_GENERALIZED_SNELL` | **ind** / n/a / **ind** | **ind** / **ind** | -- | -- | -- | n/a | -- | -- | -- |
 
-83 claims over 7 components.
+89 claims over 7 components.
 
 ## Coverage by layer — CHE-141 (M2.5)
 
@@ -35,13 +35,13 @@ Generated from `src/verification/families/`. The B0-B4 category says what may *d
 
 | Component | A — qualification | B — numerical realization and validity | C — system |
 | -- | -- | -- | -- |
-| `M_RAY_OPTILAND` | `B0-CONTRACT`, `B0-UNITS`, `B1-RAY-EFL`, `B1-RAY-LAGRANGE`, `B1-RAY-OFFAXIS-OPL`, `B1-RAY-PLATE`, `B1-RAY-SNELL` | `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | `B3-4F-REAL`, `B4-4F-REAL` |
+| `M_RAY_OPTILAND` | `B0-CONTRACT`, `B0-UNITS`, `B1-RAY-EFL`, `B1-RAY-LAGRANGE`, `B1-RAY-OFFAXIS-OPL`, `B1-RAY-PLATE`, `B1-RAY-SNELL` | `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | `B3-4F-REAL`, `B3-DOE-INLINE`, `B4-4F-REAL`, `B4-DOE-INLINE` |
 | `M_WAVE_CHROMATIX` | `B0-CONTRACT`, `B0-DTYPE`, `B0-UNITS`, `B1-WAVE-AIRY`, `B1-WAVE-ASM-VALIDITY`, `B1-WAVE-FWDBWD`, `B1-WAVE-GAUSS`, `B1-WAVE-PLANEPHASE`, `B1-WAVE-TALBOT`, `B1-WAVE-TILT` | `B4-COST` | `B3-4F-IDEAL` |
-| `C_RAY_TO_WAVE` | `B0-CONTRACT`, `B2-R2W-EXACT`, `B2-ROUNDTRIP` | `B2-R2W-ROUTE`, `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | `B3-4F-REAL`, `B3-DEMO2`, `B3-PSF-SINGLET`, `B4-4F-REAL`, `B4-DEMO3` |
+| `C_RAY_TO_WAVE` | `B0-CONTRACT`, `B2-R2W-EXACT`, `B2-ROUNDTRIP` | `B2-R2W-ROUTE`, `B3-DUALROUTE`, `B4-COST`, `B4-DUALROUTE-AGREEMENT` | `B3-4F-REAL`, `B3-DEMO2`, `B3-DOE-INLINE`, `B3-PSF-SINGLET`, `B4-4F-REAL`, `B4-DEMO3`, `B4-DOE-INLINE` |
 | `C_WAVE_TO_RAY` | `B2-ROUNDTRIP`, `B2-W2R-STOCH` | -- | `B3-4F-REAL`, `B4-4F-REAL` |
 | `C_PLANAR_DOE_STEP` | `B2-EQUIV` | `B1-GSL-VALIDITY` | `B3-4F-REAL`, `B4-4F-REAL` |
 | `C_PATCH_WFT` | `B0-CONTRACT`, `B0-VALIDITY`, `B2-EQUIV` | `B4-COST` | `B3-DEMO2`, `B4-DEMO3` |
-| `C_GENERALIZED_SNELL` | -- | `B1-GSL-VALIDITY` | -- |
+| `C_GENERALIZED_SNELL` | -- | `B1-GSL-VALIDITY` | `B3-DOE-INLINE`, `B4-DOE-INLINE` |
 
 ### Layer-C gates
 
@@ -52,9 +52,11 @@ Where the system claims currently stand. An unmet gate is a first-class state an
 | `B3-4F-IDEAL` | `not_met` | `order_power_relative_l2` | 0.1792 |
 | `B3-4F-REAL` | `met` | `field_relative_l2_vs_ideal_4f` | 0.0003731 |
 | `B3-DEMO2` | `measured_off_gate` | `demo2_ncc` | 0.9994 |
+| `B3-DOE-INLINE` | `met` | `order_position_relative_error` | 9.496e-05 |
 | `B3-PSF-SINGLET` | `not_met` | `fft_oracle_intensity_relative_l2` | 0.002207 |
 | `B4-4F-REAL` | `characterized_no_gate` | -- | -- |
 | `B4-DEMO3` | `characterized_no_gate` | -- | -- |
+| `B4-DOE-INLINE` | `characterized_no_gate` | -- | -- |
 
 ## The cells that should be read first
 

@@ -39,7 +39,7 @@
    "rings": 128,
    "traced_rays": 49537,
    "uniform_vs_o1": 0.003928950465141261,
-   "wall_seconds": 5.896607984032016,
+   "wall_seconds": 4.922316088050138,
    "weighted_vs_o1": 0.002189049217668529
   },
   {
@@ -47,7 +47,7 @@
    "rings": 256,
    "traced_rays": 197377,
    "uniform_vs_o1": 0.0011406984676466019,
-   "wall_seconds": 16.752878197992686,
+   "wall_seconds": 9.946869319013786,
    "weighted_vs_o1": 0.002203572853045589
   },
   {
@@ -55,7 +55,7 @@
    "rings": 362,
    "traced_rays": 394219,
    "uniform_vs_o1": 0.0007038779615217963,
-   "wall_seconds": 22.386815536010545,
+   "wall_seconds": 19.707994086958934,
    "weighted_vs_o1": 0.0022060149867886452
   },
   {
@@ -63,7 +63,7 @@
    "rings": 512,
    "traced_rays": 787969,
    "uniform_vs_o1": 0.0009211637948694215,
-   "wall_seconds": 40.62421993201133,
+   "wall_seconds": 40.1451492140186,
    "weighted_vs_o1": 0.0022072391812867093
   },
   {
@@ -71,7 +71,7 @@
    "rings": 724,
    "traced_rays": 1574701,
    "uniform_vs_o1": 0.0012497323374378003,
-   "wall_seconds": 82.15102798998123,
+   "wall_seconds": 81.05091070901835,
    "weighted_vs_o1": 0.0022078514712021197
   },
   {
@@ -79,7 +79,7 @@
    "rings": 1024,
    "traced_rays": 3148801,
    "uniform_vs_o1": 0.0015163678670095358,
-   "wall_seconds": 171.73038620699663,
+   "wall_seconds": 168.94881761696888,
    "weighted_vs_o1": 0.0022081579585547175
   }
  ],
@@ -87,7 +87,7 @@
  "probe": "singlet_residual_attribution",
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "6e49f427d10c3b09da70da7abebd70deccc4f4aecc12fd60d76c23fafda19122",
+   "combined_sha256": "d51203bf170ba732c7e147053b947c2be20994d35666238c07322e8ccc3f0b28",
    "files": {
     "benchmarks/probes/quadrature_weight.py": "33c91dbf2d1c239a1a8a1b26111ed73443196281ef2e7c2f8f74b436e9b80bd6",
     "benchmarks/probes/sensor_handoff_convergence.py": "e200ed9cf5981a6123c11f83751beebef6d6b29632c55f0cedd2cf4bddb69188",
@@ -110,7 +110,7 @@
     "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
     "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
     "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
-    "src/couplers/generalized_snell.py": "3a17d319366f7e2e0cf19eb390aba5ae33acd634a8ee43d35cfe38669192c07e",
+    "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
     "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
     "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
     "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
@@ -158,8 +158,8 @@
   },
   "probe": "benchmarks/probes/singlet_residual_attribution.py",
   "schema_version": 2,
-  "source_commit": "ccbf8034bdb5f098f8238a620fe8acfb54c0599a",
-  "timestamp_utc": "2026-08-27T06:47:01.149373+00:00",
+  "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
+  "timestamp_utc": "2026-08-27T16:29:43.214600+00:00",
   "working_tree_dirty": true
  },
  "verdict": {

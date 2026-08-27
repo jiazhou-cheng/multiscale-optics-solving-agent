@@ -55,11 +55,24 @@ redirected -- so its own OPL history is preserved and the surface's local
 contribution is added:
 
 ```
-OPL_out = OPL_in + phi(x, y) / k0
+OPL_out = OPL_in + m phi(x, y) / k0
 ```
 
 under the repository's `exp(+i k z)` spatial-phase convention, so that
-`exp(i k0 OPL_out)` picks up exactly the `exp(i phi)` the transmission declared.
+`exp(i k0 OPL_out)` picks up exactly the `exp(i m phi)` that the m-th order of
+the declared transmission carries. The order factor is the same `m` that
+multiplies `grad(phi)` in the momentum equation, and for the same reason: the
+m-th order's local plane-wave factor is `exp(i m phi)`, so its gradient is the
+momentum and its value is the path.
+
+The factor was missing until CHE-148 (M2.12) found it. It is bitwise irrelevant
+at `m = 1` -- `float(1) * phase` is IEEE-exact -- and wrong at every other order:
+`m = 0` is the undiffracted transmission and was being handed the whole ramp
+phase on an undeflected ray, and `(order=-1, t)` and `(order=+1, conj(t))` are
+one physical operation (`exp(i (-1) phi) == exp(i (+1) (-phi))`) that returned
+the same direction and *opposite* optical paths. Both identities are now pinned
+by `tests/test_diffractive_interaction.py`.
+
 Amplitude carries only `|t(x, y)|` -- the phase does not appear twice.
 
 ### `patch_px` is one declared transverse scale, reused for two purposes

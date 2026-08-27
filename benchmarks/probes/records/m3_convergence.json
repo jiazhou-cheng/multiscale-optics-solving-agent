@@ -425,7 +425,7 @@
   "runs": [
    {
     "handshake": "exec_complete",
-    "peak_rss_bytes": 867246080,
+    "peak_rss_bytes": 890650624,
     "peak_rss_method": "/proc/<pid>/status VmRSS sampled every 20 ms from the parent, after the child's post-exec handshake; max over the run",
     "psf_peak_index": [
      660,
@@ -435,19 +435,19 @@
     "raw_peak_intensity": 3.7252868162213765e-14,
     "raw_window_energy": 1.5615316236537202e-24,
     "rings": 48,
-    "seconds_measure": 0.019792306004092097,
-    "seconds_propagate": 2.5077754789963365,
-    "seconds_reconstruct": 0.18248506099916995,
-    "seconds_total": 5.360151319007855,
-    "seconds_trace": 2.6500871750176884,
-    "self_reported_ru_maxrss_bytes": 10334470144,
+    "seconds_measure": 0.019958760996814817,
+    "seconds_propagate": 2.4780439390451647,
+    "seconds_reconstruct": 0.17320619599195197,
+    "seconds_total": 5.320677609008271,
+    "seconds_trace": 2.6494575279648416,
+    "self_reported_ru_maxrss_bytes": 10284150784,
     "status": "succeeded",
-    "subprocess_wall_seconds": 6.693742214003578,
+    "subprocess_wall_seconds": 6.63908314803848,
     "traced_rays": 7057
    },
    {
     "handshake": "exec_complete",
-    "peak_rss_bytes": 864681984,
+    "peak_rss_bytes": 860758016,
     "peak_rss_method": "/proc/<pid>/status VmRSS sampled every 20 ms from the parent, after the child's post-exec handshake; max over the run",
     "psf_peak_index": [
      660,
@@ -457,14 +457,14 @@
     "raw_peak_intensity": 3.7252868162213765e-14,
     "raw_window_energy": 1.5615316236537202e-24,
     "rings": 48,
-    "seconds_measure": 0.01991134200943634,
-    "seconds_propagate": 2.5104795419611037,
-    "seconds_reconstruct": 0.17375464300857857,
-    "seconds_total": 5.394360117032193,
-    "seconds_trace": 2.6902030970086344,
-    "self_reported_ru_maxrss_bytes": 10334470144,
+    "seconds_measure": 0.018994790967553854,
+    "seconds_propagate": 2.5633261270122603,
+    "seconds_reconstruct": 0.17579314298927784,
+    "seconds_total": 5.390999401977751,
+    "seconds_trace": 2.6328696240088902,
+    "self_reported_ru_maxrss_bytes": 10284150784,
     "status": "succeeded",
-    "subprocess_wall_seconds": 6.724937528022565,
+    "subprocess_wall_seconds": 6.768593763001263,
     "traced_rays": 7057
    }
   ],
@@ -473,9 +473,9 @@
    "check_is_non_vacuous_note": "the comparison only says something when the parent's high-water mark is far above a fresh interpreter's, which is why this is run after the sweeps rather than before them.",
    "child_inherits_the_parent_high_water_mark": true,
    "consequence": "a child process cannot measure its own peak RSS with ru_maxrss when its parent has already allocated more. This probe's first attempt reported 8.8 GiB for a 3169-ray configuration -- the sweep's peak, not the configuration's. Peak RSS below is sampled from OUTSIDE the child instead, from /proc/<pid>/status VmRSS, and sampling only starts after the child has exec'd and announced itself, so no post-fork transient is counted.",
-   "parent_ru_maxrss_bytes": 10334470144,
+   "parent_ru_maxrss_bytes": 10284150784,
    "protocol_note": "benchmarks/protocols/protocol.yaml names ru_maxrss as the preferred method. That is correct for a top-level benchmark driver, which is how M1 and M2 used it; it is wrong for a child, and the distinction was not recorded.",
-   "trivial_child_ru_maxrss_bytes": 10334470144
+   "trivial_child_ru_maxrss_bytes": 10284150784
   },
   "why_processes_not_calls": "two calls in one interpreter share caches, JAX state and warmed allocators, so they can agree for reasons unrelated to determinism."
  },
@@ -487,7 +487,7 @@
   "runs": [
    {
     "handshake": "exec_complete",
-    "peak_rss_bytes": 952836096,
+    "peak_rss_bytes": 950280192,
     "peak_rss_method": "/proc/<pid>/status VmRSS sampled every 20 ms from the parent, after the child's post-exec handshake; max over the run",
     "psf_peak_index": [
      660,
@@ -497,19 +497,19 @@
     "raw_peak_intensity": 3.72966631537186e-14,
     "raw_window_energy": 2.7123161929485693e-24,
     "rings": 32,
-    "seconds_measure": 0.025360127037856728,
-    "seconds_propagate": 2.4792722489801235,
-    "seconds_reconstruct": 0.6756883690250106,
-    "seconds_total": 6.250735598034225,
-    "seconds_trace": 3.070401603996288,
-    "self_reported_ru_maxrss_bytes": 10334470144,
+    "seconds_measure": 0.020545483974274248,
+    "seconds_propagate": 2.5331372499931604,
+    "seconds_reconstruct": 0.5471360220108181,
+    "seconds_total": 5.725189751014113,
+    "seconds_trace": 2.6243592009996064,
+    "self_reported_ru_maxrss_bytes": 10284150784,
     "status": "succeeded",
-    "subprocess_wall_seconds": 7.807194392953534,
+    "subprocess_wall_seconds": 7.066593714989722,
     "traced_rays": 3169
    },
    {
     "handshake": "exec_complete",
-    "peak_rss_bytes": 934301696,
+    "peak_rss_bytes": 930754560,
     "peak_rss_method": "/proc/<pid>/status VmRSS sampled every 20 ms from the parent, after the child's post-exec handshake; max over the run",
     "psf_peak_index": [
      660,
@@ -519,14 +519,14 @@
     "raw_peak_intensity": 3.72966631537186e-14,
     "raw_window_energy": 2.7123161929485693e-24,
     "rings": 32,
-    "seconds_measure": 0.023901714012026787,
-    "seconds_propagate": 2.606184954987839,
-    "seconds_reconstruct": 0.7981082160258666,
-    "seconds_total": 7.5057081510312855,
-    "seconds_trace": 4.077497760998085,
-    "self_reported_ru_maxrss_bytes": 10334470144,
+    "seconds_measure": 0.020307335013058037,
+    "seconds_propagate": 2.502693175978493,
+    "seconds_reconstruct": 0.5421830909908749,
+    "seconds_total": 5.693786309973802,
+    "seconds_trace": 2.6285924920230173,
+    "self_reported_ru_maxrss_bytes": 10284150784,
     "status": "succeeded",
-    "subprocess_wall_seconds": 9.430017174978275,
+    "subprocess_wall_seconds": 7.0251950359670445,
     "traced_rays": 3169
    }
   ],
@@ -535,9 +535,9 @@
    "check_is_non_vacuous_note": "the comparison only says something when the parent's high-water mark is far above a fresh interpreter's, which is why this is run after the sweeps rather than before them.",
    "child_inherits_the_parent_high_water_mark": true,
    "consequence": "a child process cannot measure its own peak RSS with ru_maxrss when its parent has already allocated more. This probe's first attempt reported 8.8 GiB for a 3169-ray configuration -- the sweep's peak, not the configuration's. Peak RSS below is sampled from OUTSIDE the child instead, from /proc/<pid>/status VmRSS, and sampling only starts after the child has exec'd and announced itself, so no post-fork transient is counted.",
-   "parent_ru_maxrss_bytes": 10334470144,
+   "parent_ru_maxrss_bytes": 10284150784,
    "protocol_note": "benchmarks/protocols/protocol.yaml names ru_maxrss as the preferred method. That is correct for a top-level benchmark driver, which is how M1 and M2 used it; it is wrong for a child, and the distinction was not recorded.",
-   "trivial_child_ru_maxrss_bytes": 10334470144
+   "trivial_child_ru_maxrss_bytes": 10284150784
   },
   "why_processes_not_calls": "two calls in one interpreter share caches, JAX state and warmed allocators, so they can agree for reasons unrelated to determinism."
  },
@@ -882,7 +882,7 @@
     "relative_l2_vs_analytic_airy": 0.006902948521855014,
     "relative_l2_vs_fft_oracle": 0.004262853073718191,
     "sample_pitch_m": 5.317470562168779e-06,
-    "seconds_total": 2.1282246399787255,
+    "seconds_total": 2.1150498539791442,
     "status": "succeeded"
    },
    {
@@ -900,7 +900,7 @@
     "relative_l2_vs_analytic_airy": 0.006443532452903118,
     "relative_l2_vs_fft_oracle": 0.004159530389990028,
     "sample_pitch_m": 5.206689925456929e-06,
-    "seconds_total": 2.167336889950093,
+    "seconds_total": 2.140469040023163,
     "status": "succeeded"
    },
    {
@@ -918,7 +918,7 @@
     "relative_l2_vs_analytic_airy": 0.011408247775391572,
     "relative_l2_vs_fft_oracle": 0.006236151332280285,
     "sample_pitch_m": 3.905017444092697e-06,
-    "seconds_total": 2.1535732519696467,
+    "seconds_total": 2.2386088269995525,
     "status": "succeeded"
    },
    {
@@ -936,7 +936,7 @@
     "relative_l2_vs_analytic_airy": 0.01178821624065964,
     "relative_l2_vs_fft_oracle": 0.006272126911705523,
     "sample_pitch_m": 2.6587352810843895e-06,
-    "seconds_total": 1.1926400379743427,
+    "seconds_total": 1.1317652459838428,
     "status": "succeeded"
    },
    {
@@ -954,7 +954,7 @@
     "relative_l2_vs_analytic_airy": 0.011758240298435297,
     "relative_l2_vs_fft_oracle": 0.006365685909365248,
     "sample_pitch_m": 1.9525087220463484e-06,
-    "seconds_total": 2.948905953031499,
+    "seconds_total": 2.942153464013245,
     "status": "succeeded"
    },
    {
@@ -972,7 +972,7 @@
     "relative_l2_vs_analytic_airy": 0.011738632372195449,
     "relative_l2_vs_fft_oracle": 0.006386823708073839,
     "sample_pitch_m": 1.3293676405421948e-06,
-    "seconds_total": 3.708666873979382,
+    "seconds_total": 3.6165849730023183,
     "status": "succeeded"
    }
   ],
@@ -1247,8 +1247,8 @@
     "relative_l2_vs_fft_oracle": 0.02122082995852541,
     "relative_l2_vs_ray_refined_psf": 0.018222707820245838,
     "rings": 8,
-    "seconds_reconstruct": 0.06280477496329695,
-    "seconds_total": 5.424239584011957,
+    "seconds_reconstruct": 0.06347088504116982,
+    "seconds_total": 5.758700798964128,
     "traced_rays": 217
    },
    {
@@ -1267,8 +1267,8 @@
     "relative_l2_vs_fft_oracle": 0.020483075385846143,
     "relative_l2_vs_ray_refined_psf": 0.005589109801219968,
     "rings": 16,
-    "seconds_reconstruct": 0.043610603956039995,
-    "seconds_total": 0.21363300498342142,
+    "seconds_reconstruct": 0.045744750008452684,
+    "seconds_total": 0.22658486902946606,
     "traced_rays": 817
    },
    {
@@ -1287,8 +1287,8 @@
     "relative_l2_vs_fft_oracle": 0.013717529399770563,
     "relative_l2_vs_ray_refined_psf": 0.013435858831433401,
     "rings": 24,
-    "seconds_reconstruct": 0.19076039898209274,
-    "seconds_total": 0.3571186729823239,
+    "seconds_reconstruct": 0.1589542729780078,
+    "seconds_total": 0.33996581099927425,
     "traced_rays": 1801
    },
    {
@@ -1307,8 +1307,8 @@
     "relative_l2_vs_fft_oracle": 0.012282320633542902,
     "relative_l2_vs_ray_refined_psf": 0.0021643230655400848,
     "rings": 32,
-    "seconds_reconstruct": 0.4490629890351556,
-    "seconds_total": 0.6125967020052485,
+    "seconds_reconstruct": 0.45887513004709035,
+    "seconds_total": 0.6351822449942119,
     "traced_rays": 3169
    },
    {
@@ -1327,8 +1327,8 @@
     "relative_l2_vs_fft_oracle": 0.008237811440096348,
     "relative_l2_vs_ray_refined_psf": 0.00038010067393294365,
     "rings": 48,
-    "seconds_reconstruct": 0.10285737505182624,
-    "seconds_total": 0.28190059697953984,
+    "seconds_reconstruct": 0.10944400302832946,
+    "seconds_total": 0.3181210779584944,
     "traced_rays": 7057
    },
    {
@@ -1347,8 +1347,8 @@
     "relative_l2_vs_fft_oracle": 0.006890136190999849,
     "relative_l2_vs_ray_refined_psf": 7.723638975857335e-05,
     "rings": 64,
-    "seconds_reconstruct": 0.19624574400950223,
-    "seconds_total": 0.4033523760153912,
+    "seconds_reconstruct": 0.1996962099801749,
+    "seconds_total": 0.4159113960340619,
     "traced_rays": 12481
    },
    {
@@ -1367,8 +1367,8 @@
     "relative_l2_vs_fft_oracle": 0.0061571531933394125,
     "relative_l2_vs_ray_refined_psf": 3.347968875563712e-05,
     "rings": 96,
-    "seconds_reconstruct": 0.4452786729671061,
-    "seconds_total": 0.6979199019842781,
+    "seconds_reconstruct": 0.45494511898141354,
+    "seconds_total": 0.7067658329615369,
     "traced_rays": 27937
    },
    {
@@ -1387,8 +1387,8 @@
     "relative_l2_vs_fft_oracle": 0.006272126911705523,
     "relative_l2_vs_ray_refined_psf": 1.8308516541800105e-05,
     "rings": 128,
-    "seconds_reconstruct": 0.8038808839628473,
-    "seconds_total": 1.1209981319843791,
+    "seconds_reconstruct": 0.8225384310353547,
+    "seconds_total": 1.1324594109901227,
     "traced_rays": 49537
    },
    {
@@ -1407,8 +1407,8 @@
     "relative_l2_vs_fft_oracle": 0.006718353399010107,
     "relative_l2_vs_ray_refined_psf": 8.530415352601974e-06,
     "rings": 181,
-    "seconds_reconstruct": 1.6059511289931834,
-    "seconds_total": 2.0902027240372263,
+    "seconds_reconstruct": 1.6646510409773327,
+    "seconds_total": 2.168300756951794,
     "traced_rays": 98827
    },
    {
@@ -1427,8 +1427,8 @@
     "relative_l2_vs_fft_oracle": 0.007232572360565105,
     "relative_l2_vs_ray_refined_psf": 3.696024513661345e-06,
     "rings": 256,
-    "seconds_reconstruct": 3.3229511060053483,
-    "seconds_total": 4.201215872017201,
+    "seconds_reconstruct": 3.303700899006799,
+    "seconds_total": 4.177643797011115,
     "traced_rays": 197377
    },
    {
@@ -1447,8 +1447,8 @@
     "relative_l2_vs_fft_oracle": 0.007690444376493353,
     "relative_l2_vs_ray_refined_psf": 1.2674918895831716e-06,
     "rings": 362,
-    "seconds_reconstruct": 6.5879285669652745,
-    "seconds_total": 8.320765284006484,
+    "seconds_reconstruct": 6.534713879984338,
+    "seconds_total": 8.261428883997723,
     "traced_rays": 394219
    },
    {
@@ -1466,15 +1466,15 @@
     "relative_l2_vs_analytic_airy": 0.011784049066791945,
     "relative_l2_vs_fft_oracle": 0.008059070304549892,
     "rings": 512,
-    "seconds_reconstruct": 13.011190483986866,
-    "seconds_total": 16.349679445964284,
+    "seconds_reconstruct": 13.03541494399542,
+    "seconds_total": 16.420564285013825,
     "traced_rays": 787969
    }
   ]
  },
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "ce672776cf2421fd04b48901904d9f977bc19adb4e631ea1573df9e6107748e3",
+   "combined_sha256": "22d3fe3f753fab3ee99141ebaef7c1cf639909fde1961280050e627943f39381",
    "files": {
     "benchmarks/probes/pupil_to_focus_convergence.py": "a932a7d3b76c31bf5090dc513e2c261aecb2daec60879eab5914bcfcd5587b5d",
     "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
@@ -1494,7 +1494,7 @@
     "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
     "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
     "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
-    "src/couplers/generalized_snell.py": "3a17d319366f7e2e0cf19eb390aba5ae33acd634a8ee43d35cfe38669192c07e",
+    "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
     "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
     "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
     "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
@@ -1555,8 +1555,8 @@
   },
   "probe": "m3_convergence",
   "schema_version": 2,
-  "source_commit": "ccbf8034bdb5f098f8238a620fe8acfb54c0599a",
-  "timestamp_utc": "2026-08-27T06:38:23.432642+00:00",
+  "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
+  "timestamp_utc": "2026-08-27T16:16:19.382204+00:00",
   "working_tree_dirty": true
  },
  "regression_envelope": {
@@ -1585,24 +1585,24 @@
    "m2_comparable_figure": "0.622 s and 843 MiB for a 4096-ray round trip",
    "not_comparable_because": "M2's figure is a coupler round trip on a 16x16 grid. This is a full slice -- an Optiland trace, a 188^2 reconstruction, a 1320^2 padded ASM under JAX, and a PSF measurement -- so the RSS is dominated by the JAX runtime and the padded field rather than by the coupler. The figures are recorded side by side and NOT presented as a regression.",
    "peak_rss_bytes": [
-    952836096,
-    934301696
+    950280192,
+    930754560
    ],
    "seconds": [
-    6.250735598034225,
-    7.5057081510312855
+    5.725189751014113,
+    5.693786309973802
    ],
    "traced_rays": 3169
   },
   "timing_envelope": {
    "declared": false,
    "observed_peak_rss_bytes": [
-    867246080,
-    864681984
+    890650624,
+    860758016
    ],
    "observed_seconds": [
-    5.360151319007855,
-    5.394360117032193
+    5.320677609008271,
+    5.390999401977751
    ],
    "what_would_make_one_declarable": "a pinned machine or a normalized cost unit -- ray-pixel products per second, which the protocol already measures -- plus enough repetitions to characterize the spread. Neither is in this ticket.",
    "why_not": "deliberately repeating M2's L6 disclaimer, with the reason stated. The container runs on a shared, unpinned 80-core host with no CPU affinity and no reserved memory, and this probe has two timing samples of one configuration. Two samples on a machine whose load is not controlled cannot bound a distribution, and a timing gate built from them would fail for reasons that have nothing to do with this code. The figures are recorded as observations, as in M1 and M2."

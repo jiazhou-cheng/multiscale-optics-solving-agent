@@ -1088,6 +1088,108 @@ def test_control_an_order_sign_flip_conjugates_the_deflection() -> None:
     assert math.isclose(dx_plus, -dx_minus, rel_tol=0.0, abs_tol=1e-12)
 
 
+# ---------------------------------------------------------------------------
+# The order factor in the OPL rebasing -- CHE-148 (M2.12)
+# ---------------------------------------------------------------------------
+#
+# `generalized_snell_step` returns `opl_out = opl_in + m phi / k0`. The `m` was
+# missing until CHE-148's B3-DOE-INLINE-ORDER-MINUS1 instance reported a
+# Strehl-like ratio of 3.2e-6 against a predicted 0.99967 on a system whose
+# ray-side order position was correct to 9.3e-5: the rays were deflected as if
+# the phase were `-phi` while the optical path carried `+phi`. Both tests below
+# are code-independent identities rather than recorded numbers, which is why
+# they are the regression and the diagnostic at the same time.
+
+
+def test_negating_the_order_equals_conjugating_the_surface_in_every_field() -> None:
+    """``exp(i (-1) phi)`` and ``exp(i (+1) (-phi))`` are one complex factor.
+
+    So ``(order=-1, t)`` and ``(order=+1, conj(t))`` are one physical operation
+    and must return one bundle -- bitwise, since no approximation separates them.
+    With ``phi`` instead of ``m phi`` in the rebasing they agreed in DIRECTION and
+    returned opposite optical paths, which is a contradiction rather than a
+    tolerance.
+    """
+    period_m = 5e-6
+    positions = np.array([[0.0, 0.0, 0.0], [1.3e-6, 0.0, 0.0], [-2.9e-6, 0.0, 0.0]])
+    bundle = _gs_bundle([[0.0, 0.0, 1.0]] * 3, positions=positions)
+
+    negated_order = diffractive_interaction(
+        bundle,
+        _linear_ramp_surface(period_m),
+        model=DiffractiveModel.GENERALIZED_SNELL,
+        parameters=GeneralizedSnellParameters(order=-1, patch_px=5),
+    ).outgoing
+    conjugated_surface = diffractive_interaction(
+        bundle,
+        _linear_ramp_surface(period_m, sign=-1.0),
+        model=DiffractiveModel.GENERALIZED_SNELL,
+        parameters=GeneralizedSnellParameters(order=1, patch_px=5),
+    ).outgoing
+
+    assert np.array_equal(
+        np.asarray(negated_order.directions), np.asarray(conjugated_surface.directions)
+    )
+    assert np.array_equal(
+        np.asarray(negated_order.optical_path_length_m),
+        np.asarray(conjugated_surface.optical_path_length_m),
+    )
+    # The control is void if the ramp put no phase on the rays in the first place.
+    spread = np.ptp(np.asarray(negated_order.optical_path_length_m))
+    assert spread > 0.1 * GS_WAVELENGTH_M
+
+
+def test_the_zeroth_order_picks_up_no_surface_phase_at_all() -> None:
+    """``order=0`` is the undiffracted transmission: no deflection, no ramp.
+
+    With ``phi`` instead of ``m phi`` it was handed the whole ramp phase on a ray
+    that had not been deflected -- a pupil phase with no matching momentum.
+    """
+    positions = np.array([[0.0, 0.0, 0.0], [1.3e-6, 0.0, 0.0], [-2.9e-6, 0.0, 0.0]])
+    bundle = _gs_bundle([[0.0, 0.0, 1.0]] * 3, positions=positions)
+    result = diffractive_interaction(
+        bundle,
+        _linear_ramp_surface(5e-6),
+        model=DiffractiveModel.GENERALIZED_SNELL,
+        parameters=GeneralizedSnellParameters(order=0, patch_px=5),
+    ).outgoing
+    assert np.array_equal(np.asarray(result.directions), np.asarray(bundle.directions))
+    assert np.array_equal(
+        np.asarray(result.optical_path_length_m),
+        np.asarray(bundle.optical_path_length_m),
+    )
+
+
+def test_the_first_order_rebasing_is_exactly_the_local_phase_over_k0() -> None:
+    """``order=1`` must be bitwise what it was before the order factor existed.
+
+    ``float(1) * phase`` is IEEE-exact, so every record and every test written
+    before CHE-148 is unaffected. Pinned rather than assumed, because the fix
+    would otherwise be a silent change to the default order.
+    """
+    period_m = 5e-6
+    positions = np.array([[0.0, 0.0, 0.0], [1.3e-6, 0.0, 0.0], [-2.9e-6, 0.0, 0.0]])
+    bundle = _gs_bundle([[0.0, 0.0, 1.0]] * 3, positions=positions)
+    surface = _linear_ramp_surface(period_m)
+    result = diffractive_interaction(
+        bundle,
+        surface,
+        model=DiffractiveModel.GENERALIZED_SNELL,
+        parameters=GeneralizedSnellParameters(order=1, patch_px=5),
+    ).outgoing
+
+    pitch = GS_PITCH[1]
+    snapped = np.round(positions[:, 0] / pitch) * pitch
+    phase = np.arctan2(
+        np.sin(2.0 * np.pi * snapped / period_m), np.cos(2.0 * np.pi * snapped / period_m)
+    )
+    k0 = 2.0 * math.pi / GS_WAVELENGTH_M
+    expected = np.asarray(bundle.optical_path_length_m) + phase / k0
+    assert np.allclose(
+        np.asarray(result.optical_path_length_m), expected, rtol=0.0, atol=1e-18
+    )
+
+
 def test_control_omitting_2pi_from_the_gradient_gives_the_wrong_angle() -> None:
     """A caller who computed the gradient of ``phi / (2 pi)`` -- cycles, not
     radians -- and fed it straight into the k_t equation would be off by

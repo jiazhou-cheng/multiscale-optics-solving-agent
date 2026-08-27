@@ -586,9 +586,17 @@ couplers:
           mode the acceptance criterion names is detected.
         - >-
           The OPL convention is additive, not reset-to-zero like the other two
-          models: outgoing OPL = incident OPL + phi(x, y) / k0, because this
+          models: outgoing OPL = incident OPL + m phi(x, y) / k0, because this
           model preserves each incoming ray's own identity and path history
           rather than re-emitting fresh rays from a reconstructed spectrum.
+          The order factor m is the same one that multiplies grad(phi) in the
+          momentum equation: both come from the m-th order's local plane-wave
+          factor exp(i m phi), differentiated for the momentum and evaluated
+          for the path. It carried phi alone until CHE-148 (M2.12), which is
+          bitwise the same at m = 1 and was wrong for every other order --
+          order 0 was given the whole ramp phase on an undeflected ray, and
+          (order=-1, t) disagreed with (order=+1, conj(t)) about the path while
+          agreeing about the direction.
           Amplitude carries only the local amplitude transmission |t(x, y)|.
     cost_model:
       scaling: O(rays)

@@ -19,6 +19,7 @@ from verification.families import (  # noqa: F401
     b3_4f_ideal,
     b3_4f_real,
     b3_composed,
+    b3_doe_inline,
     b4_characterization,
 )
 from verification.families.registry import (

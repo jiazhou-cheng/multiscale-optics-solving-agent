@@ -7,6 +7,7 @@ out the other side still one ray.
 
     k_t^out = n_i k0 d_t^in + m grad_t(phi)(x, y)
     k_n^out = sqrt( (n_t k0)^2 - |k_t^out|^2 )
+    opl^out = opl^in + m phi(x, y) / k0
 
 ``phi`` is read off the same complex ``DiffractiveSurface.transmission`` the
 other two models use (``t = |t| exp(i phi)``), so a caller declares one surface
@@ -364,7 +365,27 @@ def generalized_snell_step(
 
     local_transmission = transmission[np.clip(iy, 0, ny - 1), np.clip(ix, 0, nx - 1)]
     amplitude_out = amplitude_in * np.abs(local_transmission)
-    opl_out = opl_in + phase / k0
+    # `m * phi`, not `phi`: the order factor belongs to the OPL for exactly the
+    # same reason it belongs to the momentum. The local plane-wave factor of the
+    # m-th order is exp(i m phi(x, y)) -- differentiate it and you get the
+    # `m grad(phi)` above; evaluate it and you get `m phi`. Carrying `phi` alone
+    # was CHE-148's finding (M2.12, B3-DOE-INLINE-ORDER-MINUS1), and two
+    # code-independent arguments say which form is right:
+    #
+    #   * exp(i (-1) phi) and exp(i (+1) (-phi)) are the SAME complex factor, so
+    #     `(order=-1, phi)` and `(order=+1, conj(t))` must return the same bundle.
+    #     They already returned the same DIRECTION; with `phi` alone they returned
+    #     opposite optical paths, which is a contradiction rather than a tolerance.
+    #     (That equality is BITWISE only away from the branch cut: at phi = pi both
+    #     `angle(t)` and `angle(conj(t))` return +pi, so the two differ there by one
+    #     whole wave -- physically inert, and not a case the identity covers.)
+    #   * `order=0` is the undiffracted transmission and picks up no ramp at all;
+    #     with `phi` alone it was given the whole ramp phase on an undeflected ray.
+    #
+    # For `order=1` -- the default, every shipped test and every recorded run
+    # before CHE-148 -- `float(1) * phase` is IEEE-exact, so this is bitwise the
+    # previous behaviour there and changes only |m| != 1.
+    opl_out = opl_in + float(order) * phase / k0
 
     outgoing = RayBundle(
         positions_m=positions_out,
@@ -376,7 +397,7 @@ def generalized_snell_step(
         optical_path_length_m=opl_out,
         optical_path_length_reference=(
             f"{bundle.optical_path_length_reference}; plus this generalized-Snell "
-            f"surface's local phase phi(x, y) / k0 at plane {plane.name!r}, order "
+            f"surface's local phase m phi(x, y) / k0 at plane {plane.name!r}, order "
             f"m={order}"
         ),
         reconstruction_normalization=bundle.reconstruction_normalization,
@@ -409,8 +430,11 @@ def generalized_snell_step(
         single_order_dominance_margin=dominance_margin,
         substrate="planar",
         opl_convention=(
-            "additive: outgoing OPL = incident OPL + phi(x, y) / k0, at the ray's "
-            "own transverse position; amplitude carries only |t(x, y)|"
+            "additive: outgoing OPL = incident OPL + m phi(x, y) / k0, at the ray's "
+            "own transverse position; amplitude carries only |t(x, y)|. The order "
+            "factor m is the same one that multiplies grad(phi) in the momentum "
+            "equation, because both come from differentiating or evaluating the "
+            "m-th order's local plane-wave factor exp(i m phi) -- see CHE-148"
         ),
     )
     return outgoing, diagnostics

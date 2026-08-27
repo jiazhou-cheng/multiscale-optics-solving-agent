@@ -537,6 +537,24 @@ entries:
       finite-samples_per_period aliasing tail against scipy.special.jv while
       authoring; both are recorded in the family module's docstring rather than
       only in this driver.
+  - path: benchmarks/systems/b3_doe_inline.py
+    bucket: B
+    justification: >-
+      POSITIVE: the embedded-DOE driver -- a diffractive interaction INSIDE a
+      refractive train, so its outgoing ray bundle is handed straight to an
+      Optiland trace with no reconstruction in between. Two topologies:
+      collimated bundle into a linear phase ramp in front of a real singlet, and
+      a converging bundle out of one singlet through the ramp into a second that
+      relays the intermediate image at -1.914x. It computes its own reference
+      rather than importing one -- closed_form_outgoing rebuilds the outgoing
+      bundle from the grating equation and m phi(x_snap) / k0 and shares no line
+      with couplers/generalized_snell.py, which a test enforces at the source
+      level -- and runs six arms per instance so the exactness limits, the
+      unmodulated Strehl denominator and the independently constructed
+      admissible bundle are all measured rather than assumed. Its m = -1
+      instance is what found the order/OPL inconsistency in
+      couplers/generalized_snell.py that CHE-148 fixed.
+    destination: The twelve B3-DOE-INLINE-* and six B4-DOE-INLINE-* canonical instances.
   - path: benchmarks/systems/b3_4f_real.py
     bucket: B
     justification: >-
@@ -1418,6 +1436,26 @@ entries:
       it, fully attributed to the mask's own Fourier-tail aliasing rather than
       a defect -- CHE-144's own requested characterization of where sampling
       stops matching the continuous theory.
+    destination: The system half of the validated evidence layer.
+  - path: src/verification/families/b3_doe_inline.py
+    bucket: A
+    justification: >-
+      B3-DOE-INLINE and B4-DOE-INLINE (M2.12): the system-ladder rung where the
+      diffractive interaction's RAY OUTPUT is load-bearing, because a downstream
+      refractive trace consumes it directly. Two families in one module for the
+      same reason as the 4f rung: B3 is a CONVENTION claim and gates -- the
+      grating equation to 1e-14 in direction cosine, opl_in + m phi / k0
+      reproduced from the declaration, |a_in| |t| for the amplitude, and the
+      zero-phase limit BITWISE identical to the plain refractive train -- with
+      the analytic grating-plus-lens order position over three periods as the
+      forward-accuracy companion and its tolerance DERIVED from the
+      PARAXIAL_ORDER_POSITION predicate's bound. B4 is category B4 and cannot
+      gate: it measures the interference structure an aberrated singlet puts in
+      a diffracted order against the diffraction-blurred ray density, whose
+      fringe contrast is exactly zero at every aperture measured. The module
+      also records two things it could NOT establish with numbers -- a pupil-side
+      wavefront metric with a 0.00971 floor that does not resolve the sawtooth,
+      and a PSF window that misses two B4 responses -- rather than omitting them.
     destination: The system half of the validated evidence layer.
   - path: src/verification/families/b3_4f_real.py
     bucket: A

@@ -41,7 +41,7 @@
       }
     ],
     "observed_parameters": {
-      "wave.output_dir": "/tmp/b1-wave-xuwduu6e",
+      "wave.output_dir": "/tmp/b1-wave-xt849rl9",
       "wave.pad_width": 0,
       "wave.propagation": "angular_spectrum",
       "wave.propagation_method": "asm_propagate",
@@ -69,7 +69,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "68af07daa705cf5f5c70a17e793fa949fc00b8b6fca020c485dfb94419ce1180",
+      "combined_sha256": "a6d3f5d4da791d0c85f8ff8a5445b11388c3eb8ff42bfa0d85802874a62e2adf",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -91,7 +91,7 @@
         "src/couplers/cascade.py": "5a8e92a80aa7e59e9b0e9869a517582158e88cf5a111982f9c4522ee113b0acc",
         "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
         "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
-        "src/couplers/generalized_snell.py": "3a17d319366f7e2e0cf19eb390aba5ae33acd634a8ee43d35cfe38669192c07e",
+        "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
         "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
         "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
         "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
@@ -123,7 +123,7 @@
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
         "src/verification/claim_ledger.py": "df0b93330e66a1c5528897d2f26a77f53a34ef8f57e74172a77af9375aedc638",
         "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
-        "src/verification/families/__init__.py": "14a060841434341258b0c1452f40009d41b5782674a888707f939d5e463ab80e",
+        "src/verification/families/__init__.py": "dadf284698dfcd72b607d3579dc061e7364b68e81239ecff4a9ff1bf9507a62a",
         "src/verification/families/b0_contract.py": "adcaea59b365cf9d4b81889b7daf9a0b8c4d80e2b2a7be8852794b4475355542",
         "src/verification/families/b1_gsl_validity.py": "3d5b6c70a9247a71cf55e663f417c7ef0db4cb83b395bbc016d65b5f1d7e2494",
         "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
@@ -132,6 +132,7 @@
         "src/verification/families/b3_4f_ideal.py": "dcddc8a8ad364e93f9293fae24fca51683e50a2e8597c35cf1eb94565fdf8710",
         "src/verification/families/b3_4f_real.py": "2529dabd846b9d71383842f46891a2a817942655e47c10f0a99956926975c971",
         "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
+        "src/verification/families/b3_doe_inline.py": "d2afbcf15e8979e6b25f28a8847df9b8813ae3b9ce24859b5e7d4bc865f2b8fd",
         "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "21a64e2d17f2098787cece75bfec879e92785f0084bcfc12638f84f5e959c4f7",
         "src/verification/families/registry.py": "46e4f60715a13d3dbad106115dcab47c05fa308499b29ebf0a26ec35a67d1a69",
@@ -161,8 +162,8 @@
     },
     "probe": "instances/b1_wave",
     "schema_version": 2,
-    "source_commit": "93ee19cf489104cf261c1053fcbe6766f85c8c81",
-    "timestamp_utc": "2026-08-27T10:51:56.366738+00:00",
+    "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
+    "timestamp_utc": "2026-08-27T16:09:26.578970+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -278,18 +279,18 @@
         "scipy": "1.15.3",
         "torch": "2.13.0+cpu"
       },
-      "run_id": "run-a49fed404e2e",
+      "run_id": "run-04c69e1e0f10",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": {
       "device": "cpu",
       "estimate": null,
-      "peak_memory_bytes": 961540096,
-      "solver_seconds": 0.014157306984998286,
-      "wall_seconds": 0.059646087989676744
+      "peak_memory_bytes": 813592576,
+      "solver_seconds": 0.013553521013818681,
+      "wall_seconds": 0.05843594000907615
     },
-    "run_id": "run-a49fed404e2e",
+    "run_id": "run-04c69e1e0f10",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

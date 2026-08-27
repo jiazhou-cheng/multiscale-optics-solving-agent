@@ -56,9 +56,46 @@ refusal it produces), and the order copies have to stay separated at the
 sensor — which is what puts M2.8's best-behaved `samples_per_period = 16` out of
 reach here at a `grid_n ** 4` ray count.
 
-The remaining rungs are authored M2.10 onward — the canonical refractive→wave
-boundary, the terminal-DOE hybrid, the embedded diffractive system, the
-conformal metasurface, and the SLM relay.
+`B3-DOE-INLINE` and `B4-DOE-INLINE` (M2.12) are the **embedded** diffractive
+system: the DOE sits *inside* the refractive train, so the interaction has to
+hand back rays and downstream refractive optics has to keep working. The chain is
+`ray → DiffractiveInteraction(model=generalized_snell) → ray → Optiland →
+C_RAY_TO_WAVE`, with no reconstruction between the interaction and the trace —
+which is what makes this the only rung where the interaction's *ray output* is
+load-bearing. Two topologies run: a collimated bundle into a linear phase ramp in
+front of a real singlet (the one system with a conventional reference — the
+textbook `x = f tan(arcsin(m λ / Λ))`), and a converging bundle out of one
+singlet through the ramp into a second that relays the intermediate image at
+−1.914×, where the incident optical path and the incident direction are per-ray
+rather than constant. Both families live in
+[`src/verification/families/b3_doe_inline.py`](../../src/verification/families/b3_doe_inline.py)
+and share one driver, [`b3_doe_inline.py`](b3_doe_inline.py). Each family is
+about 30 s::
+
+    ./run.sh python benchmarks/systems/b3_doe_inline.py --family B3-DOE-INLINE --write
+    ./run.sh python benchmarks/systems/b3_doe_inline.py --family B4-DOE-INLINE --write
+
+The split is the same as the 4f rung's and for the same reason. `B3-DOE-INLINE`
+is a **convention** claim and gates: the grating equation to 1e-14 in direction
+cosine, `opl_in + m φ / k0` reproduced from the declaration, `|a_in| |t|` for the
+amplitude, ray power conserved exactly, and the zero-phase limit *bitwise*
+identical to the plain refractive train — plus the analytic order position over
+three grating periods, whose tolerance is derived from a validity bound rather
+than read off a run. `B4-DOE-INLINE` is category B4 and measures the interference
+structure an aberrated singlet puts in a diffracted order against the
+diffraction-blurred ray density, whose fringe contrast is **exactly zero** at
+every aperture measured while the coherent field's is 0.99 at R = 1 mm.
+
+This rung is also what found the order/OPL inconsistency in
+[`src/couplers/generalized_snell.py`](../../src/couplers/generalized_snell.py):
+the momentum equation carried `m grad(φ)` while the optical path carried `φ`
+rather than `m φ`, so for `|m| ≠ 1` the rays were deflected as if the phase were
+one thing and given the optical path of another. `order=1` is bitwise unaffected;
+`tests/test_diffractive_interaction.py` pins the two identities that decide the
+correct form.
+
+The remaining rungs are authored elsewhere — the canonical refractive→wave
+boundary, the terminal-DOE hybrid, the conformal metasurface, and the SLM relay.
 
 ## Existing layer-C evidence is re-homed by classification, not moved on disk
 

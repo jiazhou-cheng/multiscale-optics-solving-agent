@@ -43,7 +43,9 @@ interaction:
 transformation: >
   per ray: k_t^out = n_i k0 d_t^in + m grad_t(phi)(x, y), evaluated at the
   ray's own transverse position, then k_n^out = sqrt((n_t k0)^2 - |k_t^out|^2).
-  The local phase enters the outgoing OPL as phi(x, y) / k0; amplitude picks up
+  The local phase enters the outgoing OPL as m phi(x, y) / k0 -- the same order
+  factor m that multiplies grad(phi), because both come from the m-th order's
+  local plane-wave factor exp(i m phi); amplitude picks up
   the local amplitude transmission |t(x, y)|. No wave representation ever
   exists inside this step -- that is the entire reason it is cheap.
 
