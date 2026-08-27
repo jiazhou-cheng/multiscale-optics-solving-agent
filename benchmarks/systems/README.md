@@ -25,9 +25,40 @@ canonical instances' records in [`records/`](records/). Run it::
 
     ./run.sh python benchmarks/systems/b3_4f_ideal.py --write
 
-The remaining rungs are authored M2.9 onward — the canonical refractive→wave
-boundary, the aberrated 4f relay, the terminal-DOE hybrid, the embedded
-diffractive system, the conformal metasurface, and the SLM relay.
+`B3-4F-REAL` and `B4-4F-REAL` (CHE-145, M2.9) are the second rung, and the
+first that genuinely requires hybrid ray–wave modelling: M2.8's relay with the
+ideal lenses replaced by two real Newport-KBX058-geometry N-BK7 singlets, the
+modulation held **unchanged** (the same `_mask` constructor, imported from the
+M2.8 driver rather than copied). The chain is `object field → C_WAVE_TO_RAY →
+Optiland → DiffractiveInteraction(model=full_field) → Optiland →
+C_RAY_TO_WAVE`. Both families live in one module,
+[`src/verification/families/b3_4f_real.py`](../../src/verification/families/b3_4f_real.py),
+and share one driver, [`b3_4f_real.py`](b3_4f_real.py).
+
+The split is the ticket's own: there is no oracle for an aberrated 4f relay
+carrying a high-frequency modulation, so `B3-4F-REAL` gates only the *paraxial
+limit*, where the 4F-1 answer is the reference and third-order spherical
+aberration's fourth-power law fixes the rate, while `B4-4F-REAL` is category B4
+— structurally incapable of gating — and reports the measured departure away
+from that limit as data. Run them separately; each is a few minutes::
+
+    ./run.sh python benchmarks/systems/b3_4f_real.py --family B3-4F-REAL --write
+    ./run.sh python benchmarks/systems/b3_4f_real.py --family B4-4F-REAL --write
+
+Three sampling walls are declared as validity predicates rather than left in
+comments, because each one caps a parameter range the ticket asks for: the
+reachable field angle obeys `theta_max * R = (object_grid_n / 2 - 4 *
+object_waist_pixels) * lambda / 2`, the aperture ceiling is where the
+aberration's own residual ray angle stops fitting the shared plane's grid
+(the margin crosses zero at 4.19 mm for `grid_n = 48`, with the 6.0 mm instance
+recorded as the structured
+refusal it produces), and the order copies have to stay separated at the
+sensor — which is what puts M2.8's best-behaved `samples_per_period = 16` out of
+reach here at a `grid_n ** 4` ray count.
+
+The remaining rungs are authored M2.10 onward — the canonical refractive→wave
+boundary, the terminal-DOE hybrid, the embedded diffractive system, the
+conformal metasurface, and the SLM relay.
 
 ## Existing layer-C evidence is re-homed by classification, not moved on disk
 

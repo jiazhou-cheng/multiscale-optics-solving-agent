@@ -537,6 +537,29 @@ entries:
       finite-samples_per_period aliasing tail against scipy.special.jv while
       authoring; both are recorded in the family module's docstring rather than
       only in this driver.
+  - path: benchmarks/systems/b3_4f_real.py
+    bucket: B
+    justification: >-
+      POSITIVE: the real aberrated 4f relay driver, and the first thing in this
+      tree that composes the whole hybrid chain end to end -- C_WAVE_TO_RAY at
+      full enumeration, an Optiland trace through a real refractive group,
+      diffractive_interaction(model=FULL_FIELD) at the shared focal plane, a
+      second Optiland trace, and a C_RAY_TO_WAVE sensor reconstruction. It
+      imports B3-4F-IDEAL's own mask constructor and order reductions rather
+      than copying them, which is what makes "the modulation is unchanged from
+      4F-1" true by identity. Drives both families and demonstrates all five
+      declared negative controls firing.
+    destination: The five B3-4F-REAL-* and eight B4-4F-REAL-* canonical instances.
+    note: >-
+      Three things were found by running it rather than by deriving them, and
+      each is recorded where a reader will meet it: displacing the ray LAUNCH
+      POSITIONS does not displace the object (the spectral sum is periodic with
+      the object grid, so the object grid is the field of view); the shared
+      plane's axial position is not load-bearing at any displacement this
+      geometry admits, because the field there is the object's own spectrum and
+      its depth of focus is of order a metre; and the aperture axis has a hard
+      ceiling where the aberration's residual ray angle stops fitting the
+      shared plane's grid, which C_RAY_TO_WAVE refuses with SHAPE_MISMATCH.
   - path: benchmarks/systems/records/*.json
     glob: true
     bucket: B
@@ -1396,6 +1419,30 @@ entries:
       a defect -- CHE-144's own requested characterization of where sampling
       stops matching the continuous theory.
     destination: The system half of the validated evidence layer.
+  - path: src/verification/families/b3_4f_real.py
+    bucket: A
+    justification: >-
+      B3-4F-REAL and B4-4F-REAL (CHE-145, M2.9): the second system-ladder rung
+      and the first that genuinely requires hybrid ray-wave modelling. Two
+      families in one module because the ticket's own acceptance criteria split
+      that way -- B3 gates the paraxial limit, where the 4F-1 answer is an
+      independent reference and third-order spherical aberration's fourth-power
+      law fixes the convergence RATE rather than a chosen tolerance; B4 is
+      category B4 and therefore structurally incapable of gating, which is how
+      "labelled characterization where no oracle exists" is made a property of
+      the schema rather than of discipline. Both gating field tolerances are
+      DERIVED from the PARAXIAL_LIMIT predicate's own bound through a
+      proportionality measured over a 256x span in aberration.
+    destination: The system half of the validated evidence layer.
+    note: >-
+      Three sampling walls are declared as validity predicates rather than left
+      in comments, because each caps a parameter range CHE-145 asks for: the
+      field angle obeys theta_max * R = (object_grid_n / 2 - 4 *
+      object_waist_pixels) * lambda / 2, the aperture ceiling is where the
+      aberration's residual ray angle stops fitting the shared plane's grid,
+      and the order copies must stay separated at the sensor -- which is what
+      puts B3-4F-IDEAL's own best-behaved samples_per_period = 16 out of reach
+      at a grid_n ** 4 ray count.
   - path: src/verification/families/b4_characterization.py
     bucket: A
     justification: >-

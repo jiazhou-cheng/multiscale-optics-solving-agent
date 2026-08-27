@@ -67,7 +67,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "4424df25b68d5ca5f0e5f2b1296758f495d69f5026bffd50c41529a6494eaca0",
+      "combined_sha256": "024ad341b9b032d3f48f71f18d628c3359aec77fb20a2c2cf7a143f9f5532b76",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -110,13 +110,14 @@
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
         "src/verification/claim_ledger.py": "df0b93330e66a1c5528897d2f26a77f53a34ef8f57e74172a77af9375aedc638",
         "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
-        "src/verification/families/__init__.py": "391812ff6ca5a7bd6b273cd453de3578f4df6ad576287265359b9de43e8d4381",
+        "src/verification/families/__init__.py": "14a060841434341258b0c1452f40009d41b5782674a888707f939d5e463ab80e",
         "src/verification/families/b0_contract.py": "adcaea59b365cf9d4b81889b7daf9a0b8c4d80e2b2a7be8852794b4475355542",
         "src/verification/families/b1_gsl_validity.py": "3d5b6c70a9247a71cf55e663f417c7ef0db4cb83b395bbc016d65b5f1d7e2494",
         "src/verification/families/b1_ray.py": "c610bc9438c1455998a3af8c506ce97d60fa9947cea80be836a9ef05d25a309d",
         "src/verification/families/b1_wave.py": "f193f441e119f9ec877701aa90b9586dfb7ae5e56cb7f70920c84992c9e466a3",
         "src/verification/families/b2_transitions.py": "70cc8dab2c1612352e7123df2e7e34eace5c7f3feb5a6d6af3a9bee4d5acf62e",
         "src/verification/families/b3_4f_ideal.py": "dcddc8a8ad364e93f9293fae24fca51683e50a2e8597c35cf1eb94565fdf8710",
+        "src/verification/families/b3_4f_real.py": "2529dabd846b9d71383842f46891a2a817942655e47c10f0a99956926975c971",
         "src/verification/families/b3_composed.py": "c112e72f615049d190034a622c2c78518f26b9153027de222bebd3d4f2cd17fb",
         "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "21a64e2d17f2098787cece75bfec879e92785f0084bcfc12638f84f5e959c4f7",
@@ -146,8 +147,8 @@
     },
     "probe": "instances/b2_transitions",
     "schema_version": 2,
-    "source_commit": "ccbf8034bdb5f098f8238a620fe8acfb54c0599a",
-    "timestamp_utc": "2026-08-27T06:26:31.314380+00:00",
+    "source_commit": "93ee19cf489104cf261c1053fcbe6766f85c8c81",
+    "timestamp_utc": "2026-08-27T10:53:19.014000+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -483,12 +484,12 @@
       "fingerprint_matched": true,
       "instance_fingerprint": "a88ab35f6b1f6a87c29361f11cb73d3b25ab4997d7680cbf08b8af3dea56502c",
       "package_versions": {},
-      "run_id": "probe-dcf927066cbf",
+      "run_id": "probe-aa41c1115efd",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-dcf927066cbf",
+    "run_id": "probe-aa41c1115efd",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": {
