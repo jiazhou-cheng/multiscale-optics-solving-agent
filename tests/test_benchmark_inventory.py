@@ -21,8 +21,12 @@ decorative:
   justification opens with ``POSITIVE:``. A row that cannot write that sentence
   is a bucket-C row;
 * a file with more than one row must give every row a ``part``, which is what
-  makes ``benchmarks/physics/L2-PSF-01/run_benchmark.py`` expressible as one
-  obsolete wrapper plus one candidate canonical instance.
+  made ``benchmarks/physics/L2-PSF-01/run_benchmark.py`` expressible as one
+  obsolete wrapper plus one candidate canonical instance. Both of that file's
+  rows are gone now -- CHE-116 (M4.1) deleted it once its bucket-B destination
+  ``B3-PSF-SINGLET-01`` existed as a committed instance -- which is the split
+  verdict working, not the rule going unused: ``benchmarks/probes/
+  quadrature_weight.py`` and others still carry one.
 """
 
 from __future__ import annotations

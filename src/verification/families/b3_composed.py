@@ -32,6 +32,43 @@ So the family split, along the line the evidence already draws:
 That is a better answer than either forcing an independent label onto a
 cross-route comparison or dropping the case. It is recorded here because the
 issue asked for one family and got two.
+
+What closing M4.1 found (CHE-116)
+---------------------------------
+Two corrections, and both came from doing the acceptance criteria rather than
+from re-reading the code.
+
+**1. The energy-accounting intermediate all three families gate on cannot be
+measured from the shipping surface.** ``HANDOFF_ENERGY_CLOSES`` (1e-3),
+``PATCH_ENERGY_CLOSES`` (1e-3) and ``B3-DUALROUTE``'s whole
+``route_power_ratio`` gate (1e-2) are the same quantity, and
+``ReconstructionReport`` exposes two power figures that are incommensurable:
+``reconstructed_discrete_power`` is ``sum(|u|^2) * dy * dx``, an integral over
+the output plane, while ``incident_amplitude_power_sum`` is a bare sum over rays
+of ``|amplitude|^2`` -- and ``couplers/handoff.py`` puts the per-ray area element
+*inside* the amplitude. Read as a ratio it gives 1.2e-8 (triplet), 2.8e-5
+(singlet), 2.1e-5 (demo2), and it moves 10.9% under a 3.94x ray refinement, so
+it is neither a closure nor a constant that could be calibrated away. Measured
+by ``benchmarks/probes/b3_energy_accounting.py``; recorded in
+``benchmarks/probes/records/b3_energy_accounting.json``. Nothing was widened and
+no ``may_gate`` was dropped -- settling it is a conservation claim across a
+representation boundary and owes a derivation, an oracle that is not the
+coupler, and independent review.
+
+**2.** ``B3-DEMO2``'s **oracle named the wrong thing.** It declared the decider
+to be "the published figure from the paper's own implementation ... a different
+group's code", and no committed number was ever measured against it. Every
+figure the family carries, ``0.999418`` included, is
+``routes.rw_p.vs_oracle.ncc_intensity`` against
+``verification/asm_oracle.angular_spectrum_float64`` -- our own float64
+propagator, which IS independent of the couplers under test and is NOT external
+to this repository. The observed value did not move; its attribution did, and the
+family's stated reason for existing was rewritten to the one the evidence
+supports. The paper's contribution is the configuration and the ray budget, not
+the answer key.
+
+Both are recorded in the fields a caller reads, not only here, because a
+docstring is not an executable claim.
 """
 
 from __future__ import annotations
@@ -558,18 +595,65 @@ B3_DEMO2 = register(
             kind=Oracle.INDEPENDENT_IMPLEMENTATION,
             independence=OracleIndependence.INDEPENDENT,
             description=(
-                "the published figure from the paper's own implementation. External to "
-                "this repository in the strongest sense available: a different group's "
-                "code, run before this project existed"
+                "verification/asm_oracle.angular_spectrum_float64 -- this repository's "
+                "own float64 angular-spectrum propagator, scored at the route's own "
+                "padding and again at 2x. INDEPENDENT is the right label because the "
+                "test is C_PATCH_WFT plus C_RAY_TO_WAVE and the oracle shares neither "
+                "their kernel nor their traced rays: it is a different algorithm on "
+                "the same input mask. It is NOT external to this repository, and "
+                "CHE-116 corrected this field because the previous wording said it "
+                "was. "
+                "THE PUBLISHED FIGURE IS NOT AN ORACLE HERE AND NEVER WAS. The paper "
+                "supplies SI Table S2's summary numbers -- NCC 0.997, MSE 4.414e-10, "
+                "each against the PAPER's own oracle -- and a printed figure, not a "
+                "field array, so there is nothing to compute a metric against. Every "
+                "number this family carries was measured against the ASM oracle above; "
+                "benchmarks/probes/records/ray_wave/demo2_paper_jax.json says so in "
+                "its own conventions block ('paper_numbers_are_context_not_thresholds: "
+                "... Quoting NCC 0.997 as a gate would be circular validation'). The "
+                "paper's configuration is what this case reproduces; the paper's "
+                "numbers are context beside the result, not the decider of it. "
+                "HOW THIS SITS BESIDE B3-PSF-SINGLET'S O2 RULE, which is the obvious "
+                "objection and is raised here rather than left for a reader to "
+                "notice. Three hundred lines above, B3-PSF-SINGLET declares an ASM "
+                "oracle with may_gate=False, because 'using our own numerical code as "
+                "the answer key for our own numerical code is circular validation'. "
+                "The distinction that makes this one different in kind is the INPUT, "
+                "not the algorithm: the singlet's O2 is built from a ring-averaged, "
+                "linearly interpolated fit to THE COUPLER'S OWN TRACED PUPIL "
+                "(sensor_handoff_convergence.py::_traced_pupil_wavefront), so it "
+                "shares the traced data and inherits that fit's unresolved "
+                "resolution error -- which is exactly how it once set a control floor "
+                "that had to be retired. This oracle starts from the physical input "
+                "mask, shares no traced ray with either coupler, and is the same "
+                "reference B1-WAVE and B0-contract use. That is what "
+                "OracleIndependence.INDEPENDENT means on its own terms: shares no "
+                "code and no traced data with the thing under test. "
+                "may_gate IS STILL True ON BOTH DEMO2 TOLERANCES AND CHE-116 DID NOT "
+                "CHANGE IT. Whether an in-repository propagator may decide a gate at "
+                "all, given the recorded no-circular-validation rule, is an OWNER'S "
+                "CALL and is flagged rather than resolved here: silently dropping "
+                "may_gate would be a weakening this issue has no mandate for, and "
+                "silently keeping it without stating the tension would be worse. "
+                "Nothing enforces it today -- the gate is MEASURED_OFF_GATE and no "
+                "collection re-runs this case."
             ),
             callable=None,
-            reference="ACS Photonics 2026 demo2, SI Table S2",
+            reference=(
+                "src/verification/asm_oracle.py (the decider); ACS Photonics 2026 "
+                "demo2, SI Table S2 (the configuration, and context numbers only)"
+            ),
         ),
         metrics=(
             Metric(
                 name="demo2_ncc",
                 definition="ncc",
-                description="normalized cross-correlation against the published intensity",
+                description=(
+                    "normalized cross-correlation against the independent float64 ASM "
+                    "oracle's intensity, at the route's own padding. NOT against the "
+                    "published intensity -- see the oracle description; CHE-116 "
+                    "corrected this line"
+                ),
                 unit=None,
                 blind_to=(
                     "an overall scale factor, by construction -- NCC normalizes it away, "
@@ -581,7 +665,11 @@ B3_DEMO2 = register(
             Metric(
                 name="demo2_relative_l2",
                 definition="relative_l2_intensity",
-                description="relative L2 against the published intensity",
+                description=(
+                    "relative L2 against the independent float64 ASM oracle's field, "
+                    "at the route's own padding. NOT against the published intensity "
+                    "-- see the oracle description; CHE-116 corrected this line"
+                ),
                 unit=None,
                 blind_to=("phase; this is an intensity comparison",),
             ),
@@ -636,7 +724,12 @@ B3_DEMO2 = register(
                     "kspace_ray_to_wave.md). 0.999 sits just below that measurement and "
                     "well above the 0.9987 the full-aperture route reaches at 1.1e6 "
                     "rays, so it separates the converged reproduction from an "
-                    "under-sampled one"
+                    "under-sampled one. "
+                    "CHE-116: the threshold is unchanged and what it is measured "
+                    "AGAINST is now stated -- verification/asm_oracle."
+                    "angular_spectrum_float64, not the published figure. 'the paper's "
+                    "own budget' describes the ray count, which is the paper's; the "
+                    "reference field is ours."
                 ),
                 basis_kind=ToleranceBasis.INDEPENDENT_DERIVATION,
                 may_gate=True,
@@ -651,7 +744,10 @@ B3_DEMO2 = register(
                 basis=(
                     "measured 2.8562e-2 at the Table S2 budget. 5e-2 admits the run-to-"
                     "run spread of a stochastic estimator at that budget without "
-                    "admitting the 8.87e-2 the full-aperture route reaches at its own"
+                    "admitting the 8.87e-2 the full-aperture route reaches at its own. "
+                    "CHE-116: unchanged threshold; the reference is the independent "
+                    "float64 ASM oracle at the route's own padding, not the published "
+                    "figure."
                 ),
                 basis_kind=ToleranceBasis.INDEPENDENT_DERIVATION,
                 may_gate=True,
@@ -697,7 +793,12 @@ B3_DEMO2 = register(
         gate_disposition=GateDisposition(
             status=GateStatus.MEASURED_OFF_GATE,
             metric="demo2_ncc",
-            observed=0.999418,
+            # Full precision, so the attribution is executable rather than argued.
+            # At six figures this number is indistinguishable from the RW-P/RW-F
+            # route agreement (0.9994180762008337), and the two are different
+            # quantities; the extra digits are what let a reader tell which record
+            # field it came from.
+            observed=0.9994182326189224,
             evidence=(
                 "benchmarks/reports/2026-08/kspace_ray_to_wave.md",
                 "benchmarks/probes/records/ray_wave/demo2_paper_jax.json",
@@ -706,7 +807,18 @@ B3_DEMO2 = register(
                 "NCC 0.999418 and relative L2 2.8562e-2 at the paper's own 1.6e8-ray "
                 "budget, on record. MEASURED_OFF_GATE rather than MET because nothing in "
                 "the required gate re-runs it: it is a 95-second GPU job and belongs in "
-                "the extended collection, not the default suite."
+                "the extended collection, not the default suite. "
+                "CHE-116 (M4.1) attributed the number to its actual oracle: it is "
+                "routes.rw_p.vs_oracle.ncc_intensity in "
+                "benchmarks/probes/records/ray_wave/demo2_paper_jax.json, measured "
+                "against verification/asm_oracle.angular_spectrum_float64. It is NOT a "
+                "comparison against the published figure -- no such comparison exists "
+                "in this repository, and the paper publishes summary numbers against "
+                "its own oracle rather than a field. The value is unchanged and the "
+                "attribution is now correct. Note also that the RW-P/RW-F route "
+                "agreement reads 0.999418 to six figures at this budget, so the two "
+                "numbers are easy to confuse in a record; the one carried here is the "
+                "oracle comparison."
             ),
         ),
         sampler=None,
@@ -722,9 +834,19 @@ B3_DEMO2 = register(
             "benchmarks/probes/ray_wave/demo2_hologram.py",
         ),
         notes=(
-            "The one composed reproduction graded against an EXTERNAL published "
-            "reference rather than against ourselves, which makes it the regression "
-            "anchor for the whole ray-wave path."
+            "M4.1 promoted this family as 'the one composed reproduction graded "
+            "against an EXTERNAL published reference rather than against ourselves'. "
+            "CHE-116 checked that against the evidence and it does not hold: every "
+            "committed number is measured against verification/asm_oracle."
+            "angular_spectrum_float64, our own float64 propagator. The promotion "
+            "argument that DOES hold is weaker and still worth the family: the oracle "
+            "is independent OF THE COUPLERS UNDER TEST -- a different algorithm on the "
+            "same input, sharing no kernel and no traced rays -- and the physical "
+            "configuration and ray budget are the paper's, so a change in the number "
+            "is attributable to our code rather than to a moved setup. That makes it a "
+            "regression anchor for the ray-wave path. It does not make it external "
+            "evidence, and the difference is exactly the one the B0-B4 split exists to "
+            "keep visible."
         ),
     )
 )
@@ -882,7 +1004,38 @@ B3_DUALROUTE = register(
                 "PB7/CHE-58 measured the route AGREEMENT and did not measure per-route "
                 "energy closure, so this gate has no number yet. That is the gap this "
                 "family exists to close: the agreement study could not decide anything, "
-                "and the invariant can."
+                "and the invariant can. "
+                "CHE-116 (M4.1) tried to close it and could not, and the reason is "
+                "sharper than 'nobody has run it'. THE QUANTITY IS NOT FORMABLE FROM "
+                "THE SHIPPING SURFACE. couplers.ray_to_wave.ReconstructionReport "
+                "exposes two power figures and they are incommensurable: "
+                "reconstructed_discrete_power is sum(|u|^2) * dy * dx, an integral over "
+                "the output plane, while incident_amplitude_power_sum is a bare sum "
+                "over rays of |amplitude|^2 -- and couplers/handoff.py puts the per-ray "
+                "area element INSIDE the amplitude (amplitude = sqrt(weight) * "
+                "quadrature_weight_m2). Measured on this family's own system at 20 "
+                "degrees, the quotient reads 1.17e-8 against a 1e-2 tolerance. A "
+                "ray-count arm shows the defect directly: sum(|amplitude|) is "
+                "invariant to 0.02% under a 3.94x refinement while "
+                "sum(|amplitude|^2) falls by nearly the same factor, which is the "
+                "squared area element and nothing else. Whether a per-configuration "
+                "normalization would nonetheless close it is UNTESTED -- on that "
+                "configuration the quotient sits within 0.5% of the plain grid area "
+                "and the reconstruction is floor-dominated, so those two points "
+                "decide nothing about a constant. An earlier draft of this note said "
+                "the 10.9% drift ruled a constant out; independent review showed it "
+                "did not, and the claim is withdrawn. Evidence: "
+                "benchmarks/probes/records/b3_energy_accounting.json. "
+                "B3-PSF-SINGLET's HANDOFF_ENERGY_CLOSES and B3-DEMO2's "
+                "PATCH_ENERGY_CLOSES are the same quantity and are equally unmeasured; "
+                "this is one property of the ray-to-wave boundary, not three gaps. "
+                "Closing it needs the incident power sum(weight_i * "
+                "quadrature_weight_m2_i) plus an argument about the coherent sum's "
+                "cross terms: a conservation claim across a representation boundary, "
+                "owing a derivation, an oracle that is not the coupler, and independent "
+                "review. M4.1 reports the open gate. NOTHING WAS WIDENED and may_gate "
+                "was NOT dropped to False -- a gate that cannot be measured is a "
+                "reason to measure it, not a reason to stop calling it a gate."
             ),
         ),
         sampler=None,

@@ -1,22 +1,42 @@
-# L2-PSF-01 — Optiland → C_RAY_TO_WAVE → Chromatix → PSF
+# L2-PSF-01 — RETIRED. The workload lives on as `B3-PSF-SINGLET-01`
 
+**There is no runnable entry point in this directory.** CHE-116 (M4.1) deleted
+`run_benchmark.py` (600 lines) and `evaluate.py` (the bundle-hash evaluator,
+whose only input was the bundle that runner wrote). What remains here is
+`tolerances.yaml` — the evidence file the family's tolerance bases are migrated
+from verbatim, and cited by `src/verification/families/b3_composed.py` — and
+this README, which records what the bundle was and measured.
 
-> `--output-dir outputs/…` writes to a **gitignored, local-only** directory.
-> The committed record for this benchmark is its `scientific_fingerprint`,
-> quoted below and reproduced by re-running the command.
-
-Protocol `M3-SLICE-CPU-V1`. Graph `[M_RAY_OPTILAND, C_RAY_TO_WAVE,
-M_WAVE_CHROMATIX]`, terminating at the propagated `ComplexField`. PSF
-extraction (`verification.psf_measurement.measure_psf`) is a benchmark-layer
-measurement on that terminal state, not a graph node: `C_FIELD_TO_PSF` was
-retired by CHE-36 (M3.7).
+Run the workload here instead:
 
 ```bash
-./run.sh python benchmarks/physics/L2-PSF-01/run_benchmark.py \
-    --output-dir outputs/M3/L2-PSF-01
+./run.sh python benchmarks/instances/b3_psf_singlet.py --write
 ```
 
-## What this bundle is, and is not
+That path is `GraphExecutor` over the committed graph document
+`examples/graphs/psf_singlet_sensor.yaml`, then `verify()` against the
+`B3-PSF-SINGLET` family. CHE-115 (M3.3) established the precondition CHE-116's
+deletion waited on: it reproduces this bundle's frozen gate number
+`fft_oracle_intensity_relative_l2 = 0.0022072391812867093` **bit-identically**
+(`tests/test_substrate_proof.py::test_the_frozen_number_is_reproduced_bit_identically`
+asserts `==`, not `approx`).
+
+## What the deleted runner owned, and where each piece went
+
+| the bundle's piece | where it is now |
+|---|---|
+| the graph `[M_RAY_OPTILAND, C_RAY_TO_WAVE, M_WAVE_CHROMATIX]` and its frozen gate | `examples/graphs/psf_singlet_sensor.yaml` + `benchmarks/instances/b3_psf_singlet.py` |
+| the `opl_sign_flip` negative control | a graph variant through `runtime.variants.with_config_overrides`, run by the driver and recorded in `benchmarks/instances/records/B3-PSF-SINGLET-01.json` |
+| the `near_sensor_fine` three-node demonstration | `b3_psf_singlet.run_near_sensor_fine` |
+| the 12-rung convergence ladder, the O2 ASM/RS characterization oracle, absolute-power convergence | unchanged, in the probes this bundle already called rather than re-derived: `benchmarks/probes/quadrature_weight.py`, `benchmarks/probes/sensor_handoff_convergence.py`, with their own committed records |
+| the `exit_pupil_hard_support_reconstruction` (O4) validity-limit control | unchanged, in `benchmarks/probes/sensor_handoff_convergence.py::_exit_pupil_negative_control` |
+| the `quadrature_weight_regression` pass/fail restatement | **NOT carried forward as a gate.** The family declares it as `inverted-quadrature-weight` with `KNOWN_FIRES_BACKWARDS` and CHE-117's finding attached: a control whose verdict flips sign with ray count (10.7 at 8 rings, 0.42 at 512, 0.69 at 1024) is measuring where two convergence curves cross, not whether the weight is right. The measurement survives in the probe record; the pass/fail restatement was the defect. |
+| `result.json` / `provenance.json` / `arrays.npz` / `convergence.json` / `plot.png` packaging, and `evaluate.py`'s hash check of it | superseded by `benchmarks/instances/records/B3-PSF-SINGLET-01.json`, stamped by `verification.evidence.write_instance_record` and swept by `tests/test_provenance_fingerprint.py` |
+
+Everything below is the bundle's own description, kept because it records what
+was run and what it found. Read it in the past tense.
+
+## What this bundle was, and was not
 
 This bundle **packages** the physics CHE-38 (M3.9R) and CHE-47 (its
 extension) already measured — it calls those two probes' own code directly
@@ -102,13 +122,15 @@ carried forward from CHE-38/CHE-47:
    unresolved fit error must not decide whether a different custom
    implementation is "correct."
 
-## Artifacts
+## Artifacts (as the bundle wrote them — no longer produced)
 
 `result.json`, `provenance.json`, `arrays.npz`, `tolerances.yaml`,
 `convergence.json` (the full sensor ray ladder), `plot.png`, `README.md`.
-Every file is SHA-256 hashed into `provenance.json`.
+Every file was SHA-256 hashed into `provenance.json`.
 
-The scientific fingerprint covers physics only (`core.provenance.VOLATILE_KEYS`
-stripped): wall-clock and run-identity keys are excluded, so
-the fingerprint is bit-identical across two runs on an unchanged tree — the
-same guarantee L2-COUPLER-01 (CHE-29) established for M2.
+The scientific fingerprint covered physics only (`core.provenance.VOLATILE_KEYS`
+stripped): wall-clock and run-identity keys were excluded, so
+the fingerprint was bit-identical across two runs on an unchanged tree — the
+same guarantee L2-COUPLER-01 (CHE-29) established for M2. That guarantee is now
+carried by the `scientific_fingerprint` field of
+`benchmarks/instances/records/B3-PSF-SINGLET-01.json`.

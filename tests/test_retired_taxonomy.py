@@ -11,12 +11,15 @@ Why this has an allowlist, and why that is not a loophole
 Three kinds of reference legitimately survive, and each one is a different
 argument:
 
-* **The live singlet workload.** ``benchmarks/physics/L2-PSF-01/`` is still the
-  only way to execute that case. CHE-133 explicitly does *not* delete it; the
-  executor and family runner replace it in M4 (CHE-115/CHE-116), and it becomes
-  ``B3-PSF-SINGLET-01`` then. Deleting the directory now to satisfy a grep would
-  be deleting the only runnable path for a workload before its replacement
-  exists.
+* **The retired singlet bundle's evidence.** ``benchmarks/physics/L2-PSF-01/``
+  no longer executes anything: CHE-116 (M4.1) deleted ``run_benchmark.py`` and
+  ``evaluate.py`` once CHE-115 proved ``GraphExecutor`` reproduces the case's
+  frozen gate number bit-identically, and the workload is now
+  ``B3-PSF-SINGLET-01``. What survives is ``tolerances.yaml`` -- the file
+  ``src/verification/families/b3_composed.py`` migrates its tolerance bases from
+  VERBATIM and cites as evidence -- and a README recording what the bundle
+  measured. A live family points at both, so this is the live surface citing its
+  own source, not a stale directory.
 * **The historical record.** Reports under ``benchmarks/reports/`` and the
   frozen protocol contracts describe runs that happened, under ids that were
   real at the time. Rewriting them to remove an identifier would falsify what
@@ -53,9 +56,13 @@ SCANNED_SUFFIXES = {".py", ".md", ".yaml", ".yml", ".json", ".toml", ".sh", ".cf
 #: path prefix -> why a reference there is legitimate. Checked for minimality.
 ALLOWED: dict[str, str] = {
     "benchmarks/physics/L2-PSF-01": (
-        "the only runnable path for the singlet workload until the executor and "
-        "family runner replace it; CHE-133 explicitly keeps it, M4 renames it to "
-        "B3-PSF-SINGLET-01"
+        "no longer runnable: CHE-116 deleted run_benchmark.py and evaluate.py once "
+        "CHE-115 proved the executor reproduces the frozen gate number "
+        "bit-identically. What is left is tolerances.yaml, the evidence file "
+        "b3_composed.py migrates its tolerance bases from VERBATIM, and a README "
+        "that records what the bundle measured. Both name the id under which the "
+        "runs happened; rewriting them to pass a grep would falsify the evidence "
+        "the live family cites"
     ),
     "benchmarks/reports": (
         "the milestone record. Rewriting a historical report to remove an "

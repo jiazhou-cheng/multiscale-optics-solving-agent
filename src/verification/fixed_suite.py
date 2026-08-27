@@ -713,9 +713,16 @@ _B3 = (
         ),
         tier=Tier.EXTENDED,
         justification=(
-            "the paper's own Table S2 budget against the paper's own published figure. "
-            "The only composed case graded against something outside this repository, "
-            "which makes it the regression anchor for the whole ray-wave path."
+            "the paper's own Table S2 budget and the paper's own configuration, graded "
+            "against verification/asm_oracle.angular_spectrum_float64 -- an oracle "
+            "independent of both couplers under test but NOT external to this "
+            "repository. CHE-116 corrected this justification: it read 'against the "
+            "paper's own published figure ... the only composed case graded against "
+            "something outside this repository', and no such comparison exists. The "
+            "reason to freeze it survives the correction -- a different algorithm on "
+            "the paper's setup at the paper's budget, so a change in the number is "
+            "attributable to our code rather than to a moved setup, which is what "
+            "makes it the regression anchor for the ray-wave path."
         ),
         expected_status=VerificationStatus.OK,
     ),

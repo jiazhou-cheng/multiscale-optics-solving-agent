@@ -42,16 +42,29 @@ m1_independence_check: archive/benchmarks/gen1/archive/benchmarks/gen1/benchmark
 #     -> benchmarks/physics/L2-PSF-01/README.md and
 #        benchmarks/reports/2026-08/slice_cleanup_disposition.md item 3
 #
-# The runner `benchmarks/physics/L2-PSF-01/run_benchmark.py` is no longer the only
-# way to execute this gate. CHE-115 (M3.3) reproduced its frozen
+# The runner `benchmarks/physics/L2-PSF-01/run_benchmark.py` is GONE. CHE-115
+# (M3.3) reproduced its frozen
 # `fft_oracle_intensity_relative_l2 = 0.0022072391812867093` BIT-IDENTICALLY
 # through `GraphExecutor` from `examples/graphs/psf_singlet_sensor.yaml`, driven by
 # `benchmarks/instances/b3_psf_singlet.py` and judged by
-# `verify(B3_PSF_SINGLET, instance, record)`. The runner still owns what that path
-# does not reproduce -- the 12-rung convergence ladder, the O2 ASM/RS
-# characterization oracle, the exit-pupil hard-support control and the
-# quadrature-weight regression control -- and its deletion is CHE-116's per
-# CHE-115's own amendment. It is bucket C in benchmarks/inventory.yaml.
+# `verify(B3_PSF_SINGLET, instance, record)`, which was the precondition CHE-115's
+# own amendment set for the deletion; CHE-116 (M4.1) then carried it out, together
+# with `evaluate.py`, the evaluator whose only input was the bundle that runner
+# wrote. The only entry point for this gate is now
+#
+#     ./run.sh python benchmarks/instances/b3_psf_singlet.py --write
+#
+# What the runner owned and this path does not reproduce was NOT deleted with it:
+# the 12-rung convergence ladder, the O2 ASM/RS characterization oracle and the
+# exit-pupil hard-support control live in the probes the runner already called
+# rather than re-derived (`benchmarks/probes/quadrature_weight.py`,
+# `benchmarks/probes/sensor_handoff_convergence.py`), each with its own committed
+# record. The one thing deliberately NOT carried forward is the
+# quadrature-weight-regression pass/fail restatement: CHE-117 established that a
+# control whose verdict flips sign with ray count is measuring where two
+# convergence curves cross, so the family carries it as
+# `inverted-quadrature-weight` with `KNOWN_FIRES_BACKWARDS` and that finding
+# attached, and nothing gates on it.
 
 # ---------------------------------------------------------------------------
 # Characterizations — NOT benchmarks, and the distinction is the entry

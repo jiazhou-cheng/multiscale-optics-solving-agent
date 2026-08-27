@@ -5,11 +5,13 @@
 # and sometimes in the same file, so "delete the benchmark stuff" is not a
 # reviewable instruction. This file classifies **artifacts, not directories**.
 #
-# The load-bearing example is `benchmarks/physics/L2-PSF-01/`: `run_benchmark.py`
-# is an obsolete task wrapper AND carries the M3-SINGLET-REF prescription that is
-# a candidate canonical instance; `evaluate.py` and `tolerances.yaml` hold metric
-# definitions and tolerance derivations that exist nowhere else. One directory,
-# three verdicts -- hence `part:` on entries that split a file.
+# The load-bearing example was `benchmarks/physics/L2-PSF-01/`: `run_benchmark.py`
+# was an obsolete task wrapper AND carried the M3-SINGLET-REF prescription that is
+# a candidate canonical instance; `evaluate.py` and `tolerances.yaml` held metric
+# definitions and tolerance derivations that existed nowhere else. One directory,
+# three verdicts -- hence `part:` on entries that split a file. CHE-116 (M4.1)
+# closed that example out: the two obsolete files are deleted, their destinations
+# exist, and the evidence file stays. That is what a split verdict is for.
 #
 # Buckets
 # -------
@@ -310,44 +312,17 @@ entries:
     destination: Family provenance_rule references for B1 ray/wave families.
 
   # =========================================================================
-  # benchmarks/physics/L2-PSF-01/ -- one directory, three verdicts
+  # benchmarks/physics/L2-PSF-01/ -- the two files CHE-116 did NOT delete
+  #
+  # CHE-116 (M4.1) deleted run_benchmark.py (both of its verdicts: the task
+  # wrapper, bucket C; and the M3-SINGLET-REF prescription plus graph
+  # construction, bucket B, whose destination B3-PSF-SINGLET-01 now exists as a
+  # committed instance, a committed graph document and a committed record) and
+  # evaluate.py (bucket A, whose destination src/verification/metrics.py
+  # exists). Their rows are gone because a row for a path that is not there
+  # reads as coverage and is not; the deletion is recorded in this directory's
+  # README and in benchmarks/reports/2026-08/b3_composed_families.md.
   # =========================================================================
-  - path: benchmarks/physics/L2-PSF-01/run_benchmark.py
-    part: the task wrapper (CLI, result.json emission, protocol plumbing)
-    bucket: C
-    justification: >-
-      Serves the old evaluation design. Replaced by GraphExecutor (M3.1) plus the
-      family runner.
-    note: >-
-      NOT deleted in M0.5.4, and NOT deleted by CHE-115 either. CHE-115 satisfied
-      the precondition its own amendment set -- the executor reproduces this
-      case's frozen gate number bit-identically from a committed graph document
-      (benchmarks/instances/b3_psf_singlet.py, 60 lines of family-specific
-      measurement against this file's 600) -- and that amendment assigns the
-      deletion itself to CHE-116. What remains bespoke here and is NOT replaced:
-      the 12-rung convergence ladder, the O2 ASM/Rayleigh-Sommerfeld
-      characterization oracle, the exit-pupil hard-support control, the
-      quadrature-weight regression control, and the result.json/plot.png bundle
-      packaging.
-  - path: benchmarks/physics/L2-PSF-01/run_benchmark.py
-    part: the M3-SINGLET-REF prescription and its graph construction
-    bucket: B
-    justification: >-
-      POSITIVE: this is the only composed ray-to-wave case in the repository with
-      an independent analytic decider, and it is the case that carries the
-      project's one open unmet gate. Freezing it keeps the residual investigation
-      (CHE-117) anchored to a fixed physical setup, so a change in the number is
-      attributable to code rather than to a moved prescription. Its scientific
-      fingerprint is the regression signal for the whole ray-to-wave path.
-    destination: B3-PSF-SINGLET-01, canonical instance, origin CANONICAL.
-  - path: benchmarks/physics/L2-PSF-01/evaluate.py
-    bucket: A
-    justification: >-
-      The metric definitions -- fft_oracle_intensity_relative_l2 and the rest --
-      exist nowhere else in executable form.
-    destination: >-
-      src/verification/metrics.py (M2.4), as canonical single definitions with a
-      documented blind spot each; referenced by B3-PSF-SINGLET's metrics.
   - path: benchmarks/physics/L2-PSF-01/tolerances.yaml
     bucket: A
     justification: >-
@@ -774,6 +749,24 @@ entries:
       Stays as the M3.3 record. Its S4 count (2 of 55 bespoke entry points now
       execute a real GraphSpec) is the denominator later migrations move.
 
+  - path: benchmarks/reports/2026-08/b3_composed_families.md
+    bucket: A
+    justification: >-
+      CHE-116 (M4.1). The M4.1 exit record: where every piece of the deleted
+      L2-PSF-01 bundle went, the three families' runtime and memory envelopes
+      measured against their declared ExecutionPolicy on real runs, and the two
+      findings closing the issue produced -- that the energy-accounting
+      intermediate all three families GATE on is not formable from the shipping
+      surface (measured, with a ray-count scaling arm ruling out a calibration
+      constant), and that B3-DEMO2's oracle declared the paper's published figure
+      as its decider when every committed number is against our own float64 ASM.
+      It also states which acceptance criteria are left OPEN and why, which is the
+      part a later reader is most likely to need.
+    destination: >-
+      Stays as the M4.1 record. Its open-criteria table is what M4.1's successor
+      inherits: B3-DEMO2's executor enrollment (blocked on M3.1's source/streaming
+      gap) and B3-DUALROUTE's (blocked on the absolute-power normalization).
+
   - path: benchmarks/reports/2026-08/singlet_residual_attribution.md
     bucket: A
     justification: >-
@@ -923,6 +916,23 @@ entries:
     bucket: A
     justification: Three independent discretizations with fitted trends.
     destination: B3-PSF-SINGLET convergence (dimension, ladder, fitted exponent).
+  - path: benchmarks/probes/b3_energy_accounting.py
+    bucket: A
+    justification: >-
+      CHE-116 (M4.1). The only place the energy-accounting intermediate that all
+      three B3 families GATE on is actually evaluated, and it does not close:
+      reconstructed_discrete_power integrates |u|^2 over the output plane while
+      incident_amplitude_power_sum is a bare sum over rays of |amplitude|^2 with the
+      per-ray area element inside the amplitude, so the quotient reads 1.2e-8 to
+      2.8e-5 against gates of 1e-2 and 1e-3, and moves 10.9% under a 3.94x ray
+      refinement. That rules out both "failing coupler" and "missing constant". It
+      is also the only place the three families' declared runtime and memory
+      envelopes are measured against real runs rather than declared.
+    destination: >-
+      B3-DUALROUTE gate_disposition (the reason its gate is NOT_MEASURED),
+      B3-PSF-SINGLET HANDOFF_ENERGY_CLOSES and B3-DEMO2 PATCH_ENERGY_CLOSES (the
+      same open question), and tests/test_b3_b4_families.py, which pins the finding
+      so a later change that makes it read 1.0 has to bring the derivation with it.
   - path: benchmarks/probes/quadrature_weight.py
     bucket: A
     justification: >-

@@ -8,13 +8,13 @@ re-run one piece of.
     ./run.sh python benchmarks/perf/run_baselines.py scaling
     ./run.sh python benchmarks/perf/run_baselines.py estimate
     ./run.sh python benchmarks/perf/run_baselines.py suite
-    ./run.sh python benchmarks/perf/run_baselines.py l2-psf-01
+    ./run.sh python benchmarks/perf/run_baselines.py b3-psf-singlet
     ./run.sh python benchmarks/perf/run_baselines.py compare <baseline> <candidate>
     MOA_GPUS=device=6 ./run.sh --gpu python benchmarks/perf/run_baselines.py demo3 ...
 
 The demo2 and demo3 subcommands are implemented and NOT run by CHE-105; their
 baselines are deferred. Nothing about the harness is untested as a result -- the
-whole-command path is exercised by the `suite` and `l2-psf-01` baselines, which
+whole-command path is exercised by the `suite` and `b3-psf-singlet` baselines, which
 go through the same `_timed_command`.
 
 Repeats
@@ -1022,14 +1022,32 @@ def baseline_suite() -> None:
     _write(f"suite_default_{_device_suffix()}", payload)
 
 
-def baseline_l2_psf_01() -> None:
+def baseline_b3_psf_singlet() -> None:
+    """Cost of the singlet workload through its *current* entry point.
+
+    CHE-116 repointed this. It used to time
+    ``benchmarks/physics/L2-PSF-01/run_benchmark.py``, the 600-line bespoke
+    bundle runner CHE-116 deleted once CHE-115 proved the executor reproduces
+    the case's frozen gate number bit-identically. The committed
+    ``l2_psf_01_cpu.json`` (170.1 s) is NOT overwritten by this and is NOT the
+    "before" arm of a speed-up: it measured a different workload -- the bundle
+    also ran the 12-rung convergence ladder, the O2 ASM/RS oracle and two
+    controls the executor path does not -- so comparing the two numbers would
+    compare scopes, not implementations. It stays under its own key as the
+    historical baseline for a workload that no longer exists.
+    """
     payload = _timed_command(
-        [sys.executable, str(ROOT / "benchmarks" / "physics" / "L2-PSF-01" / "run_benchmark.py")],
-        label="L2-PSF-01 bundle",
-        workload=Workload(size=1.0, unit="bundle_run", route="M3-SLICE-CPU-V1"),
-        notes=["One timed run, no warmup, for the same reason as the suite baseline."],
+        [sys.executable, str(ROOT / "benchmarks" / "instances" / "b3_psf_singlet.py")],
+        label="B3-PSF-SINGLET-01 through the executor",
+        workload=Workload(size=1.0, unit="instance_run", route="GraphExecutor + verify()"),
+        notes=[
+            "One timed run, no warmup, for the same reason as the suite baseline.",
+            "Includes the opl-sign-flip control, which is a second 512-ring "
+            "execution of the same graph: this is the cost of the committed "
+            "record, not of the cheapest way to get the number.",
+        ],
     )
-    _write(f"l2_psf_01_{_device_suffix()}", payload)
+    _write(f"b3_psf_singlet_{_device_suffix()}", payload)
 
 
 def _device_suffix() -> str:
@@ -1268,7 +1286,7 @@ def main() -> int:
     sub.add_parser("scaling")
     sub.add_parser("estimate")
     sub.add_parser("suite")
-    sub.add_parser("l2-psf-01")
+    sub.add_parser("b3-psf-singlet")
 
     d2 = sub.add_parser("demo2")
     d2.add_argument("--preset", default="paper")
@@ -1315,8 +1333,8 @@ def main() -> int:
         baseline_estimate()
     elif args.command == "suite":
         baseline_suite()
-    elif args.command == "l2-psf-01":
-        baseline_l2_psf_01()
+    elif args.command == "b3-psf-singlet":
+        baseline_b3_psf_singlet()
     elif args.command == "demo2":
         baseline_demo2(args)
     elif args.command == "demo3":

@@ -329,9 +329,14 @@ instances:
   fingerprint: 2efef50722264b62e5d7628bd26087a1a55e474bee70490ac355d8f2009fe15a
   validity_status: near_boundary
   expected_status: ok
-  justification: the paper's own Table S2 budget against the paper's own published figure.
-    The only composed case graded against something outside this repository, which makes it
-    the regression anchor for the whole ray-wave path.
+  justification: 'the paper''s own Table S2 budget and the paper''s own configuration, graded
+    against verification/asm_oracle.angular_spectrum_float64 -- an oracle independent of both
+    couplers under test but NOT external to this repository. CHE-116 corrected this justification:
+    it read ''against the paper''s own published figure ... the only composed case graded
+    against something outside this repository'', and no such comparison exists. The reason
+    to freeze it survives the correction -- a different algorithm on the paper''s setup at
+    the paper''s budget, so a change in the number is attributable to our code rather than
+    to a moved setup, which is what makes it the regression anchor for the ray-wave path.'
 - instance_id: B3-DUALROUTE-01
   family_id: B3-DUALROUTE
   family_version: 1.0.0
