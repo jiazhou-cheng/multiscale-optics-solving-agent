@@ -71,6 +71,10 @@ def main() -> int:
     parser.add_argument("--seeds", default="20260822,7")
     parser.add_argument("--rays-per-chunk", type=float, default=1e6)
     parser.add_argument("--target-ncc", type=float, default=0.9)
+    parser.add_argument(
+        "--reconstruction", choices=("ramp_sum", "kspace_splat"), default="ramp_sum"
+    )
+    parser.add_argument("--kspace-oversample", type=float, default=1.5)
     parser.add_argument("--output-name", default=None)
     args = parser.parse_args()
 
@@ -117,6 +121,8 @@ def main() -> int:
                     1, int(np.ceil(50 * args.secondary_count / args.rays_per_chunk))
                 ),
                 route=settings["route"],
+                reconstruction_route=args.reconstruction,
+                kspace_oversample=args.kspace_oversample,
             )
             fields.append(run["field"])
             wall += run["wall_clock_s"]
@@ -180,6 +186,10 @@ def main() -> int:
             "seeds": seeds,
             "precision": settings["precision"],
             "backend": args.backend,
+            "reconstruction": args.reconstruction,
+            "kspace_oversample": (
+                args.kspace_oversample if args.reconstruction != "ramp_sum" else None
+            ),
         },
         "rungs": rungs,
         "trend": {
@@ -199,11 +209,12 @@ def main() -> int:
         },
         "cost_ceiling": {
             "note": (
-                "Our reconstruction is O(N_rays x N_pixels); upstream's is "
-                "O(N_rays) + one FFT. This is the number the k-space fast path "
-                "tracked on CHE-95 would change, stated rather than asserted. The "
-                "issue asks for a budget shortfall to be reported as evidence, and "
-                "this is that report."
+                "Cost per ray, measured on THIS run's reconstruction route. On "
+                "ramp_sum it is O(N_rays x N_pixels) and this is the shortfall "
+                "CHE-96 reported as evidence; on kspace_splat it is O(N_rays) plus "
+                "one FFT per chunk, and the same number becomes the budget that is "
+                "now reachable. The route is recorded in `configuration` so the two "
+                "are never compared without it."
             ),
             "target_seed_to_seed_ncc": args.target_ncc,
             "extrapolated_rays_required": required,

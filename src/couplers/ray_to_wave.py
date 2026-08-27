@@ -81,6 +81,7 @@ from typing import Any, Literal
 import numpy as np
 
 from core.arrays import (
+    ArrayNamespace,
     asarray,
     device_of,
     dtype_of,
@@ -102,8 +103,10 @@ from core.capabilities import C_RAY_TO_WAVE_CAPABILITIES
 from core.precision import ArrayState, DType, Precision
 
 __all__ = [
+    "DEFAULT_KSPACE_OVERSAMPLE",
     "Perturbation",
     "Projection",
+    "Reconstruction",
     "ReconstructionDiagnostics",
     "collimated_bundle",
     "compute_precision_for",
@@ -125,6 +128,56 @@ class Projection(StrEnum):
     #: Main-text eq 2. Applies <n_hat, d_hat>. Models an angle-dependent
     #: detector response. Correct for a sensor, not for a representation change.
     SENSOR_OBLIQUITY = "sensor_obliquity"
+
+
+class Reconstruction(StrEnum):
+    """How eq 2's ramp sum is evaluated. Same operator, different algorithm.
+
+    A plane wavelet *is* a delta in k-space, so the wavelet sum can be
+    evaluated either directly in real space or as a scatter into a k-grid
+    followed by one inverse FFT. Both compute main-text eq 2. They are not
+    interchangeable, and which one a caller wants depends on what it is for:
+
+    :attr:`RAMP_SUM`
+        The historical route (CHE-24). Evaluates each ray's ramp at its exact
+        direction. Cost ``O(N_rays * ny * nx)``. **Exact per ray**, so this is
+        the oracle: the full-enumeration limit that
+        ``benchmarks/protocols/coupler_protocol.yaml`` makes mandatory and first
+        is measured through this path, and it stays the default.
+
+    :attr:`KSPACE_SPLAT`
+        Upstream's construction (CHE-101). Bilinearly splats each ray onto a
+        k-grid and inverse-FFTs once. Cost ``O(N_rays + K log K)``, i.e. per-ray
+        cost no longer scales with pixel count -- which is the whole point, and
+        the difference between demo3 needing 3.6 h and needing minutes.
+
+        The price is that a ray's direction is **quantized onto the k-grid**.
+        The two paths agree to dtype round-off exactly when every ray's
+        ``(kx, ky)`` lands on a grid node, because the bilinear weights collapse
+        to ``(1, 0)``; off-node the interpolation is an approximation whose
+        error falls with the k-grid's oversampling.
+
+        That exactness condition is a statement about *two* grids, not one, and
+        it is the same trap CHE-96 hit with oracle padding: the enumerated modes
+        of a pad-199 patch land on nodes only if the k-grid period is also 199.
+        Reconstructing them on a 100-pixel output grid at the default
+        oversampling puts every mode off-node and turns a 7e-13 exactness gate
+        into an 8e-3 agreement, with neither implementation at fault. Callers
+        that own an enumeration therefore pass ``kspace_grid_shape`` explicitly
+        rather than relying on ``kspace_oversample``.
+    """
+
+    #: Direct real-space evaluation. Exact per ray. The default and the oracle.
+    RAMP_SUM = "ramp_sum"
+    #: k-space bilinear splat plus one inverse FFT. Cheap, and quantized.
+    KSPACE_SPLAT = "kspace_splat"
+
+
+#: Oversampling of the k-grid relative to the output grid when
+#: ``kspace_grid_shape`` is not given. Upstream's default. Deliberately not
+#: raised: this value is characterized against measured off-node error in
+#: ``tests/test_ray_to_wave_kspace.py`` rather than chosen for a target.
+DEFAULT_KSPACE_OVERSAMPLE = 1.5
 
 #: Above this ray count, the pairwise nearest-neighbour scan used for the
 #: ray-density diagnostic is skipped rather than run at O(N^2). The diagnostic
@@ -198,6 +251,12 @@ class ReconstructionDiagnostics:
     ray_spacing_estimate_m: float | None
     max_adjacent_ray_phase_rad: float | None
     ray_density_status: str
+    #: Which algorithm evaluated the ramp sum. Defaulted so that every existing
+    #: construction of this record keeps working and reports the historical route.
+    reconstruction: str = str(Reconstruction.RAMP_SUM)
+    #: k-grid shape, splatted/dropped ray counts and the on-node fraction, or
+    #: ``None`` on the exact route, which has no k-grid and drops nothing.
+    kspace: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -218,6 +277,8 @@ class ReconstructionDiagnostics:
             "ray_spacing_estimate_m": self.ray_spacing_estimate_m,
             "max_adjacent_ray_phase_rad": self.max_adjacent_ray_phase_rad,
             "ray_density_status": self.ray_density_status,
+            "reconstruction": self.reconstruction,
+            "kspace": self.kspace,
         }
 
 
@@ -267,6 +328,216 @@ def _cis(xp: Any, phase: Any, complex_dtype: DType) -> Any:
     return xp.exp(phase.astype(numpy_dtype(complex_dtype)) * 1j)
 
 
+def _scatter_add(xp: Any, namespace: Any, size: int, indices: Any, values: Any, dtype: Any) -> Any:
+    """``out[indices] += values`` on a flat array of length ``size``.
+
+    Scatter-add is outside the array-API surface `xp` otherwise gives us, so it
+    is the one operation here that has to name its namespace -- the same
+    concession ``matmul_precision_kwargs`` makes, and for the same reason.
+
+    Both branches accumulate **in ``dtype``**, not in a wider one. That is worth
+    stating because ``np.bincount`` would be far faster on the host and would
+    accumulate in float64 regardless of what it was handed, which would make the
+    NumPy path quietly more accurate than the JAX path and turn a namespace
+    disagreement into a mystery. ``tests/test_ray_to_wave_kspace.py`` asserts the
+    two namespaces agree, so that accuracy has to come from the dtype, not from
+    the accumulator.
+    """
+    if namespace is ArrayNamespace.JAX:
+        return xp.zeros(size, dtype=dtype).at[indices].add(values)
+    out = np.zeros(size, dtype=dtype)
+    np.add.at(out, indices, values)
+    return out
+
+
+def _reconstruct_kspace(
+    xp: Any,
+    namespace: Any,
+    *,
+    coefficient: Any,
+    directions_xy: Any,
+    signed_wavenumber: float,
+    grid_shape: tuple[int, int],
+    sample_pitch_m: tuple[float, float],
+    oversample: float,
+    explicit_shape: tuple[int, int] | None,
+    real_dtype: DType,
+    complex_dtype: DType,
+) -> tuple[Any, dict[str, Any]]:
+    """Evaluate the wavelet sum as one k-space splat plus one inverse FFT.
+
+    Each ray is a plane wavelet, so in k-space it is a delta at
+    ``(kx, ky) = s * k * (d_x, d_y)`` weighted by the same ``coefficient`` the
+    real-space route uses. Depositing those deltas bilinearly on the grid whose
+    period is ``(K_y * dy, K_x * dx)`` and inverse-transforming gives
+
+        u[y, x] = sum_p Chat[p] exp(i (kx_p x + ky_p y))
+
+    which is exactly the ramp sum with each ray's direction snapped, by
+    interpolation, onto the k-grid.
+
+    Two departures from upstream ``raywave.py``, both deliberate:
+
+    1. **The crop offset is ``K // 2 - n // 2``, not ``(K - n) // 2``.** They
+       agree whenever ``K`` and ``n`` share parity and differ by one sample
+       otherwise, which would put the reconstructed origin one pixel off the
+       coordinate origin this repository pins at index ``n // 2`` -- a half-pixel
+       tilt, not a visible failure. Checked over every parity combination.
+    2. **A ray at the top k-bin is kept, not dropped.** Upstream requires a full
+       four-neighbour footprint (``ix_f <= K - 2``) and discards anything above
+       it. Here the upper neighbour index is clamped instead: at ``ix_f == K-1``
+       the interpolation weight on that neighbour is identically zero, so
+       clamping adds nothing and keeps a ray the exact route would have used.
+
+    Upstream's aperture crop -- dropping rays that land outside
+    ``extent = (ks // 2) * pp`` before accumulation -- is **not** ported. A
+    wavelet contributes a ramp across the whole plane, so where it happens to
+    cross the plane does not bound where it contributes; the crop is a sensor
+    model, and the exact route has no such crop. Porting it would have made the
+    two routes disagree for a reason unrelated to the algorithm.
+
+    Returns the field and a diagnostic mapping. Rays that cannot be represented
+    on the k-grid are **counted and returned**, never silently dropped: a
+    reconstruction missing 30% of its rays and one missing none must not produce
+    the same record.
+    """
+    ny, nx = grid_shape
+    dy, dx = sample_pitch_m
+    if explicit_shape is not None:
+        ky_n, kx_n = int(explicit_shape[0]), int(explicit_shape[1])
+    else:
+        ky_n, kx_n = math.ceil(ny * oversample), math.ceil(nx * oversample)
+    if ky_n < ny or kx_n < nx:
+        raise ContractError(
+            ContractCode.SHAPE_MISMATCH,
+            (
+                f"k-grid ({ky_n}, {kx_n}) is smaller than the output grid "
+                f"({ny}, {nx}); the field cannot be cropped out of it"
+            ),
+            declaration="kspace_grid_shape",
+            remedy=(
+                "pass kspace_oversample >= 1.0, or a kspace_grid_shape at least "
+                "as large as the output shape"
+            ),
+        )
+
+    real_np, complex_np = numpy_dtype(real_dtype), numpy_dtype(complex_dtype)
+    count = int(directions_xy.shape[0])
+
+    # Fractional, fftshifted grid index of each ray's transverse wavevector.
+    # dk is set by the *k-grid* period, which is why oversampling changes which
+    # rays land on a node and which do not.
+    dky = 2.0 * math.pi / (ky_n * dy)
+    dkx = 2.0 * math.pi / (kx_n * dx)
+    fy = (signed_wavenumber * directions_xy[:, 1]) / dky + ky_n // 2
+    fx = (signed_wavenumber * directions_xy[:, 0]) / dkx + kx_n // 2
+
+    # The bound is tested with a tolerance and the survivors are then clipped,
+    # because the edge bins land *on* the boundary and arrive there through
+    # floating-point. A mode at index -K//2 computes its fractional index as
+    # 0 - 1e-14, and a bare `>= 0` test discards it: measured on demo2's
+    # enumerated patch that silently dropped 397 of 39,601 rays -- exactly the
+    # outermost row and column -- and turned a 7.1e-13 exactness anchor into
+    # 8.5e-2. A ray outside the band by a millionth of a bin is not
+    # distinguishable from one on the edge, so it is kept and clipped; a ray
+    # genuinely outside is still dropped, and still counted.
+    edge_tolerance = 1e-6
+    # Unrepresentable rays are **zero-weighted, not removed**. Compacting with
+    # `fy[representable]` produces a data-dependent shape, which under JAX means
+    # a host synchronization plus a gather in the middle of the pipeline: every
+    # chunk then has to finish tracing before its splat can even be enqueued.
+    # Measured on demo3 (60 chunks of 1e6 rays at 420x420) that serialization
+    # cost 194 s against the exact route's 145 s -- i.e. it made the *fast* path
+    # slower than the one it replaces, while the reconstruction kernel itself was
+    # 6.3x quicker in isolation. Keeping every shape static is what makes the
+    # asymptotics visible in the wall clock.
+    #
+    # The bound is tested with a tolerance and the indices are then clipped,
+    # because the edge bins land *on* the boundary and arrive there through
+    # floating-point. A mode at index -K//2 computes its fractional index as
+    # 0 - 1e-14, and a bare `>= 0` test discards it: measured on demo2's
+    # enumerated patch that silently dropped 397 of 39,601 rays -- exactly the
+    # outermost row and column -- and turned a 7.1e-13 exactness anchor into
+    # 8.5e-2. A ray outside the band by a millionth of a bin is not
+    # distinguishable from one on the edge, so it is kept; a ray genuinely
+    # outside gets weight zero, and is still counted.
+    edge_tolerance = 1e-6
+    representable = (
+        (fy >= -edge_tolerance)
+        & (fy <= ky_n - 1 + edge_tolerance)
+        & (fx >= -edge_tolerance)
+        & (fx <= kx_n - 1 + edge_tolerance)
+    )
+    fy = xp.clip(fy, 0.0, float(ky_n - 1))
+    fx = xp.clip(fx, 0.0, float(kx_n - 1))
+    weights = coefficient * representable.astype(complex_np)
+
+    # int32, deliberately. These index a flat array of ky_n * kx_n elements, so
+    # int32 covers any k-grid that can be allocated at all, and asking for int64
+    # under JAX without x64 gets silently truncated to int32 anyway -- with a
+    # warning that would then be emitted once per chunk of every streamed run.
+    iy0 = xp.floor(fy).astype(np.int32)
+    ix0 = xp.floor(fx).astype(np.int32)
+    ty = (fy - iy0.astype(real_np)).astype(real_np)
+    tx = (fx - ix0.astype(real_np)).astype(real_np)
+    # Clamped rather than excluded -- the weight on a clamped neighbour is zero
+    # at the top bin, so the duplicate index contributes nothing.
+    iy1 = xp.minimum(iy0 + 1, ky_n - 1)
+    ix1 = xp.minimum(ix0 + 1, kx_n - 1)
+
+    # One allocation and one scatter for all four corners rather than four of
+    # each: at K = 3360 a corner array is 90 MB, and the fused form is the
+    # difference between 90 MB of transient per chunk and 360 MB.
+    indices = xp.concatenate(
+        [iy0 * kx_n + ix0, iy0 * kx_n + ix1, iy1 * kx_n + ix0, iy1 * kx_n + ix1]
+    )
+    corner_weights = xp.concatenate(
+        [(1.0 - ty) * (1.0 - tx), (1.0 - ty) * tx, ty * (1.0 - tx), ty * tx]
+    ).astype(complex_np)
+    flat = _scatter_add(
+        xp,
+        namespace,
+        ky_n * kx_n,
+        indices,
+        xp.concatenate([weights, weights, weights, weights]) * corner_weights,
+        complex_np,
+    )
+    chat = flat.reshape(ky_n, kx_n)
+
+    # The ifft2 carries 1/(K_y K_x); the sum being evaluated does not. This
+    # factor is the transform's, and is unrelated to the estimator's 1/N_rays,
+    # which the caller applies once at finalize.
+    padded = xp.fft.fftshift(xp.fft.ifft2(xp.fft.ifftshift(chat))) * (ky_n * kx_n)
+    y0, x0 = ky_n // 2 - ny // 2, kx_n // 2 - nx // 2
+    u = padded[y0 : y0 + ny, x0 : x0 + nx].astype(complex_np)
+
+    # Distance to the *nearest* node, not the floor's fractional part. A mode
+    # whose index rounds to 4.999999999999999 sits on a node and is reconstructed
+    # exactly, but its floor fraction is 1 - 1e-15; measuring the floor would
+    # report it as off-node and make this diagnostic depend on whether the k-grid
+    # period happens to be a power of two.
+    node_distance = xp.maximum(
+        xp.minimum(ty, 1.0 - ty).astype(real_np), xp.minimum(tx, 1.0 - tx).astype(real_np)
+    )
+    # Both reductions are read here, after the field, so the only device-to-host
+    # synchronization in this function happens once and after all the work is
+    # enqueued.
+    kept = int(xp.sum(representable))
+    on_node = int(xp.sum(representable & (node_distance < 1e-9)))
+    record = {
+        "kspace_grid_shape": [ky_n, kx_n],
+        "rays_splatted": kept,
+        "rays_dropped_out_of_band": count - kept,
+        "dropped_fraction": (count - kept) / count if count else 0.0,
+        # 1.0 means every ray hit a grid node, i.e. this reconstruction is
+        # exact and comparable to the ramp-sum route at round-off.
+        "on_node_fraction": (on_node / kept) if kept else 0.0,
+    }
+    if kept == 0:
+        record["note"] = "no ray was representable on the k-grid; the field is identically zero"
+    return u, record
+
+
 def _ray_density_diagnostic(
     positions_xy: Any, directions_xy: Any, wavenumber: float, xp: Any
 ) -> tuple[float | None, float | None, str]:
@@ -310,6 +581,9 @@ def ray_to_wave(
     perturbation: Perturbation = Perturbation(),
     enforce_grid_nyquist: bool = True,
     compute_precision: Precision | None = None,
+    reconstruction: Reconstruction = Reconstruction.RAMP_SUM,
+    kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
+    kspace_grid_shape: tuple[int, int] | None = None,
 ) -> tuple[ComplexField, ReconstructionDiagnostics]:
     """Reconstruct the complex field a ray bundle produces on a plane.
 
@@ -330,6 +604,20 @@ def ray_to_wave(
         declaration -- the bundle knows which kind of ensemble it is, and making
         every caller restate it invites the two to disagree. The resolved choice
         is recorded in the output metadata either way.
+    reconstruction
+        Which algorithm evaluates the ramp sum. :attr:`Reconstruction.RAMP_SUM`
+        (the default) is exact per ray and costs ``O(N_rays * ny * nx)``;
+        :attr:`Reconstruction.KSPACE_SPLAT` costs ``O(N_rays + K log K)`` and
+        quantizes each ray's direction onto the k-grid. See
+        :class:`Reconstruction` -- the default is the default because the
+        exactness gate is measured through it.
+    kspace_oversample, kspace_grid_shape
+        The k-grid, for ``KSPACE_SPLAT`` only. ``kspace_grid_shape`` names it
+        outright and wins; otherwise it is ``ceil(oversample * grid_shape)`` per
+        axis. A caller reconstructing an *enumeration* must name it, because
+        exactness holds only when the k-grid period equals the grid the modes
+        were enumerated on -- an oversampling factor that happens to miss that
+        period converts an exactness measurement into an interpolation error.
     compute_precision
         Precision to accumulate phase in. ``None`` derives it from the bundle
         (:func:`compute_precision_for`), floored at the coupler's declared
@@ -423,7 +711,24 @@ def ray_to_wave(
         * _cis(xp, sign * wavenumber * constant_phase, complex_dtype)
     )
 
-    if perturbation.apply_oblique_ramp:
+    kspace_record: dict[str, Any] | None = None
+    if perturbation.apply_oblique_ramp and reconstruction is Reconstruction.KSPACE_SPLAT:
+        # One scatter and one FFT. Nothing of size (N, ny) or (N, nx) is formed,
+        # which is the entire point: per-ray cost stops scaling with pixels.
+        u, kspace_record = _reconstruct_kspace(
+            xp,
+            namespace_of(bundle.positions_m),
+            coefficient=coefficient,
+            directions_xy=directions_xy,
+            signed_wavenumber=sign * wavenumber,
+            grid_shape=(ny, nx),
+            sample_pitch_m=(dy, dx),
+            oversample=kspace_oversample,
+            explicit_shape=kspace_grid_shape,
+            real_dtype=real_dtype,
+            complex_dtype=complex_dtype,
+        )
+    elif perturbation.apply_oblique_ramp:
         # exp(i k (dx_i x + dy_i y)) is separable in x and y, so the O(N ny nx)
         # sum contracts from two O(N n) factors instead of materializing an
         # (N, ny, nx) tensor.
@@ -500,6 +805,7 @@ def ray_to_wave(
                 else "ACS Photonics 2026 main text eq 2 (with <n,d> obliquity)"
             ),
             "projection": str(projection),
+            "reconstruction": str(reconstruction),
             "ray_count": bundle.count,
             "perturbation": perturbation.describe(),
             "source_reference_plane": bundle.reference_plane.name,
@@ -556,6 +862,8 @@ def ray_to_wave(
         incident_amplitude_power_sum=float(xp.sum(xp.abs(amplitude) ** 2)),
         ray_spacing_estimate_m=spacing,
         max_adjacent_ray_phase_rad=max_phase_step,
+        reconstruction=str(reconstruction),
+        kspace=kspace_record,
         ray_density_status=(
             density_status
             if density_status != "computed"

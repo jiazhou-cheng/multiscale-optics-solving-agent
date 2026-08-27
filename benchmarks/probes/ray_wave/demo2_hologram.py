@@ -51,6 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _demo_support import (
+    RECORDS,
     build_doe,
     device_memory_stats,
     enable_x64_if_needed,
@@ -222,7 +223,31 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=20260822)
     parser.add_argument("--routes", default="rw_f,rw_p")
     parser.add_argument("--batches", type=int, default=None, help="override the batch count")
+    parser.add_argument(
+        "--reconstruction",
+        choices=("ramp_sum", "kspace_splat"),
+        default="ramp_sum",
+        help="ramp_sum is the exact O(rays x pixels) route; kspace_splat is CHE-101's fast path",
+    )
+    parser.add_argument(
+        "--kspace-grid",
+        default="matched",
+        help=(
+            "'matched' derives the k-grid that puts every drawn spectral bin on a "
+            "node, which is the only setting under which this route measures "
+            "exactness rather than interpolation; otherwise an oversampling factor"
+        ),
+    )
     parser.add_argument("--output-name", default=None)
+    parser.add_argument(
+        "--save-fields",
+        action="store_true",
+        help=(
+            "also write <name>_fields.npz with each route's complex sensor field "
+            "and both oracles, so a figure can be rendered without re-running the "
+            "94.9 s RW-P route"
+        ),
+    )
     args = parser.parse_args()
 
     preset = PRESETS[args.preset]
@@ -275,6 +300,8 @@ def main() -> int:
             "numerical_aperture": 0.5,
             "seed": args.seed,
             "backend_requested": args.backend,
+            "reconstruction": args.reconstruction,
+            "kspace_grid_request": args.kspace_grid,
             "optiland_used": False,
             "optiland_note": (
                 "demo2 is a bare SLM and sensor with no refractive surface, so no "
@@ -345,6 +372,11 @@ def main() -> int:
             seed=args.seed,
             backend=args.backend,
             precision=settings["precision"],
+            reconstruction=args.reconstruction,
+            kspace_grid_shape=("matched" if args.kspace_grid == "matched" else None),
+            kspace_oversample=(
+                None if args.kspace_grid == "matched" else float(args.kspace_grid)
+            ),
         )
         run["requested"] = settings
         run["device_memory"] = device_memory_stats()
@@ -363,11 +395,33 @@ def main() -> int:
             ),
             **score(p_field, f_field),
         }
+    saved_fields = {name: route["_field"] for name, route in record["routes"].items()}
     for route in record["routes"].values():
         route.pop("_field", None)
 
-    path = write_record(args.output_name or f"demo2_{args.preset}_{args.backend}", record)
+    name = args.output_name or f"demo2_{args.preset}_{args.backend}"
+    path = write_record(name, record)
     print(f"wrote {path}")
+    if args.save_fields:
+        # Both oracles go in the same file as the routes. A saved field is only
+        # comparable against the oracle it was scored with, and the pad is part
+        # of the oracle's identity, so storing them apart would let a later
+        # figure pair a route with the wrong period.
+        fields_path = RECORDS / f"{name}_fields.npz"
+        RECORDS.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            fields_path,
+            transmission=doe.transmission,
+            oracle_upstream_pad=upstream_reference,
+            **{
+                f"oracle_matched_pad{record['routes'][n]['plan']['pad_px']}": oracle(
+                    doe.transmission, pad_to=record["routes"][n]["plan"]["pad_px"]
+                )
+                for n in saved_fields
+            },
+            **{f"route_{n}": field for n, field in saved_fields.items()},
+        )
+        print(f"wrote {fields_path}")
     for name, route in record["routes"].items():
         print(
             f"  {name}: NCC {route['vs_oracle']['ncc_intensity']:.6f}  "

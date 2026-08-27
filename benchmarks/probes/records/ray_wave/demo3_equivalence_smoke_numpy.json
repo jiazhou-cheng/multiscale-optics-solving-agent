@@ -1,0 +1,166 @@
+{
+  "comparisons": [
+    {
+      "kspace": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          128,
+          128
+        ],
+        "on_node_fraction": 0.125,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 16000
+      },
+      "kspace_oversample": 1.0,
+      "mse_intensity_unit_sum": 2.8015729276096407e-09,
+      "ncc_intensity": 0.7223736816453468,
+      "power_ratio_to_ramp_sum": 0.44534541232055974,
+      "relative_l2_field": 0.49870155717285714,
+      "relative_l2_field_after_global_phase": 0.49870146452108555,
+      "speedup_over_ramp_sum": 2.5459252480562413,
+      "wall_clock_s": 0.4976704229484312
+    },
+    {
+      "kspace": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          192,
+          192
+        ],
+        "on_node_fraction": 0.125,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 16000
+      },
+      "kspace_oversample": 1.5,
+      "mse_intensity_unit_sum": 7.22087992209225e-10,
+      "ncc_intensity": 0.9129790735235817,
+      "power_ratio_to_ramp_sum": 0.6469959985970275,
+      "relative_l2_field": 0.2642011779433108,
+      "relative_l2_field_after_global_phase": 0.26420116435553953,
+      "speedup_over_ramp_sum": 2.484371785433715,
+      "wall_clock_s": 0.5100008390145376
+    },
+    {
+      "kspace": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          256,
+          256
+        ],
+        "on_node_fraction": 0.125,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 16000
+      },
+      "kspace_oversample": 2.0,
+      "mse_intensity_unit_sum": 2.3818481348202e-10,
+      "ncc_intensity": 0.9694131940334402,
+      "power_ratio_to_ramp_sum": 0.7734418949263379,
+      "relative_l2_field": 0.15773505201680305,
+      "relative_l2_field_after_global_phase": 0.15773492590682614,
+      "speedup_over_ramp_sum": 2.3599152121141396,
+      "wall_clock_s": 0.5368971260031685
+    },
+    {
+      "kspace": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          384,
+          384
+        ],
+        "on_node_fraction": 0.125,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 16000
+      },
+      "kspace_oversample": 3.0,
+      "mse_intensity_unit_sum": 4.888643171196106e-11,
+      "ncc_intensity": 0.9935442851310798,
+      "power_ratio_to_ramp_sum": 0.8876910444821088,
+      "relative_l2_field": 0.07366679218980414,
+      "relative_l2_field_after_global_phase": 0.07366647039707053,
+      "speedup_over_ramp_sum": 2.3582559073191205,
+      "wall_clock_s": 0.5372748950030655
+    },
+    {
+      "kspace": {
+        "dropped_fraction": 0.0,
+        "kspace_grid_shape": [
+          512,
+          512
+        ],
+        "on_node_fraction": 0.125,
+        "rays_dropped_out_of_band": 0,
+        "rays_splatted": 16000
+      },
+      "kspace_oversample": 4.0,
+      "mse_intensity_unit_sum": 1.5457054526303293e-11,
+      "ncc_intensity": 0.9979505978781128,
+      "power_ratio_to_ramp_sum": 0.9352333298769974,
+      "relative_l2_field": 0.041773251256272216,
+      "relative_l2_field_after_global_phase": 0.041773038340778675,
+      "speedup_over_ramp_sum": 2.2807117887832176,
+      "wall_clock_s": 0.555542222049553
+    }
+  ],
+  "configuration": {
+    "backend": "numpy",
+    "optiland_execution": {
+      "cuda_device_name": null,
+      "cuda_version": "None",
+      "observed": {
+        "device": "cpu",
+        "grad_enabled": false,
+        "precision": "float64"
+      },
+      "requested": {
+        "backend": "torch",
+        "device": "cpu",
+        "device_note": "optiland 0.6.0 set_device takes 'cpu' or 'cuda' only; the physical GPU is selected by the container's visible devices",
+        "precision": "float64"
+      },
+      "torch_version": "2.13.0+cpu"
+    },
+    "patch_count": 64,
+    "precision": "fp64",
+    "prescription_fingerprint": "1d4dd84dbab3a7f93b85f638f0370070ff60bfbb561bf0133cf21799b2875f2f",
+    "secondary_count": 1000,
+    "seed": 20260822,
+    "sensor_grid": [
+      128,
+      128
+    ],
+    "sensor_pitch_m": 4.2e-06,
+    "total_rays": 64000
+  },
+  "environment": {
+    "commit": "b534b59f0a5d541e989da543aa1d7b2cc6e0e255",
+    "container_image": "agent_solver",
+    "jax_devices": [
+      "TFRT_CPU_0"
+    ],
+    "working_tree_dirty": true,
+    "x64_enabled": false,
+    "x64_requested": false
+  },
+  "issue": "CHE-101",
+  "note": "Identical rays through both reconstructions -- same seed, same trace, same patches. demo3's rays are refracted before the sensor, so they are off-node by construction and the splat interpolates; this is the measurement of what that costs. Contrast demo2, where a matched k-grid makes the same operation exact.",
+  "preset": "smoke",
+  "probe": "demo3_reconstruction_equivalence",
+  "reference": {
+    "energy": {
+      "captured_by_sensor_fraction": 0.008562522397739174,
+      "clipped_with_power": 0,
+      "clipped_with_power_fraction": 0.0,
+      "empty_draw_note": "patch centres are drawn over the aperture DILATED by half a patch, so a centre near the rim yields a patch that is partly or wholly outside the DOE. Those rays carry zero amplitude by construction and are not a loss -- the coverage factor A_draw / A_patch is exactly the correction for them. They are counted here because Optiland's intensity > 0 test cannot tell them from a clip, and reporting the sum as 'clipped' would invent an energy loss.",
+      "invalidated_rays": 3000,
+      "launched_sum_abs_amplitude_squared": 12940095432.795433,
+      "launched_with_zero_amplitude": 3000,
+      "note": "sum |a|^2 over the emitted rays, before and after the trace. Optiland clips by zeroing intensity rather than by removing rows, and trace_ray_batch zeroes the matching amplitude, so the difference is exactly the power that left through an aperture. A clipped ray keeps its place in N_total: it was drawn, and the operator being estimated includes the vignetting.",
+      "sensor_half_extent_m": 0.0002688,
+      "survived_sum_abs_amplitude_squared": 12940095432.795433,
+      "transmitted_fraction": 1.0
+    },
+    "reconstruction": "ramp_sum",
+    "wall_clock_s": 1.2670316949952394
+  },
+  "route": "rw_p"
+}
