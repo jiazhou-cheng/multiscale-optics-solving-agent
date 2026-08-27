@@ -1,0 +1,46 @@
+# Per-source provenance for the C_GENERALIZED_SNELL knowledge pack.
+# Provenance follows AGENTS.md "Sources of Truth".
+#
+# Unlike every other pack under knowledge/couplers/, this one is NOT derived
+# from the ray-wave paper (DOI 10.1021/acsphotonics.6c00818) and composes
+# nothing from C_RAY_TO_WAVE or C_WAVE_TO_RAY. The governing equation is
+# standard generalized Snell's law / grating-equation physics, and this
+# repository's own closed-form tests are the evidence for the implementation,
+# not an external reference implementation.
+
+sources:
+  - citation: >
+      Yu, N.; Genevet, P.; Kats, M. A.; Aieta, F.; Tetienne, J.-P.; Capasso, F.;
+      Gaburro, Z. Light Propagation with Phase Discontinuities: Generalized
+      Laws of Reflection and Refraction. Science 2011, 334 (6054), 333-337.
+    source_type: standing_physics
+    usage_note: >
+      The originating statement of the generalized law this model implements:
+      tangential momentum matching with an added phase-gradient term. Textbook
+      / foundational-literature physics, not a repository-specific derivation
+      and not read as a reference implementation -- no code from this or any
+      related work is read, vendored, or executed. The closed-form limits
+      (ordinary Snell's law at zero phase, undeflected propagation at zero
+      gradient, the exact blazed-grating angle for a linear ramp) are the
+      testable content, and they are pinned directly in
+      tests/test_diffractive_interaction.py rather than against this citation.
+  - url: https://doi.org/10.1021/acsphotonics.6c00818
+    source_type: architectural_context_only
+    citation: >
+      Cheng, J.; Gao, M.; Shao, Y.; Mao, C.; Milster, T. D.; Fan, J. A.
+      A Differentiable Ray-Wave Framework for Hybrid Refractive-Diffractive
+      System Modeling and Optimization. ACS Photonics 2026.
+    usage_note: >
+      Named only because this model sits inside the same
+      couplers.interaction.DiffractiveInteraction architecture the paper's
+      other two models (full_field, local_patch) implement, and because the
+      SI's own S10 discussion is what motivates local_patch's "direct
+      implementation" role relative to full_field's "shortcut" role -- see
+      knowledge/couplers/planar_doe_step/card.yaml. No equation, algorithm, or
+      numerical value in THIS pack is taken from this paper.
+
+# Evidence produced by this repository, not by any source above.
+internal_evidence:
+  - tests/test_diffractive_interaction.py
+  - src/verification/families/predicates.py
+  - src/verification/families/schema.py

@@ -3,6 +3,12 @@ couplers:
     version: 0.2.0
     description: Reconstruct a sampled complex pupil/wavefront field from ray amplitudes and optical path lengths.
     framework: internal
+    # CHE-142: this row is a REPRESENTATION TRANSITION and says so. It changes
+    # what the light is described by and nothing else -- no surface, no plane
+    # transfer. The distinction matters because the two DOE rows below have ray
+    # ports on both sides and are NOT representation transitions even though
+    # they contain two of them each.
+    role: representation_transition
     source:
       # CHE-34 (M3.5): was `rays_or_wavefront` / `wavefront_samples`, and both
       # halves of that were wrong. The implemented physics is a sum of plane
@@ -111,6 +117,9 @@ couplers:
       emit a Monte Carlo sample of them as rays carrying complex amplitudes.
       Registered by CHE-23; implemented and characterized by CHE-25.
     framework: internal
+    # CHE-142: a REPRESENTATION TRANSITION, the inverse direction of
+    # C_RAY_TO_WAVE in the limit of complete sampling.
+    role: representation_transition
     source:
       name: complex_field
       artifact: complex_field
@@ -226,6 +235,37 @@ couplers:
       Algorithm S1. Ray bundle in, ray bundle out; the wave representation is
       internal to the step.
     framework: internal
+    # CHE-142. This row is not a peer of C_PATCH_WFT below: the two are ONE
+    # physical operation -- incident coherent rays meet a diffractive surface,
+    # coherent rays come out -- computed at two granularities, and SI S10 says
+    # which is which. The shared identity is declared so a caller selecting
+    # between them knows they are choosing a granularity and not a physics
+    # claim; the capability rows stay separate because devices, dtypes and
+    # maturity genuinely differ, and grouping must not widen the narrower one.
+    #
+    # The role is DIFFRACTIVE_INTERACTION even though both ports are ray
+    # bundles. That is the whole reason the field exists: the ports cannot tell
+    # a reader whether the step re-described the light or diffracted it, and
+    # this step does the latter -- by way of two representation transitions
+    # that are its implementation, not its identity.
+    role: diffractive_interaction
+    interaction:
+      id: I_DIFFRACTIVE
+      model: full_field
+      relation: >-
+        The SHORTCUT, not a peer. SI S10, on the global aggregation this row
+        performs: "For conformal DOEs, this global aggregation before ray-DOE
+        interaction is not applicable because rays intersect different local
+        tangent planes with position-dependent coordinate frames and surface
+        normals. We therefore retain the direct implementation." The direct
+        implementation is C_PATCH_WFT (model local_patch); this row is that
+        model at ONE full-aperture patch, available whenever a single common
+        plane exists and one global field is affordable. The identity is
+        measured, not asserted -- 1.4e-12 relative field error in
+        tests/test_patch_wft.py -- and the regimes OVERLAP rather than
+        partition: on a planar substrate both models are valid and the choice
+        is cost and variance. On a conformal substrate this model is refused
+        with MODEL_NOT_APPLICABLE rather than approximated.
     source:
       name: incident_rays
       artifact: ray_bundle
@@ -306,6 +346,26 @@ couplers:
       CASE of this, not a peer of it -- SI S10 calls this the direct
       implementation and the global aggregation the shortcut.
     framework: internal
+    # CHE-142: the same interaction as C_PLANAR_DOE_STEP, at the other
+    # granularity. Sharing the identity does NOT share the capability: this row
+    # is CPU-only and FP64-only and stays that way -- see `devices` below and
+    # core/capabilities.py::C_PATCH_WFT_CAPABILITIES.
+    role: diffractive_interaction
+    interaction:
+      id: I_DIFFRACTIVE
+      model: local_patch
+      relation: >-
+        The DIRECT implementation, of which C_PLANAR_DOE_STEP (model full_field)
+        is the shortcut at one full-aperture patch (SI S10). Not the fallback
+        for curved substrates only: SI Fig 3 gives the same model for large
+        PLANAR surfaces whose global field does not fit in memory, and SI
+        Table S2 records the 4032x4032 Grating-Lens DOE as OOM on a 48 GB
+        A6000 on the global route and complete in 4.982 s at 11.492 GB here.
+        Its conformal path -- the case SI S10 says this model is the applicable
+        one for -- is not implemented and is refused with MISSING_DECLARATION,
+        which is a different statement from full_field's MODEL_NOT_APPLICABLE
+        there: this model is the right one and is missing an implementation,
+        that one is never going to be right.
     source:
       name: incident_rays
       artifact: ray_bundle
@@ -432,3 +492,118 @@ couplers:
     # estimator is not `validated` by any single realization.
     maturity: characterized
     tags: [ray_wave, doe, patch, windowed_fourier, monte_carlo, stochastic]
+
+  - id: C_GENERALIZED_SNELL
+    version: 0.1.0
+    description: >
+      The reduced-order diffractive interaction: each ray is redirected by the
+      local grating equation k_t^out = n_i k0 d_t^in + m grad_t(phi)(x, y),
+      evaluated at its own transverse position. No field is formed at all --
+      the third model of the same interaction as C_PLANAR_DOE_STEP and
+      C_PATCH_WFT, at the granularity where the surface is locally smooth
+      enough that the response is one redirected ray rather than a spectrum.
+    framework: internal
+    # CHE-143 (M2.7): the same shared interaction identity as the other two
+    # DIFFRACTIVE_INTERACTION rows, at a third granularity. Sharing the
+    # identity does not share the capability -- see `devices`/`dtypes` below
+    # and core/capabilities.py::C_GENERALIZED_SNELL_CAPABILITIES.
+    role: diffractive_interaction
+    interaction:
+      id: I_DIFFRACTIVE
+      model: generalized_snell
+      relation: >-
+        The reduced-order model, valid only where C_PLANAR_DOE_STEP and
+        C_PATCH_WFT's full angular-spectrum treatment is more than the surface
+        needs: a sufficiently smooth phase profile whose local spectral power
+        concentrates in one order. Neither of the other two models can express
+        this cheaply -- both compute a full spectrum even when only one order
+        is physically populated. Agreement with the other models in the smooth
+        limit, and disagreement outside it, is measured in
+        tests/test_diffractive_interaction.py rather than assumed.
+    source:
+      name: incident_rays
+      artifact: ray_bundle
+      requires_metadata:
+        [wavelength, coordinates, directions, amplitude, optical_path_length, reference_plane]
+    target:
+      name: outgoing_rays
+      artifact: ray_bundle
+      provides_metadata:
+        [wavelength, coordinates, directions, amplitude, optical_path_length, reference_plane]
+    # CPU-only and complex128-only: the implementation always computes in
+    # float64/complex128 regardless of the incident bundle's own dtype or
+    # device, unlike C_RAY_TO_WAVE's array-module-generic, precision-aware
+    # path. That is a real, currently-true limitation, not a declared one --
+    # no GPU or reduced-precision path has been exercised, so none is claimed.
+    devices: [cpu]
+    dtypes: [float32, float64, complex64, complex128]
+    derivative:
+      mode: surrogate
+      verified: false
+      parameters: []
+      notes: >-
+        No gradient across this interaction is certified. The per-ray algebra
+        is closed-form and in principle differentiable, but nothing here runs
+        through an autodiff-traced array module, so no gradient claim is made.
+    validity:
+      assumptions:
+        - >-
+          The substrate is PLANAR, declared rather than inferred. GENERALIZED_SNELL
+          evaluates the local tangent-plane equation in the surface's own local
+          frame; on a curved substrate that frame is position-dependent and this
+          model has no way to accept one declared per ray, so `substrate:
+          conformal` is refused (MISSING_DECLARATION) rather than approximated
+          with the flat-plane frame.
+        - >-
+          n_incident and n_transmitted are declared and used directly in the
+          tangential-momentum equation -- the one model of the three where a
+          declared index executes rather than being refused.
+        - >-
+          The diffraction order m is declared, defaulting to +1. One order per
+          call, by construction: a caller wanting several says so several
+          times. No multi-order emission.
+        - >-
+          Three validity predicates, each a signed normalized margin
+          (verification.families.predicates.generalized_snell_propagating_order,
+          _gradient_smoothness, _single_order_dominance): the requested order
+          must have an outgoing propagating direction (hard limit -- refused,
+          not warned, when violated), the local phase gradient estimate must be
+          reliable at the declared transverse scale (patch_px * sample pitch;
+          refused when violated, since a broken gradient estimate is not a
+          softer failure than an evanescent order), and the fraction of local
+          spectral power in the requested order is measured (not gated at
+          runtime) as the axis M2.10 characterizes.
+      warnings:
+        - >-
+          The gradient estimator reads the complex transmission directly
+          (angle of a product of neighbouring samples), not by unwrapping
+          angle(t) and differencing -- exact to round-off for a genuine linear
+          ramp at any pixel pitch, but it can still fail silently on a
+          surface aliased UNIFORMLY across every sample: the raw-step safety
+          check catches a step approaching the wrap boundary, not an already
+          badly-aliased signal that happens to wrap back to a small-looking
+          value. Arbitrary phase unwrapping is out of scope; only the failure
+          mode the acceptance criterion names is detected.
+        - >-
+          The OPL convention is additive, not reset-to-zero like the other two
+          models: outgoing OPL = incident OPL + phi(x, y) / k0, because this
+          model preserves each incoming ray's own identity and path history
+          rather than re-emitting fresh rays from a reconstructed spectrum.
+          Amplitude carries only the local amplitude transmission |t(x, y)|.
+    cost_model:
+      scaling: O(rays)
+      memory_scaling: O(rays)
+      notes: >-
+        Per-ray algebra plus one fixed-size local patch transform for the
+        dominance diagnostic; no cost model has been calibrated (CHE-143 did
+        not run a performance campaign) so this is asymptotic only.
+    lossy: true
+    invariants: [unit_direction_norm]
+    # characterized: the exact closed-form grating angle (linear ramp, to
+    # round-off) and the two limiting cases (Snell's law, undeflected
+    # propagation) are the analytic-case check this maturity level requires.
+    # NOT a convergence or performance characterization campaign across
+    # configurations -- that is M2.10's job (CHE-146) -- and NOT `validated`:
+    # no gradient across this interaction is certified.
+    maturity: characterized
+    tags: [ray_wave, doe, generalized_snell, grating_equation, reduced_order]

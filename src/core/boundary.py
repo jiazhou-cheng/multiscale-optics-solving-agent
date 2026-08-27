@@ -169,6 +169,26 @@ class ContractCode(StrEnum):
     #: actually is, a mixed artifact is refused rather than being silently
     #: unified by the first operation that touches both.
     REPRESENTATION_INCONSISTENT = "REPRESENTATION_INCONSISTENT"
+    #: The caller named a model that cannot represent the thing it was pointed
+    #: at, and no other model choice would rescue *this* pairing. Added by
+    #: CHE-142 for the diffractive interaction, whose motivating case is
+    #: `FULL_FIELD` on a conformal substrate: the model's central step is one
+    #: coherent accumulation onto the single common plane every incident ray
+    #: crosses, and a curved substrate has no such plane (SI S10).
+    #:
+    #: Distinct from MISSING_DECLARATION, and the distinction decides what a
+    #: caller does next. Nothing is missing here -- the declaration is present,
+    #: well-formed, and wrong for the surface, so the remedy is a different model
+    #: rather than another declaration. Distinct too from "not implemented",
+    #: which stays MISSING_DECLARATION: `LOCAL_PATCH` on a conformal substrate is
+    #: the *right* model and is refused only until someone builds it, whereas
+    #: `FULL_FIELD` there is never going to be right.
+    #:
+    #: It is `out_of_validity` rather than `invalid_configuration` in the refusal
+    #: catalogue, and `could_have_proceeded` is true: the accumulation would run
+    #: and return a field that looks like a diffraction pattern. That is the
+    #: reason it refuses rather than warns.
+    MODEL_NOT_APPLICABLE = "MODEL_NOT_APPLICABLE"
 
 
 class ContractError(ValueError):

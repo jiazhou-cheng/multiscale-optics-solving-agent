@@ -39,6 +39,9 @@ __all__ = [
     "declared_planarity",
     "fractional_margin",
     "fresnel_number_regime",
+    "generalized_snell_gradient_smoothness",
+    "generalized_snell_propagating_order",
+    "generalized_snell_single_order_dominance",
     "hexapolar_ring_membership",
     "paraxial_field_angle",
     "per_axis_nyquist_pitch",
@@ -376,4 +379,92 @@ def paraxial_field_angle(
             "aperture -- a paraxial field angle with a fast cone is still outside the "
             "paraxial regime, and this predicate does not see the cone",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GENERALIZED_SNELL (CHE-143, M2.7)
+# ---------------------------------------------------------------------------
+
+
+def generalized_snell_propagating_order(
+    *,
+    k_t_out_key: str = "k_t_out_m",
+    limit_key: str = "n_transmitted_k0_m",
+) -> ValidityPredicate:
+    """``|k_t^out| < n_t k0`` -- predicate 1, a hard limit.
+
+    Beyond it the requested order is evanescent: no outgoing propagating
+    direction exists, and ``couplers.generalized_snell.generalized_snell_step``
+    refuses rather than returning a normalized nonsense direction. This is the
+    same condition evaluated independently here, on the two scalar quantities
+    rather than the coupler's own arrays, for a benchmark instance to declare
+    its position against.
+    """
+
+    def margin(params: Mapping[str, Any]) -> float:
+        return fractional_margin(abs(float(params[k_t_out_key])), float(params[limit_key]))
+
+    return ValidityPredicate(
+        predicate_id="GENERALIZED_SNELL_PROPAGATING_ORDER",
+        statement="the requested diffraction order has an outgoing propagating direction",
+        basis=ValidityBasis.GENERALIZED_SNELL_PROPAGATING_ORDER,
+        margin=margin,
+        blind_to=("everything about the order except whether it exists at all",),
+    )
+
+
+def generalized_snell_gradient_smoothness(
+    *,
+    curvature_key: str = "phase_curvature_rad_per_m2",
+    scale_key: str = "transverse_scale_m",
+) -> ValidityPredicate:
+    """Predicate 2: the local plane-wave picture holds over the declared scale.
+
+    The phase change the local curvature accumulates over the declared
+    transverse scale ``D`` must stay well under one fringe (bounded at ``pi``
+    for a symmetric two-sided budget). Reused by
+    ``generalized_snell_step`` as the same hard gate whose violation is "a
+    phase discontinuity that breaks the gradient estimate" -- see that
+    module's ``local_gradient_smoothness_margin`` for the numerical estimator
+    this characterizes.
+    """
+
+    def margin(params: Mapping[str, Any]) -> float:
+        curvature = abs(float(params[curvature_key]))
+        scale = float(params[scale_key])
+        return fractional_margin(curvature * scale**2, math.pi)
+
+    return ValidityPredicate(
+        predicate_id="GENERALIZED_SNELL_GRADIENT_SMOOTHNESS",
+        statement="the local phase curvature stays negligible over the declared transverse scale",
+        basis=ValidityBasis.GENERALIZED_SNELL_GRADIENT_SMOOTHNESS,
+        margin=margin,
+        blind_to=(
+            "a uniformly aliased gradient, whose curvature can read as zero -- see "
+            "generalized_snell_step's separate raw-step check for that failure mode",
+        ),
+    )
+
+
+def generalized_snell_single_order_dominance(
+    *, dominance_key: str = "single_order_dominance"
+) -> ValidityPredicate:
+    """Predicate 3: the fraction of local spectral power in the requested order.
+
+    Measured, not assumed, from a local windowed transform of ``exp(i phi)`` --
+    see ``couplers.generalized_snell.single_order_dominance``. ``margin =
+    2*dominance - 1`` so a bare majority is the boundary and full
+    concentration is ``+1``; this is the axis M2.10 sweeps.
+    """
+
+    def margin(params: Mapping[str, Any]) -> float:
+        return 2.0 * float(params[dominance_key]) - 1.0
+
+    return ValidityPredicate(
+        predicate_id="GENERALIZED_SNELL_SINGLE_ORDER_DOMINANCE",
+        statement="most local spectral power sits in the requested diffraction order",
+        basis=ValidityBasis.GENERALIZED_SNELL_SINGLE_ORDER_DOMINANCE,
+        margin=margin,
+        blind_to=("amplitude modulation -- only the phase's own order content is measured",),
     )

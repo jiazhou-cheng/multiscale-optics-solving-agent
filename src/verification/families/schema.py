@@ -291,6 +291,20 @@ class ValidityBasis(StrEnum):
     FRESNEL_NUMBER = "fresnel_number"
     #: Paraxial regime, from the closed form the oracle is derived under.
     PARAXIAL_APPROXIMATION = "paraxial_approximation"
+    #: ``|k_t^out| < n_t k0`` -- CHE-143 (M2.7), GENERALIZED_SNELL predicate 1.
+    GENERALIZED_SNELL_PROPAGATING_ORDER = "generalized_snell_propagating_order"
+    #: Local phase curvature against a declared transverse scale -- CHE-143
+    #: (M2.7), GENERALIZED_SNELL predicate 2.
+    GENERALIZED_SNELL_GRADIENT_SMOOTHNESS = "generalized_snell_gradient_smoothness"
+    #: Fraction of local spectral power in the requested order -- CHE-143
+    #: (M2.7), GENERALIZED_SNELL predicate 3.
+    GENERALIZED_SNELL_SINGLE_ORDER_DOMINANCE = "generalized_snell_single_order_dominance"
+    #: A Fourier-plane modulation's own period must stay resolved by the
+    #: frequency grid's sampling interval -- CHE-144 (M2.8), the ideal 4f
+    #: relay's sampling limit. Distinct from ``ASM_SAMPLING``, which bounds a
+    #: propagation *distance*; this bounds a modulation *period* against the
+    #: discrete grid that represents it.
+    FFT_GRID_NYQUIST = "fft_grid_nyquist"
 
 
 class ValidityState(StrEnum):

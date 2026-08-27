@@ -395,6 +395,7 @@ PACK_PATHS = {
     "C_WAVE_TO_RAY": ("coupler", "knowledge/couplers/wave_to_ray"),
     "C_PLANAR_DOE_STEP": ("coupler", "knowledge/couplers/planar_doe_step"),
     "C_PATCH_WFT": ("coupler", "knowledge/couplers/patch_wft"),
+    "C_GENERALIZED_SNELL": ("coupler", "knowledge/couplers/generalized_snell"),
 }
 
 

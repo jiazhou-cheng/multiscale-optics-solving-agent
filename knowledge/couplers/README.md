@@ -1,8 +1,33 @@
 # Coupler knowledge packs
 
-A coupler changes *representation*, so it carries physical assumptions that
-belong to neither solver it joins. Each direction therefore gets its own pack,
-in the same shape as a `knowledge/solvers/<name>/` pack:
+`src/couplers/` holds **three kinds of operation**, and CHE-142 (M2.6) made the
+distinction explicit here as well as in the code, because a pack that calls all
+three "a coupler" cannot tell an agent which of the three it is reading about:
+
+> **representation transition ≠ diffractive physical interaction ≠ propagation.**
+
+* A **representation transition** changes what the light is *described by* —
+  rays become a field, or a field becomes rays. `C_RAY_TO_WAVE`,
+  `C_WAVE_TO_RAY`. These carry physical assumptions that belong to neither
+  solver they join, which is why each direction gets its own pack.
+* A **diffractive interaction** is *physics at a surface*: incident coherent
+  rays meet a diffractive surface and coherent rays come out. It is **one**
+  operation, and `C_PLANAR_DOE_STEP` and `C_PATCH_WFT` are **two granularities
+  of it**, not two unrelated DOE steps — see [the interaction](#the-diffractive-interaction-and-its-models)
+  below. They each contain two representation transitions plus a transmission,
+  and that is their implementation rather than their identity.
+* **Propagation** moves an existing representation between planes and changes
+  neither the representation nor the physical content.
+  `couplers/propagation.py::advance_bundle_to_plane`. It has no pack, because it
+  introduces no convention the boundary artifacts do not already declare —
+  which is itself the point: it is not a coupler and does not need one.
+
+The executable form of that partition is `src/couplers/ontology.py`, held
+against the registry and the package's exports by
+`tests/test_diffractive_interaction.py`. Read that as the source of truth; the
+prose here is the reasoning.
+
+Each pack has the same shape as a `knowledge/solvers/<name>/` pack:
 
 ```
 <direction>/
@@ -14,23 +39,64 @@ in the same shape as a `knowledge/solvers/<name>/` pack:
   probes/               executable checks
 ```
 
-| Pack | Coupler ID | Transformation |
+| Pack | Coupler ID | Role | Transformation |
+|---|---|---|---|
+| [`ray_to_wave/`](ray_to_wave/) | `C_RAY_TO_WAVE` | representation transition | ray bundle → complex field on a declared plane |
+| [`wave_to_ray/`](wave_to_ray/) | `C_WAVE_TO_RAY` | representation transition | complex field → ray bundle carrying complex amplitudes |
+| [`planar_doe_step/`](planar_doe_step/) | `C_PLANAR_DOE_STEP` | diffractive interaction, model `full_field` | rays + surface → rays, one global field |
+| [`patch_wft/`](patch_wft/) | `C_PATCH_WFT` | diffractive interaction, model `local_patch` | rays + surface → rays, per patch, summed coherently |
+| [`generalized_snell/`](generalized_snell/) | `C_GENERALIZED_SNELL` | diffractive interaction, model `generalized_snell` | rays + surface → rays, no field ever formed |
+
+## The diffractive interaction and its models
+
+The bottom three rows are **one interaction**, `I_DIFFRACTIVE`, at three
+granularities. All three registry rows declare that shared identity, and each
+says how it relates to the others:
+
+| Model | Where the field is formed | Regime |
 |---|---|---|
-| [`ray_to_wave/`](ray_to_wave/) | `C_RAY_TO_WAVE` | ray bundle → complex field on a declared plane |
-| [`wave_to_ray/`](wave_to_ray/) | `C_WAVE_TO_RAY` | complex field → ray bundle carrying complex amplitudes |
-| [`planar_doe_step/`](planar_doe_step/) | `C_PLANAR_DOE_STEP` | ray bundle → ray bundle across one planar DOE |
-| [`patch_wft/`](patch_wft/) | `C_PATCH_WFT` | ray bundle → ray bundle, per patch, summed coherently |
+| `full_field` | once, globally, on the one common plane | planar substrate, and a global field that fits in memory |
+| `local_patch` | per patch, on its own local tangent plane | large or conformal surfaces; also any planar surface whose global field does not fit |
+| `generalized_snell` | nowhere — no field is formed | reduced-order: one ray redirected by the local grating equation. Planar substrate only. CHE-143 (M2.7); see `knowledge/couplers/generalized_snell/` |
 
-The last two are **composed** from the first two and from each other:
-`C_PLANAR_DOE_STEP` is `C_RAY_TO_WAVE` then a transmission then `C_WAVE_TO_RAY`,
-and `C_PATCH_WFT` is that cascade applied per patch — with the global step being
-its special case at one full-aperture patch (SI S10), not a peer of it. Their
-packs therefore *point* at what they compose rather than restating it, and their
-capabilities are the **intersection** of what they compose. A composed pack that
-duplicated a convention would create a second place to update, and the two would
-drift.
+**`full_field` is the shortcut, not a peer.** SI S10 is explicit, about the
+global aggregation `full_field` performs: *"For conformal DOEs, this global
+aggregation before ray-DOE interaction is not applicable because rays intersect
+different local tangent planes with position-dependent coordinate frames and
+surface normals. We therefore retain the direct implementation."* The direct
+implementation is `local_patch`; `full_field` is that model at **one
+full-aperture patch**, and the identity is *measured* at 1.4e-12 relative field
+error rather than asserted (`tests/test_patch_wft.py`).
 
-Both are derived from
+The regimes **overlap** rather than partition. On a planar substrate both models
+are valid and the choice is cost and variance, not correctness — SI Fig 3 gives
+`local_patch` for large *planar* surfaces too, and SI Table S2 records the
+4032×4032 Grating-Lens DOE as OOM on a 48 GB A6000 on the global route and
+complete in 4.982 s at 11.492 GB on the patch route. On a conformal substrate
+only `local_patch` is *applicable*, and `full_field` there is refused with
+`MODEL_NOT_APPLICABLE` rather than approximated. `local_patch`'s conformal path
+is itself refused with `MISSING_DECLARATION`, and the two codes must not be
+collapsed: one says *never this model*, the other says *this model, once someone
+builds it*.
+
+One entry point performs the interaction with the model named explicitly, and
+never inferred: `couplers.interaction.diffractive_interaction`.
+
+### Why the two DOE packs point rather than restate
+
+Both models are **composed** from the two representation transitions:
+`full_field` is `C_RAY_TO_WAVE` then a transmission then `C_WAVE_TO_RAY`, and
+`local_patch` is that cascade applied per patch. Their packs therefore *point* at
+what they compose rather than restating it, and their capabilities are the
+**intersection** of what they compose. A composed pack that duplicated a
+convention would create a second place to update, and the two would drift.
+
+Sharing an interaction identity does **not** share a capability. `C_PATCH_WFT`
+is CPU-only and FP64-only and stays that way; grouping is an ontology statement,
+and if it widened the narrower row the group would be advertising a CUDA patch
+route that has never executed.
+
+Both models are derived from
 [`knowledge/papers/raywave_tracing/`](../papers/raywave_tracing/) (Cheng et al.,
 ACS Photonics 2026, DOI `10.1021/acsphotonics.6c00818`). The paper's reference
 implementation is **not vendored, pinned, or executed** by this repository, so
@@ -132,6 +198,21 @@ diffractive system is combinatorially unrunnable — which makes it a
 
 *What does survive:* `patch_coverage_corrected`, plus everything the cascade
 carries.
+
+### `C_GENERALIZED_SNELL` — rays → rays, no field ever formed
+
+* **Every diffraction order except the one requested.** One order per call, by
+  construction: a caller wanting several says so several times, and any power
+  a real surface would send to another order is simply not represented at all.
+* **Any field, of any kind.** Unlike the other two models this one never forms
+  a field even as an intermediate — there is nothing here to ask about the
+  transmitted field's spatial structure beyond the single redirected ray's own
+  direction, amplitude and phase.
+
+*What does survive:* `unit_direction_norm`, and — unlike the other two models
+— each incoming ray's own identity and OPL history, since this model redirects
+existing rays rather than re-emitting fresh ones from a reconstructed
+spectrum.
 
 ### The rule this table exists to support
 

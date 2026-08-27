@@ -223,6 +223,7 @@ class TestDeclaredCapabilities:
             "C_WAVE_TO_RAY",
             "C_PLANAR_DOE_STEP",
             "C_PATCH_WFT",
+            "C_GENERALIZED_SNELL",
         ]
         assert {row["component"] for row in rows} == set(COMPONENT_CAPABILITIES), (
             "the documented capability matrix and the declarations have diverged; "

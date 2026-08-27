@@ -70,6 +70,11 @@ def _fixture_registry() -> Registry:
                     "must carry both codes."
                 ),
                 "framework": "internal",
+                # CHE-142 made `role` required. A fixture that only exists to
+                # mismatch its ports is still a representation transition by
+                # kind, and the field is not defaulted precisely so a row cannot
+                # arrive without saying which of the three it is.
+                "role": "representation_transition",
                 "source": {"name": "absorbed_power", "artifact": "absorbed_power_density"},
                 "target": {"name": "heat_source", "artifact": "heat_source"},
                 "derivative": {"mode": "none", "verified": False, "parameters": []},

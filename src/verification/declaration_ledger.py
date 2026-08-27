@@ -1224,6 +1224,118 @@ _C_PATCH_WFT: tuple[Coverage, ...] = (
 )
 
 
+_C_GENERALIZED_SNELL: tuple[Coverage, ...] = (
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.ASSUMPTION,
+        anchor="The substrate is PLANAR, declared rather than inferred",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_generalized_snell_on_a_conformal_substrate_is_refused",
+        ),
+        reason=(
+            "a conformal substrate is refused with MISSING_DECLARATION rather than "
+            "approximated with the flat-plane frame, on every call -- there is no "
+            "conditional path that would let one through"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.ASSUMPTION,
+        anchor="n_incident and n_transmitted are declared and used directly",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_the_zero_phase_limit_is_ordinary_snells_law",
+        ),
+        reason=(
+            "the zero-phase limit is tested at n_incident=1.0, n_transmitted=1.5 and "
+            "reproduces ordinary Snell's law, which exercises the declared indices "
+            "directly rather than only at the n=1 default"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.ASSUMPTION,
+        anchor="The diffraction order m is declared, defaulting to +1",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_control_an_order_sign_flip_conjugates_the_deflection",
+        ),
+        reason=(
+            "requesting order=-1 instead of the +1 default measurably changes the "
+            "result (conjugates the deflection), so the declared default is a real "
+            "value the equation reads rather than a hidden constant"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.ASSUMPTION,
+        anchor="Three validity predicates, each a signed normalized margin",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_propagating_order_margin_sign_convention",
+            "tests/test_diffractive_interaction.py::test_local_gradient_smoothness_margin_is_perfect_for_a_pure_ramp",
+            "tests/test_diffractive_interaction.py::test_local_gradient_smoothness_margin_degrades_with_curvature",
+            "tests/test_diffractive_interaction.py::test_single_order_dominance_is_high_for_a_well_resolved_grating",
+            "tests/test_diffractive_interaction.py::test_single_order_dominance_is_low_for_a_two_tone_surface",
+            "tests/test_diffractive_interaction.py::test_an_evanescent_requested_order_is_refused_not_returned_as_nonsense",
+            "tests/test_diffractive_interaction.py::test_a_local_phase_discontinuity_is_refused_and_the_refusal_is_local",
+        ),
+        reason=(
+            "each margin function's sign convention is tested directly, and the two "
+            "that are runtime hard limits are separately shown to actually refuse the "
+            "call rather than only compute a number"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.WARNING,
+        anchor="The gradient estimator reads the complex transmission directly",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_a_local_phase_discontinuity_is_refused_and_the_refusal_is_local",
+        ),
+        reason=(
+            "the known blind spot -- a discontinuity that breaks the estimator -- is "
+            "demonstrated to be caught when local to a ray's own stencil; the warning "
+            "is honest that a uniformly aliased signal is not caught, which is a "
+            "negative claim the test suite cannot demonstrate by definition and is "
+            "instead reasoned about in knowledge/couplers/generalized_snell/failure_guide.md"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.WARNING,
+        anchor="The OPL convention is additive, not reset-to-zero",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_diffractive_interaction.py::test_a_linear_phase_ramp_deflects_to_the_exact_grating_angle",
+        ),
+        reason=(
+            "the exact grating-angle test constructs its incident bundle with a "
+            "nonzero OPL reference and the outgoing OPL is read as incident-plus-"
+            "surface-phase in couplers/generalized_snell.py, exercised on every "
+            "closed-form test rather than asserted separately"
+        ),
+    ),
+    Coverage(
+        component="C_GENERALIZED_SNELL",
+        kind=DeclarationKind.INVARIANT,
+        anchor="unit_direction_norm",
+        coverage_kind=CoverageKind.EXECUTABLE_TEST,
+        evidence=(
+            "tests/test_artifacts.py",
+            "tests/test_diffractive_interaction.py::test_a_linear_phase_ramp_deflects_to_the_exact_grating_angle",
+        ),
+        reason="enforced at the artifact boundary on the outgoing bundle, as for the other couplers",
+        tolerance_basis=(
+            "numerical_precision_floor: the dtype-dependent boundary tolerance on "
+            "||d|| - 1, as for the other three couplers"
+        ),
+    ),
+)
+
+
 #: The ledger. One entry per registry declaration, in both directions.
 COVERAGE_LEDGER: tuple[Coverage, ...] = (
     *_MODEL_OPTILAND,
@@ -1232,4 +1344,5 @@ COVERAGE_LEDGER: tuple[Coverage, ...] = (
     *_C_WAVE_TO_RAY,
     *_C_PLANAR_DOE_STEP,
     *_C_PATCH_WFT,
+    *_C_GENERALIZED_SNELL,
 )

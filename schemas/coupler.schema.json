@@ -85,6 +85,16 @@
       "title": "CostModelSpec",
       "type": "object"
     },
+    "CouplerRole": {
+      "description": "Which of the three kinds of operation a registered coupler is (CHE-142).\n\n``src/couplers/`` was using one word for three different things, so the\nregistry could not say which of them a caller was selecting. The rule:\n**representation transition != diffractive physical interaction !=\npropagation.** ``src/couplers/ontology.py`` holds the package-side partition\nand the test that keeps the two in step.\n\nThere is no default. A coupler row must say which it is, because the three\nanswer different questions and a guess would be wrong silently: a caller\nreading ``C_PLANAR_DOE_STEP``'s ray-in/ray-out ports cannot tell from them\nwhether the step re-described the light or diffracted it.",
+      "enum": [
+        "representation_transition",
+        "diffractive_interaction",
+        "propagation"
+      ],
+      "title": "CouplerRole",
+      "type": "string"
+    },
     "DerivativeMode": {
       "enum": [
         "native_autodiff",
@@ -150,6 +160,34 @@
       ],
       "title": "Framework",
       "type": "string"
+    },
+    "InteractionSpec": {
+      "additionalProperties": false,
+      "description": "The shared physical identity a group of coupler rows computes (CHE-142).\n\nTwo rows carrying the same ``id`` are the **same physical operation at\ndifferent granularities**, not two peer claims -- which is what\n``C_PLANAR_DOE_STEP`` and ``C_PATCH_WFT`` had been reading as. Each keeps its\nown capability row regardless: devices, dtypes and maturity genuinely differ\nbetween the models, and grouping them must not widen the narrower one.",
+      "properties": {
+        "id": {
+          "pattern": "^I_[A-Z0-9_]+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "relation": {
+          "minLength": 1,
+          "title": "Relation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "model",
+        "relation"
+      ],
+      "title": "InteractionSpec",
+      "type": "object"
     },
     "Maturity": {
       "enum": [
@@ -351,6 +389,17 @@
       "title": "Id",
       "type": "string"
     },
+    "interaction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InteractionSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "invariants": {
       "items": {
         "type": "string"
@@ -366,6 +415,9 @@
     "maturity": {
       "$ref": "#/$defs/Maturity",
       "default": "experimental"
+    },
+    "role": {
+      "$ref": "#/$defs/CouplerRole"
     },
     "source": {
       "$ref": "#/$defs/PortSpec"
@@ -405,6 +457,7 @@
     "version",
     "description",
     "framework",
+    "role",
     "source",
     "target",
     "derivative"

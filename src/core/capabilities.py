@@ -55,6 +55,7 @@ from core.precision import (
 __all__ = [
     "CHROMATIX_CAPABILITIES",
     "COMPONENT_CAPABILITIES",
+    "C_GENERALIZED_SNELL_CAPABILITIES",
     "C_PATCH_WFT_CAPABILITIES",
     "C_PLANAR_DOE_STEP_CAPABILITIES",
     "C_RAY_TO_WAVE_CAPABILITIES",
@@ -270,6 +271,40 @@ C_PATCH_WFT_CAPABILITIES = ComponentCapabilities(
 )
 
 
+C_GENERALIZED_SNELL_CAPABILITIES = ComponentCapabilities(
+    component="C_GENERALIZED_SNELL",
+    devices=frozenset({DeviceKind.CPU}),
+    precisions=frozenset({Precision.FP64}),
+    # The per-ray algebra runs in plain numpy at float64/complex128 regardless
+    # of what the incident bundle or the declared surface carry -- there is no
+    # array-module-generic path here the way C_RAY_TO_WAVE has one. Accepting
+    # all four field dtypes as INPUT is still honest: they are upcast, not
+    # refused, and the upcast is lossless.
+    accepted_input_dtypes=_FIELD_DTYPES,
+    native_compute_dtypes=frozenset({DType.COMPLEX128}),
+    output_dtypes=frozenset({DType.FLOAT64, DType.COMPLEX128}),
+    namespaces=frozenset({ArrayNamespace.NUMPY}),
+    device_namespaces={DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY})},
+    minimum_compute_precision=Precision.FP64,
+    evidence=(
+        "couplers/generalized_snell.py reproduces the exact grating equation "
+        "sin(theta_out) = (n_i sin(theta_in) + m lambda / Lambda) / n_t to "
+        "round-off for a linear phase ramp, and the zero-phase and "
+        "zero-gradient limits reduce to Snell's law and undeflected "
+        "propagation respectively (tests/test_diffractive_interaction.py). No "
+        "CUDA or JAX path has been executed, so none is declared."
+    ),
+    notes=(
+        "CHE-143 (M2.7) delivered correctness at closed-form and boundary-limit "
+        "cases, not a device/dtype-parity or performance campaign -- unlike "
+        "C_RAY_TO_WAVE this does not thread the array module through, so a "
+        "GPU or float32 bundle would be silently upcast and copied to the host "
+        "rather than accelerated. A device-parity implementation is future "
+        "work, not claimed here."
+    ),
+)
+
+
 COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
     capability.component: capability
     for capability in (
@@ -279,6 +314,7 @@ COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
         C_WAVE_TO_RAY_CAPABILITIES,
         C_PLANAR_DOE_STEP_CAPABILITIES,
         C_PATCH_WFT_CAPABILITIES,
+        C_GENERALIZED_SNELL_CAPABILITIES,
     )
 }
 
@@ -317,5 +353,6 @@ def capability_matrix() -> list[dict[str, Any]]:
             "C_WAVE_TO_RAY",
             "C_PLANAR_DOE_STEP",
             "C_PATCH_WFT",
+            "C_GENERALIZED_SNELL",
         )
     ]

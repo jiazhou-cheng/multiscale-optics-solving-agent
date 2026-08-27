@@ -171,6 +171,46 @@ def _pitch_mismatch(tmp: Path) -> object:
     )
 
 
+def _full_field_on_a_conformal_substrate(_tmp: Path) -> object:
+    """The wrong diffractive model for the declared surface (CHE-142).
+
+    ``FULL_FIELD``'s central step is one coherent accumulation onto the single
+    common plane every incident ray crosses. A conformal substrate has no such
+    plane (SI S10), and the accumulation would nevertheless *run* -- folding rays
+    from different tangent frames into one field and returning something that
+    looks like a diffraction pattern. Hence a refusal, and hence
+    ``could_have_proceeded``.
+
+    The smallest thing that reaches it: a 4x4 surface and a one-ray bundle. The
+    refusal happens before any transform, so nothing here has to be physical.
+    """
+    from couplers.interaction import (
+        DiffractiveModel,
+        DiffractiveSurface,
+        FullFieldParameters,
+        diffractive_interaction,
+    )
+    from couplers.patch import Substrate
+
+    return diffractive_interaction(
+        RayBundle(
+            positions_m=np.zeros((1, 3)),
+            directions=np.array([[0.0, 0.0, 1.0]]),
+            wavelength_m=_WAVELENGTH_M,
+            reference_plane=_PLANE,
+        ),
+        DiffractiveSurface(
+            transmission=np.ones((4, 4), dtype=np.complex128),
+            sample_pitch_m=_PITCH,
+            plane=_PLANE,
+            substrate=Substrate.CONFORMAL,
+            radius_m=1e-3,
+        ),
+        model=DiffractiveModel.FULL_FIELD,
+        parameters=FullFieldParameters(launch_positions_xy_m=np.zeros((1, 2))),
+    )
+
+
 def _declared_gpu_over_host_data(tmp: Path) -> object:
     """A record that says ``gpu`` over an array that is on the host.
 
@@ -420,6 +460,12 @@ TRIGGERS: tuple[Trigger, ...] = (
         surface="core.boundary.ComplexField.from_artifact_record",
         request="a record declaring gpu over an array that is on the host",
         call=_declared_gpu_over_host_data,
+    ),
+    Trigger(
+        ContractCode.MODEL_NOT_APPLICABLE,
+        surface="couplers.interaction.diffractive_interaction",
+        request="diffractive model 'full_field' for a conformal substrate",
+        call=_full_field_on_a_conformal_substrate,
     ),
 )
 

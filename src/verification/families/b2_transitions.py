@@ -123,6 +123,14 @@ WHAT_DOES_NOT_SURVIVE: Mapping[str, tuple[str, ...]] = {
         "any structure finer than the patch, which the tangent-plane approximation "
         "cannot represent",
     ),
+    "C_GENERALIZED_SNELL": (
+        "every diffraction order except the one requested -- one order per call, by "
+        "construction, so any power a real surface would send to another order is "
+        "simply not represented",
+        "any field at all: this model never forms one, so nothing about the "
+        "transmitted field's spatial structure beyond the single redirected ray's "
+        "own direction, amplitude and phase survives",
+    ),
 }
 
 

@@ -6,8 +6,8 @@ property in its own right, and it is the property that decides whether the agent
 can recover. The two failure modes it must never see are a fabricated number and
 an unstructured traceback.
 
-The repository already refuses well. ``ContractCode`` has nineteen members with
-long explanatory comments, ``CapabilityError`` carries requested/supported/
+The repository already refuses well. Every ``ContractCode`` member carries a
+long explanatory comment, ``CapabilityError`` carries requested/supported/
 evidence/remedy, and the couplers' ``diagnose()`` returns a *list* of contract
 errors rather than raising on the first. What was missing is a single place that
 says, for each code: what triggers it, what a caller should do about it, and --
@@ -243,6 +243,18 @@ REFUSAL_CATALOGUE: Mapping[str, RefusalEntry] = {
             "read the property off the array rather than off the request. A "
             "process-global JAX platform pin produces a successful run on the host "
             "while the caller asked for CUDA, with no error raised",
+        ),
+        _entry(
+            ContractCode.MODEL_NOT_APPLICABLE,
+            VerificationStatus.OUT_OF_VALIDITY,
+            "a named model is asked for a surface it cannot represent -- "
+            "diffractive model 'full_field' on a conformal substrate being the case "
+            "that motivated it, because the model's one coherent accumulation needs "
+            "the single common plane a curved substrate does not have",
+            "name a model whose regime covers the declared surface -- 'local_patch' "
+            "for a curved one. Another declaration will not help: nothing is "
+            "missing, the pairing is wrong",
+            could_have_proceeded=True,
         ),
     )
 }

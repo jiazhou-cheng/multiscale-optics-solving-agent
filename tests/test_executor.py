@@ -37,6 +37,7 @@ from core.paths import repository_root
 from core.specs import (
     ApproximationClass,
     ArtifactKind,
+    CouplerRole,
     CouplerSpec,
     DerivativeMode,
     DerivativeSpec,
@@ -95,6 +96,9 @@ BRIDGE = CouplerSpec(
     version="1.0.0",
     description="stub coupler",
     framework=Framework.NUMPY,
+    # CHE-142 made `role` required, with no default. This stub stands in for the
+    # real C_RAY_TO_WAVE, which is a representation transition.
+    role=CouplerRole.REPRESENTATION_TRANSITION,
     source=PortSpec(name="source", artifact=ArtifactKind.RAY_BUNDLE),
     target=PortSpec(name="target", artifact=ArtifactKind.COMPLEX_FIELD),
     derivative=DerivativeSpec(mode=DerivativeMode.NONE, verified=False),

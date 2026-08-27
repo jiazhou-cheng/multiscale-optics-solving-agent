@@ -12,6 +12,50 @@
 id: planar_doe_step
 role: C_PLANAR_DOE_STEP
 direction: ray_bundle -> ray_bundle
+
+# CHE-142 (M2.6). `role` above is the REGISTRY ID, which this card's schema has
+# always used that key for; the two keys below are the ontology, and the naming
+# collision is why they are spelled out rather than folded into it.
+#
+# This is not a "coupler" in the representation-transition sense, and the
+# distinction is the point: representation transition != diffractive physical
+# interaction != propagation. This card describes ONE MODEL of one interaction.
+# The other model is knowledge/couplers/patch_wft/, and they are not two
+# unrelated DOE steps -- see knowledge/couplers/README.md.
+operation_role: diffractive_interaction
+interaction:
+  id: I_DIFFRACTIVE
+  model: full_field
+  peer_models:
+    - model: local_patch
+      pack: knowledge/couplers/patch_wft
+      relation: >
+        This model is the SHORTCUT for that one, not its peer. SI S10, on the
+        global aggregation this card describes: "For conformal DOEs, this global
+        aggregation before ray-DOE interaction is not applicable because rays
+        intersect different local tangent planes with position-dependent
+        coordinate frames and surface normals. We therefore retain the direct
+        implementation." That direct implementation is local_patch, and this
+        model is it at ONE full-aperture patch -- measured at 1.4e-12 relative
+        field error in tests/test_patch_wft.py, not asserted. The regimes
+        OVERLAP: on a planar substrate both are valid and the choice is cost and
+        variance. On a conformal substrate this model is refused with
+        MODEL_NOT_APPLICABLE, because the one common plane its central step needs
+        does not exist there.
+    - model: generalized_snell
+      pack: knowledge/couplers/generalized_snell
+      relation: >
+        CHE-143 (M2.7). No field is formed at all in that model -- each ray is
+        redirected by the local grating equation at its own transverse
+        position, which is why it shares neither this card's conventions nor
+        its evidence. It agrees with this model in the smooth limit and
+        disagrees once the surface splits power across more than one order;
+        see knowledge/couplers/generalized_snell/card.yaml.
+  entry_point: couplers.interaction.diffractive_interaction
+  model_is_never_inferred: >
+    The caller names the model. Inferring it from the surface would hand a
+    caller the other model's physics under the name they asked for, which no
+    downstream diagnostic could recover.
 transformation: >
   coherent accumulation onto one common plane, one complex transmission, one
   transform, and a fixed P x S resample. The wave representation exists only

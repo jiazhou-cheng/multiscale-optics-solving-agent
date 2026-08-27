@@ -19,6 +19,53 @@
 id: patch_wft
 role: C_PATCH_WFT
 direction: ray_bundle -> ray_bundle
+
+# CHE-142 (M2.6). `role` above is the REGISTRY ID, which this card's schema has
+# always used that key for; the two keys below are the ontology.
+#
+# representation transition != diffractive physical interaction != propagation.
+# This card describes ONE MODEL of one interaction -- the DIRECT one. Its other
+# implemented model is knowledge/couplers/planar_doe_step/, which is this model
+# at one full-aperture patch rather than a separate physics claim.
+operation_role: diffractive_interaction
+interaction:
+  id: I_DIFFRACTIVE
+  model: local_patch
+  peer_models:
+    - model: full_field
+      pack: knowledge/couplers/planar_doe_step
+      relation: >
+        That model is the SHORTCUT for this one (SI S10). Note what this does
+        NOT mean: local_patch is not the conformal fallback. SI Fig 3 gives it
+        for large PLANAR surfaces too -- "For large planar DOEs where the
+        processing of the full-field planar patch exceeds available GPU memory,
+        we can instead decompose the full field into multiple smaller
+        overlapping patches" -- and SI Table S2 records the 4032x4032
+        Grating-Lens DOE as OOM on a 48 GB RTX A6000 on the full-field route and
+        complete in 4.982 s at 11.492 GB here. Patch size is a memory budget
+        dial, and the regimes overlap.
+    - model: generalized_snell
+      pack: knowledge/couplers/generalized_snell
+      relation: >
+        CHE-143 (M2.7). Also evaluates locally, per ray, but is refused
+        outright on a conformal substrate rather than sharing this model's
+        (unimplemented) path to one: it has no per-ray local tangent frame to
+        evaluate the grating equation in, which is a different statement from
+        "the right model, missing an implementation".
+  conformal_status: >
+    SI S10 names THIS model as the applicable one on a conformal substrate, and
+    it is nevertheless refused there today -- with MISSING_DECLARATION, because
+    what is missing is the implementation (Newton sag intersection, per-hit
+    tangent frames, position-dependent normals) rather than the model. That code
+    must not be collapsed with full_field's MODEL_NOT_APPLICABLE on the same
+    substrate: one says "this model, once someone builds it", the other says
+    "never this model".
+  entry_point: couplers.interaction.diffractive_interaction
+  capability_is_not_shared: >
+    Sharing the interaction identity shares no capability. This model is CPU-only
+    and FP64-only (core/capabilities.py::C_PATCH_WFT_CAPABILITIES) while
+    full_field declares cpu+gpu, and grouping them must not widen this one --
+    that would advertise a CUDA patch route that has never executed.
 transformation: >
   a local windowed Fourier transform per patch: each patch is windowed out of the
   DOE, padded, transformed, and resampled into secondary rays, and the patches

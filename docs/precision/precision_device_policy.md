@@ -74,6 +74,7 @@ Generated from `core/capabilities.py` by `benchmarks/probes/precision/capability
 | C_WAVE_TO_RAY    | cpu, cuda | fp32, fp64 | complex128, complex64                   | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
 | C_PLANAR_DOE_STEP | cpu, cuda | fp32, fp64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | complex128, complex64, float32, float64 | --                   | jax, numpy   | fp32          |
 | C_PATCH_WFT       | cpu       | fp64       | complex128, complex64, float32, float64 | complex128                              | complex128, float64                     | --                   | numpy        | fp64          |
+| C_GENERALIZED_SNELL | cpu     | fp64       | complex128, complex64, float32, float64 | complex128                              | complex128, float64                     | --                   | numpy        | fp64          |
 
 `C_PATCH_WFT` (CHE-96) is the narrowest row and the one where the four columns
 pay for themselves. It **accepts** all four dtypes -- the paper's own phase masks
@@ -90,6 +91,14 @@ about the route. A patch run's cost is the O(rays x pixels) reconstruction in
 `C_RAY_TO_WAVE`, which is xp-parameterized and does execute on CUDA under JAX;
 the patch transform is O(patches x pad^2 log pad). Declaring `cuda` here would
 claim a device this operator has never run on.
+
+`C_GENERALIZED_SNELL` (CHE-143, M2.7) shares `C_PATCH_WFT`'s row shape for a
+different reason: it never threads the array module through the way
+`C_RAY_TO_WAVE` does, so it always computes in plain-numpy float64 /
+complex128 regardless of what the incident bundle or the declared surface
+carry. Accepting all four input dtypes is still honest -- they are upcast, not
+refused -- but a GPU or float32 bundle is silently copied to the host rather
+than accelerated. That is a real limitation of this delivery, not a caution.
 
 `C_PLANAR_DOE_STEP` is the one composed row, and it is worth reading as such:
 its capability is `C_RAY_TO_WAVE`'s and `C_WAVE_TO_RAY`'s **intersected**, not an

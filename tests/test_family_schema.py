@@ -57,6 +57,9 @@ from verification.families.predicates import (
     boolean_margin,
     capability_intersection_nonempty,
     fractional_margin,
+    generalized_snell_gradient_smoothness,
+    generalized_snell_propagating_order,
+    generalized_snell_single_order_dominance,
     per_axis_nyquist_pitch,
     si_s3_curvature_bound,
 )
@@ -687,6 +690,42 @@ def test_the_planar_case_admits_only_zero_tangent_plane_error() -> None:
     planar = {"patch_width_m": 1.0, "substrate_radius_m": math.inf}
     assert predicate.margin({**planar, "tangent_plane_error_rad": 0.0}) == 1.0
     assert predicate.margin({**planar, "tangent_plane_error_rad": 1e-9}) == -1.0
+
+
+def test_the_generalized_snell_propagating_order_predicate_binds_at_the_index_limit() -> None:
+    """CHE-143 (M2.7) predicate 1: ``|k_t^out| < n_t k0``."""
+    predicate = generalized_snell_propagating_order()
+    limit = 2.0
+    assert predicate.margin({"k_t_out_m": limit, "n_transmitted_k0_m": limit}) == pytest.approx(0.0)
+    assert predicate.state({"k_t_out_m": limit * 0.5, "n_transmitted_k0_m": limit}) is (
+        ValidityState.INSIDE
+    )
+    assert predicate.state({"k_t_out_m": limit * 2.0, "n_transmitted_k0_m": limit}) is (
+        ValidityState.FAR_OUTSIDE
+    )
+
+
+def test_the_generalized_snell_gradient_smoothness_predicate_binds_at_one_fringe() -> None:
+    """CHE-143 (M2.7) predicate 2: curvature times scale squared against ``pi``."""
+    predicate = generalized_snell_gradient_smoothness()
+    scale = 5e-6
+    limit_curvature = math.pi / scale**2
+    params = {"transverse_scale_m": scale}
+    assert predicate.margin({**params, "phase_curvature_rad_per_m2": limit_curvature}) == (
+        pytest.approx(0.0)
+    )
+    assert predicate.state({**params, "phase_curvature_rad_per_m2": 0.0}) is ValidityState.INSIDE
+    assert predicate.state(
+        {**params, "phase_curvature_rad_per_m2": limit_curvature * 2.0}
+    ) is ValidityState.FAR_OUTSIDE
+
+
+def test_the_generalized_snell_single_order_dominance_predicate_binds_at_a_bare_majority() -> None:
+    """CHE-143 (M2.7) predicate 3: ``margin = 2*dominance - 1``."""
+    predicate = generalized_snell_single_order_dominance()
+    assert predicate.margin({"single_order_dominance": 0.5}) == pytest.approx(0.0)
+    assert predicate.margin({"single_order_dominance": 1.0}) == pytest.approx(1.0)
+    assert predicate.state({"single_order_dominance": 0.05}) is ValidityState.FAR_OUTSIDE
 
 
 def test_the_nyquist_predicate_binds_on_the_marginal_direction_cosine() -> None:

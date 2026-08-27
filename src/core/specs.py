@@ -166,12 +166,62 @@ class ModelSpec(StrictModel):
         return next((port for port in self.outputs if port.name == name), None)
 
 
+class CouplerRole(StrEnum):
+    """Which of the three kinds of operation a registered coupler is (CHE-142).
+
+    ``src/couplers/`` was using one word for three different things, so the
+    registry could not say which of them a caller was selecting. The rule:
+    **representation transition != diffractive physical interaction !=
+    propagation.** ``src/couplers/ontology.py`` holds the package-side partition
+    and the test that keeps the two in step.
+
+    There is no default. A coupler row must say which it is, because the three
+    answer different questions and a guess would be wrong silently: a caller
+    reading ``C_PLANAR_DOE_STEP``'s ray-in/ray-out ports cannot tell from them
+    whether the step re-described the light or diffracted it.
+    """
+
+    #: Changes what the light is described by. Rays <-> field.
+    REPRESENTATION_TRANSITION = "representation_transition"
+    #: Physics at a surface: coherent rays in, coherent rays out. Contains
+    #: representation transitions; is not one.
+    DIFFRACTIVE_INTERACTION = "diffractive_interaction"
+    #: Moves a representation between planes and changes neither the
+    #: representation nor the physical content.
+    PROPAGATION = "propagation"
+
+
+class InteractionSpec(StrictModel):
+    """The shared physical identity a group of coupler rows computes (CHE-142).
+
+    Two rows carrying the same ``id`` are the **same physical operation at
+    different granularities**, not two peer claims -- which is what
+    ``C_PLANAR_DOE_STEP`` and ``C_PATCH_WFT`` had been reading as. Each keeps its
+    own capability row regardless: devices, dtypes and maturity genuinely differ
+    between the models, and grouping them must not widen the narrower one.
+    """
+
+    #: The interaction's identity, shared across its models. Not a coupler id: an
+    #: interaction is not separately runnable and has no capability of its own.
+    id: str = Field(pattern=r"^I_[A-Z0-9_]+$")
+    #: Which granularity this row implements.
+    model: str = Field(min_length=1)
+    #: How this model relates to the interaction's others, with its source. A
+    #: group whose members do not say which is the shortcut for which is back to
+    #: reading as peers.
+    relation: str = Field(min_length=1)
+
+
 class CouplerSpec(StrictModel):
     id: str = Field(pattern=r"^C_[A-Z0-9_]+$")
     version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     description: str
     framework: Framework
     approximation: ApproximationClass = ApproximationClass.TRANSFORMATION
+    #: Required, and deliberately not defaulted -- see :class:`CouplerRole`.
+    role: CouplerRole
+    #: Present only on a row that is one model of a shared interaction.
+    interaction: InteractionSpec | None = None
     source: PortSpec
     target: PortSpec
     devices: list[Device] = Field(default_factory=list)

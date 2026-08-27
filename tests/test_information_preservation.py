@@ -124,20 +124,22 @@ def test_every_invariant_tolerance_basis_names_a_recognized_kind() -> None:
         assert len(basis) > 60, f"{key}: a basis this short is a label, not a derivation"
 
 
-def test_the_invariant_battery_covers_all_four_couplers() -> None:
+def test_the_invariant_battery_covers_all_five_couplers() -> None:
     """Stated as a count so a silently dropped coupler is visible.
 
-    Thirteen invariant declarations across four couplers, because the two
+    Fourteen invariant declarations across five couplers, because the two
     composed couplers inherit their halves' invariants and add one each --
     ``outgoing_count_is_the_budget`` for the cascade and
-    ``patch_coverage_corrected`` for the patch route.
+    ``patch_coverage_corrected`` for the patch route -- and CHE-143 (M2.7)
+    added ``unit_direction_norm`` for ``C_GENERALIZED_SNELL``, its one
+    invariant.
     """
     entries = [
         entry
         for entry in resolve_ledger().covered.values()
         if entry.kind is DeclarationKind.INVARIANT
     ]
-    assert len(entries) == 13, len(entries)
+    assert len(entries) == 14, len(entries)
     assert {entry.component for entry in entries} == set(_registry_invariants())
 
 

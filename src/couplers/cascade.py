@@ -1,4 +1,16 @@
-"""Cascaded planar DOE step — SI Algorithm S1 (CHE-26).
+"""The FULL_FIELD diffractive interaction — SI Algorithm S1 (CHE-26).
+
+What this module is, in the package's own vocabulary (CHE-142): the
+``FULL_FIELD`` **model** of the one diffractive interaction, not a coupler in
+the representation-transition sense. Incident coherent rays meet a diffractive
+surface and coherent rays come out; the two representation transitions inside
+are its implementation, not its identity. ``LOCAL_PATCH``
+(:mod:`couplers.patch`) is the same interaction at the other granularity, and
+this one is its **shortcut** rather than its peer — SI S10, restated where the
+models are declared in :mod:`couplers.interaction`. Reach it through
+:func:`couplers.interaction.diffractive_interaction` with the model named;
+:func:`planar_doe_step` below is that model's implementation and stays exported
+because every shipped call site and committed record uses it.
 
 Propagating sampled secondary rays into the next surface and resampling there
 makes the ray count grow multiplicatively per surface: ``P*S`` rays in becomes
@@ -104,7 +116,9 @@ class PrimarySampling(StrEnum):
     position changes is the phase ``exp(i k (d_u x_p + d_v y_p))`` -- modulus 1.
     So ``f_c`` is the same at every position, ``q_c ~ f_c`` *is* the uniform
     density, and no reweighting of positions can reduce the dominant variance
-    term here. The asymmetry is real and, on RW-F, correct.
+    term here. The asymmetry is real and, on this FULL_FIELD route, correct.
+    (The benchmark records call it RW-F; that label is theirs, and the model
+    name is what the package uses.)
 
     It is **not** correct on the patch route, where each patch transforms its own
     window and ``f_c = ||U~_c||_1`` varies with how much aperture that window

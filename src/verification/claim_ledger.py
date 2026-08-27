@@ -252,6 +252,7 @@ LEDGER_COMPONENTS = (
     "C_WAVE_TO_RAY",
     "C_PLANAR_DOE_STEP",
     "C_PATCH_WFT",
+    "C_GENERALIZED_SNELL",
 )
 
 #: What a complete knowledge pack contains. Solver packs and coupler packs
@@ -1261,6 +1262,102 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
         ),
         gate_status=GateStatus.MET,
     ),
+    # -- C_GENERALIZED_SNELL (CHE-143, M2.7) ---------------------------------
+    Claim(
+        component="C_GENERALIZED_SNELL",
+        kind=ClaimKind.FORWARD_ACCURACY,
+        claim=(
+            "A linear phase ramp deflects to the exact grating angle "
+            "sin(theta_out) = (n_i sin(theta_in) + m lambda / Lambda) / n_t, to "
+            "round-off, and the zero-phase and zero-gradient limits reduce to "
+            "ordinary Snell's law and undeflected propagation respectively."
+        ),
+        oracle=Oracle.ANALYTIC,
+        oracle_independence=OracleIndependence.INDEPENDENT,
+        evidence=(
+            _t(
+                "test_diffractive_interaction.py",
+                "test_a_linear_phase_ramp_deflects_to_the_exact_grating_angle",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_a_linear_phase_ramp_at_oblique_incidence_matches_the_full_grating_equation",
+            ),
+            _t("test_diffractive_interaction.py", "test_the_zero_phase_limit_is_ordinary_snells_law"),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_the_zero_gradient_limit_with_equal_indices_is_undeflected_propagation",
+            ),
+        ),
+        gate_status=GateStatus.MET,
+        caveats=(
+            "Closed-form and limiting-case evidence only, not the FIXED_V1 REQUIRED-"
+            "tier benchmark-family coverage `verification.fixed_suite`'s success "
+            "metric S1 asks every capability-table component to have -- see the "
+            "corresponding Gap below. No convergence, variance, or device-parity "
+            "evidence exists; that sweep is M2.10's (CHE-146) job, not this claim's.",
+        ),
+    ),
+    Claim(
+        component="C_GENERALIZED_SNELL",
+        kind=ClaimKind.STRUCTURED_FAILURE,
+        claim=(
+            "An evanescent requested order and a local phase discontinuity that "
+            "breaks the gradient estimate are each refused with a structured "
+            "diagnostic naming the violated predicate and its margin, rather than "
+            "returning a normalized nonsense direction; the refusal is local to the "
+            "ray whose stencil actually touches the discontinuity."
+        ),
+        oracle=Oracle.NONE,
+        oracle_independence=OracleIndependence.NOT_APPLICABLE,
+        evidence=(
+            _t(
+                "test_diffractive_interaction.py",
+                "test_an_evanescent_requested_order_is_refused_not_returned_as_nonsense",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_a_local_phase_discontinuity_is_refused_and_the_refusal_is_local",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_generalized_snell_on_a_conformal_substrate_is_refused",
+            ),
+        ),
+        gate_status=GateStatus.MET,
+    ),
+    Claim(
+        component="C_GENERALIZED_SNELL",
+        kind=ClaimKind.CONVENTION,
+        claim=(
+            "The phasor sign, the diffraction order's sign, the 2*pi in the phase "
+            "gradient, and the metres-not-pixels unit of that gradient are each load-"
+            "bearing: a test-local reimplementation with any one of them wrong "
+            "disagrees with the exact analytic grating angle the production path "
+            "reproduces."
+        ),
+        oracle=Oracle.ANALYTIC,
+        oracle_independence=OracleIndependence.INDEPENDENT,
+        evidence=(
+            _t(
+                "test_diffractive_interaction.py",
+                "test_control_a_phasor_sign_flip_conjugates_the_deflection",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_control_an_order_sign_flip_conjugates_the_deflection",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_control_omitting_2pi_from_the_gradient_gives_the_wrong_angle",
+            ),
+            _t(
+                "test_diffractive_interaction.py",
+                "test_control_a_gradient_in_pixels_instead_of_metres_gives_the_wrong_angle",
+            ),
+        ),
+        gate_status=GateStatus.MET,
+    ),
 )
 
 
@@ -1438,6 +1535,34 @@ GAPS: tuple[Gap, ...] = (
         rationale=(
             "The failure mode is visible rather than silent: the registry says "
             "verified: false and the adapter refuses a gradient request before running."
+        ),
+    ),
+    Gap(
+        component="C_GENERALIZED_SNELL",
+        kind=ClaimKind.CONVERGENCE,
+        gap=(
+            "M2.10 (CHE-146) delivered the sweep this gap called for: family "
+            "B1-GSL-VALIDITY (src/verification/families/b1_gsl_validity.py, 12 "
+            "instances, driver benchmarks/instances/b1_gsl_validity.py) against "
+            "the analytic grating equation, over spatial frequency, duty cycle "
+            "and incidence angle, with smooth-limit agreement and a demonstrated "
+            "breakdown both on record. What remains: no instance in that family "
+            "carries split_tag=HELDOUT, so verification.fixed_suite's success "
+            "metric S1 (every capability-table component appears in a REQUIRED "
+            "FIXED_V1 instance with an independent oracle) still does not hold "
+            "for this component."
+        ),
+        blocks=("verification.fixed_suite success metric S1",),
+        severity="medium",
+        owner="a dedicated FIXED_V1-enrollment follow-up to M2.10 (CHE-146)",
+        rationale=(
+            "Not critical: what exists (the analytic grating-equation oracle, "
+            "gated, plus the sweep) is loudly checked, not silently assumed. "
+            "Medium because a real repository-wide invariant (S1) is unsatisfied "
+            "for a real, registered, characterized component. Tagging a "
+            "HELDOUT instance is a src/verification/fixed_suite.py edit -- a "
+            "shared, default-gate-enrolled file -- and M2.10's acceptance "
+            "criteria did not ask for it."
         ),
     ),
 )
