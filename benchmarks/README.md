@@ -32,7 +32,7 @@ This page says where the files are.
 | **Reports** | `reports/` — the milestone record. Historical, and their numbers stand; where a report names a retired task identifier it is describing what was run at the time. |
 | **Agent harness** | `agents/README.md` — the agent-evaluation harness's design decisions and its measured exclusion table. It ships no task set; M9 authors the replacement. |
 | **Roadmap** | `roadmap.md` — retired components and the findings worth knowing before restoring one. Explicitly non-executable. |
-| **Live runner** | `physics/L2-PSF-01/` — the singlet workload. Its `1.0e-3 fft_oracle_intensity_relative_l2` gate is **unmet at 2.2072e-3**, queryable through `verification.claim_ledger.open_gates()`. The runner is retired-by-design and stays only until the executor and family runner replace it (CHE-115). |
+| **Live runner** | `physics/L2-PSF-01/` — the singlet workload. Its `1.0e-3 fft_oracle_intensity_relative_l2` gate is **unmet at 2.2072e-3**, queryable through `verification.claim_ledger.open_gates()`. The runner is retired-by-design. CHE-115 (M3.3) showed the executor reproduces this gate's number bit-identically from `examples/graphs/psf_singlet_sensor.yaml` via `instances/b3_psf_singlet.py`, which is the precondition its amendment set; the deletion itself is CHE-116's, and until then the runner keeps the convergence ladder, the O2 characterization oracle and two controls that have no replacement yet. |
 
 ## Archived (CHE-88)
 

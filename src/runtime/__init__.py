@@ -24,6 +24,7 @@ from runtime.executor import (
     graph_fingerprint,
     topological_order,
 )
+from runtime.variants import VariantError, with_config_overrides
 
 __all__ = [
     "EXECUTOR_VERSION",
@@ -33,6 +34,8 @@ __all__ = [
     "InMemoryCache",
     "ProcessModel",
     "SolverStateProtocol",
+    "VariantError",
     "graph_fingerprint",
     "topological_order",
+    "with_config_overrides",
 ]

@@ -42,9 +42,16 @@ m1_independence_check: archive/benchmarks/gen1/archive/benchmarks/gen1/benchmark
 #     -> benchmarks/physics/L2-PSF-01/README.md and
 #        benchmarks/reports/2026-08/slice_cleanup_disposition.md item 3
 #
-# The runner `benchmarks/physics/L2-PSF-01/run_benchmark.py` is still the only
-# way to execute that workload and stays until M3's executor and the family
-# runner replace it (CHE-115). It is bucket C in benchmarks/inventory.yaml.
+# The runner `benchmarks/physics/L2-PSF-01/run_benchmark.py` is no longer the only
+# way to execute this gate. CHE-115 (M3.3) reproduced its frozen
+# `fft_oracle_intensity_relative_l2 = 0.0022072391812867093` BIT-IDENTICALLY
+# through `GraphExecutor` from `examples/graphs/psf_singlet_sensor.yaml`, driven by
+# `benchmarks/instances/b3_psf_singlet.py` and judged by
+# `verify(B3_PSF_SINGLET, instance, record)`. The runner still owns what that path
+# does not reproduce -- the 12-rung convergence ladder, the O2 ASM/RS
+# characterization oracle, the exit-pupil hard-support control and the
+# quadrature-weight regression control -- and its deletion is CHE-116's per
+# CHE-115's own amendment. It is bucket C in benchmarks/inventory.yaml.
 
 # ---------------------------------------------------------------------------
 # Characterizations — NOT benchmarks, and the distinction is the entry

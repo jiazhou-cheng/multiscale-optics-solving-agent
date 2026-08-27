@@ -401,6 +401,122 @@ def test_the_example_graph_edge_config_actually_runs(coupler, ray_record, tmp_pa
     assert result.diagnostics["reconstruction"]["grid_nyquist_satisfied"] is True
 
 
+# --- The reconstruction plane, and the negative control (CHE-115) --------------
+
+
+SENSOR_Z_M = 4.90560476022521e-3
+
+
+def test_advance_to_z_m_moves_the_reconstruction_plane(coupler, ray_record, tmp_path):
+    """The plane the OPL is REFERENCED FROM and the plane the field is
+    RECONSTRUCTED AT are two declarations, and before CHE-115 an edge could only
+    make the first.
+
+    Asserted against the operation itself rather than against a expected array:
+    the edge must equal ``advance_bundle_to_plane`` then ``ray_to_wave``, bit for
+    bit, or the graph and the library have started doing different physics.
+    """
+    from couplers.handoff import advance_bundle_to_plane
+
+    result = coupler.transform(
+        _request(ray_record, tmp_path, advance_to_z_m=SENSOR_Z_M)
+    )
+    assert result.status is RunStatus.SUCCEEDED, result.error_message
+    assert result.target.metadata["z_m"] == SENSOR_Z_M
+
+    bundle = declare_coherent_bundle(
+        ray_record,
+        declared_plane=DeclaredHandoffPlane(handoff_plane="exit_pupil", z_m=PUPIL_Z_M),
+    ).bundle
+    direct, _ = ray_to_wave(
+        advance_bundle_to_plane(bundle, SENSOR_Z_M),
+        grid_shape=(GRID_N, GRID_N),
+        sample_pitch_m=(PITCH_M, PITCH_M),
+        projection=Projection.ASM_CONSISTENT,
+    )
+    assert np.array_equal(np.load(result.target.uri), direct.u)
+
+
+def test_the_promoted_advance_equals_the_probes_own_copy(ray_record):
+    """Two copies of the same operation, pinned equal on REAL traced rays.
+
+    ``benchmarks/probes/sensor_handoff_convergence.py::_advance_bundle_to_z`` is
+    the original and is not edited by CHE-115: editing it would restamp records
+    it did not produce. So there are two copies, and this asserts they agree on
+    the actual traced M3-SINGLET-REF bundle rather than assuming they agree
+    because one was written from the other.
+    """
+    import importlib.util
+    import sys
+
+    from couplers.handoff import advance_bundle_to_plane
+
+    name = "che115_sensor_probe"
+    if name in sys.modules:
+        probe = sys.modules[name]
+    else:
+        path = ROOT / "benchmarks" / "probes" / "sensor_handoff_convergence.py"
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None and spec.loader is not None
+        probe = importlib.util.module_from_spec(spec)
+        sys.modules[name] = probe
+        spec.loader.exec_module(probe)
+
+    bundle = declare_coherent_bundle(
+        ray_record,
+        declared_plane=DeclaredHandoffPlane(handoff_plane="exit_pupil", z_m=PUPIL_Z_M),
+    ).bundle
+
+    promoted = advance_bundle_to_plane(bundle, SENSOR_Z_M)
+    original, _step = probe._advance_bundle_to_z(bundle, SENSOR_Z_M)
+
+    assert np.array_equal(promoted.positions_m, original.positions_m)
+    assert np.array_equal(promoted.directions, original.directions)
+    _, promoted_opl = promoted.require_coherent()
+    _, original_opl = original.require_coherent()
+    assert np.array_equal(promoted_opl, original_opl)
+    assert promoted.reference_plane.z_m == original.reference_plane.z_m == SENSOR_Z_M
+    assert (
+        promoted.optical_path_length_reference == original.optical_path_length_reference
+    )
+
+
+def test_a_perturbation_is_expressible_on_the_edge(coupler, ray_record, tmp_path):
+    """The family declares ``opl-sign-flip`` as a control on this edge. A control
+    that can only be run by writing Python is a control the executor cannot
+    record having run.
+
+    The flip must change the field. If it did not, the phase carries no OPL and
+    every positive result through this edge would be vacuous.
+    """
+    plain = coupler.transform(_request(ray_record, tmp_path / "plain"))
+    flipped = coupler.transform(
+        _request(ray_record, tmp_path / "flipped", perturbation={"opl_sign": -1})
+    )
+    assert plain.status is RunStatus.SUCCEEDED and flipped.status is RunStatus.SUCCEEDED
+    assert not np.array_equal(np.load(plain.target.uri), np.load(flipped.target.uri))
+    assert flipped.diagnostics["declarations"]["perturbation"] != "none"
+
+
+@pytest.mark.parametrize(
+    ("config", "expected"),
+    [
+        ({"perturbation": {"opl_sign": -1, "no_such_field": True}}, "no field"),
+        ({"perturbation": ["opl_sign"]}, "must be a mapping"),
+        ({"advance_to_z_m": float("nan")}, "not a finite number of metres"),
+    ],
+)
+def test_a_misspelled_control_is_refused_rather_than_dropped(
+    coupler, ray_record, tmp_path, config, expected
+):
+    """An override silently ignored because of a typo produces a run identical to
+    the unperturbed one that reports itself as a control -- the worst available
+    outcome, and the reason these are refusals."""
+    result = coupler.transform(_request(ray_record, tmp_path, **config))
+    assert result.status is RunStatus.FAILED
+    assert expected in result.error_message
+
+
 def test_the_registry_port_matches_what_the_implementation_consumes(coupler):
     """The port type and the code must not drift apart again.
 

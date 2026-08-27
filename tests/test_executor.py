@@ -571,6 +571,41 @@ def test_a_downcast_is_recorded_as_lossy_rather_than_as_the_request(parts) -> No
     ), "an unmeasured loss must say so rather than reading as zero"
 
 
+def test_a_run_that_asked_for_cuda_and_got_the_host_is_detected(parts) -> None:
+    """CHE-115's acceptance criterion, and it needs no GPU to check.
+
+    The dangerous version of this is silent: a record whose ``device`` field says
+    ``cuda`` because the config said ``cuda`` supports a GPU performance claim
+    about a run that happened on the host. The device is read off the produced
+    artifact, so the record disagrees with the request and the node is
+    ``EXECUTED_LOSSY`` rather than ``EXECUTED``.
+
+    Faked at the adapter rather than run on a real device on purpose: what is
+    under test is that the executor believes the array and not the request, and
+    a real CUDA run would only exercise the case where the two agree.
+    """
+    _source, sink, _coupler = parts
+    sink.actual_device = Device.CPU
+    spec = _graph(
+        nodes=[
+            {"id": "lens", "model": "M_RAY_OPTILAND"},
+            {"id": "wave", "model": "M_WAVE_CHROMATIX", "config": {"device": "cuda"}},
+        ]
+    )
+    record = _executor(parts).run(spec)
+
+    wave = record.node("wave")
+    assert wave is not None
+    assert wave.device_precision is not None
+    assert wave.device_precision.requested_device == "cuda"
+    assert wave.device_precision.actual_device == "cpu"
+    assert not wave.device_precision.honoured
+    assert wave.outcome is NodeOutcome.EXECUTED_LOSSY
+    # The cost row carries the device the arrays landed on too, so a timing read
+    # out of the record cannot be attributed to hardware it never touched.
+    assert wave.cost is not None and wave.cost.device == "cpu"
+
+
 def test_the_applied_solver_state_is_recorded_when_the_adapter_reports_it(parts) -> None:
     source, _sink, _coupler = parts
     source.diagnostics = {"execution": {"backend": "numpy", "precision": "float64"}}

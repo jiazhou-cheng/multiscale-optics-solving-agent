@@ -113,7 +113,7 @@
  },
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "1c2d3a1cd7ad30ef2fa82fcfdd2a2b4602836c1fdd59bb3f2696a5d8344d6421",
+   "combined_sha256": "51c17637e388bb81dac59c3bb0723b3241cfc1bf98264d20b0c25ded09a5fc1c",
    "files": {
     "benchmarks/probes/off_axis_handoff.py": "7b6960510b108278a88eab7099fc1aa91882febfd7ec04dd5fc4a74f315119ad",
     "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
@@ -134,9 +134,9 @@
     "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
     "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
     "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
-    "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
+    "src/couplers/handoff.py": "bf664f36c82baaa30627c451801445291b00ba8b9c6b2442485746973a285156",
     "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
-    "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+    "src/couplers/node.py": "0f19f5ced93161ee6289f9586a6d6f4a5bffbc838caaa012b8f4aee65d5c1592",
     "src/couplers/ontology.py": "c6bbbb14c8a09aa7efe71bc0d15a5418e73084fbcb7167a76a260598688cfea4",
     "src/couplers/patch.py": "699e7270bebc7e03dbd0bf1a0a61606dd534ec717bbf038fb5871527af0b1aa9",
     "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
@@ -194,8 +194,8 @@
   },
   "probe": "m3_off_axis_handoff",
   "schema_version": 2,
-  "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
-  "timestamp_utc": "2026-08-27T16:12:38.352453+00:00",
+  "source_commit": "2de2cd03a4f6e33420fe08a099ce3e734fc24de1",
+  "timestamp_utc": "2026-08-27T18:58:20.928466+00:00",
   "working_tree_dirty": true
  },
  "sampling": {

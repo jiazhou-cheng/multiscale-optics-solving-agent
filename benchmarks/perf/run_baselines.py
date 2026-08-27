@@ -345,7 +345,157 @@ def baseline_overhead() -> None:
             ),
         }
 
+        results["executor"] = _executor_overhead(work)
+
     _write("framework_overhead", results)
+
+
+#: Ring count for the executor arm. NOT the frozen 512: the point of this
+#: measurement is to bound what the graph layer costs, and a configuration where
+#: the physics takes 26 s would report a ratio of 1.00 and prove nothing about the
+#: layer. 128 rings is 49,537 rays -- large enough that the reconstruction is
+#: still the dominant term, small enough that a fixed per-run cost is visible.
+_EXECUTOR_ARM_RINGS = 128
+
+
+def _executor_overhead(work: Path) -> dict[str, Any]:
+    """CHE-115 (M3.3). The arm CHE-105 could not measure: there was no executor.
+
+    ``GraphExecutor.run`` on the committed ``psf_singlet_sensor.yaml`` against the
+    same physics called directly -- adapter, declaration, ray-domain advance,
+    reconstruction, propagation -- in the order the graph runs them. Both arms
+    trace, both reconstruct, both propagate; the difference is graph validation,
+    topological ordering, the per-node cost estimate, the memory watchdog, the
+    artifact keying, the solver-state protocol and the run record.
+
+    The direct arm is written out rather than delegated to the probe, because the
+    probe's helpers advance and reconstruct but do not propagate, and an arm that
+    skipped the wave leg would divide by a smaller denominator and report a larger
+    overhead than the graph actually costs.
+    """
+    from couplers.handoff import (
+        DeclaredHandoffPlane,
+        advance_bundle_to_plane,
+        declare_coherent_bundle,
+    )
+    from couplers.ray_to_wave import ray_to_wave
+    from registry.loader import Registry
+    from runtime.executor import GraphExecutor
+    from runtime.variants import with_config_overrides
+    from solvers.base import ModelRunRequest
+    from solvers.chromatix.adapter import get_adapter as get_wave_adapter
+    from solvers.optiland.adapter import get_adapter
+
+    graph_path = ROOT / "examples" / "graphs" / "psf_singlet_sensor.yaml"
+    graph = with_config_overrides(
+        Registry.load_graph(graph_path),
+        nodes={"lens": {"num_rays": _EXECUTOR_ARM_RINGS}},
+        task_id="B3-PSF-SINGLET-01/perf",
+    )
+    edge = graph.edges[0]
+    grid_n = int(edge.config["grid_n"])
+    pitch_m = float(edge.config["target_sample_pitch_m"])
+    sensor_z_m = float(edge.config["advance_to_z_m"])
+    pupil_z_m = float(edge.config["handoff_plane_z_m"])
+    registry = Registry.from_package()
+
+    def through_executor(timer: StageTimer) -> Any:
+        with timer.stage("executor_run"):
+            return GraphExecutor(registry).run(graph, seed=1)
+
+    graph_record, graph_result = measure(
+        through_executor,
+        label="B3-PSF-SINGLET-01 via GraphExecutor.run",
+        workload=Workload(
+            size=_EXECUTOR_ARM_RINGS,
+            unit="ray_fan_ring",
+            route="executor",
+            detail={"grid_n": grid_n, "nodes": 3},
+        ),
+        repeats=3,
+        warmup=1,
+    )
+    ray_count = int(graph_result.artifacts["lens:rays"].shape[0])
+
+    def direct_chain(timer: StageTimer) -> Any:
+        with timer.stage("trace"):
+            rays = (
+                get_adapter()
+                .run(
+                    ModelRunRequest(
+                        run_id="perf",
+                        node_id="lens",
+                        config={
+                            **dict(graph.nodes[0].config),
+                            "output_directory": str(work / "executor_direct"),
+                        },
+                    )
+                )
+                .outputs["rays"]
+            )
+        with timer.stage("declare_and_advance"):
+            bundle = advance_bundle_to_plane(
+                declare_coherent_bundle(
+                    rays, declared_plane=DeclaredHandoffPlane("exit_pupil", pupil_z_m)
+                ).bundle,
+                sensor_z_m,
+            )
+        with timer.stage("reconstruct"):
+            field, _ = ray_to_wave(
+                bundle, grid_shape=(grid_n, grid_n), sample_pitch_m=(pitch_m, pitch_m)
+            )
+        with timer.stage("propagate"):
+            record = field.to_artifact_record(
+                artifact_id="perf:field", uri=work / "executor_direct" / "field.npy"
+            )
+            return get_wave_adapter().run(
+                ModelRunRequest(
+                    run_id="perf",
+                    node_id="wave",
+                    inputs={"input_field": record},
+                    config=dict(graph.nodes[1].config),
+                )
+            )
+
+    direct_record, _ = measure(
+        direct_chain,
+        label="B3-PSF-SINGLET-01 direct: adapter + advance + ray_to_wave + adapter",
+        workload=Workload(
+            size=_EXECUTOR_ARM_RINGS,
+            unit="ray_fan_ring",
+            route="direct",
+            detail={"grid_n": grid_n, "nodes": 3},
+        ),
+        repeats=3,
+        warmup=1,
+    )
+
+    framework_s = graph_record.measurement.median_s
+    direct_s = direct_record.measurement.median_s
+    return {
+        "rings": _EXECUTOR_ARM_RINGS,
+        "traced_rays": ray_count,
+        "grid_n": grid_n,
+        "graph": graph_path.relative_to(ROOT).as_posix(),
+        "framework_s": framework_s,
+        "direct_s": direct_s,
+        "overhead_ratio": framework_s / direct_s,
+        "overhead_s": framework_s - direct_s,
+        "target_ratio": 1.10,
+        "meets_10_percent_target": bool(framework_s / direct_s <= 1.10),
+        "framework_record": _validate(graph_record),
+        "direct_record": _validate(direct_record),
+        "note": (
+            "The two arms run the same three stages in the same order, so the "
+            "difference is the graph layer: GraphValidator, topological_order, the "
+            "per-node CostEstimate, the MemoryWatchdog, artifact keying, the "
+            "SolverStateProtocol capture and the ExecutionRecord. Both arms write the "
+            "same artifacts. NOT measured at the frozen 512 rings, where the "
+            "reconstruction alone is ~17 s and any fixed cost rounds to zero -- see "
+            "_EXECUTOR_ARM_RINGS. The ratio here is therefore an upper bound on what "
+            "the frozen configuration pays, not an estimate of it."
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------

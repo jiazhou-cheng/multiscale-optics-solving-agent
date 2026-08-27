@@ -63,6 +63,34 @@ The consequence, stated: **an agent cannot run demo3 through the executor.**
 demo3 stays a probe until a streaming node contract exists. That is a gap in
 what the agent can compose, and it is better as a refusal than as a run that
 dies at 40 GB.
+
+A graph needs a node to hang an edge on, and two workloads have none
+--------------------------------------------------------------------
+Found by CHE-115 (M3.3) trying to migrate demo2 and recorded here rather than
+worked around there, because it is this layer's gap and not that benchmark's.
+
+Every edge in a ``GraphSpec`` names a source **node** and a target **node**, and
+a node names a registered model. The registry has exactly two:
+``M_RAY_OPTILAND`` and ``M_WAVE_CHROMATIX``. demo2 is a bare SLM behind a
+circular amplitude mask with a sensor 1.26 mm downstream and **no refractive
+surface at all** -- so its own record says ``optiland_used: false`` -- and the
+operation it exercises is ``C_PLANAR_DOE_STEP``, which consumes an incident ray
+bundle *and* a DOE transmission and emits a ray bundle. There is no registered
+model that emits either input and none that consumes the output, so demo2 cannot
+be written as a graph document no matter what the couplers support. Its RW-P
+route is additionally 1.6e8 rays in 40 chunks, which the streaming refusal above
+covers independently.
+
+So the missing piece is a **source/sink node contract**: a way for a graph to
+declare "this array, on this plane, with these conventions, is an input" and
+"this field is the terminal state". ``runtime/instance_runner.py::field_source``
+is the shape of half of it and is deliberately *not* a registered model --
+``GraphExecutor.run`` takes it through ``inputs``, which works for a wave node
+whose port is ``input_field`` and does nothing for a coupler that needs a source
+node to exist. Naming the two workloads that are blocked, rather than inventing
+two models to unblock one benchmark, is the choice here: a registered model is a
+capability claim, and ``M_SOURCE_ARRAY`` would be claiming one that no oracle has
+ever checked.
 """
 
 from __future__ import annotations

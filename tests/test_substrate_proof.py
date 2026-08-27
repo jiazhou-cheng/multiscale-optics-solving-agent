@@ -1,29 +1,44 @@
-"""The loop, closed on a real workload.
+"""The loop, closed on a real workload, at the frozen configuration.
 
-CHE-115 (M3.3), partial. Everything else in this repository tests one link:
+CHE-115 (M3.3). Everything else in this repository tests one link:
 ``tests/test_executor*.py`` proves a graph runs, ``tests/test_verifier.py``
 proves a hand-built record is interpreted correctly, and the family tests prove
 the declarations are well formed. This file is the only place where a real
 Optiland trace becomes a real ``ExecutionRecord`` and that record is handed to
 ``verify()`` against a real family.
 
-What it asserts is deliberately not "the number is right". The number is
-``1.18e-2`` and the frozen gate is ``1.0e-3``, and the two are not comparable --
-different ray count, and a different window definition. What is asserted is that
-each link carries what the next one needs, and that the verifier tells the truth
-about a run with unexercised controls and no convergence ladder.
+And unlike its previous form, it now asserts that **the number is the frozen
+one, bit for bit.** ``fft_oracle_intensity_relative_l2`` off the executor's
+record equals ``0.0022072391812867093`` -- the value produced before this
+substrate existed, by ``benchmarks/probes/quadrature_weight.py`` calling the
+coupler directly. ``==``, not ``approx``: a substrate proof that only reproduced
+its target to a tolerance would have moved a number and called it a migration.
+
+Which arms run where, and why
+-----------------------------
+The frozen arm costs ~28 s, which is inside the default gate (the critical file
+is ``test_executor_integration.py`` at ~31 s, so this changes the gate's wall
+clock by nothing). The two further arms -- ``near_sensor_fine``, which is the
+only one that gives ``M_WAVE_CHROMATIX`` a nonzero distance, and the
+``opl_sign=-1`` negative control, which needs a second full 512-ring run to
+compare against -- are each another ~25-30 s and carry ``slow``. That is the
+marker's declared meaning: expensive numerical characterization, required before
+merging a change to coupler numerics, which any change reaching this file is.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 
 import pytest
+import yaml
 
 from core.execution import RunStatus
 from core.execution_record import NodeOutcome
 from core.paths import repository_root
+from verification.evidence import result_fingerprint
 from verification.families.b3_composed import B3_PSF_SINGLET
 from verification.result import DiagnosticCode, NegativeControlOutcome
 from verification.status import VerificationStatus
@@ -52,7 +67,77 @@ def _driver():
 
 @pytest.fixture(scope="module")
 def proof():
-    return _driver().run_and_verify(seed=1)
+    """The cheap arm: one 512-ring run, no negative control.
+
+    ``with_control=False`` is what keeps this file inside the default gate. The
+    control needs a second full 512-ring run and lives in the slow arm below,
+    together with the committed record's fingerprint.
+    """
+    run = _driver().run_instance(with_control=False, seed=1)
+    return run.record, run.result
+
+
+def _residual(result):
+    return next(
+        m for m in result.physics_accuracy if m.metric == "fft_oracle_intensity_relative_l2"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The fingerprint
+# ---------------------------------------------------------------------------
+
+
+def test_the_frozen_number_is_reproduced_bit_identically(proof) -> None:
+    """The substrate proof's whole point, as one assertion.
+
+    ``0.0022072391812867093`` was measured by a probe that builds the bundle,
+    advances it, calls ``ray_to_wave`` and masks the result itself. This value
+    comes off a ``GraphExecutor`` record produced from a committed YAML document.
+    Equality, because they are the same float64 computation reached two ways --
+    if they were not, the migration would have changed the physics and the right
+    response is to find out why, not to widen this to ``approx``.
+    """
+    _record, result = proof
+    assert _residual(result).measured.value == _driver().FROZEN_OBSERVED
+
+
+def test_the_family_and_the_driver_agree_on_what_the_frozen_number_is(proof) -> None:
+    """The target is not restated independently of the thing that carries it.
+
+    ``FROZEN_OBSERVED`` is written down in the driver so the assertion above does
+    not read its expected value out of the object it is testing. That only works
+    while the two agree, so they are pinned.
+    """
+    disposition = B3_PSF_SINGLET.gate_disposition
+    assert disposition is not None
+    assert disposition.observed == _driver().FROZEN_OBSERVED
+
+
+def test_the_instance_declares_the_configuration_the_graph_executes() -> None:
+    """A parameter on the instance that the graph does not use describes a run
+    that did not happen. Every value that appears in both is asserted equal here,
+    rather than being kept in step by whoever edits one of them."""
+    driver = _driver()
+    document = yaml.safe_load(driver.GRAPH_PATH.read_text(encoding="utf-8"))
+    lens = next(node for node in document["nodes"] if node["id"] == "lens")
+    wave = next(node for node in document["nodes"] if node["id"] == "wave")
+    edge = next(e for e in document["edges"] if e["id"] == "sensor_reconstruction")
+    parameters = driver.CANONICAL_PARAMETERS
+
+    assert lens["config"]["num_rays"] == parameters["pupil_rings"]
+    assert lens["config"]["wavelength"] * 1e-6 == parameters["wavelength_m"]
+    assert lens["config"]["Hy"] == parameters["field_angle_rad"]
+    assert wave["config"]["pad_width"] == parameters["pad_width"]
+    assert edge["config"]["grid_n"] == parameters["grid_n"]
+    # The frozen configuration reconstructs ON the sensor, which is what makes
+    # the wave node's propagation zero and the gate a float64 measurement.
+    assert edge["config"]["advance_to_z_m"] == wave["config"]["target_plane_z_m"]
+
+
+# ---------------------------------------------------------------------------
+# Each link carries what the next one needs
+# ---------------------------------------------------------------------------
 
 
 def test_the_instance_and_the_record_describe_the_same_computation(proof) -> None:
@@ -68,7 +153,7 @@ def test_the_instance_and_the_record_describe_the_same_computation(proof) -> Non
 
 def test_all_three_stages_executed(proof) -> None:
     record, _ = proof
-    assert [n.node_id for n in record.nodes] == ["lens", "pupil_reconstruction", "wave"]
+    assert [n.node_id for n in record.nodes] == ["lens", "sensor_reconstruction", "wave"]
     assert all(n.outcome is NodeOutcome.EXECUTED for n in record.nodes)
 
 
@@ -80,36 +165,49 @@ def test_the_verifier_reads_the_record_rather_than_a_committed_file(proof) -> No
     assert result.instance_id == "B3-PSF-SINGLET-01"
 
 
+def test_the_device_placement_is_read_off_the_arrays_not_off_the_request(proof) -> None:
+    """A run that asked for a device and got another one must say so.
+
+    ``requested`` is not evidence of ``actual``: the executor reads the device
+    and dtype off the produced artifact. Here both nodes are asked for the host
+    and land on it, and the wave node's dtype is the interesting half -- it is
+    asked for nothing in particular and Chromatix casts unconditionally, which is
+    exactly the fiction a requested-only record would hide.
+    """
+    record, _ = proof
+    observations = {n.node_id: n.device_precision for n in record.nodes}
+    assert all(o is not None for o in observations.values())
+    assert observations["sensor_reconstruction"].actual_device == "cpu"
+    assert observations["sensor_reconstruction"].actual_dtype == "complex128"
+    assert observations["wave"].actual_device == "cpu"
+    assert observations["wave"].actual_dtype == "complex64"
+
+
+# ---------------------------------------------------------------------------
+# What the result says about itself
+# ---------------------------------------------------------------------------
+
+
 def test_the_measured_residual_is_reported_with_an_uncertainty(proof) -> None:
-    """Every reported number carries an error bar. Here it is the window
-    sensitivity rather than a floating-point floor, because the frozen grid puts
-    2.44 pixels across the Airy radius and is not converged for radius-like
-    quantities -- quoting round-off would claim a precision the sampling does
-    not support."""
+    """Every reported number carries an error bar. Here it is what routing the
+    same field through the complex64 wave node moves the number by -- a measured
+    property of this graph, not a quoted round-off floor."""
     from verification.result import UncertaintyBasis
 
     _record, result = proof
-    residual = next(
-        m for m in result.physics_accuracy if m.metric == "fft_oracle_intensity_relative_l2"
-    )
+    residual = _residual(result)
     assert residual.measured.uncertainty is not None
-    assert residual.measured.uncertainty_basis is UncertaintyBasis.GRID_CONVERGENCE
+    assert residual.measured.uncertainty_basis is UncertaintyBasis.FLOATING_POINT_FLOOR
     assert residual.measured.value > 0.0
+    # The complex64 leg is worth ~7.5e-5 of the value, so the bar is neither zero
+    # nor the size of the number.
+    assert 0.0 < residual.measured.uncertainty < 0.1 * residual.measured.value
 
 
 def test_the_gate_is_reported_unmet_rather_than_widened(proof) -> None:
-    """1.18e-2 against a frozen 1.0e-3. The tolerance is not touched.
-
-    This is NOT the frozen 2.21e-3 and this test does not claim it is: the run
-    is 256 rings rather than 512, and the metric is a centred half window rather
-    than the 5-Airy-radius radial-profile residual the frozen gate uses. Both
-    differences are declared on the instance and in the module docstring, and
-    reproducing the fingerprint is the rest of CHE-115.
-    """
+    """2.2072e-3 against a frozen 1.0e-3. The tolerance is not touched."""
     _record, result = proof
-    residual = next(
-        m for m in result.physics_accuracy if m.metric == "fft_oracle_intensity_relative_l2"
-    )
+    residual = _residual(result)
     assert residual.tolerance == 1.0e-3
     assert residual.tolerance_may_gate
     assert residual.met is False
@@ -122,19 +220,20 @@ def test_the_oracle_independence_travels_into_the_result(proof) -> None:
     from verification.claim_ledger import Oracle, OracleIndependence
 
     _record, result = proof
-    residual = next(
-        m for m in result.physics_accuracy if m.metric == "fft_oracle_intensity_relative_l2"
-    )
+    residual = _residual(result)
     assert residual.oracle is Oracle.ANALYTIC
     assert residual.oracle_independence is OracleIndependence.INDEPENDENT
 
 
 def test_the_unexercised_controls_make_the_gate_untrustworthy(proof) -> None:
     """The result of this run is not "the gate failed"; it is "the gate failed
-    and nothing established that it could have succeeded honestly".
+    and nothing in THIS run established that it could have succeeded honestly".
 
-    Four controls are declared and none was exercised. A result reporting a
-    trustworthy gate here would be the green tick the whole structure refuses.
+    Four controls are declared and this arm exercises none of them: the
+    ``opl_sign`` control is a second 512-ring run and lives in the slow arm
+    below, where the committed record is produced with it exercised. A result
+    reporting a trustworthy gate here would be the green tick the whole structure
+    refuses.
     """
     _record, result = proof
     assert not result.gate_is_trustworthy
@@ -182,4 +281,90 @@ def test_the_validity_declared_matches_the_validity_observed(proof) -> None:
     assert result.validity.declaration_holds
     assert DiagnosticCode.DECLARED_VALIDITY_DISAGREES_WITH_OBSERVED not in (
         result.diagnostic_codes()
+    )
+
+
+# ---------------------------------------------------------------------------
+# The arms that cost a second 512-ring run
+# ---------------------------------------------------------------------------
+
+
+def test_a_variant_is_a_different_graph_and_not_a_flag() -> None:
+    """Cheap: no execution. A perturbed graph must be distinguishable from its
+    baseline in the record, or a control and its control are one run.
+
+    Also pins the refusal: an override naming an edge the graph does not have
+    raises, because an override silently dropped for a typo produces a run
+    identical to the unperturbed one that reports itself as a control.
+    """
+    from runtime.executor import graph_fingerprint
+    from runtime.variants import VariantError, with_config_overrides
+
+    driver = _driver()
+    baseline = driver.load_graph()
+    flipped = driver.opl_sign_flip_graph()
+    assert graph_fingerprint(baseline) != graph_fingerprint(flipped)
+    assert flipped.task_id == "B3-PSF-SINGLET-01/opl_sign_flip"
+    # The baseline is not mutated by taking a variant of it.
+    assert "perturbation" not in baseline.edges[0].config
+
+    with pytest.raises(VariantError):
+        with_config_overrides(baseline, edges={"no_such_edge": {"grid_n": 8}})
+
+
+@pytest.mark.slow
+def test_the_wave_node_does_real_work_in_the_near_sensor_fine_variant() -> None:
+    """The frozen configuration's wave node propagates zero distance. A three-node
+    graph whose middle node is an identity has demonstrated two nodes, so the same
+    document is run with the reconstruction 0.001 R upstream -- CHE-38's own
+    ``near_sensor_fine`` candidate -- and Chromatix propagates the residual.
+
+    The agreement asserted is deliberately loose. CHE-38 section 7's padding
+    sweep is the evidence for how much a residual post-handoff propagation moves
+    this number, and this arm exists to show the node ran with real work, not to
+    re-derive that sweep.
+    """
+    arm = _driver().run_near_sensor_fine(seed=1)
+    assert arm["status"] == "succeeded"
+    assert arm["propagation_m"] > 0.0
+    record = arm["record"]
+    wave = next(n for n in record.nodes if n.node_id == "wave")
+    assert wave.outcome is NodeOutcome.EXECUTED
+    # The propagated field is a different field from the reconstruction it came
+    # from -- if these agreed exactly the propagation would have been a no-op.
+    assert arm["terminal_relative_l2_vs_o1"] != arm["reconstruction_relative_l2_vs_o1"]
+    assert arm["terminal_relative_l2_vs_o1"] < 0.5
+
+
+@pytest.mark.slow
+def test_the_opl_sign_control_fires_and_the_committed_record_reproduces() -> None:
+    """The family declares ``opl-sign-flip``; this runs it through the executor,
+    and re-derives the committed record's scientific fingerprint from the result.
+
+    Negating the declared OPL conjugates the wavefront -- a converging pupil
+    field becomes diverging -- and the residual against O1 must exceed 0.5, or
+    the metric cannot tell a scrambled wavefront from a converging one and no
+    passing value it reports means anything. Decided against O1 only: O2 is our
+    own propagator built from the same traced pupil.
+    """
+    from verification.result import NegativeControlOutcome as Outcome
+
+    driver = _driver()
+    run = driver.run_instance(with_control=True, seed=1)
+    control = next(
+        c for c in run.result.negative_control_results if c.control_id == "opl-sign-flip"
+    )
+    assert control.baseline is not None and control.baseline.value == driver.FROZEN_OBSERVED
+    assert control.mutated is not None and control.mutated.value > 0.5
+    assert control.outcome is Outcome.FIRED
+
+    committed = json.loads(
+        (repository_root() / "benchmarks" / "instances" / "records"
+         / f"{driver.INSTANCE_ID}.json").read_text(encoding="utf-8")
+    )
+    assert run.instance.fingerprint == committed["instance_fingerprint"]
+    assert result_fingerprint(run.result) == committed["scientific_fingerprint"], (
+        "the substrate proof re-ran to a different scientific fingerprint. Identify "
+        "why the measurement moved and regenerate the record through the driver "
+        "(`--write`) rather than editing it."
     )

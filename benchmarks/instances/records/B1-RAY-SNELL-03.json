@@ -52,7 +52,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "ce24a1624647f9c71fe73cf10018a16490978cc7177d38734215fd4604666f0e",
+      "combined_sha256": "b486929d48dbd752cd06a1c0c61ab500cefa349ed8486d42c7e06da3f746a7c2",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -76,9 +76,9 @@
         "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
         "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
         "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
-        "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
+        "src/couplers/handoff.py": "bf664f36c82baaa30627c451801445291b00ba8b9c6b2442485746973a285156",
         "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
-        "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+        "src/couplers/node.py": "0f19f5ced93161ee6289f9586a6d6f4a5bffbc838caaa012b8f4aee65d5c1592",
         "src/couplers/ontology.py": "c6bbbb14c8a09aa7efe71bc0d15a5418e73084fbcb7167a76a260598688cfea4",
         "src/couplers/patch.py": "699e7270bebc7e03dbd0bf1a0a61606dd534ec717bbf038fb5871527af0b1aa9",
         "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
@@ -90,9 +90,10 @@
         "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
         "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
         "src/registry/prescriptions.py": "eaead29f70f2a5ef9327e319dbd260a0e1e72a712d8461cd8848d3eec8517b85",
-        "src/runtime/__init__.py": "181d1e8f9755456d0b479093a7ab0c5ecbf8f62e1eb854a8c566a95fc8ebd10d",
+        "src/runtime/__init__.py": "aecd476cc41d3567d92a444aec6c48dd3f2f51d138ae75e3e204ee3acddd5177",
         "src/runtime/executor.py": "434be27f14c266155f2b92a9123e8ffcac0d0b1f191fe08f0e0b19c1463de228",
         "src/runtime/instance_runner.py": "ea2aae347e10b0770800a2afb038bf09d7733943c80ae50718edbc3b24288815",
+        "src/runtime/variants.py": "13c1d7e8264d0cb678ddcca54e455bd953488ea40ef9cd6b0321dbcfdfbe8423",
         "src/solvers/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/solvers/base.py": "b7510f0f6c1d96dd51ba71f543744409a1c381961ed45057c65cae8f57a4733e",
         "src/solvers/optiland/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
@@ -147,8 +148,8 @@
     },
     "probe": "instances/b1_ray",
     "schema_version": 2,
-    "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
-    "timestamp_utc": "2026-08-27T16:09:08.471982+00:00",
+    "source_commit": "2de2cd03a4f6e33420fe08a099ce3e734fc24de1",
+    "timestamp_utc": "2026-08-27T18:54:10.941066+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
@@ -265,12 +266,12 @@
       "fingerprint_matched": true,
       "instance_fingerprint": "d08bdc056e37bbb53e17e9a1d6f37e455e00c961a3589813d4b75dfa3b394c33",
       "package_versions": {},
-      "run_id": "probe-e45259967ccd",
+      "run_id": "probe-5de531977c65",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": null,
-    "run_id": "probe-e45259967ccd",
+    "run_id": "probe-5de531977c65",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

@@ -319,8 +319,16 @@ entries:
       Serves the old evaluation design. Replaced by GraphExecutor (M3.1) plus the
       family runner.
     note: >-
-      NOT deleted in M0.5.4. It is the only way to run this case until the
-      executor and family runner exist; deletion is owned by M4 (CHE-115/CHE-116).
+      NOT deleted in M0.5.4, and NOT deleted by CHE-115 either. CHE-115 satisfied
+      the precondition its own amendment set -- the executor reproduces this
+      case's frozen gate number bit-identically from a committed graph document
+      (benchmarks/instances/b3_psf_singlet.py, 60 lines of family-specific
+      measurement against this file's 600) -- and that amendment assigns the
+      deletion itself to CHE-116. What remains bespoke here and is NOT replaced:
+      the 12-rung convergence ladder, the O2 ASM/Rayleigh-Sommerfeld
+      characterization oracle, the exit-pupil hard-support control, the
+      quadrature-weight regression control, and the result.json/plot.png bundle
+      packaging.
   - path: benchmarks/physics/L2-PSF-01/run_benchmark.py
     part: the M3-SINGLET-REF prescription and its graph construction
     bucket: B
@@ -512,12 +520,17 @@ entries:
       a person remembering to run it.
     destination: >-
       B3-PSF-SINGLET-01, the canonical instance, and the replacement for
-      benchmarks/physics/L2-PSF-01/run_benchmark.py once it reproduces the frozen
-      fingerprint (CHE-115).
+      benchmarks/physics/L2-PSF-01/run_benchmark.py (CHE-115).
     note: >-
-      It does NOT yet reproduce the 2.21e-3 frozen number, and does not claim to:
-      256 rings rather than 512, and a centred-half-window metric rather than the
-      5-Airy-radius radial-profile residual. Both differences are declared.
+      CHE-115 closed this. It reproduces the frozen
+      fft_oracle_intensity_relative_l2 = 0.0022072391812867093 BIT-IDENTICALLY
+      from the committed graph document examples/graphs/psf_singlet_sensor.yaml --
+      asserted with ==, not approx, by
+      tests/test_substrate_proof.py::test_the_frozen_number_is_reproduced_bit_identically.
+      The two things that had to change were config['advance_to_z_m'] on the
+      C_RAY_TO_WAVE edge, without which a graph could not name the sensor plane at
+      all, and reading the PSF with PsfNormalization.RAW rather than PEAK, because
+      the metric peak-normalizes its own inputs and dividing twice costs one ULP.
 
   # =========================================================================
   # benchmarks/systems/ -- layer-C specs, drivers and records, CHE-141 (M2.5)
@@ -747,6 +760,20 @@ entries:
     bucket: A
     justification: The M3 slice measurement record.
     destination: B3-PSF-SINGLET evidence.
+  - path: benchmarks/reports/2026-08/substrate_proof.md
+    bucket: A
+    justification: >-
+      CHE-115 (M3.3). The evidence that B3-PSF-SINGLET-01's frozen gate number is
+      reproduced BIT-IDENTICALLY through GraphExecutor from a committed graph
+      document, the complex64 cost of the wave node measured beside it, the
+      near_sensor_fine arm that gives that node real work, the opl-sign-flip
+      control run as a graph variant, the executor's framework overhead (1.041,
+      inside the 10% target), and the two structural reasons demo2 could not be
+      migrated.
+    destination: >-
+      Stays as the M3.3 record. Its S4 count (2 of 55 bespoke entry points now
+      execute a real GraphSpec) is the denominator later migrations move.
+
   - path: benchmarks/reports/2026-08/singlet_residual_attribution.md
     bucket: A
     justification: >-

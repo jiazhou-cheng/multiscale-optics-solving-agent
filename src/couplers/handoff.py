@@ -101,6 +101,7 @@ __all__ = [
     "CoherentHandoff",
     "DeclaredHandoffPlane",
     "HandoffPerturbation",
+    "advance_bundle_to_plane",
     "declare_coherent_bundle",
     "reconstruct_hashed_arrays",
 ]
@@ -948,4 +949,63 @@ def plane_from_reference(plane: ReferencePlane, handoff_plane: str) -> DeclaredH
         handoff_plane=handoff_plane,  # type: ignore[arg-type]
         z_m=plane.z_m,
         name=plane.name,
+    )
+
+
+def advance_bundle_to_plane(bundle: RayBundle, z_m: float) -> RayBundle:
+    """Move a declared coherent bundle to another image-space plane, in the ray domain.
+
+    CHE-115 (M3.3). The graph could declare *where the optical path length is
+    referenced from* and *what grid the field lands on*, but not *which plane the
+    field is reconstructed at* -- the adapter resolves only ``image_surface`` and
+    ``exit_pupil``, so a handoff anywhere between them could not be expressed as a
+    graph document at all. That is why the L2-PSF-01 bundle's ``near_sensor_fine``
+    configuration lived in a bespoke driver.
+
+    Each ray is advanced along its own direction by ``s = (z - z0) / d_z`` and its
+    optical path grows by ``n s`` with ``n = 1``. Directions are unchanged, which is
+    what makes this a propagation of the ray STATE rather than a change of the ray
+    model. The resulting per-ray constant phase differs from the original by
+    ``k s d_z^2``, the phase an exact plane wave accumulates over the plane offset
+    ``s d_z``: this does not approximate the field at the new plane, it evaluates the
+    same 3-D superposition there.
+
+    **Image-space air is asserted, not assumed.** ``n = 1`` holds for both M3 systems
+    and the caller that declared the handoff plane has already had the record's
+    ``image_space_refractive_index`` checked by :func:`declare_coherent_bundle`.
+
+    This is the same operation ``benchmarks/probes/sensor_handoff_convergence.py``
+    performs with its own ``_advance_bundle_to_z``; the probe keeps its copy because
+    editing it would restamp records it did not produce, and
+    ``tests/test_ray_to_wave_node.py`` pins the two equal on real traced rays rather
+    than assuming they agree because one was written from the other.
+    """
+    amplitude, optical_path_length = bundle.require_coherent()
+    positions = np.asarray(bundle.positions_m, dtype=np.float64)
+    directions = np.asarray(bundle.directions, dtype=np.float64)
+    if np.any(directions[:, 2] == 0.0):
+        raise ContractError(
+            ContractCode.NON_UNIT_DIRECTION,
+            f"a ray has d_z = 0 and never reaches z = {float(z_m)!r} m",
+            declaration="config.advance_to_z_m",
+            remedy=(
+                "A bundle containing a ray parallel to the plane cannot be advanced "
+                "onto it. Reconstruct at a plane the whole bundle reaches."
+            ),
+        )
+    step = (float(z_m) - positions[:, 2]) / directions[:, 2]
+    return RayBundle(
+        positions_m=positions + step[:, None] * directions,
+        directions=directions.copy(),
+        wavelength_m=bundle.wavelength_m,
+        reference_plane=ReferencePlane(name="image_space_observation_plane", z_m=float(z_m)),
+        frame=bundle.frame,
+        amplitude=np.asarray(amplitude).copy(),
+        reconstruction_normalization=bundle.reconstruction_normalization,
+        optical_path_length_m=np.asarray(optical_path_length, dtype=np.float64) + step,
+        optical_path_length_reference=(
+            f"{bundle.optical_path_length_reference}, then advanced along each ray to "
+            f"z = {float(z_m)!r} m through image-space air (n = 1)"
+        ),
+        provenance=dict(bundle.provenance),
     )

@@ -72,6 +72,7 @@ from advanced ray state -- do not propagate this record instead.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -93,6 +94,8 @@ from couplers.base import (
 )
 from couplers.handoff import (
     DeclaredHandoffPlane,
+    HandoffPerturbation,
+    advance_bundle_to_plane,
     declare_coherent_bundle,
 )
 from couplers.ray_to_wave import (
@@ -389,6 +392,7 @@ class RayToWaveCoupler:
                     "'sensor_obliquity' (main-text eq 2's detector model)."
                 ),
             )
+        _perturbation(config)
         normalization = config.get("normalization")
         if normalization is not None and normalization not in {"none", "one_over_n"}:
             raise _refuse(
@@ -399,13 +403,44 @@ class RayToWaveCoupler:
             )
         return config
 
-    @staticmethod
-    def _resolve_bundle(record: ArtifactRecord, config: dict[str, Any]) -> RayBundle:
+    @classmethod
+    def _resolve_bundle(cls, record: ArtifactRecord, config: dict[str, Any]) -> RayBundle:
         """Take a coherent record as-is; promote an undeclared one only on request."""
+        bundle = cls._declare_bundle(record, config)
+        advance_to_z_m = config.get("advance_to_z_m")
+        if advance_to_z_m is None:
+            return bundle
+        if not isinstance(advance_to_z_m, (int, float)) or not math.isfinite(
+            float(advance_to_z_m)
+        ):
+            raise _refuse(
+                ContractCode.MISSING_DECLARATION,
+                f"config['advance_to_z_m']={advance_to_z_m!r} is not a finite number of metres",
+                declaration="config.advance_to_z_m",
+            )
+        try:
+            return advance_bundle_to_plane(bundle, float(advance_to_z_m))
+        except ContractError as error:
+            raise _Refusal(error) from None
+
+    @staticmethod
+    def _declare_bundle(record: ArtifactRecord, config: dict[str, Any]) -> RayBundle:
         metadata = record.metadata
         already_coherent = bool(metadata.get("optical_path_length_field")) and bool(
             metadata.get("amplitude_field")
         )
+        if already_coherent and config.get("perturbation"):
+            raise _refuse(
+                ContractCode.MISSING_DECLARATION,
+                "config['perturbation'] alters the promotion of an undeclared OPL, and "
+                "this record already declares its own",
+                declaration="config.perturbation",
+                remedy=(
+                    "A perturbation is only meaningful where this edge does the "
+                    "declaring. Perturb the producer instead, or drop the key -- "
+                    "ignoring it would report a control that never ran."
+                ),
+            )
         if already_coherent:
             reference = metadata.get("optical_path_length_reference")
             if not reference:
@@ -458,7 +493,9 @@ class RayToWaveCoupler:
                 declaration="config.handoff_plane_z_m",
             )
         declared = DeclaredHandoffPlane(handoff_plane=str(plane_kind), z_m=float(plane_z_m))
-        return declare_coherent_bundle(record, declared_plane=declared).bundle
+        return declare_coherent_bundle(
+            record, declared_plane=declared, perturbation=_perturbation(config)
+        ).bundle
 
     @staticmethod
     def _sampling_errors(bundle: RayBundle, config: dict[str, Any]) -> list[ContractError]:
@@ -491,6 +528,50 @@ class RayToWaveCoupler:
                 ),
             )
         ]
+
+
+#: The negative-control keys an edge may set. Exactly ``HandoffPerturbation``'s
+#: own fields, read off the dataclass rather than restated, so a perturbation
+#: added there cannot become silently unreachable from a graph document.
+_PERTURBATION_KEYS: frozenset[str] = frozenset(HandoffPerturbation.__dataclass_fields__)
+
+
+def _perturbation(config: dict[str, Any]) -> HandoffPerturbation:
+    """``config['perturbation']`` as a :class:`HandoffPerturbation`.
+
+    CHE-115 (M3.3). A negative control belongs in the graph document, not in a
+    driver that calls the coupler directly: the family declares
+    ``opl-sign-flip`` as a control on this edge, and a control that can only be
+    run by writing Python is a control the executor cannot record having run.
+    An unknown key is refused rather than dropped -- a misspelled control that
+    silently ran the unperturbed configuration would report a passing control
+    that never fired.
+    """
+    requested = config.get("perturbation")
+    if requested is None:
+        return HandoffPerturbation()
+    if not isinstance(requested, Mapping):
+        raise _refuse(
+            ContractCode.MISSING_DECLARATION,
+            f"config['perturbation'] must be a mapping, got {type(requested).__name__}",
+            declaration="config.perturbation",
+        )
+    unknown = sorted(set(requested) - _PERTURBATION_KEYS)
+    if unknown:
+        raise _refuse(
+            ContractCode.MISSING_DECLARATION,
+            f"config['perturbation'] has no field(s) {unknown!r}",
+            declaration="config.perturbation",
+            remedy=f"The declared perturbations are {sorted(_PERTURBATION_KEYS)!r}.",
+        )
+    try:
+        return HandoffPerturbation(**dict(requested))
+    except (TypeError, ValueError) as error:
+        raise _refuse(
+            ContractCode.MISSING_DECLARATION,
+            f"config['perturbation'] is not a valid HandoffPerturbation: {error}",
+            declaration="config.perturbation",
+        ) from None
 
 
 def _grid_shape(config: dict[str, Any]) -> tuple[int, int]:
