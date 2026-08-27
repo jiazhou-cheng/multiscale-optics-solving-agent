@@ -21,13 +21,13 @@ Components x claim kinds. What each cell means:
 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
 | `M_RAY_OPTILAND` | **ind** / **ind** / n/a / n/a / self / **ind** | **ind** / **ind** / **ind** / **ind** / **ind** | **ind** / declared | **ind** | -- | **ind** / n/a | -- | n/a | n/a |
 | `M_WAVE_CHROMATIX` | **ind** / **ind** / **ind** / **FAIL** / self | **ind** / **ind** / **ind** / n/a | -- | **ind** | **ind** | **ind** / n/a | -- | **ind** / off-gate | n/a |
-| `C_RAY_TO_WAVE` | **ind** / off-gate / **FAIL** / n/a / n/a / self / **ind** / **FAIL** | **ind** / **FAIL** / **ind** | declared / **ind** | **ind** / **ind** / n/a / char | **ind** / self | **ind** / n/a | declared | off-gate | n/a |
+| `C_RAY_TO_WAVE` | **ind** / off-gate / **FAIL** / n/a / n/a / self / **ind** / **FAIL** | **ind** / **FAIL** / **ind** | declared / **ind** | **ind** / **ind** / n/a / n/a / char | **ind** / self | **ind** / n/a | declared | off-gate | n/a |
 | `C_WAVE_TO_RAY` | n/a / **ind** | **ind** | -- | **ind** / **ind** | **ind** / **ind** | n/a | char | -- | -- |
 | `C_PLANAR_DOE_STEP` | **ind** / **ind** / n/a / **ind** | -- | -- | **ind** | -- | n/a | -- | self | -- |
 | `C_PATCH_WFT` | **ind** / off-gate / **ind** | **ind** | -- | n/a | -- | **ind** / **ind** / n/a | -- | -- | n/a |
 | `C_GENERALIZED_SNELL` | **ind** / n/a / **ind** | **ind** / **ind** | -- | -- | -- | n/a | -- | -- | -- |
 
-89 claims over 7 components.
+90 claims over 7 components.
 
 ## Coverage by layer — CHE-141 (M2.5)
 

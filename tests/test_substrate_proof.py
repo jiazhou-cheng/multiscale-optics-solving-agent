@@ -240,7 +240,7 @@ def test_the_unexercised_controls_make_the_gate_untrustworthy(proof) -> None:
     outcomes = {c.control_id: c.outcome for c in result.negative_control_results}
     assert set(outcomes) == {
         "opl-sign-flip",
-        "inverted-quadrature-weight",
+        "uniform-weight-power-divergence",
         "axis-transpose",
         "launch-phase-error",
     }
@@ -310,6 +310,41 @@ def test_a_variant_is_a_different_graph_and_not_a_flag() -> None:
 
     with pytest.raises(VariantError):
         with_config_overrides(baseline, edges={"no_such_edge": {"grid_n": 8}})
+
+
+@pytest.mark.slow
+def test_the_power_divergence_control_fires() -> None:
+    """CHE-117 (M4.2). The control that replaced ``inverted-quadrature-weight``.
+
+    The retired control asserted that the production quadrature weight improves
+    rel-L2 agreement with O1 by at least 1.2x, and measured 0.42. Its premise is
+    false at convergence -- both configurations converge to the same residual --
+    so no ray count makes it fire honestly. This one tests the property CHE-47's
+    weight did establish: with the weight, reconstructed power is invariant under
+    ray refinement; without it, it scales as ``(traced rays)^1.995``.
+
+    The control is called directly rather than through ``run_instance``, which
+    would add a 512-ring baseline this assertion does not use. Four traces at 64
+    and 128 rings, about 8 s. Marked slow anyway: it is a second Optiland trace
+    in a file the default gate already pays 30 s for.
+    """
+    from verification.result import NegativeControlOutcome as Outcome
+
+    driver = _driver()
+    outcomes = driver._power_divergence_control(driver.canonical_instance(), seed=1)
+    control = outcomes["uniform-weight-power-divergence"]
+    assert control.target_metric == "reconstructed_power_ray_doubling_excess"
+    threshold = B3_PSF_SINGLET.tolerance_for(
+        "reconstructed_power_ray_doubling_excess"
+    ).threshold
+    assert control.baseline is not None and control.baseline.value < threshold
+    assert control.mutated is not None and control.mutated.value > threshold
+    # Not "differs from the baseline": the mutated arm has to cross the gate's
+    # own threshold, and by a margin nobody could mistake for round-off. The
+    # weight's absence is CHE-33's (traced rays)^1.995 divergence, so this is
+    # four orders, not a few percent.
+    assert control.mutated.value / control.baseline.value > 1e3
+    assert control.outcome is Outcome.FIRED
 
 
 @pytest.mark.slow

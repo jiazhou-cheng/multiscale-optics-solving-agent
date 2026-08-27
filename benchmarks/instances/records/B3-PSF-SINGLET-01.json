@@ -64,7 +64,7 @@
   },
   "record_provenance": {
     "code_fingerprint": {
-      "combined_sha256": "9de0b8e46620efa97defe9658806495953379ffb1c3494d89cd7717e1db4e9f2",
+      "combined_sha256": "91ccd3023b52702a57e1f6fa2f94563b361344fc82e92832057117b94c913670",
       "files": {
         "src/core/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/core/arrays.py": "2eb0cbc605677e05fffff1022323362a0cda34b27c18eb28ae53f9363e7359dd",
@@ -132,7 +132,7 @@
         "src/solvers/registry.py": "38e22edc91cfc775f1f3b25ee6b13a787a6b4e28988acaec6f2029adb7208088",
         "src/verification/__init__.py": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23",
         "src/verification/analytic.py": "8fb7e3acbbc0ee837ec449f1dea4565a8c9682e138aeded0789e9352c444d571",
-        "src/verification/claim_ledger.py": "df0b93330e66a1c5528897d2f26a77f53a34ef8f57e74172a77af9375aedc638",
+        "src/verification/claim_ledger.py": "0e7a16b409fe1e0c74ad0eaaef760f864755665380cfa7632379b4e4c23d6994",
         "src/verification/evidence.py": "7b9dc7dea0153dcb3a3781be24bc05152eede5d7c63b69854d8e8ac5187b4897",
         "src/verification/families/__init__.py": "dadf284698dfcd72b607d3579dc061e7364b68e81239ecff4a9ff1bf9507a62a",
         "src/verification/families/b0_contract.py": "adcaea59b365cf9d4b81889b7daf9a0b8c4d80e2b2a7be8852794b4475355542",
@@ -142,7 +142,7 @@
         "src/verification/families/b2_transitions.py": "70cc8dab2c1612352e7123df2e7e34eace5c7f3feb5a6d6af3a9bee4d5acf62e",
         "src/verification/families/b3_4f_ideal.py": "dcddc8a8ad364e93f9293fae24fca51683e50a2e8597c35cf1eb94565fdf8710",
         "src/verification/families/b3_4f_real.py": "2529dabd846b9d71383842f46891a2a817942655e47c10f0a99956926975c971",
-        "src/verification/families/b3_composed.py": "7473c505d396317ded21c15f2b8ea4521f98a3f86963154f0240f8a39ea95935",
+        "src/verification/families/b3_composed.py": "3d8ce32bb861a48490ebdba8e757c8218bcb307e823ad1954f7ef76cdc517f93",
         "src/verification/families/b3_doe_inline.py": "d2afbcf15e8979e6b25f28a8847df9b8813ae3b9ce24859b5e7d4bc865f2b8fd",
         "src/verification/families/b4_characterization.py": "f62938ecb4a243ec2d6def4c49027379b330232499280599784343f2692a9d00",
         "src/verification/families/predicates.py": "21a64e2d17f2098787cece75bfec879e92785f0084bcfc12638f84f5e959c4f7",
@@ -174,12 +174,12 @@
     },
     "probe": "instances/b3_psf_singlet",
     "schema_version": 2,
-    "source_commit": "eb3d792e0c8443e9063b493fdad7e54a9855d558",
-    "timestamp_utc": "2026-08-27T20:42:07.863265+00:00",
+    "source_commit": "c9393029c9340e22235d44a14e8e8c629eeef4bc",
+    "timestamp_utc": "2026-08-27T21:43:52.209085+00:00",
     "working_tree_dirty": true
   },
   "runner_version": "1.0.0",
-  "scientific_fingerprint": "7f90cc04533ca976bb124f132aebfc2c34949019cbbb667be51740ef36b2eb2e",
+  "scientific_fingerprint": "4e7e23a66d0e93209f90105f8515a9697cc84814e1ab1c43191ab90a65bd01e4",
   "verification": {
     "category": "B3",
     "contract_status": {
@@ -206,9 +206,9 @@
         "subject": "o2_asm_intensity_relative_l2"
       },
       {
-        "code": "negative_control_not_run",
-        "detail": "inverted-quadrature-weight was not exercised -- and it is the control already known to fire backwards",
-        "subject": "inverted-quadrature-weight"
+        "code": "metric_missing_from_record",
+        "detail": "the family declares reconstructed_power_ray_doubling_excess and the run measured none",
+        "subject": "reconstructed_power_ray_doubling_excess"
       },
       {
         "code": "negative_control_not_run",
@@ -252,12 +252,24 @@
         "target_metric": "fft_oracle_intensity_relative_l2"
       },
       {
-        "baseline": null,
-        "control_id": "inverted-quadrature-weight",
-        "mutated": null,
-        "note": "benchmarks/probes/records/m3_quadrature_weight.json finest_configuration. improvement_factor_vs_o1 = 0.42 at 787,969 rays (uniform is CLOSER to O1 than weighted is: 9.21e-4 vs 2.21e-3) -- below the 1.2 floor, so this control currently reads detected=false. The previous basis for this floor (improvement_factor_vs_o2_asm = 1.575) used O2, our own custom ASM/RS propagator, as the decisive oracle; that was circular validation and has been retired as the gate input, though the O2 number is still reported in result.json for characterization. CHE-117 (M4.2) established that this floor, not the weight, is the defect. The comparison is made at ONE ray count with neither arm required to be converged, so its verdict moves with that ray count: 10.7 at 8 rings, 1.79 at 128, 1.02 at 181, 0.42 at 512, 0.69 at 1024. The weighted arm is converged from 24 rings; the uniform arm is still moving at 1024 rings, heading back toward the same value. A control whose sign flips with a numerical parameter is measuring where two convergence curves cross rather than whether the weight helps. Respecifying it to require convergence of both arms is a change to the control, not to this floor, which is unchanged at 1.2. Evidence: benchmarks/probes/records/singlet_residual_attribution.json.",
-        "outcome": "not_run",
-        "target_metric": "fft_oracle_intensity_relative_l2"
+        "baseline": {
+          "note": "|P(128 rings)/P(64 rings) - 1| on the float64 sensor-plane reconstruction, production: 1.3517708332460249e-24 -> 1.3528174655253504e-24. Graph variants of examples/graphs/psf_singlet_sensor.yaml, so the mutated arm is the shipping code path with one declared term removed.",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 0.0007742675412016897
+        },
+        "control_id": "uniform-weight-power-divergence",
+        "mutated": {
+          "note": "|P(128 rings)/P(64 rings) - 1| on the float64 sensor-plane reconstruction, apply_quadrature_weight=False: 0.0054422427400886205 -> 0.08636231441759101. Graph variants of examples/graphs/psf_singlet_sensor.yaml, so the mutated arm is the shipping code path with one declared term removed.",
+          "uncertainty": null,
+          "uncertainty_basis": "not_estimated",
+          "unit": null,
+          "value": 14.868883205342785
+        },
+        "note": "CHE-117's replacement for inverted-quadrature-weight, which asserted a 1.2x rel-L2 improvement that is false at convergence. The retired floor is not widened; it is recorded in the family's caveat and in verification.claim_ledger. baseline 0.000774268 -> mutated 14.8689 against a gate of 0.05; detection margin 19203.8x",
+        "outcome": "fired",
+        "target_metric": "reconstructed_power_ray_doubling_excess"
       },
       {
         "baseline": null,
@@ -294,7 +306,7 @@
         "oracle": "analytic_closed_form",
         "oracle_independence": "independent",
         "tolerance": 0.001,
-        "tolerance_basis": "benchmarks/protocols/slice_protocol.yaml tolerance_budget.gates, unchanged since M3.2 (CHE-31). CHE-38's synthetic aberration-free diagnostic reaches 4.07e-4 (inside gate); CHE-47's real-traced-system measurement of the production (weighted) configuration reaches 2.21e-3 vs O1 (outside gate, by ~2.2x). Against O1 only, the uniform (pre-CHE-47) configuration reaches 9.21e-4 and clears the gate -- the opposite ordering from what the O2 oracle measured, which is itself evidence that O2's own pupil-fit resolution should not be trusted to decide correctness here. Open item, not closed by this bundle: why the production quadrature weight, which fixes the unrelated absolute-power N^2 divergence (see accuracy.production. absolute_power), does not also improve relative-L2 agreement with O1 on this aberrated system. CHE-117 (M4.2) closed that open item. The answer is that the production quadrature weight does not make agreement with O1 worse: both configurations converge to the same 2.208e-3. The weighted arm is flat to 0.87% from 49,537 to 3,148,801 rays and identical to ten significant figures across an 8x sensor-pitch refinement at fixed window; the uniform arm descends past it near 181 rings, bottoms out at 7.04e-4 at 362 rings, and climbs back to 1.52e-3 by 1024 rings. The 9.21e-4 above is a point on a transient dip, not a competing converged value. The residual is therefore converged and not attributable to the quadrature weight, and the narrower question that remains is whether an aberration-free paraxial oracle can decide a real traced singlet at the 1e-3 level at all. Evidence: benchmarks/probes/records/singlet_residual_attribution.json and benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold is unchanged.",
+        "tolerance_basis": "benchmarks/protocols/slice_protocol.yaml tolerance_budget.gates, unchanged since M3.2 (CHE-31). CHE-38's synthetic aberration-free diagnostic reaches 4.07e-4 (inside gate); CHE-47's real-traced-system measurement of the production (weighted) configuration reaches 2.21e-3 vs O1 (outside gate, by ~2.2x). Against O1 only, the uniform (pre-CHE-47) configuration reaches 9.21e-4 and clears the gate -- the opposite ordering from what the O2 oracle measured, which is itself evidence that O2's own pupil-fit resolution should not be trusted to decide correctness here. Open item, not closed by this bundle: why the production quadrature weight, which fixes the unrelated absolute-power N^2 divergence (see accuracy.production. absolute_power), does not also improve relative-L2 agreement with O1 on this aberrated system. CHE-117 (M4.2) closed that open item. The answer is that the production quadrature weight does not make agreement with O1 worse: both configurations converge to the same 2.208e-3. The weighted arm is flat to 0.87% from 49,537 to 3,148,801 rays and identical to ten significant figures across an 8x sensor-pitch refinement at fixed window; the uniform arm descends past it near 181 rings, bottoms out at 7.04e-4 at 362 rings, and climbs back to 1.52e-3 by 1024 rings. The 9.21e-4 above is a point on a transient dip, not a competing converged value. The residual is therefore converged and not attributable to the quadrature weight, and the narrower question that remains is whether an aberration-free paraxial oracle can decide a real traced singlet at the 1e-3 level at all. Evidence: benchmarks/probes/records/singlet_residual_attribution.json and benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold is unchanged. CHE-117 then settled the narrower question, and the answer is that O1 CANNOT decide this gate at 1e-3 on this system. Three measurements, O1 on both sides of every comparison: (1) the gate metric is linear in a fractional Airy-scale error with slope 1.517-1.532 over four decades, so the 1.0e-3 gate is the statement that the Airy scale is known to 6.53e-4; (2) M3-SINGLET-REF does not define its own scale that well -- the paraxial geometric a/sqrt(a^2+R^2) = 0.0515667 and the largest traced transverse direction cosine 0.0517163 are both defensible declarations of the same system's NA and differ by 2.902e-3, because the marginal ray crosses the axis 14.0 um before the declared image plane, and that span is 4.445e-3 of gate metric, 4.4x the gate; (3) fitting O1's NA to the frozen 512-ring reconstruction puts the best fit at 0.0516457, INSIDE that interval, and leaves 7.021e-4 there -- so 2.093e-3 of the observed 2.207e-3 (94.8% in quadrature) is a scale offset O1's own assumption cannot pin, and the 5.2% O1 can speak about is inside the gate. The gate therefore stands UNMET with every term of the residual named, which is the third of this issue's three admissible outcomes. It is NOT met at a fitted NA and must never be read that way: fitting the oracle's scale to the field under test removes the independence that makes O1 the only admissible decider, and a scale-fitted Airy pattern cannot reject a wrong answer of the same shape. Evidence: benchmarks/probes/records/o1_applicability.json. The 1.0e-3 threshold is still unchanged, O2 was not consulted, and no second Optiland PSF route was consulted.",
         "tolerance_may_gate": true
       },
       {
@@ -330,18 +342,18 @@
         "scipy": "1.15.3",
         "torch": "2.13.0+cpu"
       },
-      "run_id": "run-32530c8a02dd",
+      "run_id": "run-b740581c0271",
       "source_commit": null,
       "verifier_version": "1.0.0"
     },
     "resource_cost": {
       "device": "cpu",
       "estimate": null,
-      "peak_memory_bytes": 11974139904,
-      "solver_seconds": 25.622964729962405,
-      "wall_seconds": 25.77500833402155
+      "peak_memory_bytes": 12011515904,
+      "solver_seconds": 25.386713972024154,
+      "wall_seconds": 25.52695104898885
     },
-    "run_id": "run-32530c8a02dd",
+    "run_id": "run-b740581c0271",
     "status": "ok",
     "stochastic_evidence": {
       "ensemble_mean": null,

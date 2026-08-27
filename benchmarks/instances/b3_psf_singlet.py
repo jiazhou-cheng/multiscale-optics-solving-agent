@@ -77,6 +77,20 @@ propagates a real distance. Both arms are variants of one committed document
 through ``runtime.variants.with_config_overrides``, which is also how
 :func:`run_negative_control` runs the family's ``opl-sign-flip`` control as a
 graph rather than as a driver calling the coupler by hand.
+
+The second control this file runs, and why it is not the one the family used to
+declare
+-----------------------------------------------------------------------------
+CHE-117 (M4.2) retired ``inverted-quadrature-weight`` -- the control that
+asserted the production quadrature weight improves rel-L2 agreement with O1 by
+at least 1.2x, and measured 0.42 -- because its premise is false at convergence:
+the weighted and uniform arms converge to the *same* residual, so the converged
+improvement factor is 1.0 and no ray count makes that control fire honestly. What
+CHE-47's weight did establish is absolute-power convergence, so
+:func:`_power_divergence_control` runs that instead, as four graph variants at
+64 and 128 rings: ``|P(2N)/P(N) - 1|`` reads ``7.7e-4`` with the weight and
+``14.9`` without it. The retired 1.2 floor is not widened -- it is unchanged, and
+recorded as retired in the family's caveat and in ``verification.claim_ledger``.
 """
 
 from __future__ import annotations
@@ -112,6 +126,7 @@ __all__ = [
     "load_graph",
     "near_sensor_fine_graph",
     "opl_sign_flip_graph",
+    "power_divergence_graph",
     "run_instance",
     "run_near_sensor_fine",
 ]
@@ -213,6 +228,36 @@ def opl_sign_flip_graph() -> Any:
         load_graph(),
         edges={"sensor_reconstruction": {"perturbation": {"opl_sign": -1}}},
         task_id="B3-PSF-SINGLET-01/opl_sign_flip",
+    )
+
+
+#: Ring counts for the ``uniform-weight-power-divergence`` control (CHE-117). A
+#: *doubling*, chosen as the cheapest one already deep inside the weighted arm's
+#: converged region -- converged from 24 rings, per
+#: ``benchmarks/probes/records/m3_quadrature_weight.json``. Four small traces,
+#: about 8 s in total, which is why this control runs in the same arm as the
+#: 512-ring ``opl-sign-flip`` rather than needing its own.
+POWER_DIVERGENCE_RINGS = (64, 128)
+
+
+def power_divergence_graph(rings: int, *, weighted: bool) -> Any:
+    """One arm of the ``uniform-weight-power-divergence`` control, as a graph.
+
+    The mutated arm is the shipping path with one declared term removed --
+    ``HandoffPerturbation(apply_quadrature_weight=False)`` -- rather than a
+    parallel implementation of the reconstruction without a weight.
+    """
+    edges: dict[str, Any] = {}
+    if not weighted:
+        edges["sensor_reconstruction"] = {"perturbation": {"apply_quadrature_weight": False}}
+    return with_config_overrides(
+        load_graph(),
+        nodes={"lens": {"num_rays": rings}},
+        edges=edges or None,
+        task_id=(
+            f"B3-PSF-SINGLET-01/power_divergence/{rings}/"
+            f"{'weighted' if weighted else 'uniform'}"
+        ),
     )
 
 
@@ -323,6 +368,91 @@ def _measure(record: Any, instance: BenchmarkInstance) -> dict[str, Measurement]
 
 
 
+def _reconstructed_power(record: Any) -> float:
+    """Total power in the reconstructed sensor-plane field, ``sum |u|^2 dA``.
+
+    On the coupler's own float64 artifact, not the terminal complex64 one: this
+    is a magnitude question and a float32 cast of a number near ``1e-24`` is not
+    what the control is about.
+    """
+    measurement = measure_psf_from_record(
+        record.artifacts[COUPLER_FIELD], normalization=PsfNormalization.RAW
+    )
+    intensity = np.asarray(measurement.intensity, dtype=np.float64)
+    pitch = measurement.sample_pitch_m
+    return float(intensity.sum()) * float(pitch[0]) * float(pitch[1])
+
+
+def _power_divergence_control(
+    instance: BenchmarkInstance, *, seed: int | None
+) -> dict[str, Any]:
+    """``uniform-weight-power-divergence``, the control CHE-117 put in place of
+    ``inverted-quadrature-weight``.
+
+    The retired control asserted that the production weight improves rel-L2
+    agreement with O1 by at least 1.2x, and measured 0.42. CHE-117 falsified the
+    control's premise rather than the weight: both configurations converge to the
+    same residual, so the converged improvement factor is 1.0 and no ray count
+    makes that control fire honestly. The property CHE-47's weight *did*
+    establish is absolute-power convergence, and this control tests that: with
+    the weight, reconstructed power is invariant under ray refinement; without
+    it, power scales as ``(traced rays)^1.995`` (CHE-33's ``N^2.0024``).
+
+    No oracle is involved, which is the point -- it is a convergence property of
+    one quantity under refinement of its own discretization, so it can fire on a
+    system whose O1 gate cannot be decided at all.
+    """
+    coarse, fine = POWER_DIVERGENCE_RINGS
+    powers: dict[tuple[int, bool], float] = {}
+    for rings in (coarse, fine):
+        for weighted in (True, False):
+            record = execute(power_divergence_graph(rings, weighted=weighted), instance, seed=seed)
+            if record.status is not RunStatus.SUCCEEDED:
+                return {}
+            powers[(rings, weighted)] = _reconstructed_power(record)
+
+    def excess(weighted: bool) -> float:
+        return abs(powers[(fine, weighted)] / powers[(coarse, weighted)] - 1.0)
+
+    def note(weighted: bool) -> str:
+        arm = "production" if weighted else "apply_quadrature_weight=False"
+        return (
+            f"|P({fine} rings)/P({coarse} rings) - 1| on the float64 sensor-plane "
+            f"reconstruction, {arm}: {powers[(coarse, weighted)]!r} -> "
+            f"{powers[(fine, weighted)]!r}. Graph variants of "
+            "examples/graphs/psf_singlet_sensor.yaml, so the mutated arm is the "
+            "shipping code path with one declared term removed."
+        )
+
+    return {
+        "uniform-weight-power-divergence": control_result(
+            "uniform-weight-power-divergence",
+            "reconstructed_power_ray_doubling_excess",
+            baseline=Measurement(
+                value=excess(True),
+                uncertainty=None,
+                uncertainty_basis=UncertaintyBasis.NOT_ESTIMATED,
+                note=note(True),
+            ),
+            mutated=Measurement(
+                value=excess(False),
+                uncertainty=None,
+                uncertainty_basis=UncertaintyBasis.NOT_ESTIMATED,
+                note=note(False),
+            ),
+            threshold=B3_PSF_SINGLET.tolerance_for(
+                "reconstructed_power_ray_doubling_excess"
+            ).threshold,
+            note=(
+                "CHE-117's replacement for inverted-quadrature-weight, which asserted a "
+                "1.2x rel-L2 improvement that is false at convergence. The retired "
+                "floor is not widened; it is recorded in the family's caveat and in "
+                "verification.claim_ledger."
+            ),
+        )
+    }
+
+
 def _control(
     instance: BenchmarkInstance, baseline: Measurement, *, seed: int | None
 ) -> dict[str, Any]:
@@ -371,10 +501,11 @@ def run_instance(
     """Execute the frozen graph, measure it, verify it.
 
     ``with_control=False`` skips the second 512-ring run the ``opl-sign-flip``
-    control needs. The committed record is written *with* the control, because a
-    record whose controls all read ``NOT_RUN`` cannot support a trustworthy gate;
-    the default test gate takes the cheap arm and the slow arm is what re-derives
-    the committed fingerprint.
+    control needs, and the four small traces
+    ``uniform-weight-power-divergence`` needs. The committed record is written
+    *with* both, because a record whose controls all read ``NOT_RUN`` cannot
+    support a trustworthy gate; the default test gate takes the cheap arm and the
+    slow arm is what re-derives the committed fingerprint.
 
     The baseline graph is executed once and the record is reused for both the
     measurement and the control's baseline. Running it twice would have been a
@@ -390,9 +521,12 @@ def run_instance(
     if record.status is RunStatus.SUCCEEDED:
         measurements = _measure(record, instance)
         if with_control:
-            controls = _control(
-                instance, measurements["fft_oracle_intensity_relative_l2"], seed=seed
-            ) or None
+            controls = {
+                **_control(
+                    instance, measurements["fft_oracle_intensity_relative_l2"], seed=seed
+                ),
+                **_power_divergence_control(instance, seed=seed),
+            } or None
 
     result = verify(
         B3_PSF_SINGLET,

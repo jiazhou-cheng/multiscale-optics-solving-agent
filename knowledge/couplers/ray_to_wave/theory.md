@@ -197,3 +197,27 @@ Two results, measured rather than assumed:
   track the coupler more closely, not less. The likelier explanation is the wave
   oracle's own ring-averaged, linearly-interpolated pupil-fit quality at this
   resolution; not decomposed further (`benchmarks/probes/quadrature_weight.py`).
+
+  **CHE-117 (M4.2) decomposed it, and the answer did not need O2 at all.** The
+  `2.207e-3` is converged — flat to 0.87% from 49,537 to 3,148,801 rays and
+  identical to ten significant figures across an 8× sensor-pitch refinement — and
+  it is *not* caused by the quadrature weight: the uniform arm converges to the
+  same number from below after a transient dip through `7.04e-4`, so the
+  `9.21e-4` that used to look like better agreement was a point on that dip. What
+  the residual *is*: **94.8% of it, in quadrature, is an Airy-scale offset that
+  O1's paraxial aberration-free assumption cannot pin on this system.** The gate
+  metric is linear in fractional scale error (slope 1.52), so `1.0e-3` resolves
+  the Airy scale to `6.53e-4`, while `M3-SINGLET-REF` admits two defensible
+  image-space `NA` declarations — paraxial geometric `0.0515667` and largest
+  traced direction cosine `0.0517163` — that differ by `2.902e-3` because the
+  marginal ray focuses 14.0 µm short of the declared image plane. That span is
+  `4.445e-3` of gate metric, 4.4× the gate. At O1's own best-fit `NA` (`0.0516457`,
+  *inside* that interval) the residual is `7.021e-4`, inside the gate.
+
+  **What that means for a caller:** on a real traced system with residual
+  spherical aberration, an analytic Airy oracle is not a `1e-3`-level decider,
+  because the quantity it is most sensitive to is the one the system leaves
+  undetermined. It is *not* a licence to read the gate as met at a fitted `NA` —
+  fitting the oracle's scale to the field under test removes the independence that
+  made it admissible. Evidence: `benchmarks/probes/records/o1_applicability.json`,
+  `benchmarks/reports/2026-08/singlet_residual_attribution.md`.

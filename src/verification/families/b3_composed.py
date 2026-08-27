@@ -179,7 +179,30 @@ _FFT_ORACLE_BASIS = (
     "traced singlet at the 1e-3 level at all. Evidence: "
     "benchmarks/probes/records/singlet_residual_attribution.json and "
     "benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold "
-    "is unchanged."
+    "is unchanged. "
+    "CHE-117 then settled the narrower question, and the answer is that O1 "
+    "CANNOT decide this gate at 1e-3 on this system. Three measurements, O1 on "
+    "both sides of every comparison: (1) the gate metric is linear in a "
+    "fractional Airy-scale error with slope 1.517-1.532 over four decades, so "
+    "the 1.0e-3 gate is the statement that the Airy scale is known to 6.53e-4; "
+    "(2) M3-SINGLET-REF does not define its own scale that well -- the paraxial "
+    "geometric a/sqrt(a^2+R^2) = 0.0515667 and the largest traced transverse "
+    "direction cosine 0.0517163 are both defensible declarations of the same "
+    "system's NA and differ by 2.902e-3, because the marginal ray crosses the "
+    "axis 14.0 um before the declared image plane, and that span is 4.445e-3 of "
+    "gate metric, 4.4x the gate; (3) fitting O1's NA to the frozen 512-ring "
+    "reconstruction puts the best fit at 0.0516457, INSIDE that interval, and "
+    "leaves 7.021e-4 there -- so 2.093e-3 of the observed 2.207e-3 (94.8% in "
+    "quadrature) is a scale offset O1's own assumption cannot pin, and the "
+    "5.2% O1 can speak about is inside the gate. The gate therefore stands UNMET "
+    "with every term of the residual named, which is the third of this issue's "
+    "three admissible outcomes. It is NOT met at a fitted NA and must never be "
+    "read that way: fitting the oracle's scale to the field under test removes "
+    "the independence that makes O1 the only admissible decider, and a "
+    "scale-fitted Airy pattern cannot reject a wrong answer of the same shape. "
+    "Evidence: benchmarks/probes/records/o1_applicability.json. The 1.0e-3 "
+    "threshold is still unchanged, O2 was not consulted, and no second Optiland "
+    "PSF route was consulted."
 )
 
 _OPL_SIGN_FLIP_BASIS = (
@@ -206,7 +229,44 @@ _QUADRATURE_BASIS = (
     "than whether the weight helps. Respecifying it to require convergence of "
     "both arms is a change to the control, not to this floor, which is unchanged "
     "at 1.2. Evidence: "
-    "benchmarks/probes/records/singlet_residual_attribution.json."
+    "benchmarks/probes/records/singlet_residual_attribution.json. "
+    "CHE-117 RETIRED AND REPLACED this control rather than leaving it "
+    "KNOWN_FIRES_BACKWARDS, and the reason is that respecifying it on converged "
+    "arms does not rescue it: if both arms converge to the same residual then the "
+    "converged improvement factor is 1.0, so the premise -- that the weight "
+    "improves rel-L2 agreement with O1 by at least 1.2x -- is FALSE at "
+    "convergence and no ray count makes this control fire honestly. What CHE-47 "
+    "actually established is the property the replacement control tests: "
+    "absolute-power convergence. With the production weight the reconstructed "
+    "power is invariant under ray refinement; without it, power scales as "
+    "(traced rays)^1.995 (CHE-33's N^2.0024). Measured through the executor at "
+    "64 -> 128 rings, |P(2N)/P(N) - 1| reads 7.743e-4 with the weight and 14.869 "
+    "without it, a detection margin of 1.92e4 in the correct direction. The "
+    "replacement is the negative control uniform-weight-power-divergence on the "
+    "metric reconstructed_power_ray_doubling_excess. This floor of 1.2 is NOT "
+    "widened, NOT reworded and NOT deleted: it is recorded here and in "
+    "verification.claim_ledger as a retired gate whose premise the evidence "
+    "falsified, which is a different thing from a gate that was made easier. "
+    "Evidence: benchmarks/probes/records/o1_applicability.json, "
+    "absolute_power_under_ray_refinement."
+)
+
+_POWER_CONVERGENCE_BASIS = (
+    "A quadrature over a fixed aperture must converge as the quadrature is "
+    "refined, so the converged value of |P(2N)/P(N) - 1| is 0 and this threshold "
+    "says how much drift still counts as converged. It is a NEW tolerance on a "
+    "NEW metric, introduced by CHE-117 to carry the property CHE-47 established, "
+    "and it is not a restatement or a relaxation of the retired 1.2 improvement "
+    "floor -- that floor is unchanged and still on the record. 0.05 is set from "
+    "the two measured arms and sits between them by wide margins: the production "
+    "arm measures 7.743e-4 at 64 -> 128 rings, and the committed ladder's own "
+    "relative spread from 1801 rays upward is 7.16e-3 "
+    "(benchmarks/probes/records/m3_quadrature_weight.json, "
+    "absolute_power.weighted_power_relative_spread_from_1801_rays), so 0.05 is "
+    "about 7x above the converged arm's own drift; the uniform arm measures "
+    "14.869, so 0.05 is 297x below the divergence it has to reject. Evidence: "
+    "benchmarks/probes/records/o1_applicability.json, "
+    "absolute_power_under_ray_refinement."
 )
 
 
@@ -344,6 +404,31 @@ B3_PSF_SINGLET = register(
                 ),
             ),
             Metric(
+                name="reconstructed_power_ray_doubling_excess",
+                # A ratio between two runs rather than a comparison of two
+                # arrays, so nothing in verification/metrics.py computes it.
+                definition=None,
+                description=(
+                    "|P(2N)/P(N) - 1| for the reconstructed sensor-plane power P at "
+                    "hexapolar ring counts N and 2N. Zero when the quadrature has "
+                    "converged; ~15 when the per-ray area weight is omitted, because "
+                    "power then scales as (traced rays)^1.995. This is the property "
+                    "CHE-47's quadrature weight was introduced to fix (CHE-33's "
+                    "N^2.0024 divergence), carried as a metric by CHE-117 so the "
+                    "negative control that tests it has something to target"
+                ),
+                unit=None,
+                blind_to=(
+                    "where the power is: a converged total says nothing about the "
+                    "distribution, which is why it sits beside the O1 residual rather "
+                    "than instead of it",
+                    "any error that is a global amplitude factor, since a ratio of two "
+                    "powers under the same convention divides one out -- which is "
+                    "exactly why M0.2's 20-order amplitude drift is invisible here and "
+                    "in the gate metric alike",
+                ),
+            ),
+            Metric(
                 name="handoff_power_ratio",
                 definition="power_ratio",
                 description=(
@@ -408,6 +493,17 @@ B3_PSF_SINGLET = register(
                 basis_kind=ToleranceBasis.CROSS_ROUTE_AGREEMENT,
                 may_gate=False,
             ),
+            Tolerance(
+                metric="reconstructed_power_ray_doubling_excess",
+                threshold=0.05,
+                basis=_POWER_CONVERGENCE_BASIS,
+                basis_kind=ToleranceBasis.CONSERVATION_LAW,
+                may_gate=True,
+                rejects=(
+                    "the omitted per-ray area weight, which is CHE-33's N^2 "
+                    "absolute-power divergence and reads 14.869 here"
+                ),
+            ),
         ),
         negative_controls=(
             NegativeControl(
@@ -421,20 +517,25 @@ B3_PSF_SINGLET = register(
                 caveat=_OPL_SIGN_FLIP_BASIS,
             ),
             NegativeControl(
-                control_id="inverted-quadrature-weight",
+                control_id="uniform-weight-power-divergence",
                 description=(
-                    "the control that fires BACKWARDS. Adding the production weight is "
-                    "required to improve agreement with O1 by at least 1.2x, and it "
-                    "measures 0.42 -- the uniform configuration is CLOSER to the oracle "
-                    "than the weighted one. CHE-117 found the control, not the weight, "
-                    "to be at fault: see the caveat"
+                    "omit the production per-ray area weight. This REPLACES the "
+                    "inverted-quadrature-weight control, which asserted the weight "
+                    "improves rel-L2 agreement with O1 by at least 1.2x and measured "
+                    "0.42. CHE-117 falsified that control's premise rather than the "
+                    "weight: both configurations converge to the same residual, so the "
+                    "converged improvement factor is 1.0 and no ray count makes the old "
+                    "control fire honestly. This one tests the property CHE-47 actually "
+                    "established -- absolute-power convergence -- and it fires: 7.743e-4 "
+                    "with the weight against 14.869 without it. The retired floor of 1.2 "
+                    "is not widened and its history is kept in the caveat"
                 ),
                 mutation=(
-                    "compare the weighted configuration's O1 residual against the "
-                    "uniform configuration's; the ratio must exceed 1.2"
+                    "HandoffPerturbation(apply_quadrature_weight=False) on the "
+                    "sensor_reconstruction edge, at two ring counts, so the mutated arm "
+                    "is the shipping code path with one declared term removed"
                 ),
-                target_metric="fft_oracle_intensity_relative_l2",
-                expectation=NegativeControlExpectation.KNOWN_FIRES_BACKWARDS,
+                target_metric="reconstructed_power_ray_doubling_excess",
                 caveat=_QUADRATURE_BASIS,
             ),
             NegativeControl(
@@ -480,6 +581,7 @@ B3_PSF_SINGLET = register(
                 "benchmarks/probes/records/m3_quadrature_weight.json",
                 "benchmarks/probes/records/singlet_residual_grid.json",
                 "benchmarks/probes/records/singlet_residual_attribution.json",
+                "benchmarks/probes/records/o1_applicability.json",
                 "benchmarks/reports/2026-08/ray_to_wave_slice_exit.md",
             ),
             note=(
@@ -490,9 +592,21 @@ B3_PSF_SINGLET = register(
                 "and invariant to ten significant figures across a 8x sensor-pitch "
                 "refinement -- and it is not caused by the quadrature weight, because "
                 "the uniform arm converges to the same number from below after passing "
-                "through a 7.0e-4 minimum at 362 rings. What remains open is narrower: "
-                "whether an aberration-free paraxial oracle can decide a real traced "
-                "singlet at the 1e-3 level at all. "
+                "through a 7.0e-4 minimum at 362 rings. CHE-117 then settled the "
+                "question that left open, and the answer is NO: an aberration-free "
+                "paraxial Airy oracle cannot decide this system at 1e-3. The gate "
+                "metric is linear in a fractional Airy-scale error (slope 1.52), so "
+                "1.0e-3 resolves the scale to 6.53e-4, while this system's two "
+                "defensible NA declarations -- paraxial geometric 0.0515667 and largest "
+                "traced direction cosine 0.0517163 -- differ by 2.902e-3 and span "
+                "4.445e-3 of metric, 4.4x the gate. O1's best fit to the frozen "
+                "reconstruction lands at 0.0516457, inside that interval, leaving "
+                "7.021e-4: so 94.8% of the residual in quadrature is a scale offset the "
+                "oracle's own assumption cannot pin, and the part it can speak about is "
+                "inside the gate. This gate is therefore ATTRIBUTED AND UNMET, which is "
+                "a complete disposition rather than an open question. It is NOT met at a "
+                "fitted NA and must not be read that way -- fitting the oracle to the "
+                "field under test destroys the independence that makes O1 admissible. "
                 "This gate must NOT be closed against another Optiland PSF route: "
                 "FFTPSF and HuygensPSF share one Wavefront/OPD front end and are one "
                 "oracle, not two (PB7/CHE-58 finding F2)."
@@ -512,13 +626,23 @@ B3_PSF_SINGLET = register(
             "benchmarks/probes/records/m3_quadrature_weight.json",
             "benchmarks/probes/records/singlet_residual_grid.json",
             "benchmarks/probes/records/singlet_residual_attribution.json",
+            "benchmarks/probes/records/o1_applicability.json",
             "benchmarks/reports/2026-08/slice_cleanup_disposition.md",
+            "benchmarks/reports/2026-08/singlet_residual_attribution.md",
         ),
         notes=(
             "The only composed chain in the repository with a genuinely independent "
             "analytic decider. That is what makes an unmet gate here worth carrying: it "
             "is a known-wrong answer with something real disagreeing with it, which is a "
-            "better state than a passing comparison against ourselves."
+            "better state than a passing comparison against ourselves.",
+            "What CHE-117 changed about that sentence: the decider is genuinely "
+            "independent and is also genuinely unable to decide THIS system at 1e-3, "
+            "because 94.8% of the residual sits in the Airy scale, which M3-SINGLET-REF "
+            "leaves undetermined to 0.29% by its own residual spherical aberration. A "
+            "family that wants a met gate on this chain needs a configuration where O1's "
+            "assumptions hold -- CHE-38's synthetic aberration-free bundle reaches "
+            "4.07e-4 -- not a wider tolerance and not a second route through our own "
+            "code.",
         ),
     )
 )

@@ -363,6 +363,21 @@ validity_conditions:
       remaining real-system gap is open (see card.yaml's evidence above
       and CHE-47's recorded follow-up items), not attributed to a named
       mechanism it has not been shown to cause.
+      CHE-117 (M4.2) closed that: the real-system gap IS attributed, and not to
+      the coupler. The 2.207e-3 is converged in ray count and sensor pitch and
+      is not caused by the weight (the uniform arm converges to the same number
+      after a transient dip through 7.04e-4). 94.8% of it in quadrature is an
+      Airy-scale offset O1 cannot pin on this system: the gate metric is linear
+      in fractional scale error (slope 1.52) so 1.0e-3 resolves the scale to
+      6.53e-4, while M3-SINGLET-REF's two defensible NA declarations (paraxial
+      geometric 0.0515667, largest traced direction cosine 0.0517163) differ by
+      2.902e-3 -- 4.4x the gate in metric units -- because the marginal ray
+      focuses 14.0 um short of the declared image plane. At O1's best-fit NA
+      0.0516457, inside that interval, the residual is 7.021e-4, inside the
+      gate. So an analytic Airy oracle is NOT a 1e-3 decider on a real traced
+      system with residual spherical aberration, and the gate is carried
+      ATTRIBUTED AND UNMET rather than met at a fitted NA. Evidence:
+      benchmarks/probes/records/o1_applicability.json.
   - id: plane_not_surface
     statement: Equation 2 reconstructs onto a plane with one normal n_hat.
     enforcement: contract validation

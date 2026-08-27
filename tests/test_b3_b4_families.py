@@ -140,8 +140,16 @@ def test_the_singlet_tolerance_bases_migrated_verbatim() -> None:
     assert normalized(controls["opl-sign-flip"].caveat) == normalized(
         committed["opl_sign_flip_basis"]
     )
-    assert normalized(controls["inverted-quadrature-weight"].caveat) == normalized(
+    # The retired 1.2 floor's basis, carried by the control that REPLACED it
+    # (CHE-117). The string is where the retirement is recorded, so it is still
+    # pinned character for character against the file it came from.
+    assert normalized(controls["uniform-weight-power-divergence"].caveat) == normalized(
         committed["quadrature_weight_min_improvement_factor_basis"]
+    )
+    power = B3_PSF_SINGLET.tolerance_for("reconstructed_power_ray_doubling_excess")
+    assert power is not None
+    assert normalized(power.basis) == normalized(
+        committed["reconstructed_power_ray_doubling_excess_basis"]
     )
 
 
@@ -168,16 +176,68 @@ def test_o2_is_reported_and_cannot_gate() -> None:
         )
 
 
-def test_the_singlet_carries_the_control_that_fires_backwards() -> None:
-    """0.42 against a 1.2 floor: the uniform configuration is CLOSER to the
-    oracle than the weighted one. Reported, not hidden and not widened."""
+def test_the_control_that_fired_backwards_was_replaced_not_widened() -> None:
+    """CHE-117 (M4.2). ``inverted-quadrature-weight`` asserted that the production
+    quadrature weight improves rel-L2 agreement with O1 by at least 1.2x, and
+    measured 0.42. Its premise is false at convergence -- both arms converge to
+    the same residual, so the converged improvement factor is 1.0 -- so no ray
+    count makes it fire honestly, and respecifying it on converged arms does not
+    rescue it.
+
+    What replaced it tests the property CHE-47's weight actually established:
+    absolute-power convergence. Three things are asserted, and the third is the
+    one that matters: the retired floor is still 1.2, in the family's own text and
+    in the ledger, because a control that was removed for being wrong about its
+    subject must not read like a threshold someone relaxed.
+    """
     from verification.families.schema import NegativeControlExpectation
 
-    control = next(
-        c for c in B3_PSF_SINGLET.negative_controls if c.control_id == "inverted-quadrature-weight"
+    ids = {c.control_id for c in B3_PSF_SINGLET.negative_controls}
+    assert "inverted-quadrature-weight" not in ids
+    assert not any(
+        c.expectation is NegativeControlExpectation.KNOWN_FIRES_BACKWARDS
+        for c in B3_PSF_SINGLET.negative_controls
     )
-    assert control.expectation is NegativeControlExpectation.KNOWN_FIRES_BACKWARDS
+
+    control = next(
+        c
+        for c in B3_PSF_SINGLET.negative_controls
+        if c.control_id == "uniform-weight-power-divergence"
+    )
+    assert control.expectation is NegativeControlExpectation.MUST_FAIL
+    assert control.target_metric == "reconstructed_power_ray_doubling_excess"
+    # The history, in the string a reader of the family sees.
     assert "0.42" in control.caveat
+    assert "1.2" in control.caveat
+    assert "RETIRED AND REPLACED" in control.caveat
+
+    committed = yaml.safe_load(
+        (ROOT / "benchmarks/physics/L2-PSF-01/tolerances.yaml").read_text(encoding="utf-8")
+    )
+    assert committed["quadrature_weight_min_improvement_factor"] == 1.2
+
+
+def test_o1_cannot_decide_the_singlet_gate_and_the_family_says_so() -> None:
+    """CHE-117's other half, as an assertion on the text a planner reads.
+
+    The gate is carried ATTRIBUTED AND UNMET rather than as an open question, and
+    the disposition has to say the two things that stop it being misread: that
+    94.8% of the residual is an Airy-scale offset the system's own geometry leaves
+    undetermined to 0.29%, and that the gate is NOT met at the fitted NA -- which
+    is the one way this issue could have been closed dishonestly.
+    """
+    disposition = B3_PSF_SINGLET.gate_disposition
+    assert disposition is not None
+    assert disposition.status is GateStatus.NOT_MET
+    assert disposition.observed == pytest.approx(2.2072391812867093e-3)
+    assert "ATTRIBUTED AND UNMET" in disposition.note
+    assert "NOT met at a fitted NA" in disposition.note
+    assert "benchmarks/probes/records/o1_applicability.json" in disposition.evidence
+
+    tolerance = B3_PSF_SINGLET.tolerance_for("fft_oracle_intensity_relative_l2")
+    assert tolerance is not None
+    assert tolerance.threshold == 1.0e-3
+    assert "CANNOT decide this gate at 1e-3" in tolerance.basis
 
 
 def test_the_singlet_declares_the_controls_it_has_not_run() -> None:

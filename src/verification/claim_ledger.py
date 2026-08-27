@@ -692,6 +692,7 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "benchmarks/probes/records/m3_quadrature_weight.json",
             "benchmarks/probes/records/singlet_residual_grid.json",
             "benchmarks/probes/records/singlet_residual_attribution.json",
+            "benchmarks/probes/records/o1_applicability.json",
             "benchmarks/reports/2026-08/ray_to_wave_slice_exit.md",
         ),
         metric="fft_oracle_intensity_relative_l2 vs O1 over the 5-Airy-radius disc",
@@ -730,6 +731,40 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "paraxial Airy oracle can decide a real traced singlet at the 1e-3 level "
             "at all. Separating the system's own aberration from a coupler error needs "
             "an oracle this family does not yet have, and O2 does not qualify.",
+            "That question is now SETTLED, and the answer is that O1 cannot decide "
+            "this gate at 1e-3 on this system. The gate metric is linear in a "
+            "fractional Airy-scale error with slope 1.517-1.532 over four decades, so "
+            "1.0e-3 is the statement that the Airy scale is known to 6.53e-4; "
+            "M3-SINGLET-REF admits two defensible NA declarations -- paraxial "
+            "geometric a/sqrt(a^2+R^2) = 0.0515667 and largest traced transverse "
+            "direction cosine 0.0517163 -- which differ by 2.902e-3 because the "
+            "marginal ray focuses 14.0 um short of the declared image plane, and that "
+            "span is 4.445e-3 of metric, 4.4x the gate. O1's own best fit to the "
+            "frozen reconstruction is 0.0516457, INSIDE that interval, and leaves "
+            "7.021e-4 there. So 2.093e-3 of the 2.207e-3 (94.8% in quadrature) is a "
+            "scale offset O1's assumptions cannot pin, and the 5.2% O1 can speak "
+            "about is inside the gate. Measured with O1 on both sides; O2 not "
+            "consulted; no second Optiland route consulted. Evidence: "
+            "benchmarks/probes/records/o1_applicability.json.",
+            "The gate is therefore carried as ATTRIBUTED AND UNMET -- the third of "
+            "CHE-117's three admissible outcomes -- and NOT as met at a fitted NA. "
+            "Fitting the oracle's scale to the field under test removes the "
+            "independence that makes O1 the only admissible decider here: a "
+            "scale-fitted Airy pattern cannot reject a wrong answer of the same "
+            "shape. Nothing is widened; 1.0e-3 stands.",
+            "M0.2 cross-check, requested by this issue: the ~20-order-of-magnitude "
+            "amplitude-normalization drift CHE-103 attributed to CHE-47 is the SAME "
+            "code change as the quadrature weight, but not the same quantity and it "
+            "cannot reach this metric. The drift is the global per-ray cell-area "
+            "factor, and this metric peak-normalizes both inputs, so a global "
+            "amplitude factor divides out -- rescaling the measured intensity by "
+            "2^64, by 1e20 and by the recorded uniform/weighted power ratio moves the "
+            "residual by 1.0e-14 relative, i.e. float64 round-off. The recorded "
+            "24-order power gap between the arms IS that global factor: "
+            "sqrt(P_weighted/P_uniform) reproduces the nominal hexapolar cell area to "
+            "0.44%, and the 0.44% left over is the boundary corrections, the only "
+            "non-global part, which converges away (singlet_residual_attribution). "
+            "Same root change, different root cause.",
             "CHE-103 adds a candidate contributor the original write-up did not have: "
             "the frozen grid samples the Airy radius with 2.44 pixels and is not "
             "converged for radius-like metrics, and off-axis the weighted "
@@ -758,8 +793,9 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "benchmarks/physics/L2-PSF-01/tolerances.yaml",
             "benchmarks/probes/records/m3_quadrature_weight.json",
             "benchmarks/probes/records/singlet_residual_attribution.json",
+            "benchmarks/probes/records/o1_applicability.json",
         ),
-        metric="quadrature_weight_min_improvement_factor vs O1",
+        metric="quadrature_weight_min_improvement_factor vs O1 (RETIRED by CHE-117)",
         tolerance=1.2,
         tolerance_basis=(
             "benchmarks/physics/L2-PSF-01/tolerances.yaml. The floor previously came "
@@ -785,6 +821,66 @@ _LEGACY_CLAIMS: tuple[Claim, ...] = (
             "climbing back toward the same 2.208e-3 at 1024 rings. Respecifying the "
             "control to require convergence of both arms is a change to the control, "
             "not to this floor, and the floor is not widened here.",
+            "RETIRED AND REPLACED by CHE-117, and kept here rather than deleted so "
+            "the history is on the record. Respecifying it on converged arms does not "
+            "rescue it: if both arms converge to the same residual the converged "
+            "improvement factor is 1.0, so this claim's premise is FALSE at "
+            "convergence and no ray count makes the control fire honestly. The floor "
+            "of 1.2 is NOT widened, NOT reworded and NOT deleted -- this row stays "
+            "NOT_MET, which is the honest state of a claim whose premise the evidence "
+            "falsified, and that is a different thing from a gate made easier. The "
+            "replacement is the next row: the negative control "
+            "uniform-weight-power-divergence on "
+            "reconstructed_power_ray_doubling_excess, which tests the property CHE-47 "
+            "actually established.",
+        ),
+    ),
+    Claim(
+        component="C_RAY_TO_WAVE",
+        kind=ClaimKind.CONVERGENCE,
+        claim=(
+            "The production per-ray area weight makes the reconstructed sensor-plane "
+            "power invariant under ray refinement, and omitting it is detected: this "
+            "is the property CHE-47's weight was introduced to establish, and the "
+            "negative control that replaced the retired 1.2 improvement floor."
+        ),
+        oracle=Oracle.NONE,
+        oracle_independence=OracleIndependence.NOT_APPLICABLE,
+        evidence=(
+            "benchmarks/probes/records/o1_applicability.json",
+            "benchmarks/probes/records/m3_quadrature_weight.json",
+            "tests/test_substrate_proof.py::test_the_power_divergence_control_fires",
+        ),
+        metric="reconstructed_power_ray_doubling_excess",
+        tolerance=0.05,
+        tolerance_basis=(
+            "A quadrature over a fixed aperture must converge as the quadrature is "
+            "refined, so the converged value is 0. A NEW tolerance on a NEW metric, "
+            "not a restatement of the retired 1.2 floor. 0.05 sits between the two "
+            "measured arms by wide margins: 7x above the production arm's own drift "
+            "(7.743e-4 at 64 -> 128 rings; 7.16e-3 relative spread over the committed "
+            "ladder from 1801 rays up) and 297x below the divergence it must reject "
+            "(14.869 without the weight). "
+            "benchmarks/physics/L2-PSF-01/tolerances.yaml states it in full."
+        ),
+        observed=7.742675412016897e-4,
+        gate_status=GateStatus.MET,
+        dtype="float64",
+        namespace="numpy",
+        caveats=(
+            "Oracle NONE is correct and not an omission: this is a convergence "
+            "property of one quantity under refinement of its own discretization, so "
+            "there is nothing external to compare against and no independence claim "
+            "to make. It is the reason this control can fire while the O1 gate cannot "
+            "be decided.",
+            "The mutated arm reads 14.869 -- CHE-33's (traced rays)^1.995 divergence "
+            "-- for a detection margin of 1.92e4. Measured through GraphExecutor as "
+            "HandoffPerturbation(apply_quadrature_weight=False), so the broken arm is "
+            "the shipping path with one declared term removed rather than a parallel "
+            "implementation.",
+            "Blind to WHERE the power is. A converged total says nothing about the "
+            "distribution, which is exactly why this control does not substitute for "
+            "the O1 residual and is reported beside it.",
         ),
     ),
     Claim(

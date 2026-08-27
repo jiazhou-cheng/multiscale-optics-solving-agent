@@ -773,7 +773,11 @@ entries:
       CHE-117's write-up: the unmet singlet gate is converged in both sensor
       pitch and ray count, the weighted and uniform arms converge to the same
       2.208e-3, and the backwards negative control is mis-specified rather than
-      the quadrature weight defective.
+      the quadrature weight defective. Part 2 settles the oracle question: O1
+      cannot decide this gate at 1e-3 on this system, 94.8% of the residual is an
+      Airy-scale offset the system leaves undetermined to 0.29%, M0.2's amplitude
+      drift cannot reach the metric, and the backwards control is retired and
+      replaced by one on absolute-power convergence.
     destination: >-
       B3-PSF-SINGLET gate_disposition note and the C_RAY_TO_WAVE claim caveats.
   - path: benchmarks/reports/2026-08/ray_to_wave_slice_exit.md
@@ -962,6 +966,20 @@ entries:
     destination: >-
       B3-PSF-SINGLET evidence, gate_disposition note, and the quadrature control's
       caveat; closes the open item in the frozen tolerance basis.
+  - path: benchmarks/probes/o1_applicability.py
+    bucket: A
+    justification: >-
+      CHE-117's oracle arm, and the one that settles the question the other two
+      left open. Measures what the gate metric resolves about the Airy scale
+      (6.53e-4), how well M3-SINGLET-REF defines that scale (2.902e-3 between its
+      two admissible NA declarations, 4.4x the gate in metric units), and where
+      the observed residual sits inside that (94.8% removable by O1's own scale
+      parameter, 7.021e-4 left). Also carries the M0.2 amplitude-drift
+      cross-check and the measurement behind the replacement negative control.
+    destination: >-
+      B3-PSF-SINGLET gate_disposition (ATTRIBUTED AND UNMET), the frozen tolerance
+      basis, the uniform-weight-power-divergence control, and the C_RAY_TO_WAVE
+      claim caveats.
   - path: benchmarks/probes/sensor_handoff_convergence.py
     bucket: A
     justification: >-

@@ -107,26 +107,183 @@ two convergence curves cross. The fix is to respecify it to require convergence
 of both arms before comparing them -- a change to the control, not to the 1.2
 floor, which is unchanged.
 
-## What this does not establish
+## What part 1 did not establish
 
 That 2.208e-3 is *correct*. O1 is aberration-free and paraxial; `M3-SINGLET-REF`
 is a real traced singlet, so some residual is expected from the system's own
-aberration and this work does not separate that term. Doing so needs an oracle
-this family does not have, and O2 does not qualify.
+aberration and part 1 did not separate that term. Part 2, below, separates it.
+
+---
+
+# Part 2 -- can O1 decide this at all? No, and by 4.4x
+
+`benchmarks/probes/o1_applicability.py` ->
+`benchmarks/probes/records/o1_applicability.json`. 34 s, CPU, O1 on both sides of
+every comparison. **O2 is not consulted and no second Optiland PSF route is
+consulted** (PB7/CHE-58 F2: `FFTPSF` and `HuygensPSF` share one `Wavefront`/OPD
+front end and are one oracle, not two).
+
+## 4. What the gate metric actually resolves
+
+`[2 J1(v)/v]^2` has exactly one free parameter, the Airy scale, and it enters the
+gate metric linearly. Comparing O1 at `NA` against O1 at `NA (1 + eps)` over the
+same 5-Airy-radius disc -- no coupler, no traced data anywhere in this experiment:
+
+| fractional scale offset | rel-L2 | rel-L2 / offset |
+| --- | --- | --- |
+| 1e-5 | 1.53189e-5 | 1.5319 |
+| 1e-4 | 1.53176e-4 | 1.5318 |
+| 1e-3 | 1.53038e-3 | 1.5304 |
+| 1e-2 | 1.51667e-2 | 1.5167 |
+
+Linear to 1% over four decades. Bisecting for the offset that reads exactly
+`1.0e-3`: **`6.532e-4`**. So the frozen gate is, precisely, the statement that
+this system's Airy scale is known to 0.065%.
+
+## 5. How well this system knows its own Airy scale. It does not
+
+`M3-SINGLET-REF` admits two defensible declarations of the same image-space `NA`,
+and both are properties of the system rather than inputs to the coupler:
+
+| declaration | value |
+| --- | --- |
+| paraxial geometric, `a / sqrt(a^2 + R^2)` | 0.051566680929690 |
+| largest traced transverse direction cosine (the frozen declaration) | 0.051716318272919 |
+
+They differ by **`2.902e-3`** -- 0.29% -- because the marginal ray crosses the
+axis **14.0 um** before the declared image plane. That is this singlet's residual
+spherical aberration, and it reproduces CHE-38 section 3's independently measured
+14.1 um from the pupil side. In metric units the span is **`4.445e-3`**:
+
+> **4.4x the gate, and twice the entire observed residual.**
+
+O1's own free parameter is less determined on this system than the threshold it
+is being asked to decide. That is the answer to the question part 1 left open.
+
+## 6. Where the observed residual sits inside that
+
+Minimising the gate metric over O1's one free parameter, on the frozen 512-ring
+reconstruction taken off `GraphExecutor` (the residual at the declared `NA` comes
+back as `0.0022072391812867093`, bit-identical to the frozen number, so this is
+the gate's own field):
+
+| quantity | value |
+| --- | --- |
+| rel-L2 at the declared `NA` | 2.2072391812867093e-3 |
+| best-fit `NA` | 0.051645733465397 |
+| best-fit offset from declared | -1.3648e-3 |
+| **rel-L2 at the best-fit `NA`** | **7.0208e-4** -- inside the gate |
+| scale term, in quadrature | 2.0926e-3 -- **94.8%** |
+| shape term | 7.0208e-4 -- 5.2% |
+
+And the best-fit `NA` lands **inside** the 0.29% interval the system's own
+geometry leaves open. So: 94.8% of the residual is a scale offset that O1's
+paraxial aberration-free assumption cannot pin on this system, and the 5.2% O1
+*can* speak about is inside the gate.
+
+**This is not a claim that the gate is met.** Fitting the oracle's scale to the
+field under test removes the independence that makes O1 the only admissible
+decider here -- a scale-fitted Airy pattern cannot reject a wrong answer of the
+same shape. The best-fit number is the oracle's resolving power, measured. The
+gate stays at the declared `NA` and stays unmet.
+
+## 7. M0.2's amplitude drift is not in this number
+
+CHE-103 attributed a ~20-order-of-magnitude absolute-power drift in three
+committed records to CHE-47's amplitude change -- `sqrt(intensity) *
+quadrature_weight_m2` -- which is the *same code change* as the quadrature weight
+part 1 investigated. So the two could have been one problem. They are not, and
+the reason is checkable rather than arguable.
+
+The drift is the **global** per-ray cell-area factor, and the gate metric
+peak-normalizes both of its inputs, so a global amplitude factor divides out
+exactly. Rescaling the measured intensity by `2^64` (exact in binary), by `1e20`
+(the order of the drift) and by the recorded uniform/weighted power ratio itself
+moves the residual by at most `1.0e-14` relative -- the float64 round-off floor.
+
+That the 24-order power gap between the two arms *is* that global factor is also
+arithmetic on the committed record: `sqrt(P_weighted / P_uniform) = 2.4813e-13
+m^2` against the nominal hexapolar cell `pi a^2 / (3 n^2) = 2.4923e-13 m^2` at
+512 rings -- agreement to **0.44%**, and the 0.44% left over is the two boundary
+corrections. Which is the non-global part, the only part that can reach this
+metric, and precisely the part section 3 showed vanishes on convergence.
+
+**Same root change, different root cause.** The drift cannot contribute to the
+2.207e-3.
+
+## 8. The negative control: retired and replaced, not widened
+
+Part 1 called the control mis-specified and proposed requiring both arms to be
+converged. That does not rescue it, and the reason is part 1's own finding: if
+both arms converge to the same residual, the converged improvement factor is
+**1.0**, so the premise -- *adding the weight improves rel-L2 agreement with O1
+by at least 1.2x* -- is **false at convergence**. No ray count makes that control
+fire honestly, and a floor cannot fix a false premise.
+
+What CHE-47 actually established is **absolute-power convergence**: with the
+per-ray area weight, reconstructed power is invariant under ray refinement;
+without it, power scales as `(traced rays)^1.995` (CHE-33's `N^2.0024`). Measured
+through `GraphExecutor` as `HandoffPerturbation(apply_quadrature_weight=False)`,
+so the broken arm is the shipping path with one declared term removed:
+
+| arm | P(64 rings) | P(128 rings) | ratio | `abs(ratio - 1)` |
+| --- | --- | --- | --- | --- |
+| production (weighted) | 1.351771e-24 | 1.352817e-24 | 1.000774 | **7.743e-4** |
+| `apply_quadrature_weight=False` | 5.442243e-3 | 8.636231e-2 | 15.8689 | **14.869** |
+
+Detection margin **1.92e4**. Both coarse values reproduce
+`m3_quadrature_weight.json`'s `absolute_power` block bit-for-bit, which is an
+incidental confirmation that the committed ladder still describes this tree.
+
+So the family now declares `uniform-weight-power-divergence` on a new metric,
+`reconstructed_power_ray_doubling_excess`, with a threshold of `0.05` -- about 7x
+above the converged arm's own drift (the committed ladder's relative spread from
+1801 rays up is 7.16e-3) and 297x below the divergence it must reject. It has no
+oracle, and that is the point: a convergence property of one quantity under
+refinement of its own discretization can fire on a system whose O1 gate cannot be
+decided at all.
+
+The retired 1.2 floor is **unchanged, not reworded and not deleted**. It stays in
+`tolerances.yaml`, and `verification.claim_ledger` keeps its row `NOT_MET` with
+the retirement recorded, because a claim whose premise the evidence falsified is
+a different thing from a threshold somebody relaxed.
+
+`negative_controls_pass` on `B3-PSF-SINGLET-01` is still `false`, now for an
+honestly separate reason: `axis-transpose` and `launch-phase-error` are identity
+operations at this on-axis instance, are declared `NOT_IMPLEMENTED` rather than
+dropped, and `result.negative_controls_pass` correctly requires every declared
+control to have fired. Exercising those two needs an off-axis instance.
 
 ## Gate disposition
 
-**Unchanged and unmet.** The 1.0e-3 threshold is not widened and 2.208e-3 does
-not meet it. What changed is the shape of the open question: not *why does the
-correct weight make agreement worse* -- answered, it does not -- but *can an
-aberration-free paraxial oracle decide a real traced singlet at the 1e-3 level at
-all*.
+**ATTRIBUTED AND UNMET.** The third of CHE-117's three admissible outcomes. The
+1.0e-3 threshold is not widened, 2.2072391812867093e-3 does not meet it, and
+every term of it now has a name and a number:
+
+| term | value | share |
+| --- | --- | --- |
+| sensor sampling | 0 (ten significant figures over 8x refinement) | 0% |
+| the quadrature weight | 0 at convergence | 0% |
+| the central ray's 3/4 correction | 0.26% of the arm difference | negligible |
+| O1's Airy-scale freedom, which this system leaves open to 0.29% | 2.0926e-3 | **94.8%** |
+| what remains at O1's best fit | 7.0208e-4 -- inside the gate | 5.2% |
+
+What a met gate on this chain would require is a configuration where O1's
+assumptions hold -- CHE-38's synthetic aberration-free bundle reaches `4.07e-4`
+-- not a wider tolerance, not O2, and not a second Optiland route.
 
 ## Artifacts
 
 * `benchmarks/probes/singlet_residual_grid.py` -> `benchmarks/probes/records/singlet_residual_grid.json`
 * `benchmarks/probes/singlet_residual_attribution.py` -> `benchmarks/probes/records/singlet_residual_attribution.json`
+* `benchmarks/probes/o1_applicability.py` -> `benchmarks/probes/records/o1_applicability.json`
 
-Both records carry `record_provenance`. Runtime: 6 min 1 s and 7 min 13 s, CPU,
-float64/numpy -- deliberately not the shipping complex64 jax path, so that no
-part of the residual can be charged to a float32 cast that is not in the number.
+All three carry `record_provenance`, and all three are fresh against this tree.
+Part 1's two records were regenerated during part 2, because the M2/M3 merge moved
+`src/couplers/{handoff,node,ray_to_wave}.py` under them: **every physics value came
+back identical**, with only the provenance hashes and wall times differing, so the
+attribution above is unchanged by that merge and the frozen gate number still
+comes off `GraphExecutor` bit-identically. Runtime: 5 min 58 s, 7 min 20 s and 34 s,
+CPU, float64/numpy -- deliberately not the shipping complex64 jax path, so that
+no part of the residual can be charged to a float32 cast that is not in the
+number.

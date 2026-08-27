@@ -39,7 +39,7 @@
    "rings": 128,
    "traced_rays": 49537,
    "uniform_vs_o1": 0.003928950465141261,
-   "wall_seconds": 4.922316088050138,
+   "wall_seconds": 5.132685415039305,
    "weighted_vs_o1": 0.002189049217668529
   },
   {
@@ -47,7 +47,7 @@
    "rings": 256,
    "traced_rays": 197377,
    "uniform_vs_o1": 0.0011406984676466019,
-   "wall_seconds": 9.946869319013786,
+   "wall_seconds": 10.166767504997551,
    "weighted_vs_o1": 0.002203572853045589
   },
   {
@@ -55,7 +55,7 @@
    "rings": 362,
    "traced_rays": 394219,
    "uniform_vs_o1": 0.0007038779615217963,
-   "wall_seconds": 19.707994086958934,
+   "wall_seconds": 20.140782841015607,
    "weighted_vs_o1": 0.0022060149867886452
   },
   {
@@ -63,7 +63,7 @@
    "rings": 512,
    "traced_rays": 787969,
    "uniform_vs_o1": 0.0009211637948694215,
-   "wall_seconds": 40.1451492140186,
+   "wall_seconds": 40.76672561495798,
    "weighted_vs_o1": 0.0022072391812867093
   },
   {
@@ -71,7 +71,7 @@
    "rings": 724,
    "traced_rays": 1574701,
    "uniform_vs_o1": 0.0012497323374378003,
-   "wall_seconds": 81.05091070901835,
+   "wall_seconds": 82.4917683340027,
    "weighted_vs_o1": 0.0022078514712021197
   },
   {
@@ -79,7 +79,7 @@
    "rings": 1024,
    "traced_rays": 3148801,
    "uniform_vs_o1": 0.0015163678670095358,
-   "wall_seconds": 168.94881761696888,
+   "wall_seconds": 173.23125745501602,
    "weighted_vs_o1": 0.0022081579585547175
   }
  ],
@@ -87,7 +87,7 @@
  "probe": "singlet_residual_attribution",
  "record_provenance": {
   "code_fingerprint": {
-   "combined_sha256": "d51203bf170ba732c7e147053b947c2be20994d35666238c07322e8ccc3f0b28",
+   "combined_sha256": "d388890aeaee15d7f3abe3cd401de22f5814bec7df2cf12971723e1125641432",
    "files": {
     "benchmarks/probes/quadrature_weight.py": "33c91dbf2d1c239a1a8a1b26111ed73443196281ef2e7c2f8f74b436e9b80bd6",
     "benchmarks/probes/sensor_handoff_convergence.py": "e200ed9cf5981a6123c11f83751beebef6d6b29632c55f0cedd2cf4bddb69188",
@@ -111,16 +111,16 @@
     "src/couplers/curvature.py": "1c168ec1e1f6982b8e620114e46a2c933290ccaa895408922bee77f25f26f50e",
     "src/couplers/doe_node.py": "069b5fceb4c3c5d9aa3674c293cfb47577a209ad4a429db060573f1126e911e8",
     "src/couplers/generalized_snell.py": "bbf30cf333c1b32540ee23e9145b8d879a65eedd4895c7f47895366fb25b158e",
-    "src/couplers/handoff.py": "8c2b1fd6e3058d79e3a829c66c4f6401e4b741c5cd145392a50e9aec43471715",
+    "src/couplers/handoff.py": "bf664f36c82baaa30627c451801445291b00ba8b9c6b2442485746973a285156",
     "src/couplers/interaction.py": "2cbc90116d75f91765563107c79619026e08cc7352799b71deabcbc67975bbcd",
-    "src/couplers/node.py": "ef7ae7e5cdd33a487174c5310daf296faf3423e9d952e38584f4d7082da493fd",
+    "src/couplers/node.py": "0f19f5ced93161ee6289f9586a6d6f4a5bffbc838caaa012b8f4aee65d5c1592",
     "src/couplers/ontology.py": "c6bbbb14c8a09aa7efe71bc0d15a5418e73084fbcb7167a76a260598688cfea4",
     "src/couplers/patch.py": "699e7270bebc7e03dbd0bf1a0a61606dd534ec717bbf038fb5871527af0b1aa9",
     "src/couplers/patch_cost.py": "5d1c14dd522c222f92ccee35ea03bcf583e0ce7781f09f8d208bb15339e6bdb1",
     "src/couplers/patch_node.py": "6f0e1f98652c5a4ded1c7d41ef9d738f7f3d52c02ac018c402d5c4aaf881670e",
     "src/couplers/propagation.py": "08d99bcabf57e72b2766b8ba5f1c6ba4fe4bf2921653b56b7a095a00502f7ebd",
     "src/couplers/quadrature.py": "6c56cb1fa0b8eb3d0a68ce14f7bd0fa4a9fbcd95acfd592fbcffa030b080f3a9",
-    "src/couplers/ray_to_wave.py": "21c079bade5b40c36ecf430dfd07729097caea14aa79e4713c33ced4cc85d0be",
+    "src/couplers/ray_to_wave.py": "5015b3a0c678eb14ad188dea521a7d43fd2287014bfbf030df77e80895dcb17c",
     "src/couplers/wave_to_ray.py": "46e474a242565bf29d977b6ee533e2520436256f401ee488f85a26f92fe4a234",
     "src/registry/__init__.py": "93d0f8dfad3c87001d95aee68172edca238fa57a7d71c08be1941598c72a9e81",
     "src/registry/loader.py": "d08a5aeb2f2c5e9da5f58e0ff4d8dcc4643b1da5d5616c35a939caa0b5b153f6",
@@ -158,8 +158,8 @@
   },
   "probe": "benchmarks/probes/singlet_residual_attribution.py",
   "schema_version": 2,
-  "source_commit": "cff742cbecfa9791f0d5fd98bb8800d7b77e0327",
-  "timestamp_utc": "2026-08-27T16:29:43.214600+00:00",
+  "source_commit": "c9393029c9340e22235d44a14e8e8c629eeef4bc",
+  "timestamp_utc": "2026-08-27T22:01:50.490156+00:00",
   "working_tree_dirty": true
  },
  "verdict": {

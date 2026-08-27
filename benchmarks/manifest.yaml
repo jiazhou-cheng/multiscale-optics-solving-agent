@@ -65,6 +65,32 @@ m1_independence_check: archive/benchmarks/gen1/archive/benchmarks/gen1/benchmark
 # convergence curves cross, so the family carries it as
 # `inverted-quadrature-weight` with `KNOWN_FIRES_BACKWARDS` and that finding
 # attached, and nothing gates on it.
+#
+# ---------------------------------------------------------------------------
+# CHE-117 (M4.2) closed both of that gate's open scientific problems. The
+# disposition, so it is not inferred from the paragraph above:
+# ---------------------------------------------------------------------------
+#
+#   * `fft_oracle_intensity_relative_l2` is **ATTRIBUTED AND UNMET**. 1.0e-3
+#     unchanged, 2.2072391812867093e-3 observed, and every term of it named:
+#     sensor sampling 0, the quadrature weight 0 at convergence, 94.8% in
+#     quadrature an Airy-scale offset O1 cannot pin on this system, 7.021e-4
+#     left over -- inside the gate.
+#   * **O1 is not applicable as a 1e-3 decider on this system**, measured: the
+#     gate resolves the Airy scale to 6.53e-4 while M3-SINGLET-REF's two
+#     defensible NA declarations (paraxial geometric 0.0515667, largest traced
+#     direction cosine 0.0517163) differ by 2.902e-3, spanning 4.4x the gate.
+#     The gate is NOT met at the fitted NA and must not be read that way.
+#   * The backwards control is **RETIRED AND REPLACED**, not widened. Its
+#     premise -- that the weight improves rel-L2 agreement by >= 1.2x -- is
+#     false at convergence. `uniform-weight-power-divergence` on
+#     `reconstructed_power_ray_doubling_excess` tests the property CHE-47 did
+#     establish and fires at a 1.9e4 margin; the 1.2 floor is unchanged and
+#     recorded as retired in `verification.claim_ledger.open_gates()`.
+#   * O2 was not consulted and no second Optiland PSF route was consulted.
+#   * Evidence: `benchmarks/probes/records/o1_applicability.json`,
+#     `benchmarks/probes/records/singlet_residual_{grid,attribution}.json`,
+#     `benchmarks/reports/2026-08/singlet_residual_attribution.md`.
 
 # ---------------------------------------------------------------------------
 # Characterizations — NOT benchmarks, and the distinction is the entry

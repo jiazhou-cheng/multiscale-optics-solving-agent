@@ -1,6 +1,25 @@
 # L2-PSF-01 tolerances (CHE-39/M3.10), under protocol M3-SLICE-CPU-V1.
 #
 # Every entry states its basis, and none is chosen to make this bundle pass.
+#
+# DISPOSITION AFTER CHE-117 (M4.2), in one place so it cannot be inferred wrongly
+# from the appended bases below:
+#
+#   * The primary gate `fft_oracle_intensity_relative_l2` is **ATTRIBUTED AND
+#     UNMET**. 1.0e-3 unchanged, 2.2072391812867093e-3 observed, and every term
+#     of that number now named: sensor sampling contributes nothing (identical to
+#     ten significant figures over an 8x pitch refinement), the quadrature weight
+#     contributes nothing at convergence (both arms converge to it), 94.8% in
+#     quadrature is an Airy-scale offset that O1's paraxial aberration-free
+#     assumption cannot pin on this system, and the 5.2% remaining is 7.021e-4,
+#     inside the gate. It is NOT met at a fitted NA.
+#   * O1 is **not applicable as a 1e-3 decider on this system**, measured rather
+#     than asserted: the gate resolves the Airy scale to 6.53e-4 and the system's
+#     own two defensible NA declarations differ by 2.902e-3.
+#   * The `quadrature_weight_min_improvement_factor` control is **RETIRED AND
+#     REPLACED**, not widened. Its 1.2 floor is unchanged below.
+#     `reconstructed_power_ray_doubling_excess` is the replacement and it fires.
+#   * Nothing here was decided by O2 or by a second Optiland PSF route.
 # The primary physical gate is unchanged from benchmarks/protocols/slice_protocol.yaml's
 # tolerance_budget.gates.fft_oracle_intensity_relative_l2, frozen by M3.2
 # (CHE-31) and re-affirmed unwidened through M3.8 (CHE-37) and M3.9R (CHE-38).
@@ -46,6 +65,29 @@ fft_oracle_intensity_relative_l2_basis: >
   Evidence: benchmarks/probes/records/singlet_residual_attribution.json and
   benchmarks/probes/records/singlet_residual_grid.json. The 1.0e-3 threshold
   is unchanged.
+  CHE-117 then settled the narrower question, and the answer is that O1
+  CANNOT decide this gate at 1e-3 on this system. Three measurements, O1 on
+  both sides of every comparison: (1) the gate metric is linear in a
+  fractional Airy-scale error with slope 1.517-1.532 over four decades, so
+  the 1.0e-3 gate is the statement that the Airy scale is known to 6.53e-4;
+  (2) M3-SINGLET-REF does not define its own scale that well -- the paraxial
+  geometric a/sqrt(a^2+R^2) = 0.0515667 and the largest traced transverse
+  direction cosine 0.0517163 are both defensible declarations of the same
+  system's NA and differ by 2.902e-3, because the marginal ray crosses the
+  axis 14.0 um before the declared image plane, and that span is 4.445e-3 of
+  gate metric, 4.4x the gate; (3) fitting O1's NA to the frozen 512-ring
+  reconstruction puts the best fit at 0.0516457, INSIDE that interval, and
+  leaves 7.021e-4 there -- so 2.093e-3 of the observed 2.207e-3 (94.8% in
+  quadrature) is a scale offset O1's own assumption cannot pin, and the
+  5.2% O1 can speak about is inside the gate. The gate therefore stands UNMET
+  with every term of the residual named, which is the third of this issue's
+  three admissible outcomes. It is NOT met at a fitted NA and must never be
+  read that way: fitting the oracle's scale to the field under test removes
+  the independence that makes O1 the only admissible decider, and a
+  scale-fitted Airy pattern cannot reject a wrong answer of the same shape.
+  Evidence: benchmarks/probes/records/o1_applicability.json. The 1.0e-3
+  threshold is still unchanged, O2 was not consulted, and no second Optiland
+  PSF route was consulted.
 
 # A convention error must be caught by an INDEPENDENT oracle, not merely
 # differ from the correct answer -- otherwise a shared bug between the
@@ -85,6 +127,50 @@ quadrature_weight_min_improvement_factor_basis: >
   both arms is a change to the control, not to this floor, which is
   unchanged at 1.2. Evidence:
   benchmarks/probes/records/singlet_residual_attribution.json.
+  CHE-117 RETIRED AND REPLACED this control rather than leaving it
+  KNOWN_FIRES_BACKWARDS, and the reason is that respecifying it on converged
+  arms does not rescue it: if both arms converge to the same residual then the
+  converged improvement factor is 1.0, so the premise -- that the weight
+  improves rel-L2 agreement with O1 by at least 1.2x -- is FALSE at
+  convergence and no ray count makes this control fire honestly. What CHE-47
+  actually established is the property the replacement control tests:
+  absolute-power convergence. With the production weight the reconstructed
+  power is invariant under ray refinement; without it, power scales as
+  (traced rays)^1.995 (CHE-33's N^2.0024). Measured through the executor at
+  64 -> 128 rings, |P(2N)/P(N) - 1| reads 7.743e-4 with the weight and 14.869
+  without it, a detection margin of 1.92e4 in the correct direction. The
+  replacement is the negative control uniform-weight-power-divergence on the
+  metric reconstructed_power_ray_doubling_excess. This floor of 1.2 is NOT
+  widened, NOT reworded and NOT deleted: it is recorded here and in
+  verification.claim_ledger as a retired gate whose premise the evidence
+  falsified, which is a different thing from a gate that was made easier.
+  Evidence: benchmarks/probes/records/o1_applicability.json,
+  absolute_power_under_ray_refinement.
+
+# The replacement control's metric (CHE-117). |P(2N)/P(N) - 1| for the
+# reconstructed sensor-plane power at hexapolar ring counts N and 2N. No
+# oracle is involved and that is the point: it is a convergence property of one
+# quantity under refinement of its own discretization, so it can fire on a
+# system whose O1 gate cannot be decided at all. Adding a metric with a new
+# threshold is not a widening of the floor above -- that floor is unchanged and
+# recorded as retired.
+reconstructed_power_ray_doubling_excess: 0.05
+reconstructed_power_ray_doubling_excess_basis: >
+  A quadrature over a fixed aperture must converge as the quadrature is
+  refined, so the converged value of |P(2N)/P(N) - 1| is 0 and this threshold
+  says how much drift still counts as converged. It is a NEW tolerance on a
+  NEW metric, introduced by CHE-117 to carry the property CHE-47 established,
+  and it is not a restatement or a relaxation of the retired 1.2 improvement
+  floor -- that floor is unchanged and still on the record. 0.05 is set from
+  the two measured arms and sits between them by wide margins: the production
+  arm measures 7.743e-4 at 64 -> 128 rings, and the committed ladder's own
+  relative spread from 1801 rays upward is 7.16e-3
+  (benchmarks/probes/records/m3_quadrature_weight.json,
+  absolute_power.weighted_power_relative_spread_from_1801_rays), so 0.05 is
+  about 7x above the converged arm's own drift; the uniform arm measures
+  14.869, so 0.05 is 297x below the divergence it has to reject. Evidence:
+  benchmarks/probes/records/o1_applicability.json,
+  absolute_power_under_ray_refinement.
 
 # Protocol constant, restated so a change to it shows up in this file's hash.
 no_gate_may_be_satisfied_by_widening: true
