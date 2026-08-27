@@ -441,7 +441,6 @@ def _reconstruct_kspace(
     # 8.5e-2. A ray outside the band by a millionth of a bin is not
     # distinguishable from one on the edge, so it is kept and clipped; a ray
     # genuinely outside is still dropped, and still counted.
-    edge_tolerance = 1e-6
     # Unrepresentable rays are **zero-weighted, not removed**. Compacting with
     # `fy[representable]` produces a data-dependent shape, which under JAX means
     # a host synchronization plus a gather in the middle of the pipeline: every
@@ -451,16 +450,6 @@ def _reconstruct_kspace(
     # slower than the one it replaces, while the reconstruction kernel itself was
     # 6.3x quicker in isolation. Keeping every shape static is what makes the
     # asymptotics visible in the wall clock.
-    #
-    # The bound is tested with a tolerance and the indices are then clipped,
-    # because the edge bins land *on* the boundary and arrive there through
-    # floating-point. A mode at index -K//2 computes its fractional index as
-    # 0 - 1e-14, and a bare `>= 0` test discards it: measured on demo2's
-    # enumerated patch that silently dropped 397 of 39,601 rays -- exactly the
-    # outermost row and column -- and turned a 7.1e-13 exactness anchor into
-    # 8.5e-2. A ray outside the band by a millionth of a bin is not
-    # distinguishable from one on the edge, so it is kept; a ray genuinely
-    # outside gets weight zero, and is still counted.
     edge_tolerance = 1e-6
     representable = (
         (fy >= -edge_tolerance)
@@ -529,8 +518,9 @@ def _reconstruct_kspace(
         "rays_splatted": kept,
         "rays_dropped_out_of_band": count - kept,
         "dropped_fraction": (count - kept) / count if count else 0.0,
-        # 1.0 means every ray hit a grid node, i.e. this reconstruction is
-        # exact and comparable to the ramp-sum route at round-off.
+        # Fraction of *splatted* rays on a node -- 1.0 only certifies exactness
+        # when read together with dropped_fraction == 0.0; dropped rays are
+        # excluded from this ratio, not counted against it.
         "on_node_fraction": (on_node / kept) if kept else 0.0,
     }
     if kept == 0:
