@@ -1,18 +1,28 @@
 """The new tree's dependency direction holds, and the check that says so works.
 
-CHE-171 (R01.1). Two halves, and the second is the one that matters at R01:
+CHE-171 (R01.1). This is the **gate and meta-test layer** over
+`scripts/check_dependencies.py`, which is the CLI and report layer. The two are
+not redundant and neither replaces the other:
+
+* the script decides the rule and prints a readable report for `make check-arch`,
+  a pre-commit hook, or a developer who wants to see which import in which module
+  broke it;
+* this file puts `verify()` in the default suite so CI cannot skip it, and — the
+  part the script cannot do for itself — drives `_classify` against **synthetic**
+  inputs to prove each violation class is genuinely detected.
+
+Two halves, and the second is still the one carrying the weight:
 
 * the real tree passes;
-* the checker **detects** each violation class, proved against synthetic inputs
-  rather than by trusting it.
+* the checker detects each violation class, proved rather than trusted.
 
-At R01 the new tree is two empty packages, so "the real tree passes" is nearly
-free information — a checker that returned "OK" unconditionally would also pass
-it. The detection tests are what make the gate meaningful before there is any
-code to guard, and they are why this file exists now rather than in R02.
+The new tree is small — `numerics/` (two modules, CHE-173 / R02.1) and an empty
+`representations/` — so "the real tree passes" remains nearly free information. A
+checker that returned "OK" unconditionally would also pass it. The detection
+tests are what make the gate meaningful while there is little code to guard.
 
-Nothing here imports the old production tree; that is the rule being enforced, so
-the enforcement cannot depend on it.
+Nothing here imports the reference implementation; that is the rule being
+enforced, so the enforcement cannot depend on it.
 """
 
 from __future__ import annotations
@@ -25,6 +35,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from scripts import check_dependencies  # noqa: E402
 from scripts.check_dependencies import (  # noqa: E402
     ALLOWED,
     BACKENDS,
@@ -47,9 +58,10 @@ def test_the_new_tree_has_no_forbidden_import() -> None:
 def test_the_check_is_not_structurally_vacuous() -> None:
     """The failure mode this gate is most likely to have.
 
-    A dependency checker that walks zero files reports success, and at R01 the new
-    tree is nearly empty, so this is not a hypothetical. `verify()` reports such a
-    state as a structural problem instead of a pass.
+    A dependency checker that walks zero files reports success, and the new tree is
+    four modules, so this is not a hypothetical. `verify()` reports such a state as
+    a structural problem instead of a pass -- as it does a `LANDED` entry with no
+    package on disk, or a top-level name under `src/` that nothing classifies.
     """
     _, structural, inspected = verify()
     assert not structural, "structural problems:\n" + "\n".join(f"  {s}" for s in structural)
@@ -69,7 +81,13 @@ def test_every_landed_package_is_actually_walked() -> None:
 
 
 def test_importing_the_old_tree_is_a_violation() -> None:
-    """R01 acceptance criterion 3, and the reason this gate exists at all."""
+    """R01 acceptance criterion 3, and the reason this gate exists at all.
+
+    These packages no longer exist, so such an import would also fail at runtime.
+    The rule is kept -- and tested -- so that reviving one is caught here, with the
+    architectural reason attached, rather than surfacing later as a bare
+    `ModuleNotFoundError` that reads like a missing dependency.
+    """
     for old in sorted(OLD_TREE_ONLY):
         rule = _classify("representations", old)
         assert rule is not None, f"importing old-tree {old!r} was not flagged"
@@ -79,17 +97,22 @@ def test_importing_the_old_tree_is_a_violation() -> None:
 def test_importing_through_the_src_namespace_root_is_a_violation() -> None:
     """The shortest way to defeat every other rule in this file.
 
-    `src/` has no `__init__.py`, so PEP 420 makes `src.core.boundary` an importable
+    `src/` has no `__init__.py`, so PEP 420 makes `src.anything` an importable
     namespace path whenever the repository root is on `sys.path` -- which it is for
-    a bare `python`, `python -m` or pytest run from the root. The import *resolves*
-    to the old tree while naming none of it, and an earlier revision of the checker
-    classified the first segment (`"src"`) as third-party and let it through. Review
-    found it; this pins it closed.
+    a bare `python`, `python -m` or pytest run from the root. An import written that
+    way reaches its target while naming none of the packages this check classifies,
+    and an earlier revision classified the first segment (`"src"`) as third-party and
+    let it through. Review found it; this pins it closed.
+
+    The concrete case that motivated it was `from src.core.boundary import
+    RayBundle` reaching the reference tree. That tree is gone, but the bypass is
+    structural rather than tied to any package: `src.couplers`, `src.solvers` or
+    anything a later ticket adds would resolve the same way.
     """
     rule = _classify("representations", NAMESPACE_ROOT)
     assert rule is not None, (
-        "importing through 'src.' was not flagged, so `from src.core.boundary import "
-        "RayBundle` in the new tree would pass while resolving to the old tree"
+        "importing through 'src.' was not flagged, so any `from src.<pkg> import ...` "
+        "in the new tree would bypass every other rule in this file"
     )
     assert "namespace root" in rule
 
@@ -99,13 +122,18 @@ def test_every_top_level_name_in_src_is_classified() -> None:
 
     `_classify` returns None for anything it does not recognise, on the assumption
     that it is third-party. That assumption is only safe while every top-level name
-    under `src/` is in one of the three sets, so the sets are checked against the
-    tree instead of being trusted.
+    under `src/` is accounted for, so the sets are checked against the tree instead
+    of being trusted.
+
+    `SHARED_NAMES` is deliberately **not** subtracted here, mirroring `verify()`.
+    Those names carried an exemption while the reference tree occupied them; with
+    that tree deleted, a directory appearing under one of them is a new package
+    that must be landed like any other, not a pre-approved one.
     """
     src = ROOT / "src"
     on_disk = {p.name for p in src.iterdir() if p.is_dir() and (p / "__init__.py").is_file()}
     on_disk |= {p.stem for p in src.glob("*.py")}
-    unaccounted = on_disk - OLD_TREE_ONLY - SHARED_NAMES - LANDED
+    unaccounted = on_disk - OLD_TREE_ONLY - LANDED
     assert not unaccounted, (
         f"top-level names under src/ that the dependency check does not classify: "
         f"{sorted(unaccounted)}. An import of one from the new tree would be treated "
@@ -143,19 +171,53 @@ def test_operations_may_not_import_a_solver_or_a_coupler() -> None:
 
 
 def test_an_allowed_direction_to_an_unlanded_package_is_still_refused() -> None:
-    """Because it would resolve to the old tree instead.
+    """A legal direction is not the same fact as a package to import.
 
-    `couplers/` is an allowed target for `operators/`, and `src/couplers/` exists —
-    as *old* code. Allowing the import because the direction is legal would wire
-    the new tree to the old one through a name collision.
+    `couplers/` is an allowed target for `operators/`, but nothing has landed under
+    that name. Passing the import because the *direction* is legal would let a
+    ticket depend on a package it had not written -- and, for a name the reference
+    implementation also used, would silently accept whatever a partial revert put
+    there. `LANDED` is the second condition, and this pins that it is applied.
     """
     assert "couplers" in ALLOWED["operators"]
-    assert "couplers" in SHARED_NAMES
     assert "couplers" not in LANDED
     rule = _classify("operators", "couplers")
     assert rule is not None
-    assert "does not exist in the new tree yet" in rule
-    assert "old" in rule.lower()
+    assert "has not been landed" in rule
+    # A name the reference implementation also used says so, so the reviver of one
+    # gets the extra warning rather than only the generic refusal.
+    assert "couplers" in SHARED_NAMES
+    assert "reference implementation" in rule
+
+
+def test_a_package_under_a_reference_tree_name_is_not_pre_approved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exemption `SHARED_NAMES` used to carry, proved gone.
+
+    While the reference tree occupied `couplers/`, `solvers/` and `runtime/`, those
+    names were skipped by the "on disk but not in LANDED" structural check, because
+    they were permanently present as old code. The documented cost was that
+    authoring new code under one of them and forgetting the LANDED edit raised no
+    error, and both gates then walked and counted *zero* of it -- a package that
+    looked guarded and was not.
+
+    With that tree deleted the skip has no benefit, so it was removed. This drives
+    `verify()` against a synthetic tree to show the hole is actually closed, rather
+    than inferring it from the set arithmetic.
+    """
+    src = tmp_path / "src"
+    for package in [*sorted(LANDED), "couplers"]:
+        (src / package).mkdir(parents=True)
+        (src / package / "__init__.py").write_text("")
+    monkeypatch.setattr(check_dependencies, "ROOT", tmp_path)
+    monkeypatch.setattr(check_dependencies, "SRC", src)
+
+    _, structural, _ = check_dependencies.verify()
+    assert any("src/couplers/" in problem and "LANDED" in problem for problem in structural), (
+        "a new package under a reference-tree name was not reported as unguarded:\n"
+        + "\n".join(f"  {problem}" for problem in structural)
+    )
 
 
 def test_a_third_party_import_is_not_this_checks_business() -> None:

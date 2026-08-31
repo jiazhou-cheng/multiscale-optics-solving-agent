@@ -606,6 +606,15 @@ _REAL_DTYPES = frozenset({DType.FLOAT32, DType.FLOAT64})
 PROBE_TAG = "pre-rewrite-2026-08-30"
 
 
+# The two rows below are bootstrap anchors, not their permanent home. They live
+# here because R02.1 needed something real for `negotiate()` to negotiate
+# against and neither `solvers/` nor `operations/` exists yet -- but a static
+# registry of concrete solver names in the foundational layer is closed against
+# extension. **CHE-206** moves them into `solvers/<backend>/` when that package
+# lands, and carries the three things that have to move with them: the
+# `git cat-file` probe-citation test, the widening refusals on
+# `ComponentCapabilities.__post_init__`, and the "reading a capability imports
+# no backend" assertion.
 OPTILAND_CAPABILITIES = ComponentCapabilities(
     component="M_RAY_OPTILAND",
     devices=frozenset({DeviceKind.CPU, DeviceKind.CUDA}),
