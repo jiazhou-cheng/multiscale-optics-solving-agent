@@ -34,8 +34,8 @@ inline so any number here can be re-derived.
 * §2 Algorithm inventory — the kernels not to re-derive (R00.2 part 2)
 * §3 Class inventory: the 214 `none` count R14 is measured against (R00.2 part 3)
 * §4 Test-evidence triage and the `slow`/`gpu` blind spot (R00.3 part 4)
-* §5 Record disposition, the measured staleness mechanism, and the four
-  stamped records that are **already stale at the tag** (R00.3 part 5)
+* §5 Record disposition, the measured staleness mechanism, and the eight tests
+  that **already fail at the tag** (R00.3 part 5)
 * §6 Tolerance and oracle extraction from the two ledgers R14 deletes (R00.3 AC 4)
 * §7 Where these measurements disagree with the issues
 * §8 What this hands forward, and the open risks
@@ -452,7 +452,9 @@ $ ./run.sh --no-build pytest -q -n 0 -m "" tests/test_provenance_fingerprint.py
 ```
 
 On a **completely clean tree at `38539f2`** — no uncommitted files — six tests
-fail:
+in this file fail. Running the **whole** default suite (which CHE-171 did, to
+measure its runtime) raises the count to **eight**; the two extra are recorded in
+§5.1b. The six here:
 
 * `test_the_enrolled_records_still_describe_this_tree` for `m3_convergence`,
   `m3_first_null_grid_convergence`, `m3_off_axis_handoff` and
@@ -486,6 +488,30 @@ before the freeze without being regenerated. Three consequences for the rewrite:
 Fixing it is explicitly **not** in R00's scope: regenerating the four records
 requires running the probes, which is a source-touching act on a tree this ticket
 must leave frozen. It belongs to R07 or R13, and it is listed in §8.
+
+## 5.1b And the fixed suite is missing the whole `systems/` generation
+
+Measured by CHE-171 while timing the default suite, so it belongs with §5.1a
+rather than being found later. The default gate's full failure count at the tag is
+**8**, not 6. The two beyond §5.1a are in `tests/test_fixed_suite.py`, and they
+fail serially as well as sharded, so neither is a worker artifact:
+
+* `test_every_registered_family_contributes_at_least_one_instance` — six
+  registered families contribute no instance to `FIXED_V1`: **B1-GSL-VALIDITY,
+  B3-4F-IDEAL, B3-4F-REAL, B3-DOE-INLINE, B4-4F-REAL, B4-DOE-INLINE**.
+* `test_success_metric_s1_is_met` — fails on `C_GENERALIZED_SNELL`.
+
+Five of those six families are **exactly** the ones whose records live under
+`benchmarks/systems/records/`. That is the same split §5.2 found from the other
+direction: the `systems/` record generation is enrolled in neither the fixed suite
+nor the provenance sweep. Two independent mechanisms both fail to see it, which
+makes it a structural gap rather than two oversights, and it is the single
+strongest argument for R13 treating `systems/records/` as first-class rather than
+as a variant of `instances/records/`.
+
+It also sharpens §12: the four family modules whose evidence lives in `systems/`
+are the four largest in the family substrate, so "test evidence to reuse" is
+carrying more weight for them than the fixed suite currently knows about.
 
 **The one class of record the rewrite does not stale** is the *unstamped* part of
 `probes/records/optiland/*` and `probes/records/chromatix/*` — **13 of those 15
@@ -743,12 +769,14 @@ should be pointed here.
 
 # 8. What this hands forward, and the open risks
 
-**To R01.** `tests/test_package_dependencies.py`'s AST import walk is the
-mechanism to reuse. `AGENTS.md`'s "Initial Artifact Boundary" sentence names
-`WavefrontSamples` as a boundary artifact and is the only reason it still exists
-(§1.1) — R01.2 must rewrite it, or R02's collapse reads as a regression against
-the document that outranks the code. `pyproject.toml` enumerates the old tree in
-five places.
+**To R01 — done, recorded here because §1.1 depends on it.**
+`tests/test_package_dependencies.py`'s AST import walk was the mechanism to
+reuse, and `scripts/check_dependencies.py` reuses it as an allowlist.
+`AGENTS.md`'s "Initial Artifact Boundary" sentence named `WavefrontSamples` as a
+boundary artifact and was the only reason it still existed (§1.1); **CHE-172
+removed it**, so R02 may now collapse the artifact without contradicting the
+document that outranks the code. `pyproject.toml`'s five old-tree enumerations
+were rewritten by CHE-171 (four edited; `mypy_path` needed none).
 
 **To R02.** `WavefrontSamples` has zero production consumers; collapse it. The
 dtype-dependent `‖d‖−1` bound (§6.2) is one rule with four consumers and belongs
@@ -784,9 +812,11 @@ new layout or deleted, never ported.
    two perf records whose *fits* are cited from production cost models
    (`solvers/optiland/cost_model.py:123`, `couplers/patch_cost.py:127`), so they
    are the ones that block soonest regardless of device.
-4. **The reference tree's default suite is red before the rewrite starts** (§5.1a).
-   Six pre-existing failures, four stamped `m3_*` records drifted from
-   `src/couplers/ray_to_wave.py`. R07 or R13 owns regenerating them. Until then,
+4. **The reference tree's default suite is red before the rewrite starts**
+   (§5.1a, §5.1b). **Eight** pre-existing failures: six from four stamped `m3_*`
+   records drifted from `src/couplers/ray_to_wave.py`, and two from the fixed
+   suite not knowing about the `systems/` family generation. R07 or R13 owns
+   regenerating the records; R13 owns the enrolment gap. Until then,
    any R02/R07 parity claim that cites those four records is citing an
    unconfirmed number, and the "everything at the tag is validated" premise the
    project description leans on is not true of these four.

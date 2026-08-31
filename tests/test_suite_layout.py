@@ -346,12 +346,33 @@ def test_the_slow_suite_has_a_command(pytest_config: dict[str, Any]) -> None:
     )
 
 
+def _requested_workers(recipe: str) -> list[int]:
+    """Worker counts requested by a pytest command line.
+
+    Handles the three spellings xdist accepts -- `-n 8`, `-n8` and `-n=8` -- because
+    a parser that only understood the attached forms would read `-n 8` as "no count
+    given" and pass the thing it exists to catch. `auto`/`logical` are reported as a
+    large number: they are emphatically not one worker.
+    """
+    parts = recipe.split()
+    counts: list[int] = []
+    for index, part in enumerate(parts):
+        if not part.startswith("-n"):
+            continue
+        value = part[2:].lstrip("=").strip()
+        if not value:
+            value = parts[index + 1] if index + 1 < len(parts) else ""
+        counts.append(9999 if value in ("auto", "logical") else int(value or 0))
+    return counts
+
+
 def test_the_gpu_suite_has_a_command_and_is_not_sharded(pytest_config: dict[str, Any]) -> None:
     """`addopts` reaches invocations the CPU gate never sees, and the GPU is one.
 
-    CHE-107 found this: `-n 12 --dist loadfile` is right for the default gate and
-    wrong on a host with one device, where twelve workers each open their own CUDA
-    context and JAX preallocates a large fraction of device memory per process.
+    CHE-107 found this: the default `-n N --dist loadfile` is right for the CPU
+    gate and wrong on a host with one device, where N workers each open their own
+    CUDA context and JAX preallocates a large fraction of device memory per
+    process.
     AGENTS.md's shared-server policy settles it -- one workload per GPU -- so this
     is a correctness and resource-safety constraint, not tuning. It is the same
     shape as the swap-guard finding: a resource mechanism degrading silently
@@ -374,7 +395,17 @@ def test_the_gpu_suite_has_a_command_and_is_not_sharded(pytest_config: dict[str,
         f"the GPU recipe does not override addopts, so it inherits the sharding "
         f"the default gate needs and one device cannot survive: {recipe}"
     )
-    assert "-n 12" not in recipe and "--dist" not in recipe, recipe
+    # Checked as "any worker count above zero" rather than as the literal `-n 12`:
+    # CHE-171 re-measured the constant from 12 to 8, and a guard pinned to the old
+    # number would have silently stopped catching an inherited `-n`. `-n 0` is
+    # explicitly allowed -- it is serial, which is what one device needs, and the
+    # Makefile comment records it as the alternative once the GPU image is rebuilt
+    # with the xdist pin.
+    workers = _requested_workers(recipe)
+    assert all(w == 0 for w in workers), (
+        f"the GPU recipe requests {workers} worker(s) on a host with one device: {recipe}"
+    )
+    assert "--dist" not in recipe, recipe
     assert "gpu" in {entry.split(":", 1)[0] for entry in pytest_config["markers"]}, (
         "the `gpu` marker lost its declaration, so `-m gpu` would match nothing "
         "and the GPU suite would report a clean pass having run none of it"

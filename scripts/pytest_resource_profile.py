@@ -455,7 +455,7 @@ def pytest_configure(config: pytest.Config) -> None:
     # TRIPPED banner and no operator-facing diagnosis -- exactly the silent
     # degradation AGENTS.md forbids for a resource stop-condition.
     #
-    # This is reachable by accident now that addopts carries `-n 12`, so it is a
+    # This is reachable by accident now that addopts carries `-n 8`, so it is a
     # usage error rather than a warning. `-n 0` is the fix and is what the
     # substantial runs this plugin exists for should be using anyway.
     if getattr(config, "workerinput", None) is None and (

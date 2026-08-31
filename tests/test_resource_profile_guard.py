@@ -194,7 +194,7 @@ def test_end_to_end_a_breach_terminates_the_session_with_a_nonzero_exit(
             "no:cacheprovider",
             # CHE-140: `-n 0` because addopts now shards by default and this
             # plugin refuses to run sharded (see pytest_configure). Without it the
-            # subprocess inherits `-n 12` and the assertions below fail on the
+            # subprocess inherits `-n 8` and the assertions below fail on the
             # refusal rather than on the escalation path they are about.
             "-n",
             "0",
@@ -239,7 +239,8 @@ def test_the_guard_refuses_a_sharded_session_rather_than_degrading_in_one(
     banner and no diagnosis. A resource stop-condition that reports a confusing
     unrelated failure is worse than one that refuses to start.
 
-    `addopts` carries `-n 12` since CHE-140, so this is reachable by forgetting a
+    `addopts` carries `-n 8` (CHE-140, re-measured by CHE-171), so this is
+    reachable by forgetting a
     flag rather than by trying.
     """
     result = subprocess.run(

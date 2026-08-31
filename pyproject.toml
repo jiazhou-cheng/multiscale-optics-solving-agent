@@ -64,6 +64,9 @@ package-dir = { "" = "src" }
 include-package-data = true
 # `cli` is a loose module under src/, not a package member, and
 # `packages.find` does not pick up loose modules -- it has to be declared.
+# `cli` is an old-tree top-level module. It is listed here rather than in
+# packages.find because it is a module, not a package; R14 removes both it and
+# this line. The new tree has no top-level module and does not need an entry.
 py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
@@ -73,6 +76,13 @@ where = ["src"]
 # directory happens to sit there; an enumeration means a stray scratch directory
 # cannot silently become a shipped package.
 include = [
+  # The new tree (CHE-171 / R01.1). R01 lands these two only: they are the
+  # minimum for the first real implementation (R02) and the two target names
+  # that do not collide with a package of the old tree. Later tickets add
+  # theirs; `scripts/check_dependencies.py` holds the full declared set.
+  "numerics*",
+  "representations*",
+  # The old tree. R14 deletes these and their entries here.
   "agent*",
   "core*",
   "couplers*",
@@ -128,10 +138,31 @@ norecursedirs = [
 #   `make test-slow` runs them and MUST be run before merging a change to
 #   coupler numerics.
 #
-# `-n 12 --dist loadfile` -- the suite is ~2400 fast tests plus a short tail of
+# `-n 8 --dist loadfile` -- the suite is ~2700 fast tests plus a short tail of
 #   expensive ones, so sharding by file collapses the wall time onto the longest
-#   single file (`test_executor_integration.py`, 31 s of real Optiland ->
-#   Chromatix chain) instead of the sum.
+#   single file instead of the sum.
+#
+#   CHE-171 re-measured this rather than inheriting CHE-140's constant, because
+#   the number was chosen against a suite that has since changed. Measured on the
+#   80-core host, default selection, `--dist loadfile`, 2727 passed / 67 skipped:
+#
+#       -n 0   196.1 s        -n 8    59.7 s
+#       -n 4    76.9 s        -n 12   60.1 s
+#       -n 5    69.7 s        -n 16   60.1 s
+#       -n 6    66.7 s
+#
+#   The suite saturates at ~60 s from eight workers on: 8, 12 and 16 are within
+#   0.5 s of each other, so CHE-140's 12 was paying four extra processes for
+#   nothing. 8 is the smallest count that reaches the floor, and on a shared host
+#   AGENTS.md puts system stability ahead of throughput, so the smallest count
+#   that reaches the floor is the right one.
+#
+#   The floor is set by the longest single file, and that is no longer
+#   `test_executor_integration.py`: measured per-file totals put
+#   `test_provenance_fingerprint.py` first at 44.0 s, ahead of
+#   `test_executor_integration.py` at 31.0 s. It is slow because it recomputes an
+#   AST-normalized source fingerprint for every stamped record, so the record
+#   mechanism is now its own critical path. Re-measure before moving `-n` again.
 #
 #   `loadfile` is load-bearing, not a preference: about forty files here use
 #   module-scoped fixtures that execute a benchmark driver or build a solver
@@ -140,14 +171,12 @@ norecursedirs = [
 #   that fixture -- so the finer distribution would make the suite slower and,
 #   worse, would silently multiply real solver work.
 #
-#   12 rather than `auto`: this is a shared 80-core host and AGENTS.md puts
-#   system stability ahead of throughput. Every worker is a separate process that
-#   imports jax, chromatix and optiland, so workers cost RSS, and past ~12 there
-#   is nothing left to win -- the floor is the longest file, not the core count.
-#   A `-n` on the command line overrides this (`./run.sh pytest -q -n 0` is the
-#   serial escape hatch, and is how a suspected cross-test interaction gets
-#   confirmed).
-addopts = "-ra -m \"not slow\" -n 12 --dist loadfile"
+#   8 rather than `auto`: every worker is a separate process that imports jax,
+#   chromatix and optiland, so workers cost RSS, and `auto` would start 80 of
+#   them on a machine this project shares. A `-n` on the command line overrides
+#   this (`./run.sh pytest -q -n 0` is the serial escape hatch, and is how a
+#   suspected cross-test interaction gets confirmed).
+addopts = "-ra -m \"not slow\" -n 8 --dist loadfile"
 markers = [
   "jax: requires the optional JAX solver environment",
   "torch: requires the optional PyTorch solver environment",
@@ -187,6 +216,11 @@ plugins = ["pydantic.mypy"]
 # `explicit_package_bases` it computes a module name for `src/core/specs.py` by
 # walking up to the first directory without `__init__.py`, which is `src/`, and
 # reports every module twice under two names.
+#
+# `src` is the root for both trees, so the new packages (`numerics`,
+# `representations`) are covered without a second entry -- this is the one of
+# pyproject's five old-tree enumerations that needed no edit in CHE-171, and
+# saying so is cheaper than someone re-checking.
 mypy_path = "src"
 explicit_package_bases = true
 
@@ -194,6 +228,10 @@ explicit_package_bases = true
 # Enumerated for the same reason as packages.find: there is no single top-level
 # package to name any more.
 source = [
+  # New tree (CHE-171). See packages.find for why only these two.
+  "numerics",
+  "representations",
+  # Old tree; removed with it in R14.
   "agent",
   "cli",
   "core",

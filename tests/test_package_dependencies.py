@@ -123,14 +123,49 @@ def test_package_does_not_import_what_it_must_not(package: str) -> None:
     )
 
 
+#: Packages of the NEW production tree (CHE-171 / R01.1). Their dependency
+#: direction is governed by `scripts/check_dependencies.py` and
+#: `tests/unit/test_dependency_direction.py`, which enforce an allowlist rather
+#: than this file's denylist. They are excluded here rather than added to
+#: FORBIDDEN because this table encodes the OLD architecture: giving a new-tree
+#: package a rule in the old table would make the old layering authoritative over
+#: the thing replacing it, and there would then be two tables to disagree.
+#: R14.2 deletes this file; until then each governs its own tree.
+NEW_TREE = frozenset({"numerics", "representations"})
+
+
 def test_the_rule_table_covers_every_package_that_has_one() -> None:
     """Guards the guard: a new package with no rule is silently unconstrained."""
-    unruled = OWNED - set(FORBIDDEN) - {"cli", "studies", "agent"}
+    unruled = OWNED - set(FORBIDDEN) - {"cli", "studies", "agent"} - NEW_TREE
     assert not unruled, (
         f"these packages have no dependency rule: {sorted(unruled)}. Add one to "
         "FORBIDDEN, or add it to the deliberate-exemption set below with a "
         "reason. `cli`, `studies` and `agent` are exempt because they are the "
         "top of the stack -- they compose everything and are imported by nothing."
+    )
+
+
+def test_the_new_tree_is_governed_by_its_own_check_not_by_omission() -> None:
+    """The exemption above must be a handover, not a hole.
+
+    Excluding the new tree from this table is only defensible if something else
+    constrains it. This asserts the handover holds: every name exempted here is
+    declared in the new gate. Without it, `NEW_TREE` would be a way to add an
+    unconstrained package by naming it.
+    """
+    import sys
+
+    sys.path.insert(0, str(ROOT))
+    from scripts.check_dependencies import ALLOWED, LANDED
+
+    assert ALLOWED.keys() >= NEW_TREE, (
+        f"exempted from this table but not declared in scripts/check_dependencies.py: "
+        f"{sorted(NEW_TREE - ALLOWED.keys())}"
+    )
+    assert NEW_TREE == LANDED, (
+        "this file's NEW_TREE and the new gate's LANDED disagree about which "
+        f"packages are re-authored: {sorted(NEW_TREE ^ LANDED)}. One of them is "
+        "governing a package the other thinks is someone else's problem."
     )
 
 
@@ -175,10 +210,21 @@ def test_no_cycle_between_top_level_packages() -> None:
 def test_core_boundary_is_where_the_four_artifacts_live() -> None:
     """The move that broke the cycle, pinned as a location rather than a habit.
 
-    AGENTS.md's "Initial Artifact Boundary" makes RayBundle, WavefrontSamples,
-    ComplexField and PSF vocabulary of the whole system. They spent a while in
+    RayBundle, WavefrontSamples, ComplexField and PSF spent a while in
     `couplers/contracts.py` because a coupler consumed them first, which is why
     `solvers/optiland/coherent_trace.py` had to import from `couplers/`.
+
+    **What this test is now, and is not.** It used to cite AGENTS.md's "Initial
+    Artifact Boundary" as its authority. CHE-172 removed that declaration: the new
+    architecture has one ray representation and one scalar-field representation,
+    and PSF is a measurement rather than a boundary artifact. So this no longer
+    protects a stated architecture — it protects the OLD tree's internal
+    consistency for as long as that tree is still here, which is what stops a
+    cycle reappearing in it before R14 deletes it.
+
+    In particular this is NOT an argument for keeping `WavefrontSamples`. R00
+    measured its production consumers at zero, and R02 collapses it; when it goes,
+    it comes out of this tuple rather than being preserved to keep this test green.
     """
     from core.boundary import PSF, ComplexField, RayBundle, WavefrontSamples
 

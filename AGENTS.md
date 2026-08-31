@@ -20,11 +20,48 @@ design — surface conflicts instead of silently choosing one source.
 
 ## Architecture Boundaries
 
-- `src/core/` — shared typed artifacts, graph contracts, status, precision/device policy. Boundary artifacts: `RayBundle`, `WavefrontSamples`, `ComplexField`, `PSF`.
-- `src/solvers/` — narrow adapters; external solver imports stay here. `src/couplers/` — representation-changing physics, with no solver-specific details unless the contract requires them.
-- `src/registry/` declares supported components without executing them; `src/runtime/` executes and records what happened, never whether it was right; `src/discovery/` answers capability queries and owns no facts.
-- `src/verification/` — oracles, measurements, the benchmark family substrate, the verifier. Imports nothing from `src/agent/`, which holds agent infrastructure, not solver physics.
+Full definitions: [`docs/architecture_principles.md`](docs/architecture_principles.md).
+Read it before adding a module, a class or a package.
+
+Two concepts. **Representations** are physical state at a declared boundary.
+**Operations** consume and produce representations, problems or measurements.
+There are four operation *kinds* — `solver`, `coupler`, `physical_operator`,
+`measurement` — carried as **descriptor metadata, not four class hierarchies**.
+
+- **representation** — physical state, conventions explicit. Exactly one public ray representation and one scalar-field representation. **PSF is a measurement, never a representation.** Coherence is a stronger contract on the ray representation, not a subtype.
+- **solver** — maps a problem into a representation. The only place a backend's API or version pin appears (`solvers/<backend>/`).
+- **coupler** — changes *representation*, same physical state at the same boundary. Heavy numerics do not make it an operator.
+- **physical operator** — changes the *physical state*. Propagation and surface interaction are operators, never couplers.
+- **measurement** — derives an observable from state. Serializability does not make its output a representation.
+- **operation descriptor** — one lightweight record used to discover and reason about execution; holds its implementation path as a string and resolves lazily.
+
+Dependency direction, enforced by `scripts/check_dependencies.py`:
+
+```
+numerics/ -> nothing        representations/ -> numerics       problems/ -> representations, numerics
+operations/ -> numerics     couplers/ -> representations, numerics
+solvers/<backend>/ -> problems, representations, numerics (+ its pinned backend)
+operators/ -> representations, couplers, numerics             measurements/ -> representations, numerics
+planning/ -> operations     runtime/ -> planning, operations, representations
+```
+
+`numerics/` is the bottom and imports nothing; `src/core/` is banned because a
+package naming no domain accumulates whatever has no other home. `operations/` is
+a *sibling* of the implementation packages, never a layer above them. `src/io/`
+is banned (it would shadow the stdlib); artifact serialization lives in
+`runtime/records.py`.
+
+A class is justified only if it enforces a shared invariant across several
+fields, is a public serialized/versioned data model, owns a mutable resource
+lifecycle, needs runtime polymorphism across ≥2 *current* implementations, or is
+a real plugin boundary. Otherwise: function, module, frozen dataclass, TypedDict,
+tuple, Literal, Enum. Counted by `scripts/class_budget.py`; both gates run in the
+default suite via `tests/unit/`. Every ticket reports production classes added
+and deleted. No base class or placeholder interface exists "so the structure is
+visible".
+
 - `knowledge/` is agent-facing knowledge, not executable evidence; `benchmarks/` holds protocols, probes, records, instances, inventory; `archive/` and `tests_tutorial/` are not part of the active surface.
+- The tree still contains the pre-rewrite production source (`core/`, `discovery/`, `registry/`, `verification/`, `agent/`, `studies/`, `cli.py`, and the old `couplers/`, `solvers/`, `runtime/`). It is a reference for physics, **never** for architecture, and the new tree must not import it. `docs/rewrite/reference_inventory.md` says what it proves we need; `pre-rewrite-2026-08-30` is the citable tag.
 
 ## Execution Environment
 
@@ -35,8 +72,10 @@ imports, probes, tests, linters, solver jobs, and benchmarks inside the
 editing files and Git/Linear operations. Do not silently fall back to host
 execution — report the environment failure.
 
-- `./run.sh --no-build pytest -q` — reuse the existing image; the default. ~55 s:
-  sharded across 12 workers and excluding `slow`, per `addopts` (CHE-140).
+- `./run.sh --no-build pytest -q` — reuse the existing image; the default. ~60 s:
+  sharded across 8 workers and excluding `slow`, per `addopts` (CHE-140,
+  re-measured by CHE-171 — the suite saturates at 8 workers, so 12 was paying
+  four extra processes for nothing).
 - `./run.sh --rebuild pytest -q` — after Dockerfile/dependency changes.
 - `./run.sh pytest -q -m slow` (`make test-slow`) — ~105 s of expensive numerical
   characterization the default gate deselects. Required before merging a change to
@@ -46,7 +85,7 @@ execution — report the environment failure.
 - `./run.sh pytest -q -m "" -n 0` (`make test-serial`) — everything, unsharded. The
   arbiter when a failure might be a cross-test interaction or a worker artifact.
 - `MOA_GPUS=device=6 make test-gpu` — opt-in GPU image and one device, ~75 s for
-  66 tests. It overrides `addopts` because the default shards across 12 workers
+  66 tests. It overrides `addopts` because the default shards across 8 workers
   and there is one GPU; see `docs/testing/gpu_environment.md`. A bare
   `./run.sh --gpu pytest -q -m gpu` is no longer correct.
 

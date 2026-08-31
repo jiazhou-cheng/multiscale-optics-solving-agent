@@ -45,7 +45,7 @@ MOA_GPUS=device=3 ./run.sh --gpu python probe.py            # choose a device
 ### The GPU suite must not be sharded (CHE-140 / CHE-107)
 
 `make test-gpu` is `./run.sh --gpu pytest -q -o addopts="-ra" -m gpu`, and the
-`-o addopts=` is load-bearing. CHE-140 put `-n 12 --dist loadfile` in
+`-o addopts=` is load-bearing. CHE-140 put `-n N --dist loadfile` in
 `pyproject.toml`'s `addopts`, which is right for the CPU gate and wrong here for
 two independent reasons:
 

@@ -99,9 +99,54 @@ default suite: **61 s → 2.1 s**.
 Nothing about the sweep was made cheaper. Its ladder, seeds, tolerances and
 controls are untouched, and no benchmark record was regenerated.
 
-### 3. `-n 12 --dist loadfile`
+### 3. `-n 12 --dist loadfile` — the worker count re-measured to 8 by CHE-171
 
 `pytest-xdist==3.8.0`, pinned in `docker/requirements.txt`.
+
+> **CHE-171 (R01.1) re-measured the constant and moved it to `-n 8`.** R01.1 is
+> required not to inherit a number measured against a different suite, so the
+> curve was taken again on the 80-core host, default selection, `--dist loadfile`,
+> 2727 passed / 67 skipped:
+>
+> | `-n` | wall | | `-n` | wall |
+> | --- | --- | --- | --- | --- |
+> | 0 | 196.1 s | | 8 | 59.7 s |
+> | 4 | 76.9 s | | 12 | 60.1 s |
+> | 5 | 69.7 s | | 16 | 60.1 s |
+> | 6 | 66.7 s | | | |
+>
+> The suite saturates at ~60 s from eight workers on — 8, 12 and 16 sit within
+> 0.5 s of each other — so 8 is the smallest count that reaches the floor, and on
+> a shared host that makes it the right one. Everything section 3 says about
+> `loadfile` is unchanged and is still a correctness requirement.
+>
+> The critical path also moved. Per-file totals now put
+> `test_provenance_fingerprint.py` first at **44.0 s**, ahead of
+> `test_executor_integration.py` at 31.0 s: it recomputes an AST-normalized source
+> fingerprint for every stamped record, so the record mechanism is its own
+> critical path.
+>
+> **Two caveats on that 44.0 s, and both are re-measure triggers.** First, it was
+> measured on a *failing* file: six of `test_provenance_fingerprint.py`'s tests
+> fail at this commit (four stamped `m3_*` records drifted from
+> `src/couplers/ray_to_wave.py` — see `docs/rewrite/reference_inventory.md` §5.1a),
+> and a failing assertion does not do the same work as a passing one. When R07 or
+> R13 regenerates those records the number will move. Second, the host was shared
+> and under load (~15 of 80 cores busy) throughout, so the 0.4 s spread across
+> n=8/12/16 is inside single-run noise — the plateau is real, but the sub-second
+> ordering within it is not. **Re-measure before moving `-n` again.**
+>
+> **Why the budget is a documented number and not an executable timing gate.**
+> CHE-171's acceptance criterion asks for a *measured* runtime budget, and the
+> measurement is above. It is deliberately not a test that fails past N seconds:
+> on a host this project shares, wall-clock depends on other users' jobs, so such
+> a test would fail for reasons the committer cannot see or fix — and the honest
+> response to a flaky resource gate is the one CHE-140 found in the swap guard,
+> which is to key it on something attributable. Nothing here is attributable. So
+> the budget is enforced socially, by this document and the `addopts` comment
+> naming the number and the trigger, rather than by a check that would be
+> disabled the third time it cried wolf. If a hard gate is wanted, it needs a
+> quiet-host CI runner, which this project does not have.
 
 `loadfile` is a **correctness** requirement, not tuning. About forty files here
 use a module-scoped fixture that runs a benchmark driver or builds a solver

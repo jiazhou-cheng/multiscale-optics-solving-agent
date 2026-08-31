@@ -1,4 +1,4 @@
-.PHONY: test test-slow test-serial test-gpu test-tutorial test-agent-benchmark agent-benchmark validate list-models list-couplers clean
+.PHONY: test test-slow test-serial test-gpu test-tutorial test-agent-benchmark agent-benchmark check-arch validate list-models list-couplers clean
 
 # Every target runs through ./run.sh, which is the only supported entry point
 # (AGENTS.md, "Execution Environment -- Container Only").
@@ -15,8 +15,10 @@
 
 # The default active suite (CHE-67). `testpaths = ["tests"]` is what keeps the
 # on-demand tutorial suite and the archived generations out of this. CHE-140 put
-# `-m "not slow" -n 12 --dist loadfile` in pyproject's addopts, so this is ~55 s
-# rather than the ~375 s it was; the reasoning is in that addopts comment.
+# `-m "not slow" -n N --dist loadfile` in pyproject's addopts, so this is ~60 s
+# rather than the ~375 s it was. CHE-171 re-measured N and moved it from 12 to 8:
+# the suite saturates at ~60 s from eight workers on, so the extra four bought
+# nothing on a shared host. The measurement table is in that addopts comment.
 test:
 	./run.sh pytest -q
 
@@ -45,9 +47,9 @@ test-serial:
 # a device; see docs/testing/gpu_environment.md. Select the device with MOA_GPUS
 # (AGENTS.md prefers 6 and 7): `MOA_GPUS=device=6 make test-gpu`.
 #
-# `-o addopts=` replaces the default `-m "not slow" -n 12 --dist loadfile`
+# `-o addopts=` replaces the default `-m "not slow" -n 8 --dist loadfile`
 # wholesale, and the sharding is the reason rather than the marker. There is one
-# device: twelve workers would each import jax and open their own CUDA context on
+# device: eight workers would each import jax and open their own CUDA context on
 # it, and JAX preallocates a large fraction of device memory per process, so the
 # second worker OOMs on a GPU the first one is holding. AGENTS.md's shared-server
 # policy is explicit that this is not a throughput decision -- one workload per
@@ -83,6 +85,15 @@ agent-benchmark:
 	./run.sh python -m agent.benchmark_suite \
 	    --suite v1 --trials $(TRIALS) --participant $(PARTICIPANT) \
 	    --context-policy per-task --output outputs/che71_agent_v1
+
+# The two architecture gates of the new tree (CHE-171 / R01.1), run directly for a
+# readable report. Both also run in the default suite via `tests/unit/`, which is
+# what makes them a gate rather than a command someone remembers; this target is
+# for the report, and for seeing *why* a gate failed without reading pytest
+# assertion output.
+check-arch:
+	./run.sh python scripts/check_dependencies.py
+	./run.sh python scripts/class_budget.py
 
 validate:
 	./run.sh python scripts/validate_package.py

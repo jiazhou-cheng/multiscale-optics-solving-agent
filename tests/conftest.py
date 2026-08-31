@@ -103,7 +103,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 "the GPU, and the non-gpu tolerances were derived on the CPU. "
                 "Run: `MOA_GPUS=device=6 make test-gpu`. Not a bare "
                 "`./run.sh --gpu pytest -q -m gpu`: since CHE-140 that inherits "
-                "`-n 12 --dist loadfile` from addopts, and twelve workers on one "
+                "`-n 8 --dist loadfile` from addopts, and eight workers on one "
                 "device is a resource-policy violation before it is a test failure."
             )
         )
