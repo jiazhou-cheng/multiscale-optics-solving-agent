@@ -142,6 +142,13 @@ explicit_package_bases = true
 module = ["optiland.*"]
 ignore_missing_imports = true
 
+# chromatix 0.6.0 @ d24bdf0 ships no `py.typed` marker either, so the same applies
+# for the same reason. Added by CHE-183 (R06.1), the ticket that first imports it.
+# jax and torch are typed and need no entry.
+[[tool.mypy.overrides]]
+module = ["chromatix.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
 # package to name.

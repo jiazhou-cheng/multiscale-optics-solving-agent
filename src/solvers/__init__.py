@@ -13,11 +13,24 @@ knew about the registry would make reading the registry import a backend, and a
 solver that knew about a coupler would put the coupler's conventions inside the
 solver's anti-corruption boundary instead of outside it.
 
-One backend has landed:
+Two backends have landed:
 
 * `optiland` -- CHE-179/180/181 (R05.1/R05.2/R05.3). Sequential ray tracing.
   `solvers.optiland.trace(problem, sampling=..., execution=...)` takes a
   `RayTraceProblem` and returns a `RayBundle`. Nothing else about Optiland is
   observable from outside the package: no `RealRays`, no `.i`, no `.opd`, no
   millimetre.
+* `chromatix` -- CHE-183/184 (R06.1/R06.2). Scalar-wave angular-spectrum
+  propagation. `solvers.chromatix.propagate(field, distance_m=..., model=...)`
+  takes a `ScalarField` and returns a `ScalarField`, whose typed `validity` says
+  whether its phase is absolute or carrier-removed. No chromatix type and no JAX
+  buffer crosses the line.
+
+`chromatix` holds a *physical operator* -- propagation changes physical state
+rather than representation -- and that is not a violation of what this package
+is. Backend ownership beats taxonomy: the operation is inseparable from the
+package's FFT convention, frequency grid, padding and evanescent policy, so
+relocating it to `operators/` would put a forwarding wrapper outside the
+anti-corruption boundary and the conventions inside it. The *descriptor* records
+the operation as a `physical_operator`; the code lives with the backend it drives.
 """
