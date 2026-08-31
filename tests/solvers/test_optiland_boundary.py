@@ -93,17 +93,30 @@ MILLIMETRE_EXEMPT = frozenset(
         TESTS / "solvers" / "test_optiland_solver.py",
         TESTS / "physics" / "test_optiland_opl_convention.py",
         TESTS / "physics" / "test_optiland_rays.py",
+        # CHE-207. It measures the finite-object *launch state*, which is native
+        # solver state by definition -- the whole point is that no project type
+        # describes where a ray started -- and it checks the closed-form conjugate
+        # in the prescription's own millimetres.
+        TESTS / "physics" / "test_optiland_finite_conjugate.py",
     }
 )
 
-#: Modules exempt from the native-name and native-attribute rules. The same four
-#: boundary tests, for the same reason, and nothing in `src/`.
+#: Modules exempt from the native-name and native-attribute rules. The boundary
+#: and physics tests, for the same reason, and nothing in `src/`.
+#:
+#: `test_optiland_finite_conjugate.py` is here because CHE-207's central evidence
+#: *is* a native reading: it regenerates the launch state and asserts the origin
+#: spread is exactly zero, which is a claim about `RealRays` columns that no
+#: neutral type carries. Reading them in a test that says so is the opposite of the
+#: leak this gate exists to catch -- and the gate caught this file on its first run,
+#: which is the check working rather than the exemption weakening it.
 NATIVE_EXEMPT = frozenset(
     {
         TESTS / "solvers" / "test_optiland_boundary.py",
         TESTS / "solvers" / "test_optiland_system.py",
         TESTS / "physics" / "test_optiland_opl_convention.py",
         TESTS / "physics" / "test_optiland_rays.py",
+        TESTS / "physics" / "test_optiland_finite_conjugate.py",
     }
 )
 

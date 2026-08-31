@@ -53,6 +53,8 @@ from problems.ray_trace import Material, RayTraceProblem, SurfaceSpec
 from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
 from solvers.optiland import rays as rays_module
 from solvers.optiland.rays import (
+    LAUNCH_PLANE_WAVEFRONT,
+    LAUNCH_POINT_SOURCE,
     NATIVE_LENGTH_M,
     OPL_REFERENCE_VERSION,
     declare_optical_path_m,
@@ -308,8 +310,12 @@ def test_the_declared_reference_names_its_version_and_its_terms() -> None:
     reference = str(declared["reference"])
     assert reference.startswith("optiland-declared-opl/v2")
     assert "ray minus chief" in reference
-    assert "plane wavefront of the incoming collimated bundle" in reference
     assert "Removed piston" in reference
+    # CHE-207 made the reference *surface* a named value rather than a fixed
+    # sentence, because a finite conjugate is referenced to a sphere and not to a
+    # plane. This system is collimated, so it must name the plane.
+    assert LAUNCH_PLANE_WAVEFRONT in reference
+    assert LAUNCH_POINT_SOURCE not in reference
 
 
 def test_the_removed_piston_is_large_and_the_signal_is_not() -> None:

@@ -310,6 +310,266 @@ def _one_glass_problem(
     )
 
 
+# ---------------------------------------------------------------------------
+# 5. Even aspheres (CHE-207)
+# ---------------------------------------------------------------------------
+
+#: The manufactured aspheric surface the reference probe characterized, and the
+#: sag it measured. From
+#: `pre-rewrite-2026-08-30:benchmarks/probes/records/optiland/system_construction_probe.json`,
+#: case `even_asphere_sag_matches_analytic`.
+ASPHERE_RADIUS_MM = 10.0
+ASPHERE_CONIC = -0.5
+ASPHERE_COEFFICIENTS = (0.001, -2.5e-05, 4e-07)
+ASPHERE_RADIAL_POSITIONS_MM = (0.0, 0.5, 1.0, 1.5, 2.0)
+RECORDED_SAG_MM = (
+    0.0,
+    0.012752352443315268,
+    0.051038056739996666,
+    0.1149461923986582,
+    0.20463572677666927,
+)
+
+
+def _analytic_sag_mm(
+    radial_mm: np.ndarray, *, radius_mm: float, conic: float, coefficients: tuple[float, ...]
+) -> np.ndarray:
+    """`conic_sag(r) + sum_i c[i] r**(2(i+1))`, written out.
+
+    The oracle is closed-form and owes nothing to this repository: the conic sag is
+    the standard expression and the polynomial is the schema's declared series.
+    """
+    curvature = 1.0 / radius_mm
+    squared = radial_mm**2
+    conic_sag = (curvature * squared) / (
+        1.0 + np.sqrt(1.0 - (1.0 + conic) * curvature**2 * squared)
+    )
+    polynomial = sum(
+        value * radial_mm ** (2 * (index + 1)) for index, value in enumerate(coefficients)
+    )
+    return conic_sag + polynomial
+
+
+def _asphere_problem(
+    coefficients: tuple[float, ...], *, radius_mm: float | None = ASPHERE_RADIUS_MM
+) -> RayTraceProblem:
+    """A one-surface aspheric problem. Radius `None` is an aspheric plate."""
+    return RayTraceProblem(
+        name=f"asphere-{len(coefficients)}",
+        surfaces=(
+            SurfaceSpec(
+                radius_mm=radius_mm,
+                thickness_mm=5.0,
+                conic=ASPHERE_CONIC,
+                aspheric_coefficients=coefficients,
+                material={"kind": "ideal", "refractive_index": 1.5},
+            ),
+            SurfaceSpec(thickness_mm=40.0),
+        ),
+        entrance_pupil_diameter_mm=4.0,
+        field_angles_deg=((0.0, 0.0),),
+        wavelengths_um=(0.55,),
+        stop_index=0,
+    )
+
+
+def test_an_aspheric_surface_builds_the_aspheric_geometry() -> None:
+    """Criterion: the right Optiland type, selected from the schema alone."""
+    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    geometry = lens.surfaces.surfaces[1].geometry
+    assert type(geometry).__name__ == "EvenAsphere"
+    assert list(_host(geometry.coefficients).ravel()) == list(ASPHERE_COEFFICIENTS)
+
+
+def test_the_aspheric_sag_matches_the_closed_form_and_the_recorded_values() -> None:
+    """Both oracles: the analytic series, and the frozen probe's own numbers.
+
+    The falsifier is the reason this is worth two assertions rather than one --
+    reading the series as starting at `r**4` is wrong by 1.1e-2 mm here, four
+    orders of magnitude above the 5.6e-17 agreement, so the case discriminates the
+    convention rather than merely the arithmetic.
+    """
+    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
+    observed = _host(lens.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial)))
+
+    analytic = _analytic_sag_mm(
+        radial,
+        radius_mm=ASPHERE_RADIUS_MM,
+        conic=ASPHERE_CONIC,
+        coefficients=ASPHERE_COEFFICIENTS,
+    )
+    assert float(np.max(np.abs(observed - analytic))) < 1e-15
+    np.testing.assert_allclose(observed, np.array(RECORDED_SAG_MM), rtol=0.0, atol=0.0)
+
+    shifted = sum(
+        value * radial ** (2 * (index + 2)) for index, value in enumerate(ASPHERE_COEFFICIENTS)
+    )
+    conic_only = _analytic_sag_mm(
+        radial, radius_mm=ASPHERE_RADIUS_MM, conic=ASPHERE_CONIC, coefficients=()
+    )
+    assert float(np.max(np.abs(observed - (conic_only + shifted)))) > 1e-2, (
+        "the r**4-start reading must be far from the claim, or the case proves nothing"
+    )
+
+
+def test_an_aspheric_plate_is_the_polynomial_alone() -> None:
+    """A planar base plus aspheric terms, which `is_plane` would have got wrong."""
+    coefficients = (1e-3, -2.5e-5)
+    lens = build_lens(_asphere_problem(coefficients, radius_mm=None))
+    geometry = lens.surfaces.surfaces[1].geometry
+    assert type(geometry).__name__ == "EvenAsphere"
+    radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
+    observed = _host(geometry.sag(radial, np.zeros_like(radial)))
+    polynomial = sum(
+        value * radial ** (2 * (index + 1)) for index, value in enumerate(coefficients)
+    )
+    np.testing.assert_allclose(observed, polynomial, rtol=0.0, atol=0.0)
+
+
+def test_a_zero_coefficient_polynomial_builds_the_standard_surface() -> None:
+    """The choice that keeps the frozen collimated benchmarks bit-identical.
+
+    And the measurement that says the choice is safe either way: the aspheric
+    geometry with zeroed coefficients agrees with the standard surface **bitwise**
+    in sag, so selecting `standard` is a guarantee rather than a compromise.
+    """
+    plain = build_lens(_asphere_problem(()))
+    padded = build_lens(_asphere_problem((0.0, 0.0, 0.0)))
+    assert type(plain.surfaces.surfaces[1].geometry).__name__ == "StandardGeometry"
+    assert type(padded.surfaces.surfaces[1].geometry).__name__ == "StandardGeometry"
+    # `_without_comments` drops the problem name, which is the only thing the two
+    # helpers below differ in -- the surface tables have to be identical.
+    assert _without_comments(plain.to_dict()) == _without_comments(padded.to_dict())
+
+    radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
+    forced = build_lens(_asphere_problem((0.0, 0.0, 1e-300)))
+    np.testing.assert_array_equal(
+        _host(forced.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial))),
+        _host(plain.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial))),
+    )
+    assert type(forced.surfaces.surfaces[1].geometry).__name__ == "EvenAsphere", (
+        "a non-zero coefficient selects the aspheric geometry however small it is; the "
+        "selection is on the declaration, not on whether the term happens to matter"
+    )
+
+
+def test_the_surface_type_and_its_keywords_are_decided_together() -> None:
+    """Why `_geometry_arguments` returns both: `coefficients` is silently dropped.
+
+    Measured against the pinned install: `surface_type='standard'` with
+    `coefficients=[...]` raises nothing and builds a `StandardGeometry` with no
+    `coefficients` attribute at all. So a builder that chose the type and the
+    keywords in two places could pass an asphere to a sphere and trace a different
+    optical system with no error -- which is the recorded
+    `surface_kwargs_are_silently_filtered` hazard, reached from the other side.
+    """
+    import optiland.backend as be
+
+    from solvers.optiland.system import _geometry_arguments
+
+    aspheric = SurfaceSpec(
+        radius_mm=ASPHERE_RADIUS_MM,
+        thickness_mm=1.0,
+        aspheric_coefficients=ASPHERE_COEFFICIENTS,
+    )
+    surface_type, kwargs = _geometry_arguments(aspheric, be)
+    assert surface_type == "even_asphere"
+    assert set(kwargs) == {"radius", "conic", "coefficients"}
+    assert kwargs["coefficients"] == list(ASPHERE_COEFFICIENTS)
+    assert isinstance(kwargs["coefficients"], list), "the pinned geometry indexes a list"
+
+    conic = SurfaceSpec(radius_mm=ASPHERE_RADIUS_MM, thickness_mm=1.0)
+    surface_type, kwargs = _geometry_arguments(conic, be)
+    assert surface_type == "standard"
+    assert set(kwargs) == {"radius", "conic"}, (
+        "a conic surface must not be handed `coefficients`; the solver would discard it "
+        "silently, so the guard is that it is never assembled"
+    )
+
+
+def test_an_aspheric_system_traces() -> None:
+    """It is not enough that it builds: the surface has to be reachable by rays."""
+    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    traced = lens.trace(Hx=0.0, Hy=0.0, wavelength=0.55, num_rays=6)
+    x = _host(traced.x)
+    assert x.size == 1 + 3 * 6 * 7
+    assert bool(np.all(np.isfinite(x)))
+    assert bool(np.all(np.isfinite(_host(traced.opd))))
+
+    # And the asphere changes the trace: a strong r**4 term must move the rays.
+    strong = build_lens(_asphere_problem((0.0, -5e-3)))
+    moved = _host(strong.trace(Hx=0.0, Hy=0.0, wavelength=0.55, num_rays=6).x)
+    assert float(np.max(np.abs(moved - x))) > 1e-6, (
+        "if the polynomial were being filtered out, the two traces would agree"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 6. The object surface, for both source geometries (CHE-207)
+# ---------------------------------------------------------------------------
+
+
+def test_the_object_surface_carries_the_declared_object_distance() -> None:
+    """Index 0 is `thickness = object_distance_mm`, unconverted, or `inf`.
+
+    The whole of the source geometry is this one number, so it is asserted on the
+    built system's own surface positions rather than on the call that set it: the
+    object surface lands at `-d`, and the first optical surface stays at 0.
+    """
+    from fixtures.systems import FINITE_CONJUGATE_OBJECT_DISTANCE_MM, finite_conjugate_singlet
+
+    finite = build_lens(finite_conjugate_singlet())
+    positions = _host(finite.surfaces.positions).ravel()
+    assert positions[0] == pytest.approx(-FINITE_CONJUGATE_OBJECT_DISTANCE_MM, abs=0.0)
+    assert positions[1] == pytest.approx(0.0, abs=0.0)
+    # `bool(...)` because the pinned solver returns `np.False_` here, which is not
+    # the Python singleton -- `rays.py` coerces it for the same reason.
+    assert bool(finite.object_surface.is_infinite) is False
+
+    collimated = build_lens(singlet_ref())
+    collimated_positions = _host(collimated.surfaces.positions).ravel()
+    assert math.isinf(collimated_positions[0]) and collimated_positions[0] < 0.0
+    assert bool(collimated.object_surface.is_infinite) is True
+
+
+def test_the_field_of_a_finite_conjugate_is_a_position() -> None:
+    """The schema's declared point-source convention, verified against the solver.
+
+    `problems.RayTraceProblem` documents the source at
+    `(-tan(x_deg) * d, -tan(y_deg) * d, -d)`. That is a claim about the *solver's*
+    field convention, so it is checked here rather than only in the schema tests --
+    a schema that documented a convention the adapter did not produce would be
+    worse than one that documented nothing.
+    """
+    import optiland.backend as be
+    from fixtures.systems import FINITE_CONJUGATE_OBJECT_DISTANCE_MM, finite_conjugate_singlet
+    from optiland.distribution import create_distribution
+
+    from solvers.optiland.solver import _normalized_field
+
+    lens = build_lens(finite_conjugate_singlet())
+    distribution = create_distribution("hexapolar")
+    distribution.generate_points(2)
+    points = int(_host(distribution.x).size)
+    for field_deg in ((0.0, 0.0), (0.0, 2.0)):
+        normalized = _normalized_field(lens, field_deg)
+        launch = lens.ray_tracer.ray_generator.generate_rays(
+            be.repeat(be.atleast_1d(be.array(normalized[0])), points),
+            be.repeat(be.atleast_1d(be.array(normalized[1])), points),
+            distribution.x,
+            distribution.y,
+            0.55,
+        )
+        distance = FINITE_CONJUGATE_OBJECT_DISTANCE_MM
+        for axis, angle_deg in (("x", field_deg[0]), ("y", field_deg[1])):
+            column = _host(getattr(launch, axis))
+            assert float(column[0]) == pytest.approx(
+                -math.tan(math.radians(angle_deg)) * distance, abs=0.0
+            )
+            assert float(np.ptp(column)) == 0.0, "a point source launches from one point"
+
+
 def test_ideal_material_is_dispersionless_and_lossless() -> None:
     """An ideal index is independent of any glass catalog, which is what admits
     the analytic oracle `tests/physics/` uses."""

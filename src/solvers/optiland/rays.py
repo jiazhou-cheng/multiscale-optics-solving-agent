@@ -36,6 +36,19 @@ is cited where it is used:
     *exactly* -- which makes the declared OPL invariant under the one thing CHE-30
     warned makes the absolute value meaningless.
 
+`CHE-207` -- the finite conjugate
+    A **point source** launches every ray of one field from a single point, which
+    is a degenerate spherical wavefront centred on it, so the CHE-41 term is
+    exactly zero rather than merely small. Measured directly on a finite-conjugate
+    singlet rather than inferred from the infinite-object result, which is what
+    the canceled CHE-46 required before the old refusal could be lifted: the
+    launch origin spread is exactly 0.0 in all three coordinates, the launch `opd`
+    is exactly 0.0, the launch *directions* spread (a diverging bundle, the mirror
+    image of the collimated case), and the regenerated launch state reproduces
+    `Optic.trace` bit-identically. An origin spread that is not zero is refused
+    rather than approximated: an extended finite source is a different physical
+    problem.
+
 `CHE-41` -- which *surface* the path is measured from
     That cancellation is exact for the launch plane's **location** and says
     nothing about its **orientation**. `opd` is seeded on a plane perpendicular to
@@ -98,6 +111,8 @@ from representations import (
 
 __all__ = [
     "AMPLITUDE_MAPPING",
+    "LAUNCH_PLANE_WAVEFRONT",
+    "LAUNCH_POINT_SOURCE",
     "NATIVE_LENGTH_M",
     "NATIVE_WAVELENGTH_M",
     "OPL_REFERENCE_VERSION",
@@ -165,6 +180,19 @@ AMPLITUDE_MAPPING = (
 #: (`r = linspace(0, 1, num_rings + 1)`), so an un-vignetted fan agrees to
 #: float64 round-off. A bundle that does not is refused rather than mis-binned.
 _RING_TOLERANCE = 1.0e-6
+
+#: The two launch geometries the pinned solver produces, named so the declared
+#: optical path can say which one its reference is, rather than leaving a reader
+#: to infer it from the problem.
+#:
+#: They are mirror images, and that is the whole reason they need separate
+#: arithmetic: at infinity the launch **directions** are common and the origins
+#: spread over a plane, so the reference is a plane wavefront and the offset is
+#: `n * (d0 . r_launch)`. For a point source the **origin** is common and the
+#: directions spread, so the reference is a sphere about that point and the offset
+#: is exactly zero.
+LAUNCH_PLANE_WAVEFRONT = "plane wavefront of a collimated bundle, launched on a plane normal to z"
+LAUNCH_POINT_SOURCE = "spherical wavefront diverging from a single object point"
 
 #: How closely the regenerated launch directions must agree before the incoming
 #: bundle counts as collimated.
@@ -406,13 +434,6 @@ def _object_space_reference(
             f"the object surface could not be read ({type(exc).__name__}), so the launch "
             "geometry is unknown"
         )
-    if not object_at_infinity:
-        return unavailable(
-            "the object is at a finite distance, so the launch state is a POINT rather "
-            "than a plane. A point source is already a common wavefront and the term "
-            "would be zero -- but no problem in this repository exercises that path, and "
-            "an untested zero is still an untested claim."
-        )
 
     try:
         import optiland.backend as be
@@ -456,6 +477,23 @@ def _object_space_reference(
     if not all(np.all(np.isfinite(column)) for column in (x0, y0, z0, l0, m0, n0)):
         return unavailable("the regenerated launch state is not finite")
 
+    index = _scalar(lambda: lens.surfaces.surfaces[0].material_post.n(wavelength_um))
+    if index is None or index <= 0.0:
+        return unavailable(
+            "the object-space refractive index could not be read from the prescription, "
+            "and the optical path from a wavefront to the launch state is index-weighted"
+        )
+
+    if not object_at_infinity:
+        # A POINT SOURCE. The launch state is one point, so it *is* a wavefront --
+        # a degenerate sphere of zero radius centred on the object -- and the
+        # optical path from that wavefront to each launch point is identically
+        # zero. See `_point_source_reference` for the checks and the measurement.
+        return _point_source_reference(x0, y0, z0, index=index)
+
+    # AN OBJECT AT INFINITY. The launch points spread over a plane and the
+    # directions are common, which is the mirror image of the point source above,
+    # and it is why the two cannot share one arithmetic.
     direction_spread = max(float(np.ptp(l0)), float(np.ptp(m0)), float(np.ptp(n0)))
     if direction_spread > _LAUNCH_DIRECTION_TOLERANCE:
         return unavailable(
@@ -471,13 +509,6 @@ def _object_space_reference(
             "assumes"
         )
 
-    index = _scalar(lambda: lens.surfaces.surfaces[0].material_post.n(wavelength_um))
-    if index is None or index <= 0.0:
-        return unavailable(
-            "the object-space refractive index could not be read from the prescription, "
-            "and the optical path from a wavefront to the launch plane is index-weighted"
-        )
-
     # d0 . r_launch, index-weighted. The n0 * z0 part is common to every ray
     # because the launch plane is flat; it is retained rather than dropped so the
     # quantity is the optical path from ONE stated wavefront -- the one through
@@ -488,8 +519,73 @@ def _object_space_reference(
         "reason": None,
         "offset_native": offset_native,
         "span_native": float(np.ptp(offset_native)),
+        "launch_geometry": LAUNCH_PLANE_WAVEFRONT,
         "launch_direction": (float(l0[0]), float(m0[0]), float(n0[0])),
         "launch_plane_z_native": float(z0[0]),
+        "object_space_refractive_index": index,
+    }
+
+
+def _point_source_reference(
+    x0: np.ndarray[Any, Any],
+    y0: np.ndarray[Any, Any],
+    z0: np.ndarray[Any, Any],
+    *,
+    index: float,
+) -> dict[str, Any]:
+    """CHE-207: the object-space reference for a finite conjugate, which is zero.
+
+    Not an assumed zero. The reasoning is structural and the premise is checked:
+
+    * every ray of one field leaves the **same point**, so the launch state is a
+      single point rather than a surface;
+    * a single point is trivially a common wavefront -- the degenerate sphere of
+      zero radius centred on it -- so the optical path from that wavefront to each
+      launch point is `0` for every ray, exactly, with no arithmetic to round;
+    * being constant, it is also a piston, so `declare_optical_path_m`'s chief-ray
+      subtraction would remove it even if it were not zero. The declared path is
+      therefore referenced to the spherical wavefront diverging from the object
+      point, which is the physically meaningful surface for a finite conjugate.
+
+    **Measured directly, not inferred from the infinite-object case**, which is
+    what CHE-46 required before this refusal could be lifted. On the
+    finite-conjugate singlet at 2f, at three fields -- on axis, off axis in y, and
+    off axis in **both** x and y: the launch origin spread is **exactly 0.0** in x,
+    y and z; the launch `opd` is **exactly 0.0** with zero spread; the launch
+    *directions* spread by ~5e-2, confirming a diverging bundle rather than a
+    collimated one; and the regenerated launch state traced through the system
+    reproduces `Optic.trace` bit-identically (max |dx| = max |d opd| = 0.0).
+    `tests/physics/test_optiland_finite_conjugate.py` is where each of those is
+    asserted, so none of them is a number in a docstring.
+
+    The premise is re-checked here on every call rather than trusted, because it
+    is the whole justification: an origin spread that is not zero means the source
+    is not a point, the wavefront is not a sphere about one centre, and this zero
+    would be wrong. That case is refused rather than approximated -- an extended
+    finite source is a different physical problem, not a looser tolerance.
+    """
+    origin_spread = max(float(np.ptp(x0)), float(np.ptp(y0)), float(np.ptp(z0)))
+    if origin_spread > 0.0:
+        return {
+            "available": False,
+            "reason": (
+                f"the object is at a finite distance but the launch points do not coincide "
+                f"(origin spread {origin_spread:.3e} in native units), so the source is not "
+                "a POINT and its launch state is not a single spherical wavefront. An "
+                "extended finite source is a different physical problem and this term is "
+                "not defined for it."
+            ),
+            "offset_native": None,
+            "span_native": None,
+        }
+    return {
+        "available": True,
+        "reason": None,
+        # Exactly zero, per ray, by construction rather than by subtraction.
+        "offset_native": np.zeros_like(x0),
+        "span_native": 0.0,
+        "launch_geometry": LAUNCH_POINT_SOURCE,
+        "launch_point_native": (float(x0[0]), float(y0[0]), float(z0[0])),
         "object_space_refractive_index": index,
     }
 
@@ -514,12 +610,19 @@ def declare_optical_path_m(
     1. native unit -> metres (CHE-30 part 4);
     2. transfer from the traced image surface to the declared plane (CHE-32).
        Exact rather than approximate, because image space is homogeneous;
-    3. move the reference from Optiland's launch *plane* onto the incoming plane
-       *wavefront* (CHE-41), when and only when the term varies across the bundle.
-       A constant term is a piston that step 4 removes exactly, so adding it would
+    3. move the reference from Optiland's launch *state* onto the incoming
+       *wavefront*, when and only when the term varies across the bundle. A
+       constant term is a piston that step 4 removes exactly, so adding it would
        only spend float precision on something that cannot survive -- and not
        adding it is what keeps every on-axis number bit-identical rather than one
-       rounding away;
+       rounding away. Which wavefront depends on the source, and the declaration
+       names it:
+
+       * an object at **infinity** (CHE-41): the launch plane is not a wavefront of
+         a tilted bundle, and the difference `n * (d0 . r_launch)` is the whole
+         convergence tilt off axis;
+       * a **point source** (CHE-207): the launch state is one point, so it already
+         *is* a wavefront and the term is exactly zero;
     4. remove the chief-ray piston (CHE-40), sign 'ray minus chief', so a larger
        value means a longer optical path.
 
@@ -576,6 +679,18 @@ def declare_optical_path_m(
             f"a constant that step 4 removes exactly. Accepted for this field only. Reason: "
             f"{object_space['reason']}"
         )
+    elif object_space["launch_geometry"] == LAUNCH_POINT_SOURCE:
+        # A point source. The term is exactly zero for every ray, because the
+        # launch point IS the wavefront -- see `_point_source_reference`. Nothing
+        # to add, and the reference surface named in the declaration below is the
+        # sphere rather than the plane.
+        object_space_note = (
+            "exactly zero for every ray: the source is a single point, so the launch state "
+            "is a degenerate spherical wavefront centred on it and there is no optical path "
+            "from that wavefront to the launch point. Measured, not assumed -- the launch "
+            f"origin spread is 0.0 in all three coordinates at "
+            f"{object_space['launch_point_native']!r} in native units"
+        )
     elif object_space["span_native"] == 0.0:
         object_space_note = (
             "present and constant across the bundle: a pure piston, not applied, because "
@@ -596,15 +711,22 @@ def declare_optical_path_m(
     reference_m = float(optical_path_m[chief])
     relative_m = optical_path_m - reference_m
 
+    # Which surface the path is measured FROM, named rather than assumed. Getting
+    # this wrong in the declaration would be worse than getting it wrong in the
+    # arithmetic: a consumer would be told the reference is a plane wavefront when
+    # it is a diverging sphere, and no downstream check reads the object distance.
+    reference_wavefront = object_space.get("launch_geometry") or (
+        f"{LAUNCH_PLANE_WAVEFRONT} (assumed: the term was unavailable and the field is "
+        "on axis, where the two references agree)"
+    )
     declaration = (
         f"{OPL_REFERENCE_VERSION}: zero at the traced chief ray (smallest pupil radius, "
         f"row {chief}, rho = {float(radius[chief]):.6e} m) evaluated at the declared plane "
         f"z = {plane_z_mm * NATIVE_LENGTH_M!r} m; sign 'ray minus chief', so a larger value "
-        f"is a longer optical path. The SURFACE the path is measured from is the plane "
-        f"wavefront of the incoming collimated bundle through the global origin, not the "
-        f"solver's launch plane. Image-space index {image_space_index!r}, read from the "
-        f"prescription. Object-space reference term: {object_space_note}. Removed piston "
-        f"{reference_m:.9e} m."
+        f"is a longer optical path. The SURFACE the path is measured from is the "
+        f"{reference_wavefront}, not the solver's launch state. Image-space index "
+        f"{image_space_index!r}, read from the prescription. Object-space reference term: "
+        f"{object_space_note}. Removed piston {reference_m:.9e} m."
     )
     return relative_m, declaration
 

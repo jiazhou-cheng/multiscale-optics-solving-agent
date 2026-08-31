@@ -102,6 +102,9 @@ def test_the_declared_units_are_exported_and_complete() -> None:
         "entrance_pupil_diameter": "mm",
         "wavelength": "um",
         "field_angle": "deg",
+        # CHE-207. The one entry whose unit is index-dependent, which is why the
+        # field carries no unit suffix in its name.
+        "aspheric_coefficient": "mm**(1 - 2*(i+1)) for aspheric_coefficients[i]",
     }
 
 
@@ -216,6 +219,98 @@ def test_a_non_finite_thickness_or_conic_is_refused(bad: float) -> None:
         SurfaceSpec(thickness_mm=bad)
     with pytest.raises(ValueError, match="conic"):
         SurfaceSpec(thickness_mm=1.0, conic=bad)
+
+
+# ---------------------------------------------------------------------------
+# Even aspheric coefficients (CHE-207)
+# ---------------------------------------------------------------------------
+
+
+def test_the_default_surface_carries_no_aspheric_terms() -> None:
+    """Absent is the default, so an existing prescription means what it meant."""
+    surface = SurfaceSpec(radius_mm=10.0, thickness_mm=1.0)
+    assert surface.aspheric_coefficients == ()
+    assert surface.has_aspheric_terms is False
+
+
+def test_an_all_zero_polynomial_is_still_a_plain_conic() -> None:
+    """The invariant the solver's surface-type selection turns on.
+
+    An empty tuple and a tuple of zeros describe the same surface, so both must
+    answer `False` -- otherwise a prescription padded with zeros would silently
+    build a different geometry class than the same prescription without them.
+    """
+    for coefficients in ((), (0.0,), (0.0, 0.0, 0.0), (0.0, -0.0)):
+        surface = SurfaceSpec(
+            radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=coefficients
+        )
+        assert surface.has_aspheric_terms is False, coefficients
+    # ...and one non-zero anywhere in the series is enough, including trailing.
+    assert SurfaceSpec(
+        radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=(0.0, 0.0, 4e-7)
+    ).has_aspheric_terms is True
+
+
+def test_aspheric_coefficients_are_normalized_to_a_tuple_of_floats() -> None:
+    """A list is what a transcribed prescription looks like; a frozen surface may
+    not hold one, or the surface is mutable through one of its fields."""
+    surface = SurfaceSpec(
+        radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=[1e-3, -2, 0]
+    )
+    assert surface.aspheric_coefficients == (1e-3, -2.0, 0.0)
+    assert isinstance(surface.aspheric_coefficients, tuple)
+    assert all(isinstance(value, float) for value in surface.aspheric_coefficients)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+def test_a_non_finite_aspheric_coefficient_is_refused(bad: float) -> None:
+    with pytest.raises(ValueError, match=r"aspheric_coefficients\[1\]"):
+        SurfaceSpec(radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=(1e-3, bad))
+
+
+def test_something_that_is_not_a_sequence_of_numbers_is_refused() -> None:
+    with pytest.raises(ValueError, match="aspheric_coefficients"):
+        SurfaceSpec(radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=4e-7)  # type: ignore[arg-type]
+
+
+def test_an_aspheric_surface_is_frozen_like_every_other() -> None:
+    surface = SurfaceSpec(radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=(1e-3,))
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        surface.aspheric_coefficients = (2e-3,)  # type: ignore[misc]
+
+
+def test_an_aspheric_plate_has_a_planar_base_and_is_not_a_plane() -> None:
+    """The representation invariant a single `is_plane` would have got wrong.
+
+    A planar-base asphere is a legitimate aspheric plate -- its sag is the
+    polynomial alone -- so the two questions "is the conic term flat" and "is this
+    surface flat" have different answers and need different names. The solver reads
+    the first to choose a base radius and would build a *plane* if it read the
+    second.
+    """
+    plate = SurfaceSpec(thickness_mm=1.0, aspheric_coefficients=(1e-3, -2.5e-5))
+    assert plate.has_planar_base is True
+    assert plate.has_aspheric_terms is True
+    assert plate.is_plane is False
+    assert plate.resolved_radius_mm == math.inf
+
+    flat = SurfaceSpec(thickness_mm=1.0)
+    assert flat.has_planar_base is True and flat.is_plane is True
+
+    conic = SurfaceSpec(radius_mm=10.0, thickness_mm=1.0, aspheric_coefficients=(1e-3,))
+    assert conic.has_planar_base is False and conic.is_plane is False
+
+
+def test_the_series_convention_is_documented_where_it_can_be_got_wrong() -> None:
+    """The `r**2`-start convention is the one thing a reader must not guess.
+
+    Asserted on the docstring because that is the only place a caller transcribing
+    `A4, A6, A8` from a paper will look, and passing them without the leading zero
+    is a wrong surface that traces successfully.
+    """
+    assert SurfaceSpec.__doc__ is not None
+    assert "starts at `r**2`" in SurfaceSpec.__doc__
+    assert "(0.0, A4, A6, A8)" in SurfaceSpec.__doc__
 
 
 # ---------------------------------------------------------------------------
@@ -342,10 +437,43 @@ def test_an_unphysical_aperture_is_refused(epd: float) -> None:
         a_problem(entrance_pupil_diameter_mm=epd)
 
 
-@pytest.mark.parametrize("distance", [-1.0, math.nan, math.inf])
+@pytest.mark.parametrize("distance", [-1.0, 0.0, math.nan, math.inf])
 def test_an_unphysical_object_distance_is_refused(distance: float) -> None:
+    """Zero joined the list with CHE-207.
+
+    It used to be accepted, and it never meant anything: a point source at zero
+    distance sits *on* the first surface, so there is no object space for it to
+    radiate through. Refusing it is what makes "finite and positive" the whole of
+    the finite-object contract, with no degenerate value inside it.
+    """
     with pytest.raises(ValueError, match="object_distance_mm"):
         a_problem(object_distance_mm=distance)
+
+
+def test_a_finite_object_distance_is_a_point_source(recwarn: pytest.WarningsRecorder) -> None:
+    """The two source geometries are one field, and both are reachable."""
+    at_infinity = a_problem(object_distance_mm=None)
+    assert at_infinity.object_at_infinity is True
+    assert at_infinity.object_distance_mm is None
+
+    point = a_problem(object_distance_mm=9.674922600619196)
+    assert point.object_at_infinity is False
+    assert point.object_distance_mm == 9.674922600619196
+    assert not recwarn, "a finite conjugate is a supported case, not a warned-about one"
+
+
+def test_the_point_source_position_convention_is_documented() -> None:
+    """Where the source *is* -- asserted, because a field angle changing meaning
+    between the two source geometries is exactly the thing a caller will assume
+    rather than read.
+
+    Measured to twelve digits by CHE-207 and re-verified against the solver by
+    `tests/physics/test_optiland_finite_conjugate.py`; this asserts the schema says
+    the same thing the solver does.
+    """
+    assert RayTraceProblem.__doc__ is not None
+    assert "(-tan(x_deg) * d, -tan(y_deg) * d, -d)" in RayTraceProblem.__doc__
+    assert "point source" in RayTraceProblem.__doc__
 
 
 def test_an_unnamed_problem_is_refused() -> None:

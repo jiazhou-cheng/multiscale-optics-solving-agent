@@ -61,13 +61,26 @@ __all__ = [
     "build_lens",
 ]
 
-#: The Optiland `surface_type` this builder emits. One value: the pinned factory
-#: returns a `Plane` for an infinite radius and a `StandardGeometry` otherwise,
-#: which is how every problem the new tree can state spells a flat surface. Even
-#: aspheres and gratings are additions to `problems.SurfaceSpec` first -- the
-#: schema cannot express either today, so a second surface type here would be a
-#: branch nothing can reach.
-_SURFACE_TYPE = "standard"
+#: The two Optiland `surface_type` strings this builder emits, and nothing else.
+#:
+#: `standard` is the conic path: the pinned factory returns a `Plane` for an
+#: infinite radius and a `StandardGeometry` otherwise, which is how every conic
+#: problem the schema can state spells a surface.
+#:
+#: `even_asphere` is selected only when `SurfaceSpec.has_aspheric_terms` -- a
+#: *non-zero* coefficient, not merely a non-empty tuple. An all-zero polynomial
+#: must not change which geometry class is built, and measured for CHE-207 it does
+#: not have to: a zero-coefficient `even_asphere` and the `standard` surface of the
+#: same radius and conic agree **bitwise** in sag, in traced position and in
+#: accumulated optical path. So the selection is safe either way today, and
+#: choosing `standard` keeps it safe if that stops being true -- which is what
+#: keeps the frozen collimated benchmarks bit-identical by construction rather
+#: than by an equality this module would be relying on.
+#:
+#: Gratings are still absent: `problems.SurfaceSpec` cannot express one, so a
+#: third string here would be a branch nothing can reach.
+_SURFACE_TYPE_STANDARD = "standard"
+_SURFACE_TYPE_EVEN_ASPHERE = "even_asphere"
 
 #: The wavelength unit Optiland records on every wavelength it stores. Passed
 #: explicitly so the schema's micrometre contract is stated at the boundary
@@ -101,6 +114,10 @@ NATIVE_UNITS: dict[str, str] = {
     "entrance_pupil_diameter": "mm",
     "wavelength": "um",
     "field_angle": "deg",
+    # The one entry where a unit error is *amplified* rather than merely scaled:
+    # the r**4 coefficient carries mm**-3, so rebasing the schema on metres would
+    # move that term by 1e9 rather than by 1e3.
+    "aspheric_coefficient": "mm**(1 - 2*(i+1)) for aspheric_coefficients[i]",
 }
 
 
@@ -225,22 +242,42 @@ def _material_argument(
     )
 
 
-def _geometry_arguments(surface: SurfaceSpec, be: Any) -> dict[str, Any]:
-    """The complete geometry keyword set for one surface, assembled explicitly.
+def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, Any]]:
+    """The Optiland surface type for one surface, and its complete keyword set.
 
-    `radius` and `conic` are always both passed. A plane is `radius = inf`, which
-    is how the pinned factory is asked for a `Plane`; `problems.SurfaceSpec`
-    represents a plane by the *absence* of a radius, so `inf` is produced here and
-    never stored.
+    The two are decided together and returned together, because they are one
+    decision: `coefficients` belongs to `even_asphere` and to nothing else, and
+    passing it alongside `standard` is **silently discarded**. Measured for
+    CHE-207 against the pinned install: `surface_type='standard'` with
+    `coefficients=[...]` raises nothing, builds a `StandardGeometry`, and the
+    resulting object has no `coefficients` attribute at all -- so the asphere
+    would simply not be there, and the trace would succeed on a different optical
+    system. That is the same silent-filter hazard
+    `pre-rewrite-2026-08-30:...system_construction_probe.json` recorded as
+    `surface_kwargs_are_silently_filtered`, reached from the other direction.
 
-    Nothing is forwarded from the problem that is not named on this line. That is
-    the whole guard against the silent keyword filter -- an unrecognized key
-    cannot be discarded by Optiland if it was never assembled.
+    `radius` and `conic` are always both passed. A planar **base** is
+    `radius = inf`, which is how the pinned factory is asked for a `Plane`;
+    `problems.SurfaceSpec` represents it by the *absence* of a radius, so `inf` is
+    produced here and never stored. The test is `has_planar_base` rather than
+    `is_plane`, because an aspheric plate has a planar base and is not a plane.
+
+    Nothing is forwarded from the problem that is not named below. That is the
+    whole guard against the filter -- an unrecognized key cannot be discarded by
+    Optiland if it was never assembled.
     """
-    return {
-        "radius": be.inf if surface.is_plane else surface.resolved_radius_mm,
+    arguments: dict[str, Any] = {
+        "radius": be.inf if surface.has_planar_base else surface.resolved_radius_mm,
         "conic": surface.conic,
     }
+    if not surface.has_aspheric_terms:
+        return _SURFACE_TYPE_STANDARD, arguments
+    # A list, not the schema's tuple: the pinned geometry stores what it is handed
+    # and indexes into it, and a tuple is not what its own samples pass. Built
+    # from the surface's own coefficients, so the series convention -- index i
+    # multiplies r**(2*(i+1)) -- crosses this boundary unchanged.
+    arguments["coefficients"] = list(surface.aspheric_coefficients)
+    return _SURFACE_TYPE_EVEN_ASPHERE, arguments
 
 
 def build_lens(problem: RayTraceProblem) -> Any:
@@ -272,13 +309,15 @@ def build_lens(problem: RayTraceProblem) -> Any:
 
     # 1. Resolve everything that can fail before touching Optiland, so a rejected
     #    problem never leaves a partially constructed lens behind.
-    plans: list[tuple[SurfaceSpec, dict[str, Any], Any]] = []
+    plans: list[tuple[SurfaceSpec, str, dict[str, Any], Any]] = []
     for index, surface in enumerate(problem.surfaces):
         where = f"{problem.name}: surfaces[{index}]"
+        surface_type, geometry_kwargs = _geometry_arguments(surface, be)
         plans.append(
             (
                 surface,
-                _geometry_arguments(surface, be),
+                surface_type,
+                geometry_kwargs,
                 _material_argument(surface, ideal_cls, material_cls, where=where),
             )
         )
@@ -289,15 +328,23 @@ def build_lens(problem: RayTraceProblem) -> Any:
     # The object surface, which the problem does not list because it is fixed: a
     # plane in air, `object_distance_mm` before the first listed surface, at
     # infinity when the problem says the object is.
+    #
+    # `thickness` is the *whole* of the source geometry, and both cases are one
+    # line because the solver derives the rest. At `inf` the field is a direction
+    # and every ray of one field is launched with a common direction on a plane
+    # perpendicular to z. At a finite distance the field becomes a *position* --
+    # the source sits at `(-tan(x_deg) * d, -tan(y_deg) * d, -d)`, measured to
+    # twelve digits for CHE-207 -- and every ray of one field leaves that single
+    # point. `rays.py` owns what that does to the declared optical path.
     optic.surfaces.add(
         index=0,
         radius=be.inf,
         thickness=be.inf if problem.object_at_infinity else problem.object_distance_mm,
     )
-    for offset, (surface, geometry_kwargs, material) in enumerate(plans):
+    for offset, (surface, surface_type, geometry_kwargs, material) in enumerate(plans):
         optic.surfaces.add(
             index=offset + 1,
-            surface_type=_SURFACE_TYPE,
+            surface_type=surface_type,
             thickness=surface.thickness_mm,
             material=material,
             # The stop is one index on the problem, so "no stop" and "three

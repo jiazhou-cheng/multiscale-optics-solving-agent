@@ -31,6 +31,8 @@ from __future__ import annotations
 from problems.ray_trace import Material, RayTraceProblem, SurfaceSpec
 
 __all__ = [
+    "FINITE_CONJUGATE_MAGNIFICATION",
+    "FINITE_CONJUGATE_OBJECT_DISTANCE_MM",
     "REVERSE_TELEPHOTO",
     "SINGLET_BACK_FOCAL_LENGTH_MM",
     "SINGLET_CENTER_THICKNESS_MM",
@@ -40,6 +42,8 @@ __all__ = [
     "SINGLET_RADIUS_MM",
     "SINGLET_REFRACTIVE_INDEX",
     "SINGLET_WAVELENGTH_UM",
+    "finite_conjugate_image_distance_mm",
+    "finite_conjugate_singlet",
     "singlet_ref",
 ]
 
@@ -174,3 +178,110 @@ REVERSE_TELEPHOTO = RayTraceProblem(
     primary_wavelength_index=1,
     object_distance_mm=None,  # object at infinity
 )
+
+
+# --- M3-SINGLET-FINITE ------------------------------------------------------
+#
+# CHE-207 (R05.5). The **one** finite-object system this repository owns, added
+# because the finite-conjugate launch state and the point-source OPL reference
+# cannot be tested without one -- which is the single exception CHE-46's non-goal
+# allowed ("no new prescription unless a finite-object system is required to test
+# this, in which case add exactly one and freeze it").
+#
+# It is deliberately the same *lens* as M3-SINGLET-REF -- same radius, same ideal
+# index, same centre thickness, same entrance pupil -- with only the conjugate
+# changed. So a difference between the two traces is a difference in the source
+# geometry and nothing else, which is what makes the collimated system a control
+# for the finite one rather than merely a neighbour.
+#
+# The object sits at 2f, so the magnification is exactly -1 and the image lands
+# one object distance beyond the lens. Optiland's paraxial solver reports
+# -1.000000000000 for it, which is the arithmetic confirmation that the spacing
+# below is the conjugate rather than approximately the conjugate.
+
+#: Object distance for unit magnification: 2f from the front vertex. Derived, so a
+#: change to the index or the radius moves it rather than leaving it stale.
+FINITE_CONJUGATE_OBJECT_DISTANCE_MM = 2.0 * SINGLET_EFFECTIVE_FOCAL_LENGTH_MM
+
+#: The paraxial magnification the object distance above implies. Exact, not
+#: measured: an object at 2f images at 2f.
+FINITE_CONJUGATE_MAGNIFICATION = -1.0
+
+
+def finite_conjugate_image_distance_mm(
+    object_distance_mm: float = FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+) -> float:
+    """Rear-vertex-to-image distance for the singlet, from a closed-form paraxial trace.
+
+    Derived rather than measured, for the same reason
+    `SINGLET_BACK_FOCAL_LENGTH_MM` is: a spacing frozen as a literal beside an
+    index that later changes is a lens nobody notices is wrong.
+
+    A paraxial ray leaves the axial object point and reaches the front vertex at
+    height `h`, so its angle there is `u = h / d`. Then, with
+    `n' u' = n u - y (n' - n) / R` at each surface and a transfer through the glass:
+
+        u1' = (u - h (n - 1) / R) / n         refraction at the convex face
+        y2  = h + t u1'                      transfer through the centre thickness
+        u2' = n u1'                          the plane rear face, index change only
+        v   = -y2 / u2'                      where the ray crosses the axis
+
+    `h` cancels, so the result is independent of the ray chosen -- which is what
+    makes it paraxial rather than a particular ray's crossing. Verified against the
+    trace by `tests/physics/test_optiland_finite_conjugate.py`.
+    """
+    if not object_distance_mm > 0.0:
+        raise ValueError(
+            f"object_distance_mm={object_distance_mm!r} must be positive; a point source "
+            "sits before the first surface"
+        )
+    height = 1.0
+    angle = height / object_distance_mm
+    inside = (angle - height * (SINGLET_REFRACTIVE_INDEX - 1.0) / SINGLET_RADIUS_MM) / (
+        SINGLET_REFRACTIVE_INDEX
+    )
+    rear_height = height + SINGLET_CENTER_THICKNESS_MM * inside
+    rear_angle = SINGLET_REFRACTIVE_INDEX * inside
+    return -rear_height / rear_angle
+
+
+def finite_conjugate_singlet(
+    object_distance_mm: float = FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+) -> RayTraceProblem:
+    """M3-SINGLET-FINITE: the M3 singlet imaging a point source at a finite distance.
+
+    A function rather than a constant for the same reason `singlet_ref` is one: a
+    test that wants to vary the conjugate has something to start from. The image
+    spacing follows the object distance through the closed form above, so varying
+    one keeps the system at its conjugate.
+
+    Two fields, and the second is what makes the off-axis point-source path
+    testable at all: for a finite object a field angle is a *position*, so the
+    source moves to `(0, -tan(2 deg) * d, -d)` and the launch state has to stay a
+    single point for the reference to hold.
+    """
+    return RayTraceProblem(
+        name="M3SingletFinite",
+        description=(
+            "M3-SINGLET-FINITE: the M3-SINGLET-REF lens imaging a POINT SOURCE at 2f, so "
+            "the magnification is -1. Added by CHE-207 as the one finite-object system "
+            "needed to verify the point-source OPL reference."
+        ),
+        surfaces=(
+            SurfaceSpec(
+                radius_mm=SINGLET_RADIUS_MM,
+                thickness_mm=SINGLET_CENTER_THICKNESS_MM,
+                material={"kind": "ideal", "refractive_index": SINGLET_REFRACTIVE_INDEX},
+                comment="convex front face, and the aperture stop",
+            ),
+            SurfaceSpec(
+                thickness_mm=finite_conjugate_image_distance_mm(object_distance_mm),
+                comment="plane rear face",
+            ),
+        ),
+        stop_index=0,
+        entrance_pupil_diameter_mm=SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
+        field_angles_deg=((0.0, 0.0), (0.0, 2.0)),
+        wavelengths_um=(SINGLET_WAVELENGTH_UM,),
+        object_distance_mm=object_distance_mm,
+    )
