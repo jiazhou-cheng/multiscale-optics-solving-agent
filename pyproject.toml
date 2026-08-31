@@ -62,14 +62,16 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["src"]
 # Explicit rather than discovered, so a stray scratch directory under src/ cannot
-# silently become a shipped package. R01 landed these two and the deletion of the
-# old tree left them as the whole of it; later tickets add theirs, and
-# `scripts/check_dependencies.py` holds the full declared set.
+# silently become a shipped package. R01 landed the first two and the deletion of
+# the old tree left them as the whole of it; `solvers*` is R05's, and the trailing
+# glob is what picks up the `solvers.optiland` subpackage. Later tickets add
+# theirs, and `scripts/check_dependencies.py` holds the full declared set.
 include = [
   "numerics*",
   "operations*",
   "problems*",
   "representations*",
+  "solvers*",
 ]
 
 [tool.pytest.ini_options]
@@ -128,6 +130,17 @@ plugins = ["pydantic.mypy"]
 # twice under two names.
 mypy_path = "src"
 explicit_package_bases = true
+
+# optiland 0.6.0 ships no `py.typed` marker and no stubs, so under `strict` every
+# `import optiland...` is an error rather than an `Any`. Narrowed to the one
+# package that has the problem, and declared here rather than with a per-import
+# `# type: ignore`: the fact is a property of the installed distribution, not of
+# any one call site, and `warn_unused_ignores` would then fail the day upstream
+# adds a marker. Added by CHE-179 (R05.1), the first ticket to import a backend.
+# jax and torch are typed and need no entry.
+[[tool.mypy.overrides]]
+module = ["optiland.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level

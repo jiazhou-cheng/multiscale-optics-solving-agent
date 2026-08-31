@@ -187,11 +187,39 @@ SRC = ROOT / "src"
 #: wavelength hierarchies, its four kind enums and its error type, plus
 #: `core/optical_assembly.py`'s three and every builder.
 #: `tests/problems/test_ray_trace.py` asserts their absence.
+#: `solvers` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
+#: neither is a public class**: R05 budgets "0 public classes, at most 1 private",
+#: and the private one (`_OptilandTraceBatch`, for grouped native ray state) did
+#: not land -- the native columns are a local dict inside one function, and no
+#: second function exchanges them. Two is what an AST count sees, for the same
+#: reason `problems.Material` is counted: this gate counts `class` syntax and does
+#: not judge, and `TypedDict` is written with it.
+#:
+#:   `Sampling`   a `TypedDict`, the sanctioned alternative -- the fields share no
+#:                invariant enforced across them, nothing subclasses it, and its
+#:                runtime validation is a *function* (`_require_keys`) because a
+#:                TypedDict is an annotation that disappears at run time. It is
+#:                the public argument schema of `trace`, and the alternative was
+#:                `Mapping[str, Any]`, which is the untyped config dict this
+#:                rewrite is removing.
+#:   `Execution`  the same, for device and precision. Both keys are required
+#:                rather than defaulted, because this is the process-global solver
+#:                state whose inheritance was a measured source of
+#:                nondeterminism.
+#:
+#: Six class names did **not** land against that +2, and the tests name them:
+#: `OptilandAdapter` (a one-instance facade behind `get_adapter()`),
+#: `OptilandExecutionState`, `TracePlans`, `OptilandRayRequest` /
+#: `OptilandRayFailure` / `OptilandRayResult`, `PatchEmitterCostModel`, and
+#: `HandoffPlaneError` as a separate exception type -- an unresolvable plane is a
+#: `ContractError` with a code, because a coupler branches on the code and not on
+#: the class. `solvers/optiland/baseline.py` did not land either, in its entirety.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
     "operations": 2,
     "problems": 3,
     "representations": 5,
+    "solvers": 2,
 }
 
 #: The project's declared target for the whole production tree. The reference

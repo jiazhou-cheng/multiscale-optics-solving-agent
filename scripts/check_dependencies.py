@@ -103,6 +103,20 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   allowlist entry and `tests/operations/test_registry_imports_no_backend.py` are the two
 #:   halves of that -- the structural rule and the executed check.
 #:
+#: * `solvers` -- landed by CHE-179/CHE-180/CHE-181 (R05.1/R05.2/R05.3) as
+#:   `solvers/optiland/`: `system.py`, `rays.py`, `solver.py`. The first package
+#:   with a *permitted* backend import, and the only one there will ever be a
+#:   permitted backend import from: `_classify` exempts `solvers` from the
+#:   `BACKENDS` rule, which is the same fact stated as a rule about every other
+#:   package rather than as a privilege granted to this one. It imports `problems`
+#:   (the neutral problem it consumes), `representations` (the neutral bundle it
+#:   emits) and `numerics` (the capability row it executes within), so all three
+#:   of its allowed edges are now exercised. The forbidden edge that matters is
+#:   `solvers -> operations`: a solver holding its own descriptor would make
+#:   listing the registry import a backend, which is the one property
+#:   `operations/` exists to provide. It is also why the trace's descriptor is not
+#:   in this package -- see the R05 report.
+#:
 #: * `problems` -- landed by CHE-156 (R04): `ray_trace.py`, the neutral sequential
 #:   ray-tracing problem. Its allowlist permits `representations` and `numerics`
 #:   and it imports neither, which is correct rather than incomplete: a
@@ -114,13 +128,14 @@ ALLOWED: dict[str, frozenset[str]] = {
 #: Every later ticket adds its package here as it authors it, in the same change.
 #: When the graph is complete this equals `ALLOWED.keys()`.
 LANDED: frozenset[str] = frozenset(
-    {"numerics", "operations", "problems", "representations"}
+    {"numerics", "operations", "problems", "representations", "solvers"}
 )
 
 #: Target-architecture names that the deleted reference tree also used.
 #:
-#: These three are no longer on disk -- the reference implementation was removed
-#: wholesale -- so nothing resolves through them today. They are kept as a record
+#: `solvers` is now on disk again -- landed fresh by R05, not revived -- and the
+#: other two are not. Membership here has no effect on whether a name is checked;
+#: it only sharpens the message a violation carries. They are kept as a record
 #: of *which* target names were previously occupied, because that is the set most
 #: likely to be resurrected by a partial revert, a `git checkout` of an old path,
 #: or a copy from the `pre-rewrite-2026-08-30` tag. A package appearing under one
