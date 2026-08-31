@@ -61,17 +61,26 @@ def test_every_landed_package_has_a_declared_budget() -> None:
         )
 
 
-def test_r01_lands_no_production_class() -> None:
-    """R01's own contract: 0 classes added.
+def test_every_budgeted_class_is_a_class_that_exists() -> None:
+    """The budget is spent, not reserved.
 
-    The packages exist so the gates have a tree to walk. A base class, protocol or
-    placeholder interface created "so the structure is visible" is exactly what the
-    architecture document bans, and this is the assertion that notices one.
+    This generalizes R01's own contract, which was `counted == 0` for both packages
+    because R01 added no class. That assertion did real work -- it is what would
+    have caught a base class or placeholder interface created "so the structure is
+    visible", which the architecture document bans -- and the general form of it is
+    that a budget must equal what is actually there.
+
+    Requiring equality rather than `<=` is what keeps headroom from becoming a
+    pre-authorization: a ticket may not raise a package's number in advance of the
+    classes it is raising it for, so every raise stays attached to the code and the
+    rule that justifies it. `test_the_new_tree_is_within_its_class_budget` still
+    covers the other direction, and reports it as an overrun rather than as this.
     """
     for entry in count():
-        assert entry.counted == 0, (
-            f"src/{entry.package}/ defines {entry.counted} class(es): {list(entry.classes)}. "
-            "R01 adds none."
+        assert entry.counted == entry.budget, (
+            f"src/{entry.package}/ defines {entry.counted} class(es) against a budget of "
+            f"{entry.budget}: {list(entry.classes)}. A budget is not headroom -- raise it "
+            "in the ticket that adds the class, and lower it in the ticket that removes one."
         )
 
 

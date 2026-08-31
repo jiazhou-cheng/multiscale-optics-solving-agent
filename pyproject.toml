@@ -11,17 +11,18 @@ license = { text = "MIT" }
 authors = [
   { name = "Research scaffold" }
 ]
-# Declared for the tree that was deleted, and deliberately left as it stands.
+# What the new tree actually imports, as of CHE-173 (R02.1). The five entries this
+# replaces (networkx, pydantic, PyYAML, rich, typer) were declared for the tree
+# that was deleted and nothing in `src/` imports any of them.
+#
 # `docker/Dockerfile` installs this project with `pip install --no-deps -e .`, so
-# this list does not shape the image -- `docker/requirements.txt` does -- and
-# rewriting it now would be a claim about what the new tree needs before any of
-# it is authored. R02 declares numerics' real dependencies when numerics has code.
+# this list does not shape the image -- `docker/requirements.txt` does. It is a
+# statement about what the source needs, and a stale one reads as a dependency the
+# code has. NumPy is not a backend: it is the array vocabulary JAX and Torch are
+# described in, `numerics/arrays.py` imports it at module scope on purpose, and
+# `numerics/` still pulls no solver. Later packages add theirs as they land.
 dependencies = [
-  "networkx>=3.2",
-  "pydantic>=2.7",
-  "PyYAML>=6.0",
-  "rich>=13.7",
-  "typer>=0.12",
+  "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

@@ -53,13 +53,32 @@ SRC = ROOT / "src"
 
 #: Production classes allowed per package of the new tree.
 #:
-#: Both entries are 0 because R01 lands no numerical optics: the packages exist so
-#: the gates have a real tree to walk, and `docs/architecture_principles.md` bans
-#: a placeholder interface created "so the structure is visible". A budget of 0 is
-#: therefore the honest number, and it is also the strictest possible starting
-#: point -- the first class added to either package has to be argued for.
+#: `representations` is still 0: R01 landed no numerical optics, and
+#: `docs/architecture_principles.md` bans a placeholder interface created "so the
+#: structure is visible". R02.2-R02.4 raise it.
+#:
+#: `numerics` is 7, raised from 0 by CHE-173 (R02.1). Three of the seven are
+#: production classes and the ticket names the rule each satisfies:
+#:
+#:   `DevicePlacement`        rule 1 -- kind and index are one invariant; an index
+#:                            without a kind is meaningless and a host index is a
+#:                            contradiction, refused in `__post_init__`.
+#:   `ArrayState`             rule 1 -- namespace, device and dtype are one
+#:                            observation of one buffer. Split apart they invite a
+#:                            namespace read from data beside a device read from a
+#:                            config value, describing no array that exists.
+#:   `ComponentCapabilities`  rule 2 -- the public, probe-backed capability model
+#:                            every descriptor and solver reasons against, and the
+#:                            thing a probe re-run confirms or falsifies.
+#:
+#: The other four -- `Precision`, `DType`, `DeviceKind`, `ArrayNamespace` -- are
+#: `StrEnum`s, which the five rules list as a *sanctioned alternative* to a class.
+#: They are counted anyway because `StrEnum` is written with `class` syntax and
+#: this gate is an AST count, not a judgement; `tests/unit/test_class_budget.py`
+#: pins that behaviour deliberately. Four enums is the honest arithmetic, not four
+#: classes the architecture wanted avoided.
 BUDGETS: dict[str, int] = {
-    "numerics": 0,
+    "numerics": 7,
     "representations": 0,
 }
 
