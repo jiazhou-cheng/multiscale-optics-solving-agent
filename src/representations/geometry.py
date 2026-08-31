@@ -1,9 +1,16 @@
-"""Where a representation lives: `Frame` and `ReferenceSurface`.
+"""Where a representation lives, and how its phase is written.
 
 CHE-174 (R02.2). Two data types, added only because both the ray representation
 and the scalar-field representation have to *declare* the geometry they are
 expressed in before either can be handed to anything else. Nothing else lives
 here: this module is the smallest thing R02.3 and R02.4 can both embed.
+
+CHE-175/CHE-176 added `PHASOR` and `SPATIAL_FACTOR` beside the four geometric
+constants. They are not geometry, and the module is named for the majority
+rather than for them; they are here because both representations validate
+against them and neither may import the other. The phasor sign is what decides
+whether a converging wavefront reads as converging, so it is a frozen constant
+with an equality check, exactly like the axis order.
 
 The conventions are reused from the reference implementation verbatim, not
 re-derived. `pre-rewrite-2026-08-30:src/core/boundary.py:83-86` is where they were
@@ -25,18 +32,21 @@ the *content* stays planar until something actually needs curvature.
 
 Failure vocabulary
 ------------------
-A rejection here is a plain `ValueError` naming the declaration that failed,
-following `numerics/precision.py`: the reference implementation spent exception
-classes on refusals that nothing ever caught by type. It is deliberately *not*
-`numerics.refusal`, whose codes are enumerated so
-`tests/numerics/test_refusals.py` can prove each is reachable from that package;
-adding representation codes to that tuple would make the enumeration span two
-packages. The structured diagnostic the coupling contract needs arrives with
-`require_coherent()` in R02.3, and these constructions move onto it if a caller
-ever has to branch on them without reading prose.
+`ContractError` from `representations.contracts`, with a code from
+`CONTRACT_CODES`. R02.2 raised plain `ValueError`s here and said they would move
+onto the structured diagnostic once one existed and a caller had to branch on it;
+R02.3 is that ticket, and leaving half a package raising a code and half raising
+prose would mean a coupler's `except ContractError` silently missed a bad frame.
+`ContractError` subclasses `ValueError`, so nothing that caught the old shape
+stopped working.
 
-This module imports nothing -- no backend, and not even `numerics`. A frame is
-not a numeric policy.
+The exception is the two lookup helpers below. `field_axis_index("z")` and
+`origin_index(0)` are bad *arguments*, not bad *declarations*: no boundary
+artifact is being refused, so they stay plain `ValueError`s and cost no contract
+code.
+
+This module imports no backend. A frame is not a numeric policy, so it reaches
+`numerics` only through `contracts`.
 """
 
 from __future__ import annotations
@@ -44,11 +54,15 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from representations.contracts import ContractError
+
 __all__ = [
     "AXIS_ORDER",
     "HANDEDNESS",
     "ORIGIN_RULE",
+    "PHASOR",
     "PROPAGATION_AXIS",
+    "SPATIAL_FACTOR",
     "Frame",
     "ReferenceSurface",
 ]
@@ -67,10 +81,26 @@ HANDEDNESS = "right-handed"
 #: ramp across the pupil that no rotationally symmetric test case would show.
 ORIGIN_RULE = "array index n//2 is coordinate zero"
 
-#: Light travels toward `+z`. Combined with the `exp(-i omega t)` time convention
-#: this fixes the spatial factor as `exp(+i k z)`; R02.4 owns the phasor sign, so
-#: it is named here only to say which axis it is measured along.
+#: Light travels toward `+z`, which is the axis the spatial factor below is
+#: measured along.
 PROPAGATION_AXIS = "+z"
+
+#: The time convention. Every complex amplitude in the tree is the coefficient of
+#: `exp(-i omega t)`.
+#:
+#: Frozen and equality-checked rather than inferred, because the other convention
+#: is the complex conjugate of this one and the two are indistinguishable in any
+#: intensity: `|U|^2` is identical under conjugation, so a phasor mismatch is
+#: invisible right up to the point where a converging wavefront propagates the
+#: wrong way. Optiland, Chromatix and this repository's couplers each have to
+#: agree, and the agreement has to be checkable.
+PHASOR = "exp(-i omega t)"
+
+#: The spatial factor that `PHASOR` and `PROPAGATION_AXIS` together imply: with
+#: `exp(-i omega t)` and propagation toward `+z`, forward propagation multiplies
+#: by `exp(+i k z)`. Stated separately because it is the form the couplers write,
+#: and deriving it at each call site is how a sign gets flipped.
+SPATIAL_FACTOR = "exp(+i k z)"
 
 #: Absolute tolerance on `|n| - 1` for a declared unit normal.
 #:
@@ -142,10 +172,15 @@ class Frame:
         for name, expected, why in _FRAME_INVARIANT:
             value = getattr(self, name)
             if value != expected:
-                raise ValueError(
+                raise ContractError(
+                    "FRAME_MISMATCH",
                     f"Frame.{name} must be {expected!r}, got {value!r}. The new tree "
-                    f"supports one frame convention; {why}. Convert the data at the "
-                    "boundary that produced it, do not re-declare the frame."
+                    f"supports one frame convention; {why}.",
+                    declaration=f"Frame.{name}",
+                    remedy=(
+                        "Convert the data at the boundary that produced it; do not "
+                        "re-declare the frame."
+                    ),
                 )
 
     @property
@@ -224,43 +259,57 @@ class ReferenceSurface:
 
     def __post_init__(self) -> None:
         if not self.name:
-            raise ValueError(
+            raise ContractError(
+                "MISSING_DECLARATION",
                 "ReferenceSurface.name is empty. A surface has to be named for a "
                 "consumer to check that it is the surface it expected, which is the "
-                "difference between a defocus and a whole pupil-to-focus distance."
+                "difference between a defocus and a whole pupil-to-focus distance.",
+                declaration="ReferenceSurface.name",
             )
 
         z_m = float(self.z_m)
         if not math.isfinite(z_m):
-            raise ValueError(
-                f"ReferenceSurface.z_m must be a finite coordinate in metres, got {self.z_m!r}"
+            raise ContractError(
+                "NON_FINITE",
+                f"ReferenceSurface.z_m must be a finite coordinate in metres, got {self.z_m!r}",
+                declaration="ReferenceSurface.z_m",
             )
         object.__setattr__(self, "z_m", z_m)
 
         medium_index = float(self.medium_index)
         if not math.isfinite(medium_index) or medium_index <= 0.0:
-            raise ValueError(
+            raise ContractError(
+                "UNIT_NOT_SI",
                 f"ReferenceSurface.medium_index must be positive and finite, got "
                 f"{self.medium_index!r}. It is the real index of the medium the surface "
-                "sits in, read from the prescription and never assumed to be 1."
+                "sits in, read from the prescription and never assumed to be 1.",
+                declaration="ReferenceSurface.medium_index",
             )
         object.__setattr__(self, "medium_index", medium_index)
 
         components = tuple(float(value) for value in self.normal)
         if len(components) != 3:
-            raise ValueError(
+            raise ContractError(
+                "SHAPE_MISMATCH",
                 f"ReferenceSurface.normal must be a 3-vector, got {len(components)} "
-                f"component(s): {self.normal!r}"
+                f"component(s): {self.normal!r}",
+                declaration="ReferenceSurface.normal",
             )
         if not all(math.isfinite(value) for value in components):
-            raise ValueError(f"ReferenceSurface.normal is not finite: {self.normal!r}")
+            raise ContractError(
+                "NON_FINITE",
+                f"ReferenceSurface.normal is not finite: {self.normal!r}",
+                declaration="ReferenceSurface.normal",
+            )
         norm = math.sqrt(sum(value * value for value in components))
         if abs(norm - 1.0) > _UNIT_NORM_TOLERANCE:
-            raise ValueError(
+            raise ContractError(
+                "NON_UNIT_DIRECTION",
                 f"ReferenceSurface.normal must be a unit vector, |n| = {norm!r} "
                 f"(tolerance {_UNIT_NORM_TOLERANCE:g}). The normal is a direction, so its "
                 "length carries no information; a length that is not 1 means it was never "
                 "normalized, and it would scale the <n, d> projection that the optical "
-                "path is computed with."
+                "path is computed with.",
+                declaration="ReferenceSurface.normal",
             )
         object.__setattr__(self, "normal", components)

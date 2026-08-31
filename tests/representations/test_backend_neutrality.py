@@ -18,9 +18,9 @@ import subprocess
 import sys
 
 #: NumPy is deliberately absent, as in the numerics sibling: it is the array
-#: vocabulary the others are described in, not a solver or an accelerator. This
-#: module happens not to import it either -- geometry is Python floats -- but the
-#: criterion is about backends, and R02.3/R02.4 will bring arrays.
+#: vocabulary the others are described in, not a solver or an accelerator. The
+#: package imports it at module scope from R02.3 onward and still pulls no solver
+#: and no accelerator framework, which is the criterion.
 BACKENDS = ("jax", "jaxlib", "torch", "optiland", "chromatix")
 
 
@@ -47,11 +47,34 @@ def test_importing_representations_pulls_no_backend() -> None:
 
 
 def test_declaring_a_boundary_pulls_no_backend() -> None:
-    """Constructing the types, not merely importing the package."""
+    """Constructing every type, not merely importing the package.
+
+    R02's parent criterion 1: the pure representation tests pass while importing
+    neither Optiland, Chromatix, JAX nor Torch. Both representations are built
+    here, with arrays, because `RayBundle.__post_init__` runs a norm through the
+    namespace dispatch and `ScalarField.coordinates()` builds a grid -- either
+    could reach for a framework without the import being visible at module level.
+    """
     loaded = _modules_after(
-        "from representations import Frame, ReferenceSurface\n"
+        "import numpy as np\n"
+        "from representations import Frame, RayBundle, ReferenceSurface, ScalarField\n"
+        "surface = ReferenceSurface(name='exit_pupil', z_m=-3.2e-3, medium_index=1.0)\n"
         "Frame()\n"
-        "ReferenceSurface(name='exit_pupil', z_m=-3.2e-3, medium_index=1.0)\n"
+        "bundle = RayBundle(\n"
+        "    positions_m=np.zeros((4, 3)),\n"
+        "    directions=np.tile([0.0, 0.0, 1.0], (4, 1)),\n"
+        "    wavelength_m=550e-9,\n"
+        "    reference_surface=surface,\n"
+        ")\n"
+        "field = ScalarField(\n"
+        "    u=np.ones((4, 6), dtype=np.complex64),\n"
+        "    sample_pitch_m=(1e-6, 1e-6),\n"
+        "    wavelength_m=550e-9,\n"
+        "    reference_surface=surface,\n"
+        ")\n"
+        "field.coordinates()\n"
+        "field.discrete_power()\n"
+        "assert bundle.count == 4\n"
     )
     assert not loaded & set(BACKENDS), (
         f"declaring a boundary loaded {sorted(loaded & set(BACKENDS))}"

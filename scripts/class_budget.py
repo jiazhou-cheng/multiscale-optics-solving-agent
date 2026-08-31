@@ -91,9 +91,31 @@ SRC = ROOT / "src"
 #:                       unnormalized normal or an index nobody set yields an OPL
 #:                       wrong by a factor no later check can attribute back.
 #:
-#: The package is still empty of a ray or field type; R02.3 and R02.4 raise this
-#: again, each for the class it lands. It is *not* raised to 4 now -- see the
-#: equality rule above.
+#: Raised again to 5 by CHE-175 (R02.3, +2) and CHE-176 (R02.4, +1):
+#:
+#:   `ContractError`     exception -- the one catchable failure type in the
+#:                       package. None of the five rules claims an exception and
+#:                       R00.2 counted 22 of them in the old tree the same way;
+#:                       it is a class because `except ContractError` is what
+#:                       lets a coupler return a diagnostic instead of an
+#:                       invented field, and `except ValueError` would also
+#:                       swallow every unrelated arithmetic error.
+#:   `RayBundle`         rules 1 + 2 -- geometry, coherent state and sampling
+#:                       measure are three groups with joint invariants (per-ray
+#:                       length, one device and one namespace, an optical path
+#:                       without its reference or a measure without its kind is
+#:                       unusable), and it is the public model a solver produces
+#:                       and a coupler consumes.
+#:   `ScalarField`       rules 1 + 2 -- array, pitch, wavelength, surface and pad
+#:                       state are one physical object; a pitch that does not
+#:                       belong to this array gives a plausible extent that is
+#:                       wrong by a factor.
+#:
+#: Seven names did *not* land against that +3: `CoherentRayBatch`,
+#: `WavefrontSamples`, `GeometricRayBundle`, `CoherentRayBundle`, `RayBundleBase`,
+#: `TrackedRayBundle` and `RayBatch`, plus `PSF` as a representation.
+#: `tests/representations/test_rays.py` and `test_scalar.py` assert their absence,
+#: because a budget records what exists and cannot record what was avoided.
 #:
 #: `numerics` is 7, raised from 0 by CHE-173 (R02.1). Three of the seven are
 #: production classes and the ticket names the rule each satisfies:
@@ -117,7 +139,7 @@ SRC = ROOT / "src"
 #: classes the architecture wanted avoided.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
-    "representations": 2,
+    "representations": 5,
 }
 
 #: The project's declared target for the whole production tree. The reference

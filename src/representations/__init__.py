@@ -16,31 +16,66 @@ representation. PSF is **not** here -- an observable derived from state is a
 measurement, not a representation. Coherence is a stronger contract on the ray
 representation, not a subtype of it.
 
-Landed so far:
+Four modules, and the order is the dependency order:
 
-* `geometry` -- CHE-174 (R02.2). `Frame` and `ReferenceSurface`, the two
-  declarations both of those representations embed, plus the convention constants
-  they are validated against. It imports nothing at all, `numerics` included: a
-  frame is not a numeric policy.
+* `contracts` -- CHE-175 (R02.3). `ContractError` and `CONTRACT_CODES`, the one
+  catchable failure type a coupler branches on, plus the array-intake rules every
+  representation applies at construction.
+* `geometry` -- CHE-174 (R02.2). `Frame` and `ReferenceSurface`, the declarations
+  both representations embed, and the frozen boundary conventions.
+* `rays` -- CHE-175 (R02.3). `RayBundle`. Coherence is a contract on it
+  (`require_coherent()`), not a subtype of it, and the sampling measure is
+  declared separately from the amplitude.
+* `scalar` -- CHE-176 (R02.4). `ScalarField`, with typed `validity` in place of a
+  provenance string.
 
-The ray and field types themselves (R02.3, R02.4) are not here yet, and the
-package holds no placeholder standing in for them.
+That is the whole public physical data model: one ray type, one field type. There
+is no PSF type, no second ray carrier, and no base class under either.
 """
 
+from representations.contracts import CONTRACT_CODES, ContractError
 from representations.geometry import (
     AXIS_ORDER,
     HANDEDNESS,
     ORIGIN_RULE,
+    PHASOR,
     PROPAGATION_AXIS,
+    SPATIAL_FACTOR,
     Frame,
     ReferenceSurface,
+)
+from representations.rays import (
+    MEASURE_KINDS,
+    UNVERIFIED,
+    MeasureKind,
+    RayBundle,
+    direction_norm_tolerance,
+)
+from representations.scalar import (
+    VALIDITY_FLAGS,
+    VALIDITY_NOTES,
+    ScalarField,
+    ValidityFlag,
 )
 
 __all__ = [
     "AXIS_ORDER",
+    "CONTRACT_CODES",
     "HANDEDNESS",
+    "MEASURE_KINDS",
     "ORIGIN_RULE",
+    "PHASOR",
     "PROPAGATION_AXIS",
+    "SPATIAL_FACTOR",
+    "UNVERIFIED",
+    "VALIDITY_FLAGS",
+    "VALIDITY_NOTES",
+    "ContractError",
     "Frame",
+    "MeasureKind",
+    "RayBundle",
     "ReferenceSurface",
+    "ScalarField",
+    "ValidityFlag",
+    "direction_norm_tolerance",
 ]
