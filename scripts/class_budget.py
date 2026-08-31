@@ -137,8 +137,32 @@ SRC = ROOT / "src"
 #: this gate is an AST count, not a judgement; `tests/unit/test_class_budget.py`
 #: pins that behaviour deliberately. Four enums is the honest arithmetic, not four
 #: classes the architecture wanted avoided.
+#: `operations` is 2, raised from 0 by CHE-177 (R03.1). CHE-178 (R03.2) adds none:
+#: the registry is module-level state plus four functions, and a `Registry` class
+#: would need two consumers wanting independent registries to justify it.
+#:
+#:   `OperationDescriptor`  rules 2 + 5 -- the public model planning and the
+#:                          runtime read, and the plugin boundary between an
+#:                          operation and the layer that selects one. The four
+#:                          operation kinds are a *field* on it; four subclasses
+#:                          would share every field and override nothing, and the
+#:                          distinction they would encode (a coupler changes
+#:                          representation, a physical operator changes physical
+#:                          state) is not one an `isinstance` check can enforce.
+#:   `OperationKind`        a `StrEnum`, counted for the same reason the four in
+#:                          `numerics` are: this gate is an AST count and
+#:                          `StrEnum` is written with `class` syntax. CHE-177 calls
+#:                          the class delta +1 on the grounds that an enum is a
+#:                          sanctioned alternative to a class; 2 is what is on
+#:                          disk, and the budget records disk.
+#:
+#: Not landed against that +2, and asserted absent by
+#: `tests/operations/test_descriptors.py`: `SolverDescriptor`, `CouplerDescriptor`,
+#: `PhysicalOperatorDescriptor`, `MeasurementDescriptor`, `Registry`, and the
+#: 13 spec classes of the old `core/specs.py` that became fields on one record.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
+    "operations": 2,
     "representations": 5,
 }
 

@@ -67,6 +67,7 @@ where = ["src"]
 # `scripts/check_dependencies.py` holds the full declared set.
 include = [
   "numerics*",
+  "operations*",
   "representations*",
 ]
 

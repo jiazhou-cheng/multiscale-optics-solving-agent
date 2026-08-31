@@ -91,14 +91,21 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   it is also the first time the allowlist has done non-vacuous work.
 #: * `representations` -- landed as an empty package by CHE-153 (R01); first real
 #:   module by CHE-174 (R02.2): `geometry.py`, holding `Frame` and
-#:   `ReferenceSurface`. It imports nothing in this project at all -- not even
-#:   `numerics`, which its allowlist permits -- so the `representations -> numerics`
-#:   edge is still unexercised. R02.3 and R02.4 land the ray and field types, which
-#:   is what will exercise it.
+#:   `ReferenceSurface`. CHE-175/CHE-176 (R02.3/R02.4) added `contracts.py`,
+#:   `rays.py` and `scalar.py`, and those do import `numerics`, so the
+#:   `representations -> numerics` edge is exercised.
+#: * `operations` -- landed by CHE-177/CHE-178 (R03.1/R03.2): `descriptors.py` and
+#:   `registry.py`. It imports `numerics` (one name, `COMPONENT_CAPABILITIES`, which
+#:   a descriptor cites rather than copies) and nothing else in the project. The
+#:   forbidden edges matter more here than anywhere else so far: `operations ->
+#:   solvers` or `-> couplers` would be the end of "listing the registry imports no
+#:   backend", which is the single property the package exists to provide. This
+#:   allowlist entry and `tests/operations/test_registry_imports_no_backend.py` are the two
+#:   halves of that -- the structural rule and the executed check.
 #:
 #: Every later ticket adds its package here as it authors it, in the same change.
 #: When the graph is complete this equals `ALLOWED.keys()`.
-LANDED: frozenset[str] = frozenset({"numerics", "representations"})
+LANDED: frozenset[str] = frozenset({"numerics", "operations", "representations"})
 
 #: Target-architecture names that the deleted reference tree also used.
 #:
