@@ -103,9 +103,19 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   allowlist entry and `tests/operations/test_registry_imports_no_backend.py` are the two
 #:   halves of that -- the structural rule and the executed check.
 #:
+#: * `problems` -- landed by CHE-156 (R04): `ray_trace.py`, the neutral sequential
+#:   ray-tracing problem. Its allowlist permits `representations` and `numerics`
+#:   and it imports neither, which is correct rather than incomplete: a
+#:   prescription is physical *intent*, not physical state at a boundary. What the
+#:   gate is really guarding here is the other direction -- a problem that imported
+#:   a solver would be a problem statable only by someone who has that solver
+#:   installed, which is the entanglement R04 exists to undo.
+#:
 #: Every later ticket adds its package here as it authors it, in the same change.
 #: When the graph is complete this equals `ALLOWED.keys()`.
-LANDED: frozenset[str] = frozenset({"numerics", "operations", "representations"})
+LANDED: frozenset[str] = frozenset(
+    {"numerics", "operations", "problems", "representations"}
+)
 
 #: Target-architecture names that the deleted reference tree also used.
 #:

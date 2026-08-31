@@ -160,9 +160,37 @@ SRC = ROOT / "src"
 #: `tests/operations/test_descriptors.py`: `SolverDescriptor`, `CouplerDescriptor`,
 #: `PhysicalOperatorDescriptor`, `MeasurementDescriptor`, `Registry`, and the
 #: 13 spec classes of the old `core/specs.py` that became fields on one record.
+#: `problems` is 3, raised from 0 by CHE-156 (R04). The ticket budgets "2 public
+#: classes, with material / aperture / source / wavelength as TypedDict, Literal
+#: or frozen tuples"; three is what an AST count sees, and the third is the
+#: TypedDict:
+#:
+#:   `RayTraceProblem`  rules 1 + 2 -- `stop_index` has to index `surfaces` and
+#:                      `primary_wavelength_index` has to index `wavelengths_um`,
+#:                      so the fields are jointly constrained and none of them
+#:                      means anything alone; and it is the public model a solver
+#:                      adapter consumes.
+#:   `SurfaceSpec`      rule 1 -- curvature, conic, following medium and spacing
+#:                      describe one interface. A radius given twice in two forms
+#:                      makes the surface silently a *different* one rather than
+#:                      an invalid one, which is the failure mode the joint
+#:                      validation exists for.
+#:   `Material`         a `TypedDict`, which the five rules list as a sanctioned
+#:                      alternative to a class, counted for the same reason the
+#:                      enums in `numerics` and `operations` are: this gate is an
+#:                      AST count. Its runtime validation is a *function*
+#:                      (`_check_material`), because a TypedDict is an annotation
+#:                      that disappears at run time.
+#:
+#: Twenty class names did not land against that +3 -- the whole of
+#: `core/optical_system.py`'s geometry, interaction, material, aperture, field and
+#: wavelength hierarchies, its four kind enums and its error type, plus
+#: `core/optical_assembly.py`'s three and every builder.
+#: `tests/problems/test_ray_trace.py` asserts their absence.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
     "operations": 2,
+    "problems": 3,
     "representations": 5,
 }
 

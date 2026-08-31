@@ -68,6 +68,7 @@ where = ["src"]
 include = [
   "numerics*",
   "operations*",
+  "problems*",
   "representations*",
 ]
 
