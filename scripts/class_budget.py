@@ -29,6 +29,21 @@ labels this a judgement call for exactly that reason.
 budget indefinitely and every individual raise would look local; the ceiling makes
 the sum of the budgets fail against the project's declared target of 22.
 
+**Why this is a script *and* a test.** Same two-layer split as
+`scripts/check_dependencies.py`, for the same reason:
+
+* **This file is the CLI and report layer.** No pytest dependency. `make
+  check-arch` prints every package, its count, its budget and the fully-qualified
+  name of each class counted -- which is the output you want when deciding
+  whether a raise is justified, and which an assertion failure does not give you.
+* **`tests/unit/test_class_budget.py` is the gate and the meta-test.** It runs
+  `verify()` in the default suite, and it drives `_classes_in` against synthetic
+  modules to prove the counter behaves as claimed: that it finds nested classes
+  (the cheapest way to hide growth under one budgeted name), that it does not
+  charge for the five rules' sanctioned alternatives, and that it *does* charge
+  for `TypedDict` and `Enum` -- a known limit pinned as a test rather than left as
+  a surprise.
+
 Run directly for a report, or through `tests/unit/test_class_budget.py`, which is
 what puts it in the default suite.
 """
@@ -53,9 +68,32 @@ SRC = ROOT / "src"
 
 #: Production classes allowed per package of the new tree.
 #:
-#: `representations` is still 0: R01 landed no numerical optics, and
-#: `docs/architecture_principles.md` bans a placeholder interface created "so the
-#: structure is visible". R02.2-R02.4 raise it.
+#: One entry per package in `LANDED`, and the numbers are the reviewed artifact:
+#: a raise belongs to the ticket that adds the class and must name the rule that
+#: class satisfies. `tests/unit/test_class_budget.py` requires each number to
+#: equal what is actually on disk, so a budget cannot be raised in advance of the
+#: code -- headroom is not a pre-authorization.
+#:
+#: `representations` is 2, raised from 0 by CHE-174 (R02.2). Both are rule 1 --
+#: a shared invariant across several fields -- and the invariant is named, because
+#: "these fields go together" is the justification every unjustified class also
+#: claims:
+#:
+#:   `Frame`             rule 1 -- axis order, handedness, origin rule and
+#:                       propagation axis are one mapping from array indices to
+#:                       physical directions. Each fixes part of the same mapping,
+#:                       and getting any one wrong silently mirrors, transposes or
+#:                       shifts a wavefront instead of raising. All four are
+#:                       validated in `__post_init__`.
+#:   `ReferenceSurface`  rule 1 -- axial coordinate, unit normal and medium index
+#:                       are only meaningful together: an optical path is `n * s`
+#:                       projected onto the normal, so a valid `z_m` beside an
+#:                       unnormalized normal or an index nobody set yields an OPL
+#:                       wrong by a factor no later check can attribute back.
+#:
+#: The package is still empty of a ray or field type; R02.3 and R02.4 raise this
+#: again, each for the class it lands. It is *not* raised to 4 now -- see the
+#: equality rule above.
 #:
 #: `numerics` is 7, raised from 0 by CHE-173 (R02.1). Three of the seven are
 #: production classes and the ticket names the rule each satisfies:
@@ -79,13 +117,23 @@ SRC = ROOT / "src"
 #: classes the architecture wanted avoided.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
-    "representations": 0,
+    "representations": 2,
 }
 
 #: The project's declared target for the whole production tree. The reference
 #: implementation had 280; R00's inventory found 66 of them would satisfy a rule
 #: at all, which is still three times this number, so the collapse R02-R11 owes is
 #: real work and not rounding.
+#:
+#: **Open inconsistency, recorded rather than resolved here.** `AGENTS.md` and
+#: `docs/architecture_principles.md` were both rewritten for the clean slate and
+#: now state that the rewrite does *not* inherit a project-wide class ceiling from
+#: the reference implementation, on the grounds that 22 was derived from a tree
+#: that no longer exists. This script still enforces it. Nothing fails today (7 of
+#: 22) and the per-package budgets above are the part doing the real work either
+#: way, but the two documents and this constant disagree and the owner has not
+#: settled it. Do not quietly delete the ceiling to make a raise fit -- that is the
+#: exact move it exists to make visible.
 PROJECT_CEILING = 22
 
 

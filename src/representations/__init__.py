@@ -16,5 +16,31 @@ representation. PSF is **not** here -- an observable derived from state is a
 measurement, not a representation. Coherence is a stronger contract on the ray
 representation, not a subtype of it.
 
-Empty of code at R01 by intent, for the reason `numerics/__init__.py` gives.
+Landed so far:
+
+* `geometry` -- CHE-174 (R02.2). `Frame` and `ReferenceSurface`, the two
+  declarations both of those representations embed, plus the convention constants
+  they are validated against. It imports nothing at all, `numerics` included: a
+  frame is not a numeric policy.
+
+The ray and field types themselves (R02.3, R02.4) are not here yet, and the
+package holds no placeholder standing in for them.
 """
+
+from representations.geometry import (
+    AXIS_ORDER,
+    HANDEDNESS,
+    ORIGIN_RULE,
+    PROPAGATION_AXIS,
+    Frame,
+    ReferenceSurface,
+)
+
+__all__ = [
+    "AXIS_ORDER",
+    "HANDEDNESS",
+    "ORIGIN_RULE",
+    "PROPAGATION_AXIS",
+    "Frame",
+    "ReferenceSurface",
+]

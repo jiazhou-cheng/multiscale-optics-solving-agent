@@ -1,14 +1,29 @@
 """The class budget holds, and the counter that says so works.
 
-CHE-171 (R01.1). Same shape as `test_dependency_direction.py`: the real tree is
-within budget, and the counter is proved to *detect* growth rather than trusted
-to. At R01 both budgets are 0 and both packages are empty, so "within budget" is
-almost free information — the detection tests are what make the gate real before
-there is anything to count.
+CHE-171 (R01.1). This is the **gate and meta-test layer** over
+`scripts/class_budget.py`, which is the CLI and report layer — the same split as
+`test_dependency_direction.py` and `scripts/check_dependencies.py`:
 
-The one thing this file deliberately does not test is whether a class is
-*justified*. That is a judgement against the five minimality rules and no script
-can make it; the budget number is the reviewed artifact instead.
+* the script owns the budgets and prints the full report (`make check-arch`),
+  naming every class it counted, which is what you need to judge a raise;
+* this file runs `verify()` in the default suite so CI cannot skip it, and drives
+  `_classes_in` against **synthetic** modules to prove the counter behaves as
+  claimed rather than being trusted to.
+
+Same shape as its sibling: the real tree is within budget, and the counter is
+proved to *detect* growth. The detection half matters most while the tree is
+small — `numerics/` is at 7 (CHE-173 / R02.1) and `representations/` at 2
+(CHE-174 / R02.2), so "within budget" is cheap information on its own.
+
+Two things this file deliberately does not test:
+
+* **Whether a class is justified.** That is a judgement against the five
+  minimality rules and no script can make it; the budget number is the reviewed
+  artifact instead.
+* **Whether the project ceiling is the right number.** It only checks the budgets
+  stay under whatever `PROJECT_CEILING` currently is. See the note on that
+  constant — the governing documents and the script currently disagree about
+  whether an inherited ceiling applies at all.
 """
 
 from __future__ import annotations

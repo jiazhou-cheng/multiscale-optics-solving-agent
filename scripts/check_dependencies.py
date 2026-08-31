@@ -18,6 +18,24 @@ disk or when no module was inspected at all. A gate that cannot fail is not a
 gate, and this one is landed before the code it guards precisely so it is in place
 when the code arrives.
 
+**Why this is a script *and* a test, since the pair looks redundant.** They are
+two layers with different jobs and neither subsumes the other:
+
+* **This file is the CLI and report layer.** A standalone AST pass with no pytest
+  dependency, for `make check-arch`, a pre-commit hook, or a developer who wants
+  to see *which* import in *which* module broke the rule without reading an
+  assertion diff. `_report()` prints the whole graph state, including the
+  packages that are fine.
+* **`tests/unit/test_dependency_direction.py` is the gate and the meta-test.** It
+  runs `verify()` in the default suite so CI cannot skip it, and -- the part this
+  file cannot do for itself -- it drives `_classify` against synthetic inputs to
+  prove each violation class is actually *detected*. During bootstrap the real
+  tree is small enough that "the tree passes" is nearly free information; the
+  synthetic cases are what make the gate mean something.
+
+So: this file decides the rule, that file proves the rule is enforced. Change a
+rule here and the detection test there is what fails if you got it wrong.
+
 Run directly (`python scripts/check_dependencies.py`) for a report, or through
 `tests/unit/test_dependency_direction.py`, which is what puts it in the default
 suite.
@@ -59,36 +77,61 @@ ALLOWED: dict[str, frozenset[str]] = {
 
 #: Which packages of the new tree have actually been authored.
 #:
-#: This cannot be derived from the filesystem, and that is the whole subtlety of
-#: the migration: `src/couplers/`, `src/solvers/` and `src/runtime/` exist right
-#: now and belong to the **old** tree, whose names the new architecture reuses.
-#: Detecting "present" by directory existence made this gate walk 52 old modules
-#: and report 50 violations that were really just old code importing old code.
+#: **Declared, not derived from the filesystem**, and that distinction still earns
+#: its keep now that the reference tree is gone. A directory under `src/` is not
+#: the same fact as a package being part of the new architecture: a stray
+#: checkout, a scratch directory, or a package created ahead of the code that
+#: justifies it would all read as "landed" to a filesystem probe. Declaring it
+#: means joining the graph is an edit someone reviews.
 #:
-#: So the migration state is declared. R01 lands `numerics` and `representations`
-#: only -- the minimum for the first real implementation (R02), and the two target
-#: names that do not collide with the old tree. Every later ticket adds its package
-#: here as it authors it; R14 deletes the old tree, after which this equals
-#: `ALLOWED.keys()`.
+#: Current state:
+#:
+#: * `numerics` -- landed with real code by CHE-173 (R02.1): `precision.py` and
+#:   `arrays.py`. This is the first package the gate walks with anything in it, so
+#:   it is also the first time the allowlist has done non-vacuous work.
+#: * `representations` -- landed as an empty package by CHE-153 (R01); first real
+#:   module by CHE-174 (R02.2): `geometry.py`, holding `Frame` and
+#:   `ReferenceSurface`. It imports nothing in this project at all -- not even
+#:   `numerics`, which its allowlist permits -- so the `representations -> numerics`
+#:   edge is still unexercised. R02.3 and R02.4 land the ray and field types, which
+#:   is what will exercise it.
+#:
+#: Every later ticket adds its package here as it authors it, in the same change.
+#: When the graph is complete this equals `ALLOWED.keys()`.
 LANDED: frozenset[str] = frozenset({"numerics", "representations"})
 
-#: Names declared by the new architecture that the old tree currently occupies.
-#: An import of one of these from a landed package would resolve to old code, so
-#: `_classify` refuses it by name rather than letting it silently work.
+#: Target-architecture names that the deleted reference tree also used.
 #:
-#: **A known blind spot, stated rather than left to be discovered.** These three
-#: names are exempt from the "on disk but not in LANDED" structural check below,
-#: because they are on disk as *old* code and always will be until R14. So when
-#: R05/R09/R12 author new-tree code under `src/couplers/`, `src/solvers/` or
-#: `src/runtime/`, forgetting to add the name to LANDED raises no error and both
-#: gates then walk and count *zero* of that new code. The ticket that lands one of
-#: these must add it to LANDED in the same change. R14 empties this set, after
-#: which the exemption -- and this hazard -- disappear.
+#: These three are no longer on disk -- the reference implementation was removed
+#: wholesale -- so nothing resolves through them today. They are kept as a record
+#: of *which* target names were previously occupied, because that is the set most
+#: likely to be resurrected by a partial revert, a `git checkout` of an old path,
+#: or a copy from the `pre-rewrite-2026-08-30` tag. A package appearing under one
+#: of these names is a package that has to be argued in like any other.
+#:
+#: **The exemption these names used to carry has been removed.** While the old
+#: tree was on disk they were skipped by the "on disk but not in LANDED"
+#: structural check below, because they were permanently present as old code.
+#: That skip was a documented hazard: authoring new code under `src/couplers/`
+#: and forgetting to add `couplers` to LANDED raised no error, and both gates then
+#: walked and counted *zero* of it. With the old tree gone the skip has no
+#: remaining benefit, so it is gone too -- these names are now checked exactly
+#: like every other, and landing one still requires the same LANDED edit.
 SHARED_NAMES: frozenset[str] = frozenset({"couplers", "solvers", "runtime"})
 
-#: Top-level names in `src/` that belong to the old tree and to nothing else.
-#: An import of any of these from the new tree is the violation R01 exists to
+#: Top-level names that belonged to the reference implementation and to nothing
+#: else. An import of one from the new tree is the violation R01 exists to
 #: prevent: the new implementation must not be built on the tree it replaces.
+#:
+#: **Kept deliberately now that none of them exist.** The obvious reading is that
+#: this set is dead weight -- `import core` raises `ModuleNotFoundError` on its
+#: own, so what is there to guard? Two things. A reintroduced `src/core/` is
+#: caught here as an architecture violation with the reason attached, instead of
+#: passing this gate and failing later as a confusing runtime error; and these
+#: names are the ones a physics-recovery task is most likely to reach for, since
+#: `docs/rewrite/reference_inventory.md` cites them by path. Re-deriving from the
+#: tag is the supported route, importing is not, and this is where that is said.
+#: The set is an anti-pollution guard, not a description of the current disk.
 OLD_TREE_ONLY: frozenset[str] = frozenset(
     {"agent", "cli", "core", "discovery", "registry", "studies", "verification"}
 )
@@ -176,11 +219,16 @@ def _classify(package: str, imported: str) -> str | None:
             "to be argued into ALLOWED, not assumed."
         )
     if imported not in LANDED:
-        collides = " The old tree still owns that name." if imported in SHARED_NAMES else ""
+        reserved = (
+            " That name was also used by the reference implementation, so a partial revert "
+            "could make it resolve to code the new tree must not be built on."
+            if imported in SHARED_NAMES
+            else ""
+        )
         return (
-            f"{package}/ -> {imported}/ is an allowed direction, but {imported!r} does not "
-            "exist in the new tree yet, so the import would resolve to the OLD "
-            f"src/{imported}/.{collides} Land the new package first."
+            f"{package}/ -> {imported}/ is an allowed direction, but {imported!r} has not "
+            "been landed, so there is no new-tree package for the import to reach."
+            f"{reserved} Land the package -- and add it to LANDED in the same change -- first."
         )
     return None
 
@@ -203,25 +251,27 @@ def verify() -> tuple[list[Violation], list[str], int]:
 
     # LANDED is hand-maintained, so it is checked rather than trusted. Three ways
     # it can go wrong, all of which make the gate quietly weaker:
-    undeclared = ALLOWED.keys() - LANDED - SHARED_NAMES
+    undeclared = ALLOWED.keys() - LANDED
     for name in sorted(undeclared):
         if (SRC / name / "__init__.py").is_file():
             structural.append(
                 f"src/{name}/ exists and is a new-architecture package name, but is not in "
                 "LANDED, so nothing checks its imports. Add it to LANDED."
             )
-    # Every top-level name under src/ must be accounted for by one of the three
-    # sets, derived from the tree rather than trusted. An unaccounted name is
-    # classified as third-party and silently importable -- the same failure shape
-    # as the `src.` bypass.
+    # Every top-level name under src/ must be accounted for, derived from the tree
+    # rather than trusted. An unaccounted name is classified as third-party and
+    # silently importable -- the same failure shape as the `src.` bypass. Note that
+    # SHARED_NAMES is *not* subtracted here: a directory appearing under one of
+    # those names is a new package that has to be landed, not a pre-approved one.
     on_disk = {p.name for p in SRC.iterdir() if p.is_dir() and (p / "__init__.py").is_file()}
     on_disk |= {p.stem for p in SRC.glob("*.py")}
-    unaccounted = on_disk - OLD_TREE_ONLY - SHARED_NAMES - LANDED
+    unaccounted = on_disk - OLD_TREE_ONLY - LANDED
     for name in sorted(unaccounted):
         structural.append(
             f"src/{name}/ is a top-level name this check does not classify, so an import of "
-            f"it from the new tree would be treated as third-party and allowed. Add it to "
-            "OLD_TREE_ONLY, SHARED_NAMES or LANDED."
+            f"it from the new tree would be treated as third-party and allowed. If it is a "
+            "new-architecture package, add it to LANDED (and to ALLOWED); if it is a revived "
+            "reference-implementation package, it does not belong under src/ at all."
         )
 
     for name in sorted(LANDED - ALLOWED.keys()):
