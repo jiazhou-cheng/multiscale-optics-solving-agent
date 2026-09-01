@@ -46,15 +46,12 @@ plane wave of wavevector `n k d_hat` accumulates over an axial offset `dz`. No
 term is dropped. The reconstruction at the new surface is not an approximation of
 the field there; it is the same superposition of plane wavelets evaluated there.
 
-**That composed claim is executable at `n = 1` and only there, today.** The
-derivation above writes the coupler's constant phase as `k (OPL - n d_t . x0_t)`;
-the landed kernel writes it without the `n`, which is the same expression at
-`n = 1` and nothing else -- see the medium-index section below. So this operation
-is correct for any `n`, and a bundle it advances through glass has an optical path
-no reconstruction in this tree will currently read: `couplers.ray_to_scalar`
-refuses `medium_index != 1` rather than computing with a silent vacuum ramp. The
-failure direction is right and the gap is real, and a reader should not take "no
-term is dropped" to mean the pair composes at `n != 1` yet.
+**That composed claim is executable at any `n`.** The derivation above writes the
+coupler's constant phase as `k (OPL - n d_t . x0_t)`, which is what
+`couplers.ray_to_scalar` now forms -- the `n` in its transverse ramp and in its
+launch-ramp subtraction is the CHE-192 follow-up, made after R09 found it missing.
+So a bundle advanced through glass has an optical path the reconstruction reads on
+the same convention, and the pair composes in a medium as well as in air.
 
 **The refractive index is the whole risk of this ticket**, and the arithmetic
 above is why: `n` appears twice and has to appear in both places. A version that
@@ -64,22 +61,19 @@ trace actually uses it. The reference implementation hard-coded `n = 1` in both 
 its copies and had no test that would have caught it;
 `tests/physics/test_ray_propagation.py` is that test, with the negative control.
 
-The medium index in the reconstruction kernel, and what R09 did not fix
-----------------------------------------------------------------------
-Deriving the above turned up that `couplers.ray_to_scalar`'s transverse ramp does
-not carry the index: it writes `k0 (OPL + d_hat . dr)` where the medium form is
-`k0 OPL + n k0 d_hat . dr`, and `medium_index` was never read there. Same on the
-decomposition side -- `couplers.scalar_to_ray`'s direction cosines are
-`lambda_vacuum f`, which is the `n = 1` form. Both are undeclared assumptions
-rather than wrong numbers: every case this tree has run is in air.
+The medium index in the reconstruction kernel, found here
+---------------------------------------------------------
+Deriving the above turned up that neither coupler carried the index:
+`couplers.ray_to_scalar` wrote `k0 (OPL + d_hat . dr)` where the medium form is
+`k0 OPL + n k0 d_hat . dr`, and `couplers.scalar_to_ray`'s direction cosines were
+`lambda_vacuum f`, the `n = 1` form. Both were undeclared assumptions rather than
+wrong numbers -- every case the tree had run was in air.
 
-R09 **refused rather than fixed**. Both couplers now reject `medium_index != 1`,
-which turns a silent wrong answer into a message and costs nothing that worked
-before. The fix -- putting `n` into the ramp and into the launch-ramp subtraction
--- is three lines, is a no-op at `n = 1`, and makes the composition exact for any
-medium; it also alters a landed physical convention in two already-committed
-tickets, so it is the owner's call and is recorded on CHE-192 rather than taken
-here.
+R09 refused rather than fixed, because the fix alters a landed physical convention
+in two already-committed tickets. The owner then took it: `n` is in both couplers,
+a no-op at `n = 1`, and the refusals are gone. This operation's `n s` and their
+`n k0` ramps are one convention now, which is what the exactness claim above
+depends on.
 
 One medium, asserted rather than assumed
 ----------------------------------------

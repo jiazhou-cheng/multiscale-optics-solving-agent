@@ -133,15 +133,21 @@ it to.
 There is also no chunking framework. If a workload needs chunking that is the
 executor's concern or the caller's, not the coupler's.
 
-The medium index is refused, not assumed (found by R09)
--------------------------------------------------------
-The transverse direction cosines here are `d = lambda_vacuum * f`, which is the
-`n = 1` form: in a medium the transverse cosine of a mode at spatial frequency `f`
-is `lambda_vacuum f / n`, and the evanescent circle is in those units too. The
-`medium_index` on the reference surface was never read, so **`medium_index != 1` is
-refused** -- the same decision, for the same reason, that
-`couplers.ray_to_scalar` makes. R09 found it; the fix alters a landed physical
-convention in two tickets and is the owner's call. See that module's docstring.
+The medium index is carried, not assumed (CHE-192 follow-up)
+------------------------------------------------------------
+The transverse direction cosine of a mode at spatial frequency `f` is
+`lambda_vacuum f / n`, and the evanescent circle is in those units too: a mode
+propagates when `|k_t| < n k0`, which is the same cut `sources.plane_wave`
+already applies. The cosines are formed that way here, and the launch phase is
+`exp(i n k0 (d_u x_p + d_v y_p))` -- the transverse wavevector `2 pi f`, written
+in the medium form so that it is the same phase `couplers.ray_to_scalar`'s ramp
+evaluates at that point. Both are **no-ops at `n = 1`**.
+
+`RayBundle.directions` stays a **unit** vector rather than `n d_hat`, which is
+what forces the `n` onto the wavenumber on both sides rather than into the
+direction. R09 found the omission (CHE-192) while deriving
+`operators.propagate_rays`; the refusal it landed in the meantime is gone. See
+`couplers.ray_to_scalar`'s medium-index section for the composition.
 
 Sampling is an input, not a side effect
 ---------------------------------------
@@ -661,24 +667,12 @@ def scalar_to_ray(
             declaration="draw",
         )
 
-    if emitted_surface.medium_index != 1.0:
-        raise ContractError(
-            "MISSING_DECLARATION",
-            f"the field is declared in a medium of index "
-            f"{emitted_surface.medium_index!r}, and this decomposition's direction "
-            "cosines are lambda_vacuum * f, which is the n = 1 form -- in a medium they "
-            "are lambda_vacuum f / n and the evanescent circle is in those units. "
-            "Refused rather than emitting directions that are not unit vectors in the "
-            "medium they are declared in.",
-            declaration="reference_surface.medium_index",
-            remedy=(
-                "Decompose a field in air, or settle the convention -- see "
-                "couplers.ray_to_scalar's medium-index section (found by R09)."
-            ),
-        )
-
     ny, nx = field.shape
     dy, dx = field.sample_pitch_m
+    # The declared medium, applied in exactly two places below: the direction
+    # cosines `lambda_0 f / n` -- which carry the evanescent cut `|k_t| < n k0`
+    # with them -- and the launch phase `n k0 d . x_p`. Both no-ops at `n = 1`.
+    medium_index = emitted_surface.medium_index
     xp = field.xp
     namespace = namespace_of(field.u)
     dot = matmul_precision_kwargs(namespace)
@@ -694,7 +688,7 @@ def scalar_to_ray(
         ny * nx
     )
 
-    # Transverse direction cosines, d = lambda * f. Computed at the **widest real
+    # Transverse direction cosines, d = lambda_0 f / n. Computed at the **widest real
     # dtype the namespace has**, not at the field's storage precision, because the
     # evanescent mask is a property of the grid and the wavelength -- both of which
     # arrive as Python floats -- and not of how the samples happen to be stored.
@@ -706,11 +700,12 @@ def scalar_to_ray(
     # follows the namespace, which is a property of the execution environment and
     # is visible in `compute_precision`.)
     mask_np = numpy_dtype(DType.FLOAT64)
+    medium_wavelength_m = field.wavelength_m / medium_index
     direction_u = (
-        xp.fft.fftshift(xp.fft.fftfreq(nx, d=dx)) * field.wavelength_m
+        xp.fft.fftshift(xp.fft.fftfreq(nx, d=dx)) * medium_wavelength_m
     ).astype(mask_np)
     direction_v = (
-        xp.fft.fftshift(xp.fft.fftfreq(ny, d=dy)) * field.wavelength_m
+        xp.fft.fftshift(xp.fft.fftfreq(ny, d=dy)) * medium_wavelength_m
     ).astype(mask_np)
     grid_v, grid_u = xp.meshgrid(direction_v, direction_u, indexing="ij")
     radial = grid_u**2 + grid_v**2
@@ -796,11 +791,15 @@ def scalar_to_ray(
     launch_count = int(launch.shape[0])
     mode_count = int(indices.size)
 
-    # exp(i k (d_u x_p + d_v y_p)), the phase each launch point implies. Written
+    # exp(i n k0 (d_u x_p + d_v y_p)), the phase each launch point implies -- the
+    # transverse wavevector is `2 pi f`, and `n k0 d_t` is how it is written once the
+    # cosines carry the `1/n`. Written
     # with an explicit complex dtype for the reason `ray_to_scalar._cis` gives:
     # scalar promotion must not decide a contract-visible dtype.
     projected = xp.matmul(launch, selected_transverse.T, **dot)
-    launch_phase = xp.exp((field.wavenumber * projected).astype(complex_np) * 1j)
+    launch_phase = xp.exp(
+        (field.wavenumber * medium_index * projected).astype(complex_np) * 1j
+    )
 
     amplitude = (selected_amplitudes[None, :] * launch_phase).reshape(-1)
     positions = xp.column_stack(

@@ -20,10 +20,11 @@ discretization one of them has and the other does not.
 The operator is
 
 ```
-U(r) = sum_i  a_i * w_i * exp[ i k ( OPL_i + dr_i(r) ) ]
+U(r) = sum_i  a_i * w_i * exp[ i k0 ( OPL_i + n * dr_i(r) ) ]
 ```
 
-with `dr_i(r) = d_u_i (x - x0_i) + d_v_i (y - y0_i)` the extra path from the
+with `n` the reference surface's `medium_index`, `k0` the vacuum wavenumber, and
+`dr_i(r) = d_u_i (x - x0_i) + d_v_i (y - y0_i)` the extra *geometric* path from the
 ray's own intersection point on the surface to the field point, along the
 wavelet direction.
 
@@ -278,27 +279,29 @@ The three options not taken, with the reason each was rejected:
    optical path already does -- and that is a change to `RayBundle` and its
    producers, not to this kernel.
 
-The medium index is refused, not assumed (found by R09)
--------------------------------------------------------
+The medium index is carried, not assumed (CHE-192 follow-up)
+------------------------------------------------------------
 In a medium of index `n` a plane wave is `exp(i n k0 s_hat . r)`, so a wavelet's
 field at `r` is `a exp(i k0 OPL) exp(i n k0 d_hat . (r - x0))` -- the **ramp
-carries `n`** and so does the launch-ramp subtraction. This kernel writes `k0 (OPL
-+ d_hat . (r - x0))`, which is that expression at `n = 1` and nothing else. The
-`medium_index` on the reference surface was never read.
+carries `n`** and so does the launch-ramp subtraction, while `OPL` does not,
+because an optical path is already `n` times a geometric one. The kernel writes
+exactly that: `n` multiplies the transverse ramp, the launch-ramp subtraction and
+nothing else, so it is a **no-op at `n = 1`** and every number this tree measured
+in air is unchanged.
 
-That is an undeclared assumption rather than a wrong number: every case this tree
-has ever run is in air. R09 found it while deriving `operators.propagate_rays`,
-whose optical path grows by `n s` -- so a bundle advanced through glass and handed
-here would have a correct path against a ramp that assumes vacuum, and the two
-would disagree by `(n - 1) k0 d_t . (r - x0)`.
+R09 found the omission while deriving `operators.propagate_rays`, whose optical
+path grows by `n s`: a vacuum ramp against a medium-aware path disagrees by
+`(n - 1) k0 d_t . (r - x0)`, unbounded in waves. With `n` in the ramp the pair
+composes exactly for any medium -- advancing a bundle by `s` moves this kernel's
+constant phase by `n k0 d_z dz`, which is what a plane wave of wavevector
+`n k0 d_hat` accumulates. The refusal R09 landed in the meantime is gone; the
+arithmetic is worked out in `operators/ray_propagation.py`.
 
-**So `medium_index != 1` is refused here**, and the fix is not made. Putting `n`
-into the ramp and into the launch-ramp subtraction is a three-line change that is
-a no-op at `n = 1` and makes the composition exact -- the arithmetic is worked out
-in `operators/ray_propagation.py` -- but it alters a landed physical convention in
-two tickets, so it is the owner's call and not R09's. Refusing turns a silent wrong
-answer into a message in the meantime, which is what this module does with every
-other declaration it cannot honour.
+Two consequences a caller sees. The **grid Nyquist limit is on the medium
+wavelength**, `|d_t| <= lambda_0 / (2 n pitch)`: the ramp on the grid has spatial
+frequency `n d_t / lambda_0`, so a medium tightens the condition by exactly `n`
+and the reported limit follows. And the **grazing bound** uses the `n`-scaled
+launch ramp, because that is the term the constant phase actually carries.
 
 Grid Nyquist is a refusal, not a warning
 -----------------------------------------
@@ -595,11 +598,6 @@ REFUSALS: dict[str, str] = {
         "to the emitted field, because the pitch is divided by to get the Nyquist limit "
         "before the field exists."
     ),
-    "MISSING_DECLARATION": (
-        "the field's reference surface declares a medium of index other than 1, and this "
-        "kernel's transverse ramp does not carry the index. Refused rather than computed "
-        "with a silent n = 1 -- see the module docstring's medium-index section."
-    ),
     "GRAZING_PHASE_UNREPRESENTABLE": (
         "a mode's constant phase k (OPL - d . x0) cannot be represented in the compute "
         "precision to within the declared budget, because both terms scale as Z / d_n "
@@ -741,6 +739,11 @@ def grid_nyquist_direction_limit(wavelength_m: float, pitch_m: float) -> float:
     samples the wavefront densely enough. Both can fail independently and
     refining one does not fix the other, which is the usual wasted debugging
     step -- so both are reported, separately, on the diagnostics record.
+
+    `wavelength_m` is the wavelength **in the medium the surface declares**: the
+    ramp written onto the grid is `exp(i n k0 d_t x)`, of spatial frequency
+    `n d_t / lambda_0`, so the coupler passes `lambda_0 / n` here and a caller
+    sizing a pitch for a submerged surface must do the same.
 
     Public because a caller choosing an output pitch needs it *before* calling
     the coupler, and because deriving it again at a call site is how the factor
@@ -1176,7 +1179,10 @@ def _apply_grazing_floor(
     The bound is the kernel's own arithmetic rather than a caller declaration, and
     it is taken **per term at the precision that term was stored in**:
 
-        delta_phi_i  <=  k ( eps_opl |OPL_i| + eps_geom |d_i . x0_i| )
+        delta_phi_i  <=  k0 ( eps_opl |OPL_i| + eps_geom |n d_i . x0_i| )
+
+`launch_ramp` arrives already multiplied by the medium index, because that is the
+term the constant phase carries; at `n = 1` this is the bound as before.
 
     Both terms are needed. `k OPL_i` alone understates the error whenever the ray
     was launched far off axis, and for a near-grazing mode the two are nearly equal
@@ -1320,20 +1326,11 @@ def ray_to_scalar(
     measure_weight, normalization = _resolve_measure(rays)
     emitted_surface = _require_declared_surface(rays, surface, rays.xp)
 
-    if emitted_surface.medium_index != 1.0:
-        raise ContractError(
-            "MISSING_DECLARATION",
-            f"the rays are declared in a medium of index "
-            f"{emitted_surface.medium_index!r}, and this kernel's transverse ramp does "
-            "not carry the index: it writes k0 (OPL + d_hat . dr) where the medium form "
-            "is k0 OPL + n k0 d_hat . dr. Refused rather than computed with a silent "
-            "n = 1, which would disagree with an optical path that grew by n s.",
-            declaration="reference_surface.medium_index",
-            remedy=(
-                "Reconstruct in air, or settle the convention -- see the module "
-                "docstring's medium-index section (found by R09)."
-            ),
-        )
+    # The declared medium, read here and applied in exactly three places below: the
+    # transverse ramp, the launch-ramp subtraction, and the grid Nyquist limit. The
+    # optical path is *not* scaled -- it already grew by `n s`. See the module
+    # docstring's medium-index section. Every one of them is a no-op at `n = 1`.
+    medium_index = emitted_surface.medium_index
 
     ny, nx = int(grid_shape[0]), int(grid_shape[1])
     dy, dx = float(sample_pitch_m[0]), float(sample_pitch_m[1])
@@ -1378,13 +1375,17 @@ def ray_to_scalar(
     real_np, complex_np = numpy_dtype(real_dtype), numpy_dtype(complex_dtype)
 
     wavenumber = rays.wavenumber
+    # `n k0`: the wavenumber of the ramp, distinct from the vacuum `k0` the optical
+    # path is multiplied by.
+    ramp_wavenumber = wavenumber * medium_index
     positions_xy = rays.positions_m[:, :2].astype(real_np)
     directions_xy = rays.directions[:, :2].astype(real_np)
 
     # The grid must be able to represent the steepest ramp before anything is
     # summed onto it, per axis rather than on the direction norm.
-    limit_y = grid_nyquist_direction_limit(rays.wavelength_m, dy)
-    limit_x = grid_nyquist_direction_limit(rays.wavelength_m, dx)
+    medium_wavelength_m = rays.wavelength_m / medium_index
+    limit_y = grid_nyquist_direction_limit(medium_wavelength_m, dy)
+    limit_x = grid_nyquist_direction_limit(medium_wavelength_m, dx)
     max_du = float(xp.max(xp.abs(directions_xy[:, 0])))
     max_dv = float(xp.max(xp.abs(directions_xy[:, 1])))
     # The corner bins of an enumerated spectrum land *on* the limit and arrive
@@ -1431,7 +1432,7 @@ def ray_to_scalar(
     # Constant per-ray phase: the optical path, minus the ramp evaluated back at
     # the ray's own intersection point, so `dr_i` is measured from there.
     optical_path = optical_path_m.astype(real_np)
-    launch_ramp = xp.sum(directions_xy * positions_xy, axis=1)
+    launch_ramp = medium_index * xp.sum(directions_xy * positions_xy, axis=1)
     constant_phase = optical_path - launch_ramp
     coefficient = launch * weight * _cis(xp, wavenumber * constant_phase, complex_dtype)
 
@@ -1467,7 +1468,7 @@ def ray_to_scalar(
             namespace,
             coefficient=coefficient,
             directions_xy=directions_xy,
-            wavenumber=wavenumber,
+            wavenumber=ramp_wavenumber,
             grid_shape=(ny, nx),
             sample_pitch_m=(dy, dx),
             oversample=kspace_oversample,
@@ -1479,8 +1480,8 @@ def ray_to_scalar(
     else:
         # `exp(i k (d_u x + d_v y))` is separable, so the O(N ny nx) sum contracts
         # from two O(N n) factors instead of materializing an (N, ny, nx) tensor.
-        ramp_y = _cis(xp, wavenumber * xp.outer(directions_xy[:, 1], y), complex_dtype)
-        ramp_x = _cis(xp, wavenumber * xp.outer(directions_xy[:, 0], x), complex_dtype)
+        ramp_y = _cis(xp, ramp_wavenumber * xp.outer(directions_xy[:, 1], y), complex_dtype)
+        ramp_x = _cis(xp, ramp_wavenumber * xp.outer(directions_xy[:, 0], x), complex_dtype)
         u = xp.einsum("n,ny,nx->yx", coefficient, ramp_y, ramp_x, optimize=True, **dot)
 
     if normalization == "one_over_n":
@@ -1503,7 +1504,7 @@ def ray_to_scalar(
     )
 
     spacing, max_phase_step, density_status = _ray_density(
-        positions_xy, directions_xy, wavenumber, xp
+        positions_xy, directions_xy, ramp_wavenumber, xp
     )
     diagnostics = ReconstructionDiagnostics(
         ray_count=rays.count,

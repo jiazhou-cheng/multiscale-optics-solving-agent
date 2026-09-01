@@ -96,12 +96,12 @@ The outgoing rays are a *ray* state again, so `surface_only` no longer binds the
 -- `operators.propagate_rays` will happily advance them, and correctly. What does
 not come back is the curvature the interior reconstruction never had.
 
-Air only, for now
------------------
-R09 found that neither coupler carries the refractive index in its ramp, and both
-now refuse `medium_index != 1`. This composition inherits that refusal from its
-parts rather than restating it, which is the right place for it: when the
-convention is settled, this module needs no change.
+The medium comes from the parts
+-------------------------------
+R09 found that neither coupler carried the refractive index in its ramp, and both
+refused `medium_index != 1` until CHE-192's follow-up put the `n` in. This
+composition inherited the refusal from its parts rather than restating it, and
+inherits the fix the same way: settling the convention needed no change here.
 
 This module imports `couplers` and `operators.transmission`, and no solver and no
 backend. The two couplers inside are the same functions R07 and R08 built -- no
@@ -1426,8 +1426,7 @@ def diffractive_surface(
 
     if model == "generalized_snell":
         # Straight to the reduced-order model: it forms no field, so none of the
-        # steps below apply -- and because it never reaches a coupler, it is the
-        # one model that may run in a medium (R09's ramp refusal does not bind it).
+        # steps below apply.
         outgoing, snell = _generalized_snell(
             rays,
             surface=surface,

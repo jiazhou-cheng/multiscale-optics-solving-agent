@@ -663,78 +663,76 @@ def test_the_optical_path_reference_records_the_advance() -> None:
     assert "n * s" in reference
 
 
-def test_both_couplers_refuse_a_medium_this_tree_cannot_reconstruct_in() -> None:
-    """The mitigation for R09's central finding, executed rather than declared.
+def test_both_couplers_carry_the_medium_index_this_operation_uses() -> None:
+    """R09's central finding, fixed rather than refused (CHE-192).
 
-    `couplers.ray_to_scalar`'s transverse ramp is `k0 d_hat . dr`, the `n = 1` form
-    of `n k0 d_hat . dr`, and `couplers.scalar_to_ray`'s direction cosines are
-    `lambda_vacuum f`, likewise. R09 found that while deriving `propagate_rays`,
-    whose optical path grows by `n s` -- so composing the two through glass would
-    put a medium-aware path against a vacuum ramp, disagreeing by
-    `(n - 1) k0 d_t . dr`, which is unbounded in waves.
+    `couplers.ray_to_scalar`'s transverse ramp was `k0 d_hat . dr`, the `n = 1` form
+    of `n k0 d_hat . dr`, and `couplers.scalar_to_ray`'s direction cosines were
+    `lambda_vacuum f`, likewise. R09 found both while deriving this operation --
+    whose optical path grows by `n s`, so composing them through glass would have
+    put a medium-aware path against a vacuum ramp -- and refused rather than alter a
+    landed convention overnight. The owner took the fix: `n` is in both, a no-op at
+    `n = 1`.
 
-    Neither is fixed here, because putting `n` in the ramp alters a landed
-    convention in two committed tickets. Both **refuse** instead, and this is the
-    test that says so: a silent wrong answer became a message. It is the only
-    behavioural change in this diff that affects callers other than R09's own,
-    which is why it is tested from both sides -- the refusal, and the `n = 1` call
-    that still works.
+    This test is what the refusal became. Both calls it used to reject now return,
+    which is the half a reader of this file needs; the ramp and the cosines are
+    graded against their own analytic oracles in the two couplers' test files.
     """
     from ray_support import a_random_field
 
-    from couplers import ray_to_scalar as reconstruct
     from couplers import scalar_to_ray
 
     in_water = 1.336
 
     rays = a_bundle(medium_index=in_water)
-    with pytest.raises(ContractError) as reconstruction:
-        reconstruct(rays, grid_shape=(8, 8), sample_pitch_m=PITCH_M)
-    assert reconstruction.value.code == "MISSING_DECLARATION"
-    assert reconstruction.value.declaration == "reference_surface.medium_index"
-    assert "n = 1" in str(reconstruction.value)
+    field, reconstruction = ray_to_scalar(rays, grid_shape=(8, 8), sample_pitch_m=PITCH_M)
+    assert field.reference_surface.medium_index == in_water
+    # The Nyquist limit is on the medium wavelength, tightened by exactly `n`.
+    assert reconstruction.grid_nyquist_direction_limit[1] == pytest.approx(
+        WAVELENGTH_M / (in_water * 2.0 * PITCH_M[1])
+    )
 
-    field = a_random_field(shape=(8, 8), sample_pitch_m=PITCH_M)
     submerged = dataclasses.replace(
-        field,
-        reference_surface=ReferenceSurface(
-            name="in water", z_m=0.0, medium_index=in_water
-        ),
+        a_random_field(shape=(8, 8), sample_pitch_m=PITCH_M),
+        reference_surface=ReferenceSurface(name="in water", z_m=0.0, medium_index=in_water),
     )
-    with pytest.raises(ContractError) as decomposition:
-        scalar_to_ray(submerged)
-    assert decomposition.value.code == "MISSING_DECLARATION"
-    assert decomposition.value.declaration == "reference_surface.medium_index"
-
-    # ...and in air both still work, so this is a declaration this tree cannot
-    # honour rather than a ban on a medium.
-    reconstruct(a_bundle(), grid_shape=(8, 8), sample_pitch_m=PITCH_M)
-    scalar_to_ray(field)
+    emitted, _ = scalar_to_ray(submerged)
+    assert emitted.reference_surface.medium_index == in_water
+    assert np.allclose(np.linalg.norm(np.asarray(emitted.directions), axis=1), 1.0)
 
 
-def test_the_advance_itself_accepts_the_medium_the_couplers_refuse() -> None:
-    """The gap, pinned so it cannot be mistaken for a fixed problem.
+def test_the_advance_and_the_reconstruction_compose_in_a_medium() -> None:
+    """The exactness claim of this module, executed at `n != 1` rather than argued.
 
-    `propagate_rays` is correct for any `n` and says so; the reconstruction is not.
-    So a bundle advanced through water has a correct optical path and no
-    reconstruction in this tree will read it. The failure direction is right --
-    refusal, not a plausible wrong field -- and pinning it here means the day the
-    ramp convention is settled, this test is what has to change.
+    The derivation in `operators/ray_propagation.py` writes the coupler's constant
+    phase as `k0 (OPL - n d_t . x0_t)` and gets `C2 = C1 + n s d_z^2` after the
+    advance, so reconstructing at the new plane must equal reconstructing at the old
+    one times `exp(i n k0 d_z dz)` -- exactly what a plane wave of wavevector
+    `n k0 d_hat` accumulates over an axial offset `dz`. One ray, so the factor is
+    uniform across the grid and can be read off rather than fitted.
+
+    This is the composition R09 could not run. Both `n`s are load-bearing: the one
+    on the optical path here and the one on the ramp in the coupler, and the vacuum
+    phase is asserted *not* to be the answer.
     """
-    from couplers import ray_to_scalar as reconstruct
-
     in_water = 1.336
-    rays = a_bundle(medium_index=in_water)
+    offset_m = 4.0e-3
+    rays = a_bundle(thetas=(0.15,), medium_index=in_water)
+    axial = float(np.asarray(rays.directions)[0, 2])
+
+    before, _ = ray_to_scalar(rays, grid_shape=SHAPE, sample_pitch_m=PITCH_M)
     advanced = propagate_rays(
-        rays, to=a_surface("end", z_m=4e-3, medium_index=in_water)
+        rays, to=a_surface("end", z_m=offset_m, medium_index=in_water)
     )
-    assert np.allclose(
-        np.asarray(advanced.optical_path_m),
-        in_water * arc_lengths(rays, 4e-3),
-        rtol=1e-12,
-    )
-    with pytest.raises(ContractError):
-        reconstruct(advanced, grid_shape=(8, 8), sample_pitch_m=PITCH_M)
+    after, _ = ray_to_scalar(advanced, grid_shape=SHAPE, sample_pitch_m=PITCH_M)
+
+    ratio = np.asarray(after.u) / np.asarray(before.u)
+    expected = np.exp(1j * in_water * rays.wavenumber * axial * offset_m)
+    assert np.allclose(ratio, expected, rtol=0.0, atol=1e-8)
+    # The vacuum phase is 1.4e4 rad away from it, so this is not a factor the test
+    # would have accepted either way.
+    vacuum = np.exp(1j * rays.wavenumber * axial * offset_m)
+    assert not np.allclose(ratio, vacuum, rtol=0.0, atol=1e-3)
 
 
 # ---------------------------------------------------------------------------

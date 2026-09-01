@@ -124,6 +124,103 @@ def test_the_asm_convention_reproduces_a_whole_random_field() -> None:
     assert diagnostics.normalization == "one_over_n"
 
 
+@pytest.mark.parametrize("medium_index", [1.0, 1.336, 1.5168])
+def test_the_transverse_ramp_carries_the_medium_index(medium_index: float) -> None:
+    """The `n` R09 found missing (CHE-192): the ramp is `n k0 d_hat . dr`, not `k0 d_hat . dr`.
+
+    In a medium of index `n` a plane wave is `exp(i n k0 s_hat . r)`, so the same
+    collimated ensemble -- whose optical path is `n` times the geometric one, because
+    an optical path always is -- must reconstruct to `N dA exp(i n k0 d_hat . r)`.
+    Checked at three indices including air, so the `n = 1` case cannot be the only
+    one that passes, and every number this tree measured in air is unchanged.
+    """
+    theta = 0.35
+    rays, d_hat, area = collimated_bundle(
+        shape=SHAPE,
+        sample_pitch_m=PITCH_M,
+        direction=(math.sin(theta), 0.0, math.cos(theta)),
+        medium_index=medium_index,
+    )
+    field, diagnostics = reconstruct(rays)
+
+    y, x = field.coordinates()
+    grid_y, grid_x = np.meshgrid(y, x, indexing="ij")
+    ramp = medium_index * rays.wavenumber * (d_hat[0] * grid_x + d_hat[1] * grid_y)
+    oracle = rays.count * area * np.exp(1j * ramp)
+    assert peak_relative_residual(field.u, oracle) < 1e-13
+
+    # The Nyquist limit is on the *medium* wavelength: the ramp on the grid has
+    # spatial frequency `n d_t / lambda_0`, so a medium tightens it by exactly `n`.
+    assert diagnostics.grid_nyquist_direction_limit == (
+        pytest.approx(grid_nyquist_direction_limit(WAVELENGTH_M / medium_index, PITCH_M[0])),
+        pytest.approx(grid_nyquist_direction_limit(WAVELENGTH_M / medium_index, PITCH_M[1])),
+    )
+
+
+def test_the_vacuum_ramp_is_the_negative_control_for_the_medium_one() -> None:
+    """The half that makes the test above mean something: at `n != 1` they differ.
+
+    A kernel that ignored `medium_index` would reconstruct `exp(i k0 d_hat . r)`
+    against an optical path that already grew by `n`, and the two disagree by
+    `(n - 1) k0 d_t . dr` -- unbounded in waves, and here **1.7 of peak amplitude**
+    over a 10 um window at `n = 1.336`. Not a tolerance question, which is why R09
+    refused rather than let it compute.
+    """
+    theta = 0.35
+    medium_index = 1.336
+    rays, d_hat, area = collimated_bundle(
+        shape=SHAPE,
+        sample_pitch_m=PITCH_M,
+        direction=(math.sin(theta), 0.0, math.cos(theta)),
+        medium_index=medium_index,
+    )
+    field, _ = reconstruct(rays)
+
+    y, x = field.coordinates()
+    grid_y, grid_x = np.meshgrid(y, x, indexing="ij")
+    vacuum = rays.count * area * np.exp(
+        1j * rays.wavenumber * (d_hat[0] * grid_x + d_hat[1] * grid_y)
+    )
+    assert peak_relative_residual(field.u, vacuum) > 1.0
+
+
+def test_the_medium_ramp_agrees_with_the_plane_wave_source() -> None:
+    """Corroboration from a module that was already `n`-aware, and is not this one.
+
+    `sources.plane_wave` states illumination as the transverse wavevector `k_t` and
+    refuses `|k_t| > n k0`, so its `k_t` is the **medium** wavevector -- which is what
+    told R09 the missing `n` was real rather than a bookkeeping choice. Building the
+    source at `k_t = n k0 d_t` and the bundle at the same `d_hat` must give the same
+    ramp, so the two conventions are checked against each other rather than each
+    against itself.
+    """
+    from sources import plane_wave
+
+    theta = 0.35
+    medium_index = 1.336
+    surface = ReferenceSurface(name="in water", z_m=0.0, medium_index=medium_index)
+    rays, d_hat, area = collimated_bundle(
+        shape=SHAPE,
+        sample_pitch_m=PITCH_M,
+        direction=(math.sin(theta), 0.0, math.cos(theta)),
+        medium_index=medium_index,
+    )
+    field, _ = reconstruct(rays)
+
+    transverse = medium_index * rays.wavenumber * np.asarray([d_hat[1], d_hat[0]])
+    source = plane_wave(
+        SHAPE,
+        sample_pitch_m=PITCH_M,
+        wavelength_m=WAVELENGTH_M,
+        reference_surface=surface,
+        transverse_wavevector_rad_per_m=(float(transverse[0]), float(transverse[1])),
+    )
+    # complex64 from the source, so the tolerance is float32's on a phase of ~30 rad.
+    assert peak_relative_residual(
+        np.asarray(field.u) / (rays.count * area), np.asarray(source.u)
+    ) < 1e-5
+
+
 def test_the_sensor_obliquity_convention_is_a_different_operator() -> None:
     """Criterion 3, checklist item 3: main-text eq 2 and SI eq S5 are not one operator.
 
@@ -447,8 +544,10 @@ def test_the_wavelet_sum_registers_as_a_coupler(isolated_registry: None) -> None
                 "the SI field and every reported power is relative"
             ),
             validity=(
-                "the output grid must represent the steepest ramp, |d_t| <= lambda / "
-                "(2 * pitch) per axis; beyond it the reconstruction is refused",
+                "the output grid must represent the steepest ramp, |d_t| <= lambda_0 / "
+                "(2 n pitch) per axis; beyond it the reconstruction is refused",
+                "the transverse ramp and the launch-ramp subtraction carry the surface's "
+                "medium index; the optical path is already an optical one",
                 "the bundle must declare its integration measure; 'undeclared' is refused",
                 "fully coherent, scalar, monochromatic",
             ),

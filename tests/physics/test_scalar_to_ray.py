@@ -146,6 +146,60 @@ def test_the_round_trip_holds_for_the_k_space_route_too() -> None:
     assert peak_relative_residual(reconstructed.u, propagating_only(field)) < 1e-13
 
 
+def test_the_direction_cosines_are_the_medium_ones() -> None:
+    """The `n` R09 found missing (CHE-192): `d = lambda_0 f / n`, not `lambda_0 f`.
+
+    The transverse direction cosine of a mode at spatial frequency `f` carries the
+    index, and so does the evanescent circle -- a mode propagates when
+    `|k_t| < n k0`, the same cut `sources.plane_wave` already refuses past. The
+    corner bin of this grid is the sharpest place to read it: at `n = 1` its radial
+    cosine is 1.09 and it is evanescent, and in water it is 0.78 and it is a ray.
+    """
+    field = a_random_field(shape=SHAPE, sample_pitch_m=PITCH_M)
+    submerged = dataclasses.replace(
+        field, reference_surface=a_surface("in water", medium_index=1.336)
+    )
+
+    rays, sampling = scalar_to_ray(submerged)
+    directions = np.asarray(rays.directions)
+    edge_u = PITCH_M[1] ** -1 / 2.0 * field.wavelength_m / 1.336
+    edge_v = PITCH_M[0] ** -1 / 2.0 * field.wavelength_m / 1.336
+
+    assert np.max(np.abs(directions[:, 0])) == pytest.approx(edge_u, rel=1e-12)
+    assert np.max(np.abs(directions[:, 1])) == pytest.approx(edge_v, rel=1e-12)
+    # Still unit vectors: the `n` is on the wavenumber, never on the direction,
+    # which is what `RayBundle.directions` is contractually declared to hold.
+    assert np.allclose(np.linalg.norm(directions, axis=1), 1.0, atol=1e-12)
+    # And in air the same grid loses its four corners plus the (12, 0) edge bin.
+    assert sampling.evanescent_mode_count == 0
+    assert scalar_to_ray(field)[1].evanescent_mode_count == 5
+
+
+def test_the_round_trip_holds_in_a_medium() -> None:
+    """The pair composes at `n != 1`, and a medium *widens* what is representable.
+
+    Both halves carry the index now -- cosines `lambda_0 f / n` here, ramp
+    `n k0 d_hat . dr` in `ray_to_scalar` -- so the product `n k0 d_t = 2 pi f` is
+    the same transverse wavevector on both sides and the round trip stays exact.
+    What changes is the mode set: in water no bin of this grid is evanescent, so
+    the round trip returns the **source field itself** rather than its propagating
+    part, which the `5.3e-2` residual in air cannot do.
+    """
+    field = a_random_field(shape=SHAPE, sample_pitch_m=PITCH_M)
+    submerged = dataclasses.replace(
+        field, reference_surface=a_surface("in water", medium_index=1.336)
+    )
+
+    reconstructed, sampling, _ = round_trip(submerged)
+
+    assert sampling.propagating_modes == SHAPE[0] * SHAPE[1]
+    assert peak_relative_residual(reconstructed.u, propagating_only(submerged)) < 1e-13
+    assert peak_relative_residual(reconstructed.u, submerged.u) < 1e-13
+    # ...and the reconstruction is on the surface it was decomposed from, so the
+    # medium is carried rather than dropped somewhere in the middle.
+    assert reconstructed.reference_surface.medium_index == 1.336
+
+
 @pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
 def test_the_round_trip_computes_at_the_fields_own_precision(dtype) -> None:
     """A complex64 field decomposes in FP32 and comes back complex64, at FP32 accuracy.
@@ -665,6 +719,8 @@ def test_the_decomposition_registers_as_a_coupler(isolated_registry: None) -> No
             ),
             validity=(
                 "scalar, monochromatic, fully coherent",
+                "the direction cosines are lambda_0 f / n and the evanescent cut is "
+                "|k_t| < n k0, both on the surface's declared medium index",
                 "the field's grid fixes the mode set; a mode finer than the pitch is not "
                 "represented",
                 "exhaustive enumeration is exact only under the uniform density",

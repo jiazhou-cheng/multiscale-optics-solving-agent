@@ -474,11 +474,14 @@ def test_an_unknown_model_is_refused() -> None:
     assert raised.value.declaration == "model"
 
 
-def test_the_medium_index_refusal_is_inherited_rather_than_restated() -> None:
-    """R09's finding reaches here through the parts, which is the right place for it.
+def test_the_medium_index_is_inherited_from_the_parts_rather_than_restated() -> None:
+    """R09's finding reached here through the parts, and so does its fix (CHE-192).
 
-    When the ramp convention is settled this module needs no change, and that is
-    the property being pinned: the refusal is not duplicated in the composition.
+    Both couplers refused `medium_index != 1` while the ramp convention was open,
+    and this composition inherited the refusal rather than restating it. The owner
+    then put `n` into the ramp and into the direction cosines, and this module needed
+    no change -- which is the property being pinned. A grating in water now runs, and
+    its outgoing rays are still declared in water.
     """
     surface, _ = a_binary_phase_grating(period_px=8)
     rays, _, _ = an_incident_bundle()
@@ -491,13 +494,12 @@ def test_the_medium_index_refusal_is_inherited_rather_than_restated() -> None:
         sample_pitch_m=surface.sample_pitch_m,
         reference_surface=submerged.reference_surface,
     )
-    with pytest.raises(ContractError) as raised:
-        diffractive_surface(submerged, surface=in_water)
-    assert raised.value.declaration == "reference_surface.medium_index"
-    # The refusal is not restated here: no `ContractError` in this module names the
-    # medium index, so when the ramp convention is settled this module needs no
-    # change. (The module *docstring* mentions it, which is why this walks the
-    # raise sites rather than the source text.)
+    outgoing, record = diffractive_surface(submerged, surface=in_water)
+    assert outgoing.reference_surface.medium_index == 1.336
+    assert record["model"] == "full_field"
+
+    # No `ContractError` in this module names the medium index -- the convention
+    # lives in the couplers, which is why settling it needed no change here.
     raises = [
         node
         for node in ast.walk(ast.parse(MODULE.read_text(encoding="utf-8")))
