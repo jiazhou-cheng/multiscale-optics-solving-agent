@@ -262,7 +262,9 @@ def test_the_two_couplers_inside_are_the_functions_r07_and_r08_built() -> None:
     assert module.complex_transmission is complex_transmission
 
     # ...and the module defines no function that looks like a second kernel. The
-    # patch route's helpers (R10.3) window and pad; none of them reconstructs or
+    # patch route's helpers (R10.3) window and pad; the reduced-order route's
+    # (R10.4) estimate a local gradient and evaluate three validity predicates,
+    # and `_generalized_snell` forms no field at all. None of them reconstructs or
     # decomposes, which is what the enumeration is guarding.
     defined = {
         node.name
@@ -279,6 +281,12 @@ def test_the_two_couplers_inside_are_the_functions_r07_and_r08_built() -> None:
         "multiples",
         "_windowed_patch",
         "_decompose_by_patch",
+        "propagating_order_margin",
+        "local_gradient_smoothness_margin",
+        "single_order_dominance",
+        "_local_phase_gradient",
+        "step",
+        "_generalized_snell",
     }
 
 
@@ -449,14 +457,19 @@ def test_an_unusable_surface_is_refused(kwargs: dict, code: str) -> None:
 
 
 def test_an_unknown_model_is_refused() -> None:
-    """Named, never inferred. Two members: R10.2's and R10.3's."""
+    """Named, never inferred. Three members now: R10.1's, R10.3's and R10.4's.
+
+    Each arrived with the ticket that implemented it, so the vocabulary has never
+    named a model nothing computes -- this assertion is what kept that true, and it
+    is why `generalized_snell` was the *refused* value here until R10.4 landed it.
+    """
     from operators import DIFFRACTIVE_MODELS
 
-    assert DIFFRACTIVE_MODELS == ("full_field", "local_patch")
+    assert DIFFRACTIVE_MODELS == ("full_field", "local_patch", "generalized_snell")
     surface, _ = a_binary_phase_grating(period_px=8)
     rays, _, _ = an_incident_bundle()
     with pytest.raises(ContractError) as raised:
-        diffractive_surface(rays, surface=surface, model="generalized_snell")  # type: ignore[arg-type]
+        diffractive_surface(rays, surface=surface, model="rigorous_coupled_wave")  # type: ignore[arg-type]
     assert raised.value.code == "MISSING_DECLARATION"
     assert raised.value.declaration == "model"
 
