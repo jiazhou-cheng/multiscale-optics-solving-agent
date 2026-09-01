@@ -261,13 +261,25 @@ def test_the_two_couplers_inside_are_the_functions_r07_and_r08_built() -> None:
     assert module.scalar_to_ray is scalar_to_ray
     assert module.complex_transmission is complex_transmission
 
-    # ...and the module defines no function that looks like a second kernel.
+    # ...and the module defines no function that looks like a second kernel. The
+    # patch route's helpers (R10.3) window and pad; none of them reconstructs or
+    # decomposes, which is what the enumeration is guarding.
     defined = {
         node.name
         for node in ast.walk(ast.parse(MODULE.read_text(encoding="utf-8")))
         if isinstance(node, ast.FunctionDef)
     }
-    assert defined == {"__post_init__", "from_phase", "grid_shape", "diffractive_surface"}
+    assert defined == {
+        "__post_init__",
+        "from_phase",
+        "grid_shape",
+        "diffractive_surface",
+        "resolve_pad_px",
+        "_patch_centres",
+        "multiples",
+        "_windowed_patch",
+        "_decompose_by_patch",
+    }
 
 
 def test_the_package_attribute_is_the_function_and_not_the_module() -> None:
@@ -437,14 +449,14 @@ def test_an_unusable_surface_is_refused(kwargs: dict, code: str) -> None:
 
 
 def test_an_unknown_model_is_refused() -> None:
-    """Named, never inferred. One member today, and that is the honest count."""
+    """Named, never inferred. Two members: R10.2's and R10.3's."""
     from operators import DIFFRACTIVE_MODELS
 
-    assert DIFFRACTIVE_MODELS == ("full_field",)
+    assert DIFFRACTIVE_MODELS == ("full_field", "local_patch")
     surface, _ = a_binary_phase_grating(period_px=8)
     rays, _, _ = an_incident_bundle()
     with pytest.raises(ContractError) as raised:
-        diffractive_surface(rays, surface=surface, model="local_patch")  # type: ignore[arg-type]
+        diffractive_surface(rays, surface=surface, model="generalized_snell")  # type: ignore[arg-type]
     assert raised.value.code == "MISSING_DECLARATION"
     assert raised.value.declaration == "model"
 
@@ -582,8 +594,16 @@ def test_no_composite_operator_framework_landed() -> None:
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.FunctionDef | ast.ClassDef)
     }
-    for framework in ("pipeline", "stage", "compose", "Composite", "register", "chain"):
-        assert not any(framework.lower() in name.lower() for name in defined), framework
+    # Token matching, not substring: `_decompose_by_patch` (R10.3) contains
+    # "compose" and is a windowing helper, not a framework. A framework function
+    # would be *called* `compose_...` or `..._pipeline`, so the token is the check.
+    tokens = {
+        token
+        for name in defined
+        for token in name.lower().strip("_").split("_")
+    }
+    for framework in ("pipeline", "stage", "compose", "composite", "register", "chain"):
+        assert framework not in tokens, framework
     assert "There is one." in source
 
 
