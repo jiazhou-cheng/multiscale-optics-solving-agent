@@ -1,12 +1,21 @@
 """`RayBundle -> ScalarField`: the wavelet sum, and the conventions it stands on.
 
-CHE-185 (R07.1). One public function, one `StrEnum` and one diagnostics record:
+CHE-185 (R07.1) and CHE-186 (R07.2). One public function, two `StrEnum`s and one
+diagnostics record:
 
 ```python
 couplers.ray_to_scalar(rays, *, grid_shape, sample_pitch_m, surface=None,
-                       projection=Projection.ASM_CONSISTENT)
+                       projection=Projection.ASM_CONSISTENT,
+                       reconstruction=Reconstruction.DIRECT,
+                       kspace_oversample=1.5, kspace_grid_shape=None)
     -> tuple[ScalarField, ReconstructionDiagnostics]
 ```
+
+The route is an **argument**, not a second operation. Both realizations compute the
+same sum with the same semantic port pair, so a second public name, a second
+descriptor or a module-level route registry would put two answers behind one
+question. See `Reconstruction` for what the two actually differ by, which is a
+discretization one of them has and the other does not.
 
 The operator is
 
@@ -118,6 +127,61 @@ residual sits at 1e-3, so `|U|^2` will not warn a consumer who propagates it.
 The remedy is not a correction term. Advance the **ray** state to the new surface
 and reconstruct there -- exact, not an approximation.
 
+The declared error budget between the two routes
+-----------------------------------------------
+`Reconstruction.DIRECT` evaluates each ray's ramp at its exact direction, so it
+is exact per ray and is the oracle. `Reconstruction.KSPACE` bins each ray's
+transverse wavevector bilinearly onto a k-grid and inverse-transforms once,
+which removes the `O(N_rays x N_pixels)` cost and adds a discretization the
+direct route does not have.
+
+Measured speedup, with the configuration, because a performance claim without one
+is not a performance claim: **61x** for 60 000 rays onto a 256x256 grid, 1.275 s
+to 0.021 s, NumPy on the host in the pinned CPU container. The ratio is the point
+rather than the seconds -- direct cost is `O(N_rays x ny x nx)` and k-space cost
+is `O(N_rays + K log K)`, so it grows with the pixel count.
+
+The budget:
+
+* **On-node they agree to dtype round-off.** When every ray's `(k_x, k_y)` lands
+  on a k-grid node the bilinear weights collapse to `(1, 0)` and the two routes
+  are the same arithmetic. Measured 1.6e-15 of peak on an enumerated 16x16
+  spectrum with `kspace_grid_shape` equal to the grid the modes were enumerated
+  on -- and, for the same reason, at every integer oversampling of it.
+* **Off-node the disagreement is the interpolation's, and it is not small.**
+  Measured on 2 000 random directions in a 0.15 rad cone onto a 64x64 grid, as a
+  fraction of peak amplitude against the direct route:
+
+  | oversample | 1.0 | 1.5 | 2 | 4 | 8 | 16 | 32 |
+  | -- | -- | -- | -- | -- | -- | -- | -- |
+  | vs direct | 7.5e-1 | 4.0e-1 | 2.8e-1 | 7.3e-2 | 1.8e-2 | 4.9e-3 | 1.2e-3 |
+
+  It falls as `oversample^-2`, which is bilinear interpolation's own rate and is
+  what identifies the disagreement as the interpolation rather than as a defect.
+  **At the default 1.5x the routes are not interchangeable**: 40 % of peak is not
+  a tolerance, it is a different answer, and the caller either owns an
+  enumeration and names `kspace_grid_shape`, or oversamples until the budget
+  above is small enough for what it is doing.
+
+The two routes also differ at the **top** band edge. A ray's fractional k-index is
+`d_u K dx / lambda + K // 2`, so the representable band is asymmetric for even
+`K` -- `[-lambda / (2 dx), lambda / (2 dx) (1 - 2 / K)]`, one bin short of the
+output grid's Nyquist limit on the positive side, at any oversampling -- and
+symmetric at `+- lambda / (2 dx) (1 - 1 / K)` for odd `K`, which the `n // 2`
+origin rule makes the natural consequence rather than a special case. Either way a
+mode sitting exactly on `+lambda / (2 dx)` is evaluated by the direct route and
+**dropped, and counted in both rays and launch power, and reported** by the
+k-space one. That is the declared rule for a mode the k-grid cannot hold: never
+folded into the wrong bin, and never silently discarded either.
+
+The trap in that first bullet is that exactness is a statement about *two* grids.
+The enumerated modes of a padded patch land on nodes only if the k-grid period is
+also the pad period; reconstructing them on a differently sized output grid at
+some oversampling factor puts every mode off-node and converts an exactness
+measurement into an interpolation error, with neither route at fault. **A caller
+that owns an enumeration passes `kspace_grid_shape` outright** rather than relying
+on `kspace_oversample`.
+
 Grid Nyquist is a refusal, not a warning
 -----------------------------------------
 A wavelet with transverse direction cosine `d_t` writes a ramp of spatial
@@ -143,6 +207,7 @@ here for native names.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any, Literal
@@ -151,6 +216,7 @@ import numpy as np
 
 from numerics import (
     PHASE_ACCUMULATION_FLOOR,
+    ArrayNamespace,
     ArrayState,
     DType,
     Precision,
@@ -170,9 +236,11 @@ from representations import (
 )
 
 __all__ = [
+    "DEFAULT_KSPACE_OVERSAMPLE",
     "SCALE_NOTE",
     "Normalization",
     "Projection",
+    "Reconstruction",
     "ReconstructionDiagnostics",
     "grid_nyquist_direction_limit",
     "ray_to_scalar",
@@ -196,6 +264,79 @@ class Projection(StrEnum):
     #: Main-text eq 2. Applies `<n_hat, d_hat>`. Models an angle-dependent
     #: detector response -- a sensor, not a field.
     SENSOR_OBLIQUITY = "sensor_obliquity"
+
+
+class Reconstruction(StrEnum):
+    """How the ramp sum is evaluated. The same operator, two numerical realizations.
+
+    A plane wavelet *is* a delta in k-space, so the sum can be evaluated either
+    directly in real space or as a scatter onto a k-grid followed by one inverse
+    FFT. Which one a caller wants depends on what it is for, and the two are not
+    interchangeable -- see the module docstring's error budget.
+    """
+
+    #: Direct real-space evaluation at each ray's exact direction. Cost
+    #: `O(N_rays x ny x nx)`, contracted from two `O(N n)` factors because the
+    #: ramp is separable. **Exact per ray**, so this is the oracle every
+    #: analytic gate in `tests/physics/test_ray_to_scalar.py` is measured
+    #: through, and it stays the default.
+    DIRECT = "direct"
+
+    #: Bilinear scatter onto a k-grid plus one inverse FFT. Cost
+    #: `O(N_rays + K log K)` -- per-ray cost stops scaling with pixel count,
+    #: which is the whole point. The price is that each ray's direction is
+    #: quantized onto the k-grid.
+    KSPACE = "kspace"
+
+
+#: Oversampling of the k-grid relative to the output grid when
+#: `kspace_grid_shape` is not given. The reference implementation's value, kept
+#: rather than raised: it is *characterized* against measured off-node error
+#: (`tests/physics/test_ray_to_scalar_kspace.py`) rather than tuned to hit a
+#: target, and raising it would hide the interpolation instead of reporting it.
+DEFAULT_KSPACE_OVERSAMPLE = 1.5
+
+#: Floor on how close to a k-grid node a ray must fall to count as on it, in bins.
+#:
+#: Measured as the distance to the *nearest* node, not the floor's fractional
+#: part. A mode whose fractional index rounds to `4.999999999999999` sits on a
+#: node and is reconstructed exactly, but its floor fraction is `1 - 1e-15`;
+#: measuring the floor would report it as off-node and make the diagnostic depend
+#: on whether the k-grid period happens to be a power of two.
+#:
+#: A floor rather than the value, because `_bin_tolerance` widens it for the dtype:
+#: a fractional index has magnitude up to `K`, so its representation error is
+#: `K * eps` bins, and at the FP32 floor a genuinely on-node bundle would
+#: otherwise report `on_node_fraction = 0`.
+_ON_NODE_BINS = 1.0e-9
+
+#: How far outside the k-grid band a ray may fall and still be kept, in bins.
+#:
+#: The edge bins land *on* the boundary and arrive there through floating point:
+#: a mode at index `-K//2` computes its fractional index as `0 - 1e-14`, and a
+#: bare `>= 0` test discards it. The reference implementation measured that on an
+#: enumerated patch it silently dropped 397 of 39 601 rays -- exactly the
+#: outermost row and column -- and turned a 7.1e-13 exactness anchor into 8.5e-2.
+#: A ray outside the band by a millionth of a bin is not distinguishable from one
+#: on the edge, so it is kept and clipped; a ray genuinely outside is still
+#: dropped, and still counted.
+#:
+#: Also a floor, widened for the dtype by `_bin_tolerance`. The frozen float64
+#: value is unchanged by that widening (`64 * eps * K` is 3e-11 bins at `K = 2048`),
+#: which is the point of keeping it as the floor rather than replacing it.
+_KSPACE_EDGE_BINS = 1.0e-6
+
+
+def _bin_tolerance(floor: float, *, bins: int, real_dtype: DType) -> float:
+    """`floor`, widened to the representation error of a fractional index this large.
+
+    A fractional k-index runs to `K`, so it carries about `K * eps` bins of
+    round-off before anything is compared. `64 * eps` is the same allowance
+    `representations.direction_norm_tolerance` derives for a unit vector, scaled
+    by the magnitude actually being represented -- the module's one rule for this,
+    applied to a bin index instead of a length.
+    """
+    return max(floor, 64.0 * float(np.finfo(numpy_dtype(real_dtype)).eps) * bins)
 
 
 #: Whether the sum carries the `1/N` of a Monte-Carlo estimator.
@@ -297,8 +438,19 @@ class ReconstructionDiagnostics:
     input_state: dict[str, str]
     output_state: dict[str, str]
 
+    #: Which of the two numerical realizations produced the field, so a
+    #: downstream consumer can tell without being told.
+    reconstruction: str
+
     reconstructed_discrete_power: float
     scale: str = SCALE_NOTE
+
+    #: The k-grid, the splatted and dropped ray counts and the on-node fraction --
+    #: or `None` on the direct route, which has no k-grid and drops nothing.
+    #: Rays that cannot be represented on the k-grid are counted and reported,
+    #: never silently dropped: a reconstruction missing 30 % of its rays and one
+    #: missing none must not produce the same record.
+    kspace: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """A JSON-shaped mapping. `asdict` is enough because every field is plain."""
@@ -516,6 +668,204 @@ def _ray_density(positions_xy: Any, directions_xy: Any, wavenumber: float, xp: A
     )
 
 
+def _scatter_add(
+    xp: Any, namespace: ArrayNamespace, size: int, indices: Any, values: Any, dtype: Any
+) -> Any:
+    """`out[indices] += values` on a flat array of length `size`.
+
+    Scatter-add is outside the array-API surface `xp` otherwise provides, so this
+    is the one operation in the module that has to name its namespace -- the same
+    concession `numerics.matmul_precision_kwargs` makes, for the same reason.
+
+    Both branches accumulate **in `dtype`**, not in a wider one. Worth stating
+    because `np.bincount` would be faster on the host and would accumulate in
+    float64 regardless of what it was handed, which would make the NumPy path
+    quietly more accurate than the JAX path and turn a namespace disagreement into
+    a mystery.
+    """
+    if namespace is ArrayNamespace.JAX:
+        return xp.zeros(size, dtype=dtype).at[indices].add(values)
+    out = np.zeros(size, dtype=dtype)
+    np.add.at(out, indices, values)
+    return out
+
+
+def _reconstruct_kspace(
+    xp: Any,
+    namespace: ArrayNamespace,
+    *,
+    coefficient: Any,
+    directions_xy: Any,
+    wavenumber: float,
+    grid_shape: tuple[int, int],
+    sample_pitch_m: tuple[float, float],
+    oversample: float,
+    explicit_shape: tuple[int, int] | None,
+    origin_index: Callable[[int], int],
+    real_dtype: DType,
+    complex_dtype: DType,
+) -> tuple[Any, dict[str, Any]]:
+    """Evaluate the wavelet sum as one k-space scatter plus one inverse FFT.
+
+    Each ray is a plane wavelet, so in k-space it is a delta at
+    `(k_x, k_y) = k (d_u, d_v)` weighted by the same `coefficient` the direct
+    route uses. Depositing those deltas bilinearly on the grid whose period is
+    `(K_y dy, K_x dx)` and inverse-transforming gives
+
+        u[y, x] = sum_p Chat[p] exp(i (k_x_p x + k_y_p y))
+
+    which is the ramp sum with each ray's direction snapped, by interpolation,
+    onto the k-grid.
+
+    Two departures from the reference implementation's upstream source, both
+    deliberate and both kept:
+
+    1. **The crop offset is `origin(K) - origin(n)`, not `(K - n) // 2`.** They
+       agree whenever `K` and `n` share parity and differ by one sample otherwise,
+       which would put the reconstructed origin one pixel off the coordinate origin
+       this repository pins -- a half-pixel tilt, not a visible failure.
+       `origin_index` is `Frame.origin_index`, passed in rather than written out, so
+       this route and the field it produces cannot adopt different centrings.
+    2. **A ray at the top k-bin is kept, not dropped.** Requiring a full
+       four-neighbour footprint discards it; here the upper neighbour index is
+       clamped instead, and at `i == K - 1` the interpolation weight on that
+       neighbour is identically zero, so clamping adds nothing and keeps a ray the
+       direct route would have used.
+
+    The upstream aperture crop -- dropping rays that land outside the grid extent
+    before accumulation -- is **not** ported. A wavelet contributes a ramp across
+    the whole surface, so where it happens to cross does not bound where it
+    contributes; that crop is a sensor model, the direct route has none, and
+    porting it would make the two routes disagree for a reason unrelated to the
+    algorithm.
+    """
+    ny, nx = grid_shape
+    dy, dx = sample_pitch_m
+    if explicit_shape is not None:
+        ky_n, kx_n = int(explicit_shape[0]), int(explicit_shape[1])
+    else:
+        ky_n, kx_n = math.ceil(ny * oversample), math.ceil(nx * oversample)
+    if ky_n < ny or kx_n < nx:
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"the k-grid ({ky_n}, {kx_n}) is smaller than the output grid ({ny}, {nx}), so "
+            "the field cannot be cropped out of it",
+            declaration="kspace_grid_shape",
+            remedy=(
+                "Pass kspace_oversample >= 1.0, or a kspace_grid_shape at least as large "
+                "as the output shape on each axis."
+            ),
+        )
+
+    real_np, complex_np = numpy_dtype(real_dtype), numpy_dtype(complex_dtype)
+    count = int(directions_xy.shape[0])
+
+    # Fractional, fftshifted grid index of each ray's transverse wavevector. `dk`
+    # is set by the *k-grid* period, which is why oversampling changes which rays
+    # land on a node and which do not.
+    delta_ky = 2.0 * math.pi / (ky_n * dy)
+    delta_kx = 2.0 * math.pi / (kx_n * dx)
+    fractional_y = (wavenumber * directions_xy[:, 1]) / delta_ky + origin_index(ky_n)
+    fractional_x = (wavenumber * directions_xy[:, 0]) / delta_kx + origin_index(kx_n)
+
+    # Unrepresentable rays are **zero-weighted, not removed**. Compacting with a
+    # boolean index produces a data-dependent shape, which under JAX means a host
+    # synchronization plus a gather in the middle of the pipeline; the reference
+    # implementation measured that serialization making the fast path slower than
+    # the one it replaces. Keeping every shape static is what puts the asymptotics
+    # in the wall clock.
+    edge = _bin_tolerance(_KSPACE_EDGE_BINS, bins=max(ky_n, kx_n), real_dtype=real_dtype)
+    representable = (
+        (fractional_y >= -edge)
+        & (fractional_y <= ky_n - 1 + edge)
+        & (fractional_x >= -edge)
+        & (fractional_x <= kx_n - 1 + edge)
+    )
+    fractional_y = xp.clip(fractional_y, 0.0, float(ky_n - 1))
+    fractional_x = xp.clip(fractional_x, 0.0, float(kx_n - 1))
+    weights = coefficient * representable.astype(complex_np)
+
+    # int32, deliberately. These index a flat array of ky_n * kx_n elements, so
+    # int32 covers any k-grid that can be allocated at all, and asking for int64
+    # under JAX without x64 is silently truncated to int32 anyway.
+    lower_y = xp.floor(fractional_y).astype(np.int32)
+    lower_x = xp.floor(fractional_x).astype(np.int32)
+    frac_y = (fractional_y - lower_y.astype(real_np)).astype(real_np)
+    frac_x = (fractional_x - lower_x.astype(real_np)).astype(real_np)
+    upper_y = xp.minimum(lower_y + 1, ky_n - 1)
+    upper_x = xp.minimum(lower_x + 1, kx_n - 1)
+
+    # One allocation and one scatter for all four corners rather than four of
+    # each: the fused form is the difference between one transient corner array
+    # per chunk and four.
+    indices = xp.concatenate(
+        [
+            lower_y * kx_n + lower_x,
+            lower_y * kx_n + upper_x,
+            upper_y * kx_n + lower_x,
+            upper_y * kx_n + upper_x,
+        ]
+    )
+    corner_weights = xp.concatenate(
+        [
+            (1.0 - frac_y) * (1.0 - frac_x),
+            (1.0 - frac_y) * frac_x,
+            frac_y * (1.0 - frac_x),
+            frac_y * frac_x,
+        ]
+    ).astype(complex_np)
+    flat = _scatter_add(
+        xp,
+        namespace,
+        ky_n * kx_n,
+        indices,
+        xp.concatenate([weights, weights, weights, weights]) * corner_weights,
+        complex_np,
+    )
+
+    # `ifft2` carries `1 / (K_y K_x)`; the sum being evaluated does not. That
+    # factor belongs to the transform and is unrelated to the estimator's
+    # `1 / N_rays`, which the caller applies once afterwards.
+    padded = xp.fft.fftshift(xp.fft.ifft2(xp.fft.ifftshift(flat.reshape(ky_n, kx_n)))) * (
+        ky_n * kx_n
+    )
+    start_y = origin_index(ky_n) - origin_index(ny)
+    start_x = origin_index(kx_n) - origin_index(nx)
+    u = padded[start_y : start_y + ny, start_x : start_x + nx].astype(complex_np)
+
+    node_distance = xp.maximum(
+        xp.minimum(frac_y, 1.0 - frac_y).astype(real_np),
+        xp.minimum(frac_x, 1.0 - frac_x).astype(real_np),
+    )
+    # Both reductions are read after the field, so the only device-to-host
+    # synchronization here happens once and after all the work is enqueued.
+    on_node_bins = _bin_tolerance(_ON_NODE_BINS, bins=max(ky_n, kx_n), real_dtype=real_dtype)
+    kept = int(xp.sum(representable))
+    on_node = int(xp.sum(representable & (node_distance < on_node_bins)))
+    # Power as well as rays. A ray count is the number a consumer reaches for, and
+    # on an ensemble with non-uniform amplitude the two are not interchangeable:
+    # the rays nearest the band edge carry the extreme wavevectors, so a 0.1 % ray
+    # drop on an apodized or vignetted pupil can be a large amplitude drop.
+    launch_power = float(xp.sum(xp.abs(coefficient) ** 2))
+    dropped_power = float(xp.sum(xp.abs(coefficient * (~representable).astype(complex_np)) ** 2))
+    record: dict[str, Any] = {
+        "kspace_grid_shape": [ky_n, kx_n],
+        "rays_splatted": kept,
+        "rays_dropped_out_of_band": count - kept,
+        "dropped_fraction": (count - kept) / count if count else 0.0,
+        "dropped_launch_power_fraction": (
+            dropped_power / launch_power if launch_power > 0.0 else 0.0
+        ),
+        # Fraction of *splatted* rays on a node. 1.0 certifies exactness only when
+        # read together with `dropped_fraction == 0.0`; dropped rays are excluded
+        # from this ratio rather than counted against it.
+        "on_node_fraction": (on_node / kept) if kept else 0.0,
+    }
+    if kept == 0:
+        record["note"] = "no ray was representable on the k-grid; the field is identically zero"
+    return u, record
+
+
 def ray_to_scalar(
     rays: RayBundle,
     *,
@@ -523,6 +873,9 @@ def ray_to_scalar(
     sample_pitch_m: tuple[float, float],
     surface: ReferenceSurface | None = None,
     projection: Projection = Projection.ASM_CONSISTENT,
+    reconstruction: Reconstruction = Reconstruction.DIRECT,
+    kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
+    kspace_grid_shape: tuple[int, int] | None = None,
 ) -> tuple[ScalarField, ReconstructionDiagnostics]:
     """Reconstruct the scalar field a ray bundle describes on its own surface.
 
@@ -546,6 +899,19 @@ def ray_to_scalar(
         `ASM_CONSISTENT` (the default) reconstructs the field;
         `SENSOR_OBLIQUITY` applies `<n_hat, d_hat>` and models a detector. They
         are different operators -- see the module docstring.
+    reconstruction
+        Which realization evaluates the sum. `DIRECT` (the default) is exact per
+        ray and costs `O(N_rays x ny x nx)`; `KSPACE` costs
+        `O(N_rays + K log K)` and quantizes each ray's direction onto the k-grid.
+        The default is the default because every analytic gate is measured
+        through it.
+    kspace_oversample, kspace_grid_shape
+        The k-grid, for `KSPACE` only. `kspace_grid_shape` names it outright and
+        wins; otherwise it is `ceil(oversample * grid_shape)` per axis. A caller
+        reconstructing an *enumeration* must name it: exactness holds only when
+        the k-grid period equals the grid the modes were enumerated on, and an
+        oversampling factor that happens to miss that period converts an
+        exactness measurement into an interpolation error.
 
     Returns
     -------
@@ -662,11 +1028,30 @@ def ray_to_scalar(
     y = (xp.arange(ny, dtype=real_np) - origin_y) * dy
     x = (xp.arange(nx, dtype=real_np) - origin_x) * dx
 
-    # `exp(i k (d_u x + d_v y))` is separable, so the O(N ny nx) sum contracts
-    # from two O(N n) factors instead of materializing an (N, ny, nx) tensor.
-    ramp_y = _cis(xp, wavenumber * xp.outer(directions_xy[:, 1], y), complex_dtype)
-    ramp_x = _cis(xp, wavenumber * xp.outer(directions_xy[:, 0], x), complex_dtype)
-    u = xp.einsum("n,ny,nx->yx", coefficient, ramp_y, ramp_x, optimize=True, **dot)
+    kspace_record: dict[str, Any] | None = None
+    if reconstruction is Reconstruction.KSPACE:
+        # One scatter and one FFT. Nothing of size (N, ny) or (N, nx) is formed,
+        # which is the entire point: per-ray cost stops scaling with pixels.
+        u, kspace_record = _reconstruct_kspace(
+            xp,
+            namespace,
+            coefficient=coefficient,
+            directions_xy=directions_xy,
+            wavenumber=wavenumber,
+            grid_shape=(ny, nx),
+            sample_pitch_m=(dy, dx),
+            oversample=kspace_oversample,
+            explicit_shape=kspace_grid_shape,
+            origin_index=rays.frame.origin_index,
+            real_dtype=real_dtype,
+            complex_dtype=complex_dtype,
+        )
+    else:
+        # `exp(i k (d_u x + d_v y))` is separable, so the O(N ny nx) sum contracts
+        # from two O(N n) factors instead of materializing an (N, ny, nx) tensor.
+        ramp_y = _cis(xp, wavenumber * xp.outer(directions_xy[:, 1], y), complex_dtype)
+        ramp_x = _cis(xp, wavenumber * xp.outer(directions_xy[:, 0], x), complex_dtype)
+        u = xp.einsum("n,ny,nx->yx", coefficient, ramp_y, ramp_x, optimize=True, **dot)
 
     if normalization == "one_over_n":
         u = u / rays.count
@@ -717,6 +1102,8 @@ def ray_to_scalar(
         compute_precision=str(precision),
         input_state=rays.state.as_dict(),
         output_state=ArrayState(dtype_of(u), device_of(u), namespace_of(u)).as_dict(),
+        reconstruction=str(reconstruction),
         reconstructed_discrete_power=field.discrete_power(),
+        kspace=kspace_record,
     )
     return field, diagnostics

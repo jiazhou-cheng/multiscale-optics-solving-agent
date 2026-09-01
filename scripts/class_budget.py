@@ -252,8 +252,20 @@ SRC = ROOT / "src"
 #:                                a flag would name the factor instead of the
 #:                                physics.
 #:
+#: Raised to 3 by CHE-186 (R07.2), which adds `Reconstruction` -- a `StrEnum`
+#: again, and the ticket's own budget is 0 production classes plus it. What it did
+#: *not* add is what the budget is protecting: no second k-space coupler, no
+#: separate module, and no module-level route registry. The route is an argument,
+#: because the semantic port pair is identical and one operation with two numerical
+#: realizations is what that means.
+#:
+#: **That raise puts the declared total at exactly `PROJECT_CEILING`.** The next
+#: package that needs a class cannot have one until the owner settles the
+#: inconsistency recorded below, which is the ceiling doing its job rather than a
+#: problem with this ticket.
+#:
 BUDGETS: dict[str, int] = {
-    "couplers": 2,
+    "couplers": 3,
     "numerics": 7,
     "operations": 2,
     "operators": 0,

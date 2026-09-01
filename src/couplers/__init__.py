@@ -19,15 +19,15 @@ solver, a problem or a backend -- the coupler core is the physics under test, an
 if it could reach an engine a coupler defect could be misattributed to engine
 behaviour.
 
-One module, landed by CHE-185 (R07.1):
+One module, landed by CHE-185 (R07.1) and CHE-186 (R07.2):
 
 * `ray_to_scalar` -- the coherent wavelet sum `RayBundle -> ScalarField`, with
   the projection convention and the sampling measure each stated and refusable
-  rather than defaulted.
+  rather than defaulted, and two numerical realizations of the same sum selected
+  by an argument.
 
-The k-space route (R07.2) and the grazing-mode phase floor (R07.4) are named by
-the parent ticket and have **not** landed; this docstring lists them when they
-do.
+The grazing-mode phase floor (R07.4) is named by the parent ticket and has **not**
+landed; this docstring lists it when it does.
 
 Not here, deliberately: `RayToWaveCoupler` and the 533-LOC node wrapper around it,
 `CoherentHandoff`, `DeclaredHandoffPlane`, `Perturbation`, `HandoffPerturbation`,
@@ -40,18 +40,22 @@ so they exercise the kernel that ships.
 """
 
 from couplers.ray_to_scalar import (
+    DEFAULT_KSPACE_OVERSAMPLE,
     SCALE_NOTE,
     Normalization,
     Projection,
+    Reconstruction,
     ReconstructionDiagnostics,
     grid_nyquist_direction_limit,
     ray_to_scalar,
 )
 
 __all__ = [
+    "DEFAULT_KSPACE_OVERSAMPLE",
     "SCALE_NOTE",
     "Normalization",
     "Projection",
+    "Reconstruction",
     "ReconstructionDiagnostics",
     "grid_nyquist_direction_limit",
     "ray_to_scalar",

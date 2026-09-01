@@ -112,8 +112,11 @@ markers = [
 # solvers, couplers, benchmark tiers and tutorial reproductions that no longer
 # exist, and a registered marker matching nothing reads as a suite someone can
 # select. `slow` stays because addopts names it; `gpu` stays because
-# `make test-gpu` does. `slow` selects its first test as of CHE-185 (R07.1) --
-# the focal-peak convergence sweep in `tests/physics/test_ray_to_scalar.py`;
+# `make test-gpu` does. `slow` started selecting tests at CHE-185 (R07.1) -- the
+# focal-peak convergence sweep in `tests/physics/test_ray_to_scalar.py`, joined by
+# CHE-186's speedup gate in `test_ray_to_scalar_kspace.py`. Note that the second
+# one is an *acceptance criterion*, and `-m "not slow"` deselects it, so
+# `make test-slow` is not optional before merging a change to coupler numerics.
 # `gpu` still selects nothing outside `tests/numerics/`.
 
 [tool.ruff]
