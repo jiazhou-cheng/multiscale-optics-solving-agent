@@ -30,7 +30,9 @@ evidence that the new tree is currently protected.
 The target system has exactly two conceptual categories.
 
 **Representations** are physical state at a declared boundary. **Operations**
-consume and produce representations, problems, or measurements.
+consume and produce representations, problems, or measurements — with one
+asymmetric case: a **source** produces a representation without consuming one,
+because it *initializes* physical state rather than transforming it (§2).
 
 There are four operation kinds — `solver`, `coupler`, `physical_operator`, and
 `measurement` — and they are **descriptor metadata, not four class hierarchies**.
@@ -49,7 +51,7 @@ that satisfies the class-minimality rules below.
 
 ---
 
-## 2. The six terms
+## 2. The seven terms
 
 Each term is defined by the boundary that separates it from its nearest
 neighbour. These definitions are target semantics even before their corresponding
@@ -82,6 +84,63 @@ version requirements may appear.
 **Boundary against *coupler*:** a solver is where an external solver enters the
 system; a coupler is repository-owned physics between representations. Backend
 imports belong in `solvers/<backend>/` once that adapter exists.
+
+### source
+
+Owns the **physically meaningful initialization** of a representation: how the
+state of a representation is created from physical source parameters.
+
+A representation defines the *structure and conventions* of physical state at a
+declared boundary. A source defines how that state is *initialized*. A plane-wave
+source initializes the complex amplitude and phase of a `ScalarField` from its
+wavelength, propagation direction, amplitude, sampling grid, and reference
+surface; a collimated ray source initializes a `RayBundle` from its spatial
+sampling and common propagation direction.
+
+**Boundary against *representation*:** the representation owns the declaration —
+units, axes, frame, handedness, phasor sign, sampling, reference surface — and
+validates it. The source owns the physics that fills it. Putting initialization
+physics in `representations/` would make the data model own physics it exists only
+to declare.
+
+**Boundary against every other operation:** a source **does not consume an
+existing physical representation. It creates the initial state of one.** Every
+other kind takes a representation in — a coupler re-describes one, a physical
+operator changes one, a measurement derives an observable from one. A source is
+the only operation in the graph with no input representation, and that asymmetry
+is why it has its own package and its own row in §3.
+
+**Boundary against *problem*:** a problem is physical *intent*. The declaration of
+a source may live in `problems/`; the constructor that turns it into state is the
+source. A source may read a problem; it is not one.
+
+**Kind:** `solver`. A source maps a problem statement into a representation, which
+is this document's definition of a solver, and there is no fifth operation kind.
+What separates `sources/` from `solvers/<backend>/` is that a source has **no
+external backend**: it is the project's own arithmetic on the project's own grid,
+so per-backend organization has nothing to organize.
+
+`sources/` is **representation-independent at the package level and
+representation-explicit at each public operation.** A source operation may
+initialize a `ScalarField`, a `RayBundle`, or any other landed representation, and
+which one it returns must be unambiguous in the public API — in the signature's
+return type and in the descriptor's `output`. The package is therefore not
+partitioned by representation and must not grow a subpackage per representation;
+the individual operation is never ambiguous about what it produces.
+
+*[LANDING GATE]* A source operation's return representation is declared in its
+public signature and in its descriptor. A constructor that could return either of
+two representations depending on its arguments is a design error, not a
+convenience.
+
+*[LANDING GATE]* `OperationDescriptor.input` has no vocabulary for "no input
+representation", so a landed source currently names the representation it produces
+on both sides — CHE-210 registered `S_SOURCE_PLANE_WAVE` with
+`input='scalar_field'`, following the precedent R05.3 set for the ray solver,
+which also names the representation it works in rather than the problem it
+consumes. That is an imprecision in the descriptor, not in this definition. The
+ticket that gives a descriptor a way to say *produces without consuming* — R12's
+capability graph is the natural home — closes it.
 
 ### coupler
 
@@ -148,7 +207,7 @@ Absence of any row from the current tree is valid. Do not create a package only
 because it appears in this graph. A package is introduced when a scoped issue has
 real code to put in it.
 
-Four properties are load-bearing:
+Five properties are load-bearing:
 
 1. **It is an allowlist.** Each landed package declares what it *may* import;
    everything else is forbidden. A denylist fails open when new packages appear.
@@ -158,19 +217,31 @@ Four properties are load-bearing:
    metadata and import paths; it does not import solver/coupler implementations.
 4. **`representations/` is backend-neutral.** A representation must not know
    which backend produced it.
+5. **`sources/` owns initialization, and it is representation-independent as a
+   package while each of its operations is representation-explicit.** The package
+   may initialize any landed representation; a public operation declares exactly
+   one. No subpackage per representation, and no constructor whose return
+   representation depends on its arguments. See §2.
 
 **`sources/` was added to this graph by CHE-210 (R06.5)**, as a deliberate
-architecture change and not as a convenience. A source maps a problem statement
-into a representation, which is this document's definition of a *solver* -- and a
-source's operations register as `solver`-kind for that reason -- but it has no
-external backend, and `solvers/<backend>/` is organized per backend. The three
-homes that already existed were each wrong in a specific way:
-`representations/` would own field-construction physics it exists only to
-*declare*; `operators/` is wrong by definition, because an operator consumes a
-representation and a source does not; and `problems/` may hold the illumination
-*declaration* but the constructor is not the problem. Widening an existing
-package's remit to make a source fit is the move the allowlist exists to
-prevent, so the row was added instead.
+architecture change and not as a convenience. §2 defines the term; the row exists
+because a source is the one operation with **no input representation**, so none of
+the packages that already existed could hold it without changing what they are.
+`representations/` would own initialization physics it exists only to *declare*;
+`operators/` is wrong by definition, because an operator consumes a representation
+and a source does not; `problems/` may hold a source *declaration* but the
+constructor is not the problem; and `solvers/<backend>/` is organized per backend,
+which a source has none of. Widening an existing package's remit to make a source
+fit is the move the allowlist exists to prevent, so the row was added instead.
+
+The row is `sources/ -> problems, representations, numerics`. It reaches
+`representations/` because it constructs one, `numerics/` because an initialized
+state must respect the same dtype and device policy as everything downstream of
+it, and `problems/` because a source may read a physical source declaration. It
+may **not** import `solvers/`, `couplers/`, `operators/` or `measurements/`: a
+source is upstream of all of them by construction, and an edge in the other
+direction would describe an initial state that cannot be created without the
+thing that consumes it.
 
 *[LANDING GATE]* Dependency enforcement is package-by-package. The change that
 introduces a package must add it to the dependency classifier/checker if one has

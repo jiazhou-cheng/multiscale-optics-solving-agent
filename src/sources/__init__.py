@@ -1,17 +1,40 @@
-"""Declared illuminations: a problem statement becomes a representation.
+"""The physically meaningful initialization of a representation.
+
+`docs/architecture_principles.md` section 2 defines the term. In short: a
+representation defines the *structure and conventions* of physical state at a
+declared boundary, and a source defines how that state is *initialized* from
+physical source parameters. A source therefore **does not consume an existing
+physical representation -- it creates the initial state of one**, which makes it
+the only operation in the graph with no input representation.
 
 `sources/` is a **new package**, landed by CHE-210 (R06.5) as a deliberate
-architecture change with the owner's decision. A source maps a problem statement
-into a representation, which is `docs/architecture_principles.md` section 2's
-definition of a `solver` -- and its operations register as `solver`-kind for
-exactly that reason -- but it has no external backend, and `solvers/<backend>/`
-is organized per backend. `src/sources/plane_wave.py` records why each of the
-alternative homes was worse.
+architecture change with the owner's decision. Its operations register as
+`solver`-kind, because mapping a problem statement into a representation is what
+that document calls a solver and there is no fifth operation kind; what separates
+this package from `solvers/<backend>/` is that a source has no external backend,
+so per-backend organization has nothing to organize. Section 3 records why each
+alternative home was worse.
 
 The allowlist row is `sources/ -> problems, representations, numerics`. Only the
-last two are exercised today: an illumination *declaration* belongs in
-`problems/` when something needs one, and the edge is declared so that landing it
-is not a second architecture change.
+last two are exercised today: a source *declaration* belongs in `problems/` when
+something needs one, and the edge is declared so that landing it is not a second
+architecture change. There is deliberately no edge to `solvers/`, `couplers/`,
+`operators/` or `measurements/`: a source is upstream of everything that consumes
+state.
+
+Representation-independent as a package, representation-explicit per operation
+---------------------------------------------------------------------------------
+A source operation may initialize a `ScalarField`, a `RayBundle`, or any other
+landed representation, and **which one it returns must be unambiguous in the
+public API** -- in the signature's return type and in the descriptor's `output`.
+So this package is not partitioned by representation and must not grow a
+subpackage per representation, and no constructor here may return one of two
+representations depending on its arguments.
+
+Today the only landed operation initializes a `ScalarField`. A collimated
+`RayBundle` source -- spatial sampling plus a common propagation direction -- is
+the obvious second one, and it belongs beside `plane_wave` under this same rule
+rather than under a `sources/wave/` and `sources/ray/` split.
 
 This package imports **no backend**. A plane wave is arithmetic on the project's
 own grid; `chromatix.functional.plane_wave` is a cross-check, and one that
