@@ -134,14 +134,21 @@ def test_there_is_no_operator_per_element_type() -> None:
             f"operators.{name} exists; it is complex_transmission with one factor at its "
             "identity, and shipping it separately means keeping the two consistent forever"
         )
-    # `propagate_rays` (CHE-192, R09.2) is the package's second operator and is not
-    # an element type: it changes a ray bundle's *state* between two surfaces and
-    # touches no transmission. Named here rather than filtered out, so a third
-    # operator has to be argued into this list too.
+    # The package's other two operators are named here rather than filtered out, so
+    # a fourth has to be argued into this list too. Neither is an element type:
+    # `propagate_rays` (CHE-192, R09.2) changes a ray bundle's *state* between two
+    # surfaces and touches no transmission, and `diffractive_surface` (CHE-194,
+    # R10.2) is the composition that *uses* `complex_transmission` -- it is the
+    # thin element applied inside a representation round trip, which is the
+    # opposite of a per-element-type operator.
     assert set(operators.__all__) == {
+        "DIFFRACTIVE_MODELS",
         "EDGES",
+        "DiffractiveModel",
+        "DiffractiveSurface",
         "circular_aperture_amplitude",
         "complex_transmission",
+        "diffractive_surface",
         "numerical_aperture_radius_m",
         "propagate_rays",
     }
@@ -486,3 +493,49 @@ def test_the_module_defines_no_class() -> None:
     on, and the grid already lives on the `ScalarField`."""
     source = MODULE.read_text(encoding="utf-8")
     assert [n.name for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef)] == []
+
+
+def test_the_passive_gate_admits_round_off_and_refuses_real_gain() -> None:
+    """The allowance CHE-194 added, pinned at both ends.
+
+    The gate was `|A| > 1`, which refuses **every lossless phase-only element**:
+    `|exp(i phi)|` is `1 + 2e-16` for a great many phases, and
+    `DiffractiveSurface.from_phase` hit it on the first surface it built. It is now
+    `1 + 64 eps` at float32 or wider.
+
+    Loosening a safety check needs its own evidence, so both ends are measured
+    rather than argued: `1 + 1e-15` is admitted and `1 + 1e-12` is refused -- a
+    gain of one part in a trillion, which no physical mask carries by accident.
+    """
+    field = a_field()
+    complex_transmission(field, amplitude=1.0 + 1e-15)
+    with pytest.raises(ContractError) as raised:
+        complex_transmission(field, amplitude=1.0 + 1e-12)
+    assert raised.value.code == "REPRESENTATION_INCONSISTENT"
+
+    # The motivating case: a lossless phase-only element, whose modulus is 1 only
+    # to round-off.
+    phase = np.linspace(0.0, 2.0 * np.pi, field.shape[0] * field.shape[1]).reshape(
+        field.shape
+    )
+    modulus = np.abs(np.exp(1j * phase))
+    assert float(modulus.max()) > 1.0  # the thing the old gate refused
+    complex_transmission(field, amplitude=modulus)
+
+
+@pytest.mark.parametrize(
+    "amplitude",
+    [1, True, np.ones(SHAPE, dtype=np.int64), np.ones(SHAPE, dtype=bool)],
+)
+def test_an_integer_or_boolean_amplitude_still_works(amplitude: object) -> None:
+    """The two spellings the module docstring names, and neither has a machine epsilon.
+
+    `amplitude=1` is an int and `amplitude=(r <= R)` is a boolean -- the most
+    natural way to write a hard aperture. Reading the gain allowance off the
+    amplitude's own dtype would refuse both, which is why it is read off
+    `result_type(dtype, float32)` instead. Pinned because the regression was
+    introduced and caught in one ticket.
+    """
+    field = a_field()
+    out = complex_transmission(field, amplitude=amplitude)
+    assert np.allclose(np.asarray(out.u), np.asarray(field.u))

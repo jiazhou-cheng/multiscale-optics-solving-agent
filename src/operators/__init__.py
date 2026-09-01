@@ -10,8 +10,15 @@ not import a solver or a backend. Neither operator here needs one: an elementwis
 multiply and an advance along a direction both happen in whatever array namespace
 the artifact already carries.
 
-Two modules:
+Three modules:
 
+* `diffractive_surface` (CHE-194, R10.2) -- `diffractive_surface`, the diffractive
+  surface as a physical operation: `RayBundle -> RayBundle`, at the surface's own
+  reference surface. Its interior converts representation twice and its identity is
+  still a physical state change, because an optical surface changes the state. The
+  two couplers inside it are R07's and R08's own functions, and the thin element is
+  R06.6's -- this module writes no numerics of its own, which is why the
+  composition is hard-coded rather than generalized.
 * `ray_propagation` (CHE-192, R09.2) -- `propagate_rays`, `RayBundle(S1) ->
   RayBundle(S2)`: physical evolution through one declared medium, with the optical
   path growing by `n * s`. It is CHE-50's declared remedy for the wavelet sum's
@@ -25,6 +32,12 @@ Two modules:
   (`circular_aperture_amplitude`) and the pure arithmetic that turns a system NA
   into a stop radius in the Fourier plane's own coordinates
   (`numerical_aperture_radius_m`).
+
+**No composite-operator framework**, and the condition is stated rather than
+assumed: `docs/architecture_principles.md` permits one only if at least two
+production compositions immediately need it, and there is one. `diffractive_surface`
+is three named calls in sequence. The way to tell when that changes is that two
+functions here want to share a step, not that one of them looks parameterizable.
 
 Not here, deliberately: `phase_mask`, `amplitude_mask`, `pupil` and `grating` as
 separate operations. Each is `complex_transmission` with one factor at its
@@ -43,6 +56,12 @@ beats taxonomy -- a forwarding wrapper in this package would put a second name o
 one implementation without adding a boundary.
 """
 
+from operators.diffractive_surface import (
+    DIFFRACTIVE_MODELS,
+    DiffractiveModel,
+    DiffractiveSurface,
+    diffractive_surface,
+)
 from operators.ray_propagation import propagate_rays
 from operators.transmission import (
     EDGES,
@@ -52,9 +71,13 @@ from operators.transmission import (
 )
 
 __all__ = [
+    "DIFFRACTIVE_MODELS",
     "EDGES",
+    "DiffractiveModel",
+    "DiffractiveSurface",
     "circular_aperture_amplitude",
     "complex_transmission",
+    "diffractive_surface",
     "numerical_aperture_radius_m",
     "propagate_rays",
 ]

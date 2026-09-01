@@ -214,12 +214,30 @@ SRC = ROOT / "src"
 #: `HandoffPlaneError` as a separate exception type -- an unresolvable plane is a
 #: `ContractError` with a code, because a coupler branches on the code and not on
 #: the class. `solvers/optiland/baseline.py` did not land either, in its entirety.
-#: `operators` is 0, declared by CHE-211 (R06.6), and `sources` is 0, declared by
-#: CHE-210 (R06.5). Both are genuinely zero rather than budgeted-at-zero-for-now: a
-#: mask is an array plus the grid it was built on and the grid already lives on the
-#: `ScalarField`, and an illumination is three keyword arguments and a return
-#: value. Nine class names did **not** land against those two packages, and the
-#: tests name them: `ThinElement`, `PhaseMask`, `AmplitudeMask`, `Pupil` and
+#: `operators` is **1**, raised from 0 by CHE-194 (R10.2), which adds
+#: `DiffractiveSurface` -- rules 1 and 2. Rule 1: the transmission, the pitch it is
+#: sampled at and the surface it lives on are one physical object, and the failure
+#: mode is specific rather than tidiness -- before the reference implementation
+#: gathered them, "the diffractive surface" was four loose arguments repeated at
+#: every call site, so a caller could describe one surface to one function and a
+#: different one to the next. Rule 2: it is the public argument schema of the
+#: operation.
+#:
+#: R10.2 writes `DiffractiveModel` as a `StrEnum` and budgets the change at "+1";
+#: this gate counts a `StrEnum` as a class, so it landed as a `Literal`, the same
+#: stricter reading R08.1 and R08.2 took. **Eight** class names did not land against
+#: that +1, and `tests/physics/test_diffractive_surface_full_field.py` asserts each:
+#: `DiffractiveSurfaceBase`, `FullFieldDiffractiveSurfaceSubclass`,
+#: `PlanarDoeStepCoupler` (491 LOC of node wrapper), `CascadeDiagnostics`,
+#: `DiffractiveInteractionResult`, `FullFieldParameters`, `PrimarySampling` and
+#: `DiffractiveModel` itself.
+#:
+#: `sources` is 0, declared by CHE-210 (R06.5), and that zero is genuine rather
+#: than budgeted-at-zero-for-now: an illumination is three keyword arguments and a
+#: return value. `operators` was zero for the same kind of reason until R10.2 -- a
+#: mask is an array plus the grid it was built on, and the grid already lives on
+#: the `ScalarField`. Nine class names did **not** land against those two
+#: packages, and the tests name them: `ThinElement`, `PhaseMask`, `AmplitudeMask`, `Pupil` and
 #: `Grating` as separate operators or result types, and `Illumination`,
 #: `PlaneWaveSource`, `IlluminationAngle` and `SourceResult` on the source side.
 #: The `Illumination` frozen dataclass is the one that has a real argument -- lambda,
@@ -282,7 +300,7 @@ BUDGETS: dict[str, int] = {
     "couplers": 4,
     "numerics": 7,
     "operations": 2,
-    "operators": 0,
+    "operators": 1,
     "problems": 3,
     "representations": 5,
     "solvers": 2,
@@ -323,8 +341,10 @@ BUDGETS: dict[str, int] = {
 #: constant stays it should be re-derived from the new tree; if it goes, that
 #: per-package equality is what remains, and it is already the stronger check.
 #: Until the owner decides, it ratchets by one per class -- which at least makes
-#: every raise a visible, reviewable line in a diff.
-PROJECT_CEILING = 23
+#: every raise a visible, reviewable line in a diff. **23 -> 24 by CHE-194
+#: (R10.2)**, one class, same handling: the raise is the size of the class that
+#: forced it and lands in the commit that adds it.
+PROJECT_CEILING = 24
 
 
 @dataclass(frozen=True)

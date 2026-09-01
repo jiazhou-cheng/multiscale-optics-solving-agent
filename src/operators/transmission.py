@@ -219,11 +219,31 @@ def complex_transmission(
             declaration="amplitude",
             remedy="Move the sign into `phase_rad` as a pi offset.",
         )
-    if not allow_gain and bool(xp.any(a > 1.0)):
+    # `1 + 64 eps`, not `1`. A lossless phase-only element has `|t| = |exp(i phi)|`,
+    # which a real `sqrt(cos^2 + sin^2)` returns as `1 + 2e-16` for a great many
+    # phases -- so a bare `> 1` refuses the most common passive surface there is,
+    # which CHE-194 hit on the first `DiffractiveSurface.from_phase` it built. The
+    # allowance is round-off at the amplitude's own dtype and nothing more: it
+    # still refuses `1 + 1e-12` -- measured -- which is a gain no physical mask has
+    # by accident. `64 * eps` is the same allowance `representations` derives for a
+    # unit vector, and for the same reason: a modulus that should be 1 is not
+    # exactly 1.
+    #
+    # `result_type(..., float32)` rather than the amplitude's own dtype, and that
+    # is not a detail. `amplitude=1` is an int and `amplitude=(r <= R)` is a
+    # boolean -- the module docstring names both, and neither has a machine
+    # epsilon at all, so reading one off them would refuse the very masks this
+    # operator is for. Promoting to at least float32 also caps the allowance for a
+    # float16 mask, whose own `64 * eps` would be 6 %.
+    gain_tolerance = 1.0 + 64.0 * float(
+        np.finfo(np.result_type(np.asarray(a).dtype, np.float32)).eps
+    )
+    if not allow_gain and bool(xp.any(a > gain_tolerance)):
         raise ContractError(
             "REPRESENTATION_INCONSISTENT",
-            f"amplitude reaches {float(xp.max(a))!r} > 1. A passive thin element cannot "
-            "amplify. Pass allow_gain=True to state the claim deliberately.",
+            f"amplitude reaches {float(xp.max(a))!r}, above the round-off allowance "
+            f"{gain_tolerance!r}. A passive thin element cannot amplify. Pass "
+            "allow_gain=True to state the claim deliberately.",
             declaration="amplitude",
             remedy="allow_gain=True, or normalize the mask.",
         )
