@@ -33,7 +33,7 @@ That is the whole public physical data model: one ray type, one field type. Ther
 is no PSF type, no second ray carrier, and no base class under either.
 """
 
-from representations.contracts import CONTRACT_CODES, ContractError
+from representations.contracts import CONTRACT_CODES, ContractError, require_finite
 from representations.geometry import (
     AXIS_ORDER,
     HANDEDNESS,
@@ -78,4 +78,5 @@ __all__ = [
     "ScalarField",
     "ValidityFlag",
     "direction_norm_tolerance",
+    "require_finite",
 ]

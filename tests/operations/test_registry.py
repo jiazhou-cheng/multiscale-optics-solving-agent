@@ -182,7 +182,7 @@ def test_a_typo_in_a_query_is_an_error_not_an_empty_result() -> None:
     with pytest.raises(ValueError, match="semantic type"):
         registry.find(input="rays")
     with pytest.raises(ValueError, match="semantic type"):
-        registry.find(output="psf")
+        registry.find(output="mueller_matrix")
     with pytest.raises(ValueError, match="physical_operator"):
         registry.find(kind="propagator")
 

@@ -230,14 +230,21 @@ def test_an_undeclared_derivative_mode_is_refused() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_semantic_types_are_the_boundaries_r02_landed() -> None:
-    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field")
+def test_semantic_types_are_the_boundaries_that_landed() -> None:
+    """Two representations from R02, and one measurement result type from R11.1.
+
+    The rule the vocabulary states is that a type joins it **in the change that
+    lands the boundary it names** -- so this assertion is the ratchet, and the
+    exemplar below had to move off `psf` when `measurements/psf.py` landed. That
+    is the vocabulary working, not the test being brittle.
+    """
+    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf")
 
 
 @pytest.mark.parametrize("field", ["input", "output"])
 def test_an_undeclared_semantic_type_is_refused(field: str) -> None:
     with pytest.raises(ValueError, match="declared semantic type"):
-        a_descriptor(**{field: "psf"})
+        a_descriptor(**{field: "mueller_matrix"})
 
 
 def test_an_empty_approximation_is_refused() -> None:
@@ -272,7 +279,7 @@ def test_an_empty_operation_id_is_refused() -> None:
 def test_every_problem_is_reported_at_once() -> None:
     """Three faults, one exception -- not three edit-and-rerun cycles."""
     with pytest.raises(ValueError) as caught:
-        a_descriptor(operation_id="", input="psf", approximation="")
+        a_descriptor(operation_id="", input="mueller_matrix", approximation="")
     message = str(caught.value)
     assert "operation_id" in message
     assert "semantic type" in message

@@ -79,6 +79,13 @@ __all__ = [
 #: because a shared failure alphabet is what lets one `except ContractError` handle
 #: a boundary end to end -- and because a code invented locally by each consumer is
 #: how the free-form provenance string this module replaced came back.
+#:
+#: `NEGATIVE_INTENSITY` is the second such code, and it belongs to
+#: `measurements.psf.PsfResult` (CHE-197). Intensity is not a representation --
+#: `ScalarField` holds an amplitude and refuses a real array for exactly this
+#: reason -- so no representation can enforce non-negativity. The measurement
+#: that derives the observable is where the invariant lives, and it is one of the
+#: two the retired `C_FIELD_TO_PSF` coupler entry declared.
 CONTRACT_CODES: tuple[str, ...] = (
     "MISSING_DECLARATION",
     "UNIT_NOT_SI",
@@ -97,6 +104,7 @@ CONTRACT_CODES: tuple[str, ...] = (
     "UNKNOWN_VALIDITY_FLAG",
     "PAD_STATE_UNKNOWN",
     "GRAZING_PHASE_UNREPRESENTABLE",
+    "NEGATIVE_INTENSITY",
 )
 
 

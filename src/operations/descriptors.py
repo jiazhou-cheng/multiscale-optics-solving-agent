@@ -47,6 +47,7 @@ from numerics import COMPONENT_CAPABILITIES
 
 __all__ = [
     "DERIVATIVE_MODES",
+    "OBSERVABLE_TYPES",
     "SEMANTIC_TYPES",
     "OperationDescriptor",
     "OperationKind",
@@ -74,8 +75,13 @@ class OperationKind(StrEnum):
 #: physical data model, and importing it here would put the whole representation
 #: layer behind every capability query.
 #:
-#: **Two entries, matching the two boundaries R02 actually landed** --
-#: `RayBundle` and `ScalarField`. This is deliberately not the reference
+#: **Three entries: the two boundaries R02 landed -- `RayBundle` and
+#: `ScalarField` -- and the one measurement result type R11.1 landed, `psf`.**
+#: `psf` is here as the *output port of a measurement*, and it is deliberately not
+#: a representation: `measurements/psf.py` says why. `OBSERVABLE_TYPES` below is
+#: what keeps that distinction from being prose.
+#:
+#: This is deliberately not the reference
 #: implementation's `ArtifactKind`, which enumerated 26 members of which the tree
 #: could produce a handful; the rest read as capability the project did not have.
 #: A problem type, a measurement result type or a second field type joins this
@@ -88,7 +94,26 @@ class OperationKind(StrEnum):
 SEMANTIC_TYPES: tuple[str, ...] = (
     "ray_bundle",
     "scalar_field",
+    "psf",
 )
+
+#: The subset of `SEMANTIC_TYPES` that are **observables**, not representations.
+#:
+#: An observable is derived from physical state; it is not physical state at a
+#: boundary. Two rules follow, and `__post_init__` enforces both:
+#:
+#: * **only a `measurement` may produce one.** A coupler that produced a `psf`
+#:   would be `C_FIELD_TO_PSF`, which CHE-36 removed from the reference registry
+#:   for changing no representation and consulting no convention it did not
+#:   already hold; a trivial observable in the coupler list, complete with a
+#:   framework and a derivative mode it had no numerics for, made the category
+#:   unfalsifiable. R11's acceptance criterion 3 says it must not come back, and
+#:   this is where "must not" becomes a construction error.
+#: * **nothing may consume one.** An observable is terminal. An operation reading
+#:   a PSF as its input is either a second measurement of a measurement, or a
+#:   physical operation that has mistaken an intensity for a state -- and the
+#:   representation it should have consumed is still sitting upstream.
+OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
 
 #: What may be claimed about differentiating through an operation.
 #:
@@ -194,6 +219,20 @@ class OperationDescriptor:
                     f"{list(SEMANTIC_TYPES)}. Add it in the ticket that lands the boundary "
                     "it names; an operation cannot introduce one by using it."
                 )
+        if self.input in OBSERVABLE_TYPES:
+            problems.append(
+                f"`input` is {self.input!r}, which is an observable and not a "
+                "representation. Nothing consumes an observable: it is derived from "
+                "physical state and the state it was derived from is still upstream."
+            )
+        if self.output in OBSERVABLE_TYPES and self.kind is not OperationKind.MEASUREMENT:
+            problems.append(
+                f"`output` is the observable {self.output!r} but `kind` is "
+                f"{getattr(self.kind, 'value', self.kind)!r}. Only a measurement produces "
+                "an observable. A coupler that produced one would be C_FIELD_TO_PSF, "
+                "which changes no representation and consults no convention it does not "
+                "already hold -- CHE-36 removed it, and R11 criterion 3 keeps it out."
+            )
         if ":" not in self.implementation or self.implementation.startswith(":"):
             problems.append(
                 f"`implementation` is {self.implementation!r}; it must be "

@@ -28,6 +28,7 @@ import numpy as np
 import pytest
 
 from couplers import ray_to_scalar
+from measurements import NORMALIZATION_DECLARATIONS, PsfResult
 from representations import (
     CONTRACT_CODES,
     ContractError,
@@ -143,6 +144,24 @@ TRIGGERS: dict[str, Callable[[], object]] = {
         ),
         grid_shape=(4, 4),
         sample_pitch_m=(0.25e-6, 0.25e-6),
+    ),
+    # The second consumer-owned code (CHE-197). Intensity is not a representation
+    # -- `ScalarField` holds an *amplitude*, and refuses a real array precisely so
+    # that `|U|` cannot be read as `U` -- so no `__post_init__` here can enforce
+    # non-negativity. The measurement that derives the observable does, and this is
+    # the smaller half of what the retired `C_FIELD_TO_PSF` entry declared.
+    "NEGATIVE_INTENSITY": lambda: PsfResult(
+        intensity=np.array([[1.0, -1e-30], [1.0, 1.0]]),
+        sample_pitch_m=(1e-6, 1e-6),
+        wavelength_m=0.55e-6,
+        normalization="raw",
+        normalization_declaration=NORMALIZATION_DECLARATIONS["raw"],
+        scale_factor=1.0,
+        raw_peak_intensity=1.0,
+        raw_window_energy=1.0,
+        peak_index=(0, 0),
+        peak_position_m=(0.0, 0.0),
+        border_energy_fraction=1.0,
     ),
 }
 

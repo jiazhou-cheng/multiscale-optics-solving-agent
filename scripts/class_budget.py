@@ -298,6 +298,7 @@ SRC = ROOT / "src"
 #:
 BUDGETS: dict[str, int] = {
     "couplers": 4,
+    "measurements": 1,
     "numerics": 7,
     "operations": 2,
     "operators": 1,
@@ -344,7 +345,14 @@ BUDGETS: dict[str, int] = {
 #: every raise a visible, reviewable line in a diff. **23 -> 24 by CHE-194
 #: (R10.2)**, one class, same handling: the raise is the size of the class that
 #: forced it and lands in the commit that adds it.
-PROJECT_CEILING = 24
+#: **24 -> 25 by CHE-197 (R11.1)**, which lands `measurements/` with one class:
+#: `PsfResult`, on rule 2 -- the public serialized record a consumer reads back,
+#: and the thing three of that ticket's acceptance criteria are statements about
+#: (which normalization, at what scale, with how much energy on the border). Its
+#: `PsfNormalization` is a `Literal` rather than the `StrEnum` the ticket names,
+#: for the reason R08.1 established: this gate counts a `StrEnum` as a class, the
+#: two readings of "+1" differ by one, and the stricter one is taken.
+PROJECT_CEILING = 25
 
 
 @dataclass(frozen=True)

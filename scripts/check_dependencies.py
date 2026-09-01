@@ -175,6 +175,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 LANDED: frozenset[str] = frozenset(
     {
         "couplers",
+        "measurements",  # CHE-197 (R11.1): `psf.py`, one measurement.
         "numerics",
         "operations",
         "operators",
