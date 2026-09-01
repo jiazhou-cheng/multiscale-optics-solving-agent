@@ -1,0 +1,363 @@
+{
+  "written_at_utc": "2026-09-01T04:31:31Z",
+  "environment": {
+    "numpy": "2.2.6",
+    "scipy": "1.15.3",
+    "jax": "0.6.2",
+    "chromatix": "0.6.0"
+  },
+  "benchmark": "B-4F-IDEAL",
+  "ticket": "CHE-212",
+  "configuration": "magnifying_relay",
+  "produced_by": "benchmarks/systems/b4f_ideal.py",
+  "composition": [
+    "sources.plane_wave",
+    "operators.complex_transmission",
+    "solvers.chromatix.focal_plane_transform",
+    "operators.complex_transmission",
+    "solvers.chromatix.focal_plane_transform"
+  ],
+  "parameters": {
+    "wavelength_m": 5.32e-07,
+    "medium_index": 1.0,
+    "shape": [
+      192,
+      256
+    ],
+    "sample_pitch_m": [
+      6e-07,
+      5e-07
+    ],
+    "focal_length_1_m": 0.02,
+    "focal_length_2_m": 0.04,
+    "numerical_aperture": 0.1,
+    "stop_edge": "hard",
+    "fourier_plane_pitch_m": [
+      9.236111111111112e-05,
+      8.312500000000001e-05
+    ],
+    "image_plane_pitch_m": [
+      1.2e-06,
+      1e-06
+    ],
+    "stop_radius_in_fourier_samples_yx": [
+      21.654135338345863,
+      24.060150375939845
+    ],
+    "declared_validity_at_the_image_plane": [
+      "carrier_removed_phase"
+    ]
+  },
+  "not_covered": [
+    "the validity-envelope sweep over modulation frequency to the sampling limit (CHE-144's optional output; not run)",
+    "a direct ifft2c(mask * fft2c(u)) NumPy cross-model (not run: the closed form above predicts the amplitude factor, the sign and the pitch, which a differential FFT check does not)",
+    "real or aberrated lenses, ray-domain anything, partial coherence, polarization, noise and sensor models"
+  ],
+  "gates": [
+    {
+      "name": "fourier_plane_pitch",
+      "oracle": "dx_F = lambda f1 / (n N dx_in), per axis, recomputed here from the formula rather than by calling the same function the operator declares with",
+      "oracle_kind": "closed_form",
+      "measured": [
+        9.236111111111112e-05,
+        8.312500000000001e-05
+      ],
+      "expected": [
+        9.236111111111112e-05,
+        8.312500000000001e-05
+      ],
+      "tolerance": 1e-15,
+      "tolerance_basis": "float64 on both sides, at 1e-15 rather than exact equality because the recomputation groups the arithmetic differently from the library function -- (lambda f)/(n N dx) against (lambda f / n)/(N dx) -- and a 1-ulp associativity difference is not a sampling error. The separate exact equality against `fourier_plane_pitch_m` is kept beside it as what it actually is: the statement that the boundary carried the operator's own declaration through unchanged, which is a tautology about the formula and so cannot be the thing that decides",
+      "passed": true
+    },
+    {
+      "name": "image_plane_pitch",
+      "oracle": "dx_img = dx_in f2 / f1, per axis",
+      "oracle_kind": "closed_form",
+      "measured": [
+        1.2e-06,
+        1e-06
+      ],
+      "expected": [
+        1.2e-06,
+        1e-06
+      ],
+      "tolerance": 1e-15,
+      "tolerance_basis": "float64 arithmetic on both sides; an independent claim from the magnification, because a system can invert correctly and still report every length wrong by f2/f1",
+      "passed": true
+    },
+    {
+      "name": "fourier_plane_frequency_axis",
+      "oracle": "the sample at offset j is the spatial frequency j / (N dx_in), i.e. x_F = j lambda f1 / (n N dx_in)",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "peak_index_offset": [
+          0,
+          15
+        ],
+        "peak_position_m": 0.0012468750355765224,
+        "centroid_m": 0.00124687503557652,
+        "peak_energy_fraction": 1.0
+      },
+      "expected": {
+        "index_offset": [
+          0,
+          15
+        ],
+        "position_m": 0.0012468750000000002
+      },
+      "tolerance": 5e-07,
+      "tolerance_basis": "the carrier sits on an integer DFT bin, so the whole plane wave lands on one output sample and the position is the declared pitch times an integer; the tolerance covers only the float32 storage of that pitch",
+      "passed": true
+    },
+    {
+      "name": "image_is_minus_f1_over_f2_times_the_mirrored_input",
+      "oracle": "U_img[k] = -(f1/f2) U_in[-k], from DFT{DFT{U}}[k] = N U[-k] and the 1/(i lambda f / n) prefactor on each leg",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "residual": 2.1490760104825313e-07,
+        "residual_without_mirroring": 0.9999998807907104,
+        "residual_without_the_global_pi": 2.0
+      },
+      "expected": 0.0,
+      "tolerance": 5e-07,
+      "tolerance_basis": "two FFT legs in complex64: four float32 epsilons is 4.8e-7. The two falsifiable twins land at O(1), so this is not a tolerance that could absorb a composition error",
+      "passed": true
+    },
+    {
+      "name": "magnification",
+      "oracle": "M = -f2/f1, as a feature's centroid and its second moment at both planes",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "centroid_ratio_yx": [
+          -2.000000212852172,
+          -2.000000159589149
+        ],
+        "width_ratio_yx": [
+          2.0000000752047886,
+          2.0000002574989124
+        ]
+      },
+      "expected": {
+        "centroid_ratio": -2.0,
+        "width_ratio": 2.0
+      },
+      "tolerance": 1e-05,
+      "tolerance_basis": "a ratio of two float32 second moments over the same window; 1e-5 is two orders above the 1.5e-7 measured and still far below any plausible magnification error, which would be a factor of f2/f1",
+      "passed": true
+    },
+    {
+      "name": "power_through_an_open_filter",
+      "oracle": "the f1/f2 amplitude factor against the f2/f1 pitch change conserves sum |u|^2 dy dx exactly",
+      "oracle_kind": "closed_form",
+      "measured": 0.9999997642538877,
+      "expected": 1.0,
+      "tolerance": 1e-06,
+      "tolerance_basis": "a sum of squares in float32: two epsilons on the amplitude is ~2.4e-7 on the power, and the measured deviation is 2.36e-7 -- i.e. this gate runs at its derived floor with a factor of four in hand, not with orders. It is the gate that catches a normalization error nothing else here can see, which is why no comparison in this benchmark is normalized by its own peak",
+      "passed": true
+    },
+    {
+      "name": "the_four_f_length_is_2f1_plus_2f2",
+      "oracle": "each leg advances the declared surface by 2f",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "z_fourier_m": 0.04,
+        "z_image_m": 0.12
+      },
+      "expected": {
+        "z_fourier_m": 0.04,
+        "z_image_m": 0.12
+      },
+      "tolerance": 0.0,
+      "tolerance_basis": "float64 addition of two declared focal lengths",
+      "passed": true
+    },
+    {
+      "name": "gaussian_transforms_to_a_gaussian_of_the_predicted_waist",
+      "oracle": "w_F = lambda f1 / (pi n w0); intensity second moment is w/2",
+      "oracle_kind": "closed_form",
+      "measured": [
+        0.0006773634112454804,
+        0.0006773634179313029
+      ],
+      "expected": [
+        0.0006773634377991066,
+        0.0006773634377991066
+      ],
+      "tolerance": 0.02,
+      "tolerance_basis": "2e-2 is **borrowed**, not derived for this case: it is the threshold the B1-WAVE Gaussian-spreading family justified for the same second-moment estimator, where window truncation dominated. Here it does not -- the Fourier waist is 15.7 (x) and 13.0 (y) waists inside the window and the measured error is 4e-8 -- so this bound is loose-but-safe rather than tight. It is kept because it still rejects every plausible error in the relation (a missing pi is 3.14x, a missing n is 1.33x at index 1.33), and tightening it to the measurement would be fitting",
+      "passed": true
+    },
+    {
+      "name": "slit_gives_the_sampled_boxcars_dirichlet_kernel",
+      "oracle": "|D(k)| / L with D(k) = sin(pi k L / N) / sin(pi k / N); zeros at k = m N / L, i.e. x_F = m lambda f1 / (n w)",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "null_amplitudes": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "null_positions_m": [
+          0.0013300000000000002,
+          0.0026600000000000005,
+          0.0039900000000000005
+        ],
+        "lobe_amplitudes": {
+          "1": 0.9936116933822632,
+          "3": 0.9433783888816833,
+          "5": 0.8474596738815308,
+          "7": 0.714464008808136
+        }
+      },
+      "expected": {
+        "nulls": 0.0,
+        "lobes": {
+          "1": 0.993611790316204,
+          "3": 0.9433784129556839,
+          "5": 0.8474596670333424,
+          "7": 0.714463872470877
+        }
+      },
+      "tolerance": 1e-06,
+      "tolerance_basis": "the sampled boxcar's transform is the Dirichlet kernel exactly, so the only error is complex64 storage. The continuous sinc would need a percent-level tolerance covering a known discretization effect, which is why the sampled form is the oracle",
+      "passed": true
+    },
+    {
+      "name": "sinusoidal_phase_grating_gives_bessel_orders_and_relays_end_to_end",
+      "oracle": "Jacobi-Anger: A_n / A_0 = J_n(m) / J_0(m) at x_n = n lambda f1 / (n_med Lambda), signed; and the image reproduces the object",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "order_residuals": {
+          "-3": 1.6866429163878056e-08,
+          "-2": 8.456987413157134e-08,
+          "-1": 1.1559715972809791e-07,
+          "0": 0.0,
+          "1": 3.210543408645349e-08,
+          "2": 4.1478283397380415e-08,
+          "3": 5.960327210402733e-08
+        },
+        "image_residual": 3.1680303891334916e-07,
+        "order_positions_m": [
+          0.0006650000000000001,
+          0.0013300000000000002,
+          0.0019950000000000002
+        ]
+      },
+      "expected": 0.0,
+      "tolerance": 5e-07,
+      "tolerance_basis": "the FFT's rounding scale is set by its largest term, so the *absolute* residual on A_n/A_0 is a few float32 epsilons however small A_n is -- which is why the comparison is absolute. The signed ratio is asserted, because J_{-n} = (-1)^n J_n and a magnitude-only check would pass a mirrored spectrum",
+      "passed": true
+    },
+    {
+      "name": "the_stop_removes_exactly_the_frequencies_above_its_cutoff",
+      "oracle": "pass iff |f| <= NA/lambda; the surviving sideband keeps its analytic amplitude ratio a/2 to the DC line",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "sideband_to_dc": {
+          "15": 0.20000003278255463,
+          "35": 2.4699502443326082e-09
+        },
+        "cutoff_bin": 24.06015037593985,
+        "stop_radius_m": 0.002,
+        "stop_radius_in_fourier_samples": [
+          21.654135338345863,
+          24.060150375939845
+        ]
+      },
+      "expected": {
+        "15": 0.2,
+        "35": 0.0
+      },
+      "tolerance": 1e-05,
+      "tolerance_basis": "a ratio of two line amplitudes read off one complex64 DFT: a few float32 epsilons, with the blocked line at the arithmetic zero of an exact elementwise multiply by 0",
+      "passed": true
+    },
+    {
+      "name": "power_through_the_stop_is_the_analytically_transmitted_fraction",
+      "oracle": "the transmitted fraction is the sum of |c_n|^2 over the surviving lines, over the sum over all of them",
+      "oracle_kind": "closed_form",
+      "measured": 0.9599999597694076,
+      "expected": 0.9600000000000001,
+      "tolerance": 1e-05,
+      "tolerance_basis": "the object is an exact five-line spectrum on this grid, so the fraction is arithmetic on |c_n|^2; the residual is the same float32 power floor as the open-filter case, one order looser because two power sums are divided",
+      "passed": true
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "phasor_sign_flip",
+      "changed": "the object's phase negated, i.e. the conjugate phasor convention",
+      "breaks_gate": "image_is_minus_f1_over_f2_times_the_mirrored_input",
+      "measured": 1.7578203678131104,
+      "reference": 5e-07,
+      "broke_the_gate": true
+    },
+    {
+      "name": "transposed_axis",
+      "changed": "the carrier moved from k_x to k_y",
+      "breaks_gate": "fourier_plane_frequency_axis",
+      "measured": {
+        "peak_index_offset": [
+          13,
+          0
+        ],
+        "x_position_m": 0.0
+      },
+      "reference": {
+        "index_offset": [
+          0,
+          15
+        ],
+        "x_position_m": 0.0012468750000000002
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "filter_at_the_image_plane",
+      "changed": "the same stop applied after leg two instead of between the legs",
+      "breaks_gate": "the_stop_removes_exactly_the_frequencies_above_its_cutoff",
+      "measured": {
+        "stopband_to_dc": 0.15000000596046448
+      },
+      "reference": 0.0,
+      "broke_the_gate": true
+    },
+    {
+      "name": "two_pi_frequency_scale",
+      "changed": "the Fourier-plane position predicted from k_x as if it were cycles/m",
+      "breaks_gate": "fourier_plane_frequency_axis",
+      "measured": {
+        "position_m": 0.0012468750355765224
+      },
+      "reference": {
+        "wrong_prediction_m": 0.007834346679889548
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "carrier_off_the_dft_grid",
+      "changed": "the carrier moved half a bin off the DFT frequency grid",
+      "breaks_gate": "fourier_plane_frequency_axis (its peak_energy_fraction > 0.99 part)",
+      "measured": {
+        "peak_energy_fraction": 0.4052898585796356,
+        "centroid_m": 0.0012831745452397147,
+        "centroid_relative_error": -0.004084757514652759
+      },
+      "reference": {
+        "peak_energy_fraction_on_grid": 1.0,
+        "dirichlet_half_bin": 0.40528473456935116,
+        "analytic_position_m": 0.0012884375
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "second_leg_as_an_inverse_transform",
+      "changed": "model['direction']='inverse' on leg two",
+      "breaks_gate": "image_is_minus_f1_over_f2_times_the_mirrored_input",
+      "measured": 0.9999998211860657,
+      "reference": 5e-07,
+      "broke_the_gate": true
+    }
+  ]
+}

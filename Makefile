@@ -1,4 +1,4 @@
-.PHONY: test test-slow test-serial test-gpu check-arch clean
+.PHONY: test test-slow test-serial test-gpu check-arch benchmarks clean
 
 # Every target runs through ./run.sh, which is the only supported entry point
 # (AGENTS.md, "Execution Environment").
@@ -63,6 +63,20 @@ test-gpu:
 check-arch:
 	./run.sh python scripts/check_dependencies.py
 	./run.sh python scripts/class_budget.py
+
+# The system-level benchmarks (CHE-212 / CHE-213), which are deliberately *not* in
+# the pytest suite: they cost about three seconds each where the default gate costs
+# a fraction of one, and `testpaths` excludes them. Each rewrites its records under
+# `benchmarks/systems/records/` and exits non-zero if any closed-form gate fails or
+# any negative control fails to break the gate it names.
+#
+# A record measures the code at a commit, so re-run this and commit the regenerated
+# records in the same change as any edit to `sources/`, `operators/` or
+# `solvers/chromatix/`. `tests/benchmarks/test_records.py` is what checks in the
+# default suite that the committed records claim a clean, closed-form-decided run.
+benchmarks:
+	./run.sh python -m benchmarks.systems.b4f_ideal
+	./run.sh python -m benchmarks.systems.b_fourier_ptychography
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

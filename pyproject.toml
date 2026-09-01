@@ -151,6 +151,15 @@ ignore_missing_imports = true
 module = ["chromatix.*"]
 ignore_missing_imports = true
 
+# scipy ships no stubs in the pinned image either. It is used only as an
+# *oracle* library -- Bessel functions in `benchmarks/systems/` and in
+# `tests/physics/test_thin_element_spectrum.py` -- and nothing in `src/` imports
+# it. Added by CHE-211/CHE-212, the first tickets to need a special function this
+# project must not implement itself.
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
 # package to name.
