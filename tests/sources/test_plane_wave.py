@@ -153,11 +153,24 @@ def test_the_amplitude_is_the_peak_and_nothing_renormalizes_it() -> None:
 
 
 def test_normal_incidence_is_the_same_primitive() -> None:
-    """`k_t = (0, 0)` is the default and there is no second function for it."""
+    """`k_t = (0, 0)` is the default and there is no second function for it.
+
+    Narrowed by CHE-215 (R06.10), which added three more sources: this used to pin
+    `sources.__all__` to exactly two names, which asserted the *package's* whole
+    surface in a file about one function and failed the moment a second source
+    landed for legitimate reasons. The invariant it was really guarding is that
+    `plane_wave` has no per-incidence variant, which is what is asserted now --
+    `sources/__init__.py` and `tests/sources/test_sources_package.py` own the
+    package surface.
+
+    `point_source` stays on the absent list and `gaussian_beam` comes off it. Both
+    are deliberate: R06.10 lifted the Gaussian exclusion on the owner's decision,
+    while a wave-optics point emitter remains `spherical_wave` with explicit
+    geometry rather than a delta on a pixel.
+    """
     import sources
 
-    assert set(sources.__all__) == {"plane_wave", "transverse_wavevector_from_angle"}
-    for name in ("normal_plane_wave", "tilted_plane_wave", "point_source", "gaussian_beam"):
+    for name in ("normal_plane_wave", "tilted_plane_wave", "point_source"):
         assert not hasattr(sources, name)
 
     explicit = a_source(transverse_wavevector_rad_per_m=(0.0, 0.0))

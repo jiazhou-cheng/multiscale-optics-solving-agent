@@ -143,7 +143,13 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   the direction: `couplers -> operators` remains forbidden, because a coupler that
 #:   reached for an operator would be propagating.
 #:
-#: * `sources` -- landed by CHE-210 (R06.5): `plane_wave.py`. **A new row in
+#: * `sources` -- landed by CHE-210 (R06.5) with `plane_wave.py`, and extended by
+#:   CHE-215 (R06.10) to `collimated_bundle.py`, `gaussian_beam.py`,
+#:   `spherical_wave.py` and the private `_grid.py` they share. That second ticket
+#:   needed **no allowlist change** -- the row below already covered it -- but it did
+#:   change what this package *is*: it now initializes both landed representations
+#:   rather than only `ScalarField`, one flat package with the return representation
+#:   explicit in each signature, and no subpackage per representation. **A new row in
 #:   `ALLOWED`, and therefore a deliberate architecture change**, decided by the
 #:   owner on that ticket rather than assumed here. A source maps a problem
 #:   statement into a representation -- the definition of a `solver`, which is what

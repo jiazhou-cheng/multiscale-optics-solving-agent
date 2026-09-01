@@ -4,11 +4,23 @@ A module rather than fixtures in a `conftest.py`, following
 `tests/solvers/chromatix_support.py`: four test files build the same bundles and a
 conftest would load them for the rest of the suite as well.
 
-Every builder here is **analytic**. None of them calls a solver, so none of the
-numbers a test compares against came out of this repository's numerical code --
-which is the rule that makes these gates independent evidence rather than
-characterization (`AGENTS.md`, "Scientific Non-Negotiables"). The three ensembles
-and the oracle each one exists for:
+Every builder here is **analytic**. None of them calls a backend solver, and --
+the part that carries the independence claim -- **none of the oracles came out of
+this repository's numerical code**: every one below is a closed form written from
+the physics, which is what makes these gates independent evidence rather than
+characterization (`AGENTS.md`, "Scientific Non-Negotiables").
+
+One caveat, added by CHE-215 (R06.10) and stated rather than left implicit:
+`collimated_bundle` now builds its *ensemble* by delegating to the public
+`sources.collimated_bundle`, so the ensemble side of that gate is repository code
+where it used to be local arithmetic. The oracle side is unchanged and still
+independent, which is where the gate's force lives -- and the delegation is what
+makes these gates measure the shipped capability instead of a hand-built twin. The
+`n (d_hat . r)` optical path is asserted directly against the closed form in
+`tests/sources/test_collimated_bundle.py`, so a defect in the source shows up there
+as well and not only as a residual here.
+
+The three ensembles and the oracle each one exists for:
 
 `collimated_bundle`
     SI Figure S1c: one angular mode, many launch points, each given the optical
@@ -70,12 +82,14 @@ at each call site is how a half-grid roll becomes "a coupler bug".
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from typing import Any
 
 import numpy as np
 
 from representations import RayBundle, ReferenceSurface
+from sources import collimated_bundle as collimated_source
 
 #: The M3 reference wavelength and the singlet focal length the frozen `lambda R`
 #: record was taken at, reused so the reproduced number is comparable to it.
@@ -107,6 +121,7 @@ def collimated_bundle(
     z_m: float = 0.0,
     length_scale: float = 1.0,
     optical_path_sign: float = 1.0,
+    medium_index: float = 1.0,
     dtype: Any = np.float64,
 ) -> tuple[RayBundle, Any, float]:
     """One angular mode launched from every point of a grid. Returns `(rays, d_hat, dA)`.
@@ -118,6 +133,11 @@ def collimated_bundle(
     `optical_path_sign` negates the optical path, and is the negative twin of
     checklist item 1: it conjugates every wavelet, so a converging wavefront
     reconstructs as a diverging one and no intensity check can tell.
+
+    `medium_index` declares the surface's medium *and* scales the optical path,
+    which is `n` times the geometric one -- the two have to move together or the
+    ensemble is not a plane-wave mode in that medium. Its oracle is
+    `N dA exp(i n k0 d_hat . r)`.
     """
     ny, nx = shape
     dy, dx = sample_pitch_m[0] * length_scale, sample_pitch_m[1] * length_scale
@@ -130,21 +150,28 @@ def collimated_bundle(
     d_hat = np.asarray(direction, dtype=np.float64)
     d_hat = d_hat / np.linalg.norm(d_hat)
     count = positions.shape[0]
-    return (
-        RayBundle(
-            positions_m=positions.astype(dtype),
-            directions=np.tile(d_hat, (count, 1)).astype(dtype),
-            wavelength_m=wavelength_m,
-            reference_surface=a_surface(z_m=z_m * length_scale),
-            amplitude=np.ones(count, dtype=dtype),
-            optical_path_m=(optical_path_sign * (positions @ d_hat)).astype(dtype),
-            optical_path_reference="the global origin, along d_hat",
-            measure_weight=np.full(count, dy * dx, dtype=dtype),
-            measure_kind="quadrature_area_m2",
-        ),
-        d_hat,
-        dy * dx,
+
+    # The honest path is the public source (CHE-215), so the ensemble these gates
+    # reconstruct from is the one a caller outside a test gets. The rectangular
+    # grid stays here on purpose: the source takes explicit (N, 3) points because
+    # binding it to a rectangular aperture model is what it exists not to do.
+    rays = collimated_source(
+        positions.astype(dtype),
+        direction=direction,
+        wavelength_m=wavelength_m,
+        reference_surface=a_surface(z_m=z_m * length_scale, medium_index=medium_index),
+        measure_weight=np.full(count, dy * dx, dtype=dtype),
+        measure_kind="quadrature_area_m2",
     )
+    if optical_path_sign != 1.0:
+        # The conjugate twin, applied *on top* of the honest bundle rather than
+        # pushed into `src/`. A negative control has to stay test-side: a
+        # production source that could emit a conjugated wavefront on request is
+        # the failure this control exists to detect.
+        rays = dataclasses.replace(
+            rays, optical_path_m=(optical_path_sign * rays.optical_path_m).astype(dtype)
+        )
+    return (rays, d_hat, dy * dx)
 
 
 def mode_bundle(
@@ -373,14 +400,20 @@ def propagating_only(field: Any) -> Any:
     not be graded as though it could. Written here from the closed-form transform
     rather than by calling `scalar_to_ray`, so the oracle is not the code under
     test: centred DFT, strict `radial < 1` cut, centred inverse.
+
+    The cut is taken on the **medium** direction cosines `lambda_0 f / n`, read
+    from the field's own reference surface: `|k_t| < n k0` is a wider circle in a
+    medium, so an oracle written at `n = 1` would grade a submerged round trip
+    against the wrong mode set.
     """
     u = np.asarray(field.u)
     ny, nx = u.shape
     dy, dx = field.sample_pitch_m
+    wavelength_m = field.wavelength_m / field.reference_surface.medium_index
     spectrum = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(u)))
     direction_v, direction_u = np.meshgrid(
-        np.fft.fftshift(np.fft.fftfreq(ny, dy)) * field.wavelength_m,
-        np.fft.fftshift(np.fft.fftfreq(nx, dx)) * field.wavelength_m,
+        np.fft.fftshift(np.fft.fftfreq(ny, dy)) * wavelength_m,
+        np.fft.fftshift(np.fft.fftfreq(nx, dx)) * wavelength_m,
         indexing="ij",
     )
     keep = direction_u**2 + direction_v**2 < 1.0

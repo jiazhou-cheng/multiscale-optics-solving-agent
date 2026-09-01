@@ -107,13 +107,17 @@ import math
 
 import numpy as np
 
-from representations import ContractError, Frame, ReferenceSurface, ScalarField
+from representations import Frame, ReferenceSurface, ScalarField
 from representations.contracts import require_positive_si
+from sources._grid import (
+    SOURCE_DTYPE,
+    grid_coordinates,
+    require_grid_shape,
+    require_sample_pitch,
+    require_transverse_wavevector,
+)
 
 __all__ = ["plane_wave", "transverse_wavevector_from_angle"]
-
-#: The one storage dtype of the project's wave path. See the module docstring.
-_SOURCE_DTYPE = np.complex64
 
 
 def transverse_wavevector_from_angle(
@@ -200,68 +204,24 @@ def plane_wave(
         ValueError: a non-positive axis length, or a non-finite / non-positive
             amplitude.
     """
-    counts = tuple(int(value) for value in shape)
-    if len(counts) != 2 or any(count < 1 for count in counts):
-        raise ValueError(f"shape must be (ny, nx) with at least one sample per axis, got {shape!r}")
-
-    # The same helpers `ScalarField.__post_init__` applies, called early because
-    # the refusals below divide by the pitch and the wavelength. A field built
-    # from a bad declaration would be refused either way; doing it here means the
-    # message names the declaration rather than the NaNs it produced.
-    pitch = tuple(
-        require_positive_si(value, name=name)
-        for value, name in zip(
-            sample_pitch_m, ("sample_pitch_m[dy]", "sample_pitch_m[dx]"), strict=True
-        )
-    )
+    counts = require_grid_shape(shape)
+    pitch = require_sample_pitch(sample_pitch_m)
     wavelength = require_positive_si(wavelength_m, name="wavelength_m")
     peak = require_positive_si(amplitude, name="amplitude")
-
-    wavevector = tuple(float(value) for value in transverse_wavevector_rad_per_m)
-    if len(wavevector) != 2 or not all(math.isfinite(value) for value in wavevector):
-        raise ValueError(
-            "transverse_wavevector_rad_per_m must be a finite (k_y, k_x) pair in rad/m, got "
-            f"{transverse_wavevector_rad_per_m!r}"
-        )
-
-    index = reference_surface.medium_index
-    medium_wavenumber = 2.0 * math.pi * index / wavelength
-    magnitude = math.hypot(*wavevector)
-    if magnitude > medium_wavenumber:
-        raise ContractError(
-            "REPRESENTATION_INCONSISTENT",
-            f"|k_t| = {magnitude:.6g} rad/m exceeds n k0 = {medium_wavenumber:.6g} rad/m "
-            f"(n = {index}, lambda = {wavelength} m). That is an evanescent wave, not an "
-            "illumination angle: the field this would build decays along +z and would be "
-            "carried as a propagating one.",
-            declaration="transverse_wavevector_rad_per_m",
-            remedy="Reduce |k_t|, or state the medium index the angle was measured in.",
-        )
-
-    for value, step, axis in zip(wavevector, pitch, ("k_y", "k_x"), strict=True):
-        nyquist = math.pi / step
-        if abs(value) > nyquist:
-            raise ContractError(
-                "REPRESENTATION_INCONSISTENT",
-                f"|{axis}| = {abs(value):.6g} rad/m is past this grid's Nyquist limit "
-                f"pi/d = {nyquist:.6g} rad/m at a pitch of {step} m. The sampled ramp would "
-                "alias, and an aliased tilt reads back as a completely different and "
-                "entirely plausible angle -- which is the failure this refusal exists for.",
-                declaration="transverse_wavevector_rad_per_m",
-                remedy="Refine the pitch, or reduce the tilt.",
-            )
+    ky, kx = require_transverse_wavevector(
+        transverse_wavevector_rad_per_m,
+        pitch=pitch,
+        wavelength_m=wavelength,
+        medium_index=reference_surface.medium_index,
+    )
 
     frame = Frame()
-    ky, kx = wavevector
     dy, dx = pitch
-    ny, nx = counts
-    # float64 throughout, cast once. `Frame.origin_index` rather than `n // 2`:
-    # a half-sample origin shift is a linear phase ramp across the grid, i.e. a
-    # tilt, which is exactly the quantity this function exists to state.
-    y = (np.arange(ny, dtype=np.float64) - frame.origin_index(ny)) * dy
-    x = (np.arange(nx, dtype=np.float64) - frame.origin_index(nx)) * dx
+    # float64 throughout, cast once. See `_grid.grid_coordinates` on why the
+    # origin comes from the frame rather than from a rewritten `n // 2`.
+    y, x = grid_coordinates(counts, pitch, frame)
     phase = ky * y[:, None] + kx * x[None, :]
-    u = (peak * np.exp(1j * phase)).astype(_SOURCE_DTYPE)
+    u = (peak * np.exp(1j * phase)).astype(SOURCE_DTYPE)
 
     return ScalarField(
         u=u,
