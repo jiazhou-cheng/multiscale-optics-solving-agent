@@ -134,11 +134,16 @@ def test_there_is_no_operator_per_element_type() -> None:
             f"operators.{name} exists; it is complex_transmission with one factor at its "
             "identity, and shipping it separately means keeping the two consistent forever"
         )
+    # `propagate_rays` (CHE-192, R09.2) is the package's second operator and is not
+    # an element type: it changes a ray bundle's *state* between two surfaces and
+    # touches no transmission. Named here rather than filtered out, so a third
+    # operator has to be argued into this list too.
     assert set(operators.__all__) == {
         "EDGES",
         "circular_aperture_amplitude",
         "complex_transmission",
         "numerical_aperture_radius_m",
+        "propagate_rays",
     }
 
 

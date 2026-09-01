@@ -127,13 +127,21 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   installed, which is the entanglement R04 exists to undo.
 #:
 #: * `operators` -- landed by CHE-211 (R06.6): `transmission.py`, the single thin
-#:   element `U * A * exp(i phi)` and the mask builders that feed it. It imports
-#:   `representations` and `numerics`; it does **not** import `couplers`, which its
-#:   row permits, because an elementwise multiply at one surface needs no change of
-#:   representation. The forbidden edge that matters is `operators -> solvers`: a
-#:   thin element needs no backend at all, and importing one would put JAX behind
-#:   every mask multiply and end the package's backend neutrality
-#:   (`tests/solvers/test_chromatix_boundary.py` walks it).
+#:   element `U * A * exp(i phi)` and the mask builders that feed it, joined by
+#:   CHE-192 (R09.2)'s `ray_propagation.py`. The forbidden edge that matters is
+#:   `operators -> solvers`: a thin element needs no backend at all, and importing
+#:   one would put JAX behind every mask multiply and end the package's backend
+#:   neutrality (`tests/solvers/test_chromatix_boundary.py` walks it).
+#:
+#:   **The `operators -> couplers` edge is now exercised**, and it took until R09 to
+#:   find a use that was not taxonomy. `transmission.py` still does not import
+#:   `couplers`, correctly: an elementwise multiply at one surface needs no change of
+#:   representation. `ray_propagation.py` does, for one derived quantity --
+#:   `grazing_floor_for_phase_budget` -- because the floor on a ray's axial direction
+#:   cosine during an advance is the same `eps k Z / d_n` bound the reconstruction
+#:   kernel needed, and a second copy of a derivation is how two copies drift. Note
+#:   the direction: `couplers -> operators` remains forbidden, because a coupler that
+#:   reached for an operator would be propagating.
 #:
 #: * `sources` -- landed by CHE-210 (R06.5): `plane_wave.py`. **A new row in
 #:   `ALLOWED`, and therefore a deliberate architecture change**, decided by the

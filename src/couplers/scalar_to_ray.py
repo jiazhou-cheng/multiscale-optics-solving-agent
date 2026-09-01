@@ -133,6 +133,16 @@ it to.
 There is also no chunking framework. If a workload needs chunking that is the
 executor's concern or the caller's, not the coupler's.
 
+The medium index is refused, not assumed (found by R09)
+-------------------------------------------------------
+The transverse direction cosines here are `d = lambda_vacuum * f`, which is the
+`n = 1` form: in a medium the transverse cosine of a mode at spatial frequency `f`
+is `lambda_vacuum f / n`, and the evanescent circle is in those units too. The
+`medium_index` on the reference surface was never read, so **`medium_index != 1` is
+refused** -- the same decision, for the same reason, that
+`couplers.ray_to_scalar` makes. R09 found it; the fix alters a landed physical
+convention in two tickets and is the owner's call. See that module's docstring.
+
 Sampling is an input, not a side effect
 ---------------------------------------
 Indices are drawn from an explicitly seeded generator and the kernel that turns
@@ -649,6 +659,22 @@ def scalar_to_ray(
             "MISSING_DECLARATION",
             f"draw must be one of {list(DRAW_RULES)}, got {draw!r}",
             declaration="draw",
+        )
+
+    if emitted_surface.medium_index != 1.0:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"the field is declared in a medium of index "
+            f"{emitted_surface.medium_index!r}, and this decomposition's direction "
+            "cosines are lambda_vacuum * f, which is the n = 1 form -- in a medium they "
+            "are lambda_vacuum f / n and the evanescent circle is in those units. "
+            "Refused rather than emitting directions that are not unit vectors in the "
+            "medium they are declared in.",
+            declaration="reference_surface.medium_index",
+            remedy=(
+                "Decompose a field in air, or settle the convention -- see "
+                "couplers.ray_to_scalar's medium-index section (found by R09)."
+            ),
         )
 
     ny, nx = field.shape

@@ -278,6 +278,28 @@ The three options not taken, with the reason each was rejected:
    optical path already does -- and that is a change to `RayBundle` and its
    producers, not to this kernel.
 
+The medium index is refused, not assumed (found by R09)
+-------------------------------------------------------
+In a medium of index `n` a plane wave is `exp(i n k0 s_hat . r)`, so a wavelet's
+field at `r` is `a exp(i k0 OPL) exp(i n k0 d_hat . (r - x0))` -- the **ramp
+carries `n`** and so does the launch-ramp subtraction. This kernel writes `k0 (OPL
++ d_hat . (r - x0))`, which is that expression at `n = 1` and nothing else. The
+`medium_index` on the reference surface was never read.
+
+That is an undeclared assumption rather than a wrong number: every case this tree
+has ever run is in air. R09 found it while deriving `operators.propagate_rays`,
+whose optical path grows by `n s` -- so a bundle advanced through glass and handed
+here would have a correct path against a ramp that assumes vacuum, and the two
+would disagree by `(n - 1) k0 d_t . (r - x0)`.
+
+**So `medium_index != 1` is refused here**, and the fix is not made. Putting `n`
+into the ramp and into the launch-ramp subtraction is a three-line change that is
+a no-op at `n = 1` and makes the composition exact -- the arithmetic is worked out
+in `operators/ray_propagation.py` -- but it alters a landed physical convention in
+two tickets, so it is the owner's call and not R09's. Refusing turns a silent wrong
+answer into a message in the meantime, which is what this module does with every
+other declaration it cannot honour.
+
 Grid Nyquist is a refusal, not a warning
 -----------------------------------------
 A wavelet with transverse direction cosine `d_t` writes a ramp of spatial
@@ -572,6 +594,11 @@ REFUSALS: dict[str, str] = {
         "a sample pitch is not a positive length in metres. Checked here rather than left "
         "to the emitted field, because the pitch is divided by to get the Nyquist limit "
         "before the field exists."
+    ),
+    "MISSING_DECLARATION": (
+        "the field's reference surface declares a medium of index other than 1, and this "
+        "kernel's transverse ramp does not carry the index. Refused rather than computed "
+        "with a silent n = 1 -- see the module docstring's medium-index section."
     ),
     "GRAZING_PHASE_UNREPRESENTABLE": (
         "a mode's constant phase k (OPL - d . x0) cannot be represented in the compute "
@@ -1292,6 +1319,21 @@ def ray_to_scalar(
     amplitude, optical_path_m = rays.require_coherent()
     measure_weight, normalization = _resolve_measure(rays)
     emitted_surface = _require_declared_surface(rays, surface, rays.xp)
+
+    if emitted_surface.medium_index != 1.0:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"the rays are declared in a medium of index "
+            f"{emitted_surface.medium_index!r}, and this kernel's transverse ramp does "
+            "not carry the index: it writes k0 (OPL + d_hat . dr) where the medium form "
+            "is k0 OPL + n k0 d_hat . dr. Refused rather than computed with a silent "
+            "n = 1, which would disagree with an optical path that grew by n s.",
+            declaration="reference_surface.medium_index",
+            remedy=(
+                "Reconstruct in air, or settle the convention -- see the module "
+                "docstring's medium-index section (found by R09)."
+            ),
+        )
 
     ny, nx = int(grid_shape[0]), int(grid_shape[1])
     dy, dx = float(sample_pitch_m[0]), float(sample_pitch_m[1])
