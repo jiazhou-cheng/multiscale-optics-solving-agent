@@ -205,6 +205,22 @@ class Frame:
             raise ValueError(f"{label!r} is not a spatial axis of this frame; it declares {axes}.")
         return axes.index(label)
 
+    @property
+    def propagation_normal(self) -> tuple[float, float, float]:
+        """`propagation_axis` as a unit vector, e.g. `"+z"` -> `(0.0, 0.0, 1.0)`.
+
+        Parsed from the declaration for the same reason `field_axes` is: there is
+        one statement of the axis and everything reads it, so the string and the
+        vector cannot disagree. Added by CHE-185 (R07.1), which needs to refuse a
+        reference surface that is not perpendicular to the propagation axis --
+        writing `(0.0, 0.0, 1.0)` at that call site would be a second, silent
+        statement of this convention.
+        """
+        sign, axis = self.propagation_axis[0], self.propagation_axis[1:]
+        components = [0.0, 0.0, 0.0]
+        components["xyz".index(axis)] = 1.0 if sign == "+" else -1.0
+        return (components[0], components[1], components[2])
+
     def origin_index(self, count: int) -> int:
         """The index of coordinate zero on a spatial axis of `count` samples.
 

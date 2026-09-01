@@ -173,20 +173,36 @@ def test_operations_may_not_import_a_solver_or_a_coupler() -> None:
 def test_an_allowed_direction_to_an_unlanded_package_is_still_refused() -> None:
     """A legal direction is not the same fact as a package to import.
 
-    `couplers/` is an allowed target for `operators/`, but nothing has landed under
-    that name. Passing the import because the *direction* is legal would let a
-    ticket depend on a package it had not written -- and, for a name the reference
-    implementation also used, would silently accept whatever a partial revert put
-    there. `LANDED` is the second condition, and this pins that it is applied.
+    `planning/` is an allowed target for `runtime/`, and nothing has landed under
+    either name. Passing the import because the *direction* is legal would let a
+    ticket depend on a package it had not written. `LANDED` is the second
+    condition, and this pins that it is applied.
+
+    This used to be stated with `operators/ -> couplers/`, which CHE-185 (R07.1)
+    landed; the pair moved rather than the rule.
     """
-    assert "couplers" in ALLOWED["operators"]
-    assert "couplers" not in LANDED
+    assert "planning" in ALLOWED["runtime"]
+    assert "planning" not in LANDED
+    rule = _classify("runtime", "planning")
+    assert rule is not None
+    assert "has not been landed" in rule
+
+
+def test_a_reference_tree_name_carries_the_extra_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A name the reference implementation also used says so in the refusal.
+
+    The reviver of one gets the warning that a partial revert could have put old
+    code there, rather than only the generic "not landed". `couplers` is landed
+    now, so the message is exercised by un-landing it for the length of this test:
+    what is pinned is the message, not which packages happen to exist today.
+    """
+    assert "couplers" in SHARED_NAMES
+    monkeypatch.setattr(check_dependencies, "LANDED", LANDED - {"couplers"})
     rule = _classify("operators", "couplers")
     assert rule is not None
     assert "has not been landed" in rule
-    # A name the reference implementation also used says so, so the reviver of one
-    # gets the extra warning rather than only the generic refusal.
-    assert "couplers" in SHARED_NAMES
     assert "reference implementation" in rule
 
 
@@ -207,14 +223,14 @@ def test_a_package_under_a_reference_tree_name_is_not_pre_approved(
     than inferring it from the set arithmetic.
     """
     src = tmp_path / "src"
-    for package in [*sorted(LANDED), "couplers"]:
+    for package in [*sorted(LANDED), "runtime"]:
         (src / package).mkdir(parents=True)
         (src / package / "__init__.py").write_text("")
     monkeypatch.setattr(check_dependencies, "ROOT", tmp_path)
     monkeypatch.setattr(check_dependencies, "SRC", src)
 
     _, structural, _ = check_dependencies.verify()
-    assert any("src/couplers/" in problem and "LANDED" in problem for problem in structural), (
+    assert any("src/runtime/" in problem and "LANDED" in problem for problem in structural), (
         "a new package under a reference-tree name was not reported as unguarded:\n"
         + "\n".join(f"  {problem}" for problem in structural)
     )

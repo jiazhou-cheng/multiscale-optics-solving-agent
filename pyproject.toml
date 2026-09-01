@@ -67,6 +67,7 @@ where = ["src"]
 # glob is what picks up the `solvers.optiland` subpackage. Later tickets add
 # theirs, and `scripts/check_dependencies.py` holds the full declared set.
 include = [
+  "couplers*",
   "numerics*",
   "operations*",
   "operators*",
@@ -111,8 +112,9 @@ markers = [
 # solvers, couplers, benchmark tiers and tutorial reproductions that no longer
 # exist, and a registered marker matching nothing reads as a suite someone can
 # select. `slow` stays because addopts names it; `gpu` stays because
-# `make test-gpu` does. Neither selects anything yet, and both are honest about
-# why: there is no test to carry them until R02.
+# `make test-gpu` does. `slow` selects its first test as of CHE-185 (R07.1) --
+# the focal-peak convergence sweep in `tests/physics/test_ray_to_scalar.py`;
+# `gpu` still selects nothing outside `tests/numerics/`.
 
 [tool.ruff]
 line-length = 100

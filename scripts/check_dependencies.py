@@ -149,10 +149,24 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   so that moving an illumination *declaration* into `problems/` later is not a
 #:   second architecture change.
 #:
+#: * `couplers` -- landed by CHE-185 (R07.1): `ray_to_scalar.py`, the coherent
+#:   wavelet sum from a ray ensemble onto a grid. It imports `representations` and
+#:   `numerics`, which is its whole row. Three forbidden edges matter here and each
+#:   has a reason that is not taxonomy: `couplers -> solvers` would let a coupler
+#:   defect be misattributed to engine behaviour, which is the independence
+#:   property the old tree asserted with an AST walk and this tree inherits;
+#:   `couplers -> problems` would make a representation change depend on the
+#:   prescription that happened to produce the rays; and a backend import would end
+#:   the "one implementation serves every device" property, since the array module
+#:   is read off the bundle. Note also what this row does *not* permit and the
+#:   `operators` row does: `operators -> couplers` is allowed, the reverse is not,
+#:   because a coupler that reached for an operator would be propagating.
+#:
 #: Every later ticket adds its package here as it authors it, in the same change.
 #: When the graph is complete this equals `ALLOWED.keys()`.
 LANDED: frozenset[str] = frozenset(
     {
+        "couplers",
         "numerics",
         "operations",
         "operators",

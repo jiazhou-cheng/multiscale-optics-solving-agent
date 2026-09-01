@@ -228,7 +228,32 @@ SRC = ROOT / "src"
 #: built*, where the grid's Nyquist limit is also known and is the second refusal;
 #: a declaration object could not check that half, so it would validate less than
 #: the function does while adding a type.
+#: `couplers` is 2, raised from 0 by CHE-185 (R07.1). Neither is a coupler *object*:
+#: R07 budgets one diagnostics record plus enums, and `RayToWaveCoupler` -- 533 LOC
+#: of node wrapper in the reference implementation -- did not land, nor did
+#: `CoherentHandoff`, `DeclaredHandoffPlane`, `Perturbation`,
+#: `HandoffPerturbation`, `StreamingReconstruction`, `StreamingResult`,
+#: `PositionalAngularSampler`, `LaunchGeometry`, `BandLimit`, `ChunkWorkItem`,
+#: `CurvatureBudget`, the `Coupler` protocol with `CouplerRunRequest` /
+#: `CouplerRunResult`, or `GradientProblem` / `DifferentiabilityReport`.
+#: `tests/physics/test_ray_to_scalar.py` asserts their absence.
+#:
+#:   `ReconstructionDiagnostics`  rule 2 -- the public record a caller reads back,
+#:                                and the thing three of R07's acceptance criteria
+#:                                are statements about (which route produced the
+#:                                field, which measure was applied, what power was
+#:                                excluded). The alternative was a free-form dict,
+#:                                which is the provenance mapping R02.4 removed
+#:                                from `ScalarField` for the same reason.
+#:   `Projection`                 a `StrEnum`, the sanctioned alternative, counted
+#:                                because this gate is an AST count. It is not a
+#:                                boolean because the two members name two
+#:                                *operators* -- SI eq S5 and main-text eq 2 -- and
+#:                                a flag would name the factor instead of the
+#:                                physics.
+#:
 BUDGETS: dict[str, int] = {
+    "couplers": 2,
     "numerics": 7,
     "operations": 2,
     "operators": 0,
