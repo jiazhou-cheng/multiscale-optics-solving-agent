@@ -41,11 +41,27 @@ Pitch crosses in float64 and is *checked* against the backend, not read from it
 The backend stores `dx` as `float32` under `jax_enable_x64=False`, which is the
 only mode this adapter runs in. Reading the pitch back off the native field
 would therefore inject a ~6e-8 relative rounding into `extent_m` on every round
-trip, for a quantity the caller declared exactly. `from_native` instead compares
-the native pitch against the declared one and carries the declared float64
-value -- so a genuine pitch change (an `output_dx` the caller did not ask for) is
-a refusal, and a float32 storage artifact is not silently promoted to a physical
-one.
+trip, for a quantity the project can state exactly. `from_native` instead
+compares the native pitch against a **declared** one and carries the declared
+float64 value -- so a pitch the caller did not predict is a refusal, and a
+float32 storage artifact is not silently promoted to a physical one.
+
+The operation declares its output sampling; the boundary verifies it
+---------------------------------------------------------------------
+CHE-208 (R06.3). Until R06.3 the declaration was implicit and fixed: the result
+had to come back on the *source* field's pitch. That is right for ASM, which
+preserves sampling, and it is a hard stop for a Fourier-transforming operator,
+which must change it. So `expected_pitch_m` is now an argument, with no default:
+`propagate` passes the source pitch and behaves exactly as before, while
+`focal_plane_transform` passes `fourier_plane_pitch_m(...)`, the analytic value
+computed in float64 before the call.
+
+"Unexpected regrid" therefore stops meaning "any change at all" and starts
+meaning "not the change that was declared", which is the stronger statement. The
+argument is required and never defaulted or inferred: a declaration filled in
+from the native field would make the check a tautology, and a factor-of-`N`
+sampling error produces a physically plausible image at completely the wrong
+scale.
 
 Importing this module imports no backend. `import_backend` is the only route in,
 it is called from inside functions, and `tests/solvers/test_chromatix_boundary.py`
@@ -54,6 +70,7 @@ asserts that against `sys.modules` in a fresh interpreter.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -77,6 +94,7 @@ __all__ = [
     "PINNED_COMMIT",
     "PINNED_VERSION",
     "edge_energy_fraction",
+    "fourier_plane_pitch_m",
     "from_native",
     "import_backend",
     "native_state",
@@ -112,6 +130,17 @@ EDGE_ENERGY_REPORTING_THRESHOLD = 0.05
 #: before the difference is a physical change rather than a storage artifact.
 #: float32 carries ~1.2e-7 relative, so 1e-6 admits the storage rounding with a
 #: factor of eight in hand and rejects any real regrid.
+#:
+#: **Re-derived for the regridding path rather than carried over** (CHE-208). The
+#: ASM comparison is one float32 quantity round-tripping, so one epsilon. A
+#: Fourier-plane pitch is `dx * df * lambda * f`-worth of float32 arithmetic
+#: inside the backend -- `df` from `dx`, then a multiply and a divide -- so the
+#: accumulated relative error is a small multiple of 1.2e-7 rather than one of
+#: them. Four epsilons is 4.8e-7; 1e-6 still clears it, with about a factor of two
+#: in hand instead of eight. It is kept because a *real* regrid is never within a
+#: factor of two of the declared value -- the errors this catches are factors of
+#: `N`, of `n`, or of `2 pi` -- and tightening it to the measured margin would
+#: make the gate a float32 noise detector.
 _PITCH_STORAGE_RTOL = 1e-6
 
 
@@ -187,6 +216,7 @@ def from_native(
     *,
     source: ScalarField,
     requested: ArrayState,
+    expected_pitch_m: tuple[float, float],
     reference_surface: ReferenceSurface,
     validity: frozenset[ValidityFlag],
     pad_width: int,
@@ -198,6 +228,14 @@ def from_native(
     device the computation actually happened on. A NumPy caller therefore never
     receives a JAX buffer, and a JAX caller keeps its device residency instead of
     being pushed through the host to satisfy a type rule.
+
+    Args:
+        expected_pitch_m: the `(dy, dx)` the calling operation predicts, in
+            float64 project units. Required and never defaulted: it is the
+            declaration this boundary checks the backend against, and it is what
+            the returned field carries. A sampling-preserving operation passes the
+            source field's own pitch; a Fourier-transforming one passes
+            `fourier_plane_pitch_m(...)`.
 
     Raises:
         ValueError: the output landed on a device other than the one the
@@ -232,7 +270,16 @@ def from_native(
             "boundary to declare.",
             declaration="sample_pitch_m",
         )
-    declared = source.sample_pitch_m
+    declared = tuple(float(value) for value in expected_pitch_m)
+    if len(declared) != 2 or not all(math.isfinite(v) and v > 0.0 for v in declared):
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"expected_pitch_m={expected_pitch_m!r} is not a positive, finite (dy, dx) pair. "
+            "The operation has to predict its own output sampling for this boundary to "
+            "check anything; a declaration read back off the native field would make the "
+            "check a tautology.",
+            declaration="expected_pitch_m",
+        )
     if not all(
         abs(float(got) - want) <= _PITCH_STORAGE_RTOL * want
         for got, want in zip(native_pitch, declared, strict=True)
@@ -240,10 +287,11 @@ def from_native(
         raise ContractError(
             "REPRESENTATION_INCONSISTENT",
             f"the backend returned a sample pitch of {tuple(float(v) for v in native_pitch)} m "
-            f"where the field declared {declared} m. That is a regrid, not float32 storage "
-            f"rounding (which is bounded by {_PITCH_STORAGE_RTOL:g} relative), and an "
-            "extent taken from the declared pitch would be wrong by the ratio.",
-            declaration="sample_pitch_m",
+            f"where the operation declared {declared} m. That is a regrid the caller did not "
+            f"predict, not float32 storage rounding (which is bounded by "
+            f"{_PITCH_STORAGE_RTOL:g} relative), and an extent taken from the declared pitch "
+            "would be wrong by the ratio.",
+            declaration="expected_pitch_m",
         )
 
     return ScalarField(
@@ -251,7 +299,7 @@ def from_native(
         # The **declared** float64 pitch, checked against the backend above and
         # not read out of it: `dx` is float32 storage, and a round trip through it
         # would move every extent this project reports by ~6e-8 relative.
-        sample_pitch_m=declared,
+        sample_pitch_m=(declared[0], declared[1]),
         wavelength_m=source.wavelength_m,
         reference_surface=reference_surface,
         frame=source.frame,
@@ -259,6 +307,68 @@ def from_native(
         pad_width=pad_width,
         padded=padded,
     )
+
+
+def fourier_plane_pitch_m(
+    sample_pitch_m: tuple[float, float],
+    shape: tuple[int, int],
+    *,
+    wavelength_m: float,
+    focal_length_m: float,
+    medium_index: float,
+) -> tuple[float, float]:
+    """`(dy, dx)` at the focal plane conjugate to a grid of `shape` at `sample_pitch_m`.
+
+    The analytic sampling relation of an optical Fourier transform, per axis:
+
+        dx_out = lambda * f / (n * N * dx_in)
+
+    which is `df = 1 / (N dx)` -- the discrete Fourier relation -- scaled onto
+    position by `x = lambda f f_x / n`. Pure float64 arithmetic: it imports no
+    backend, takes no array, and is therefore both what an operator declares to
+    `from_native` and what a test holds the backend to.
+
+    It is *derivable* rather than merely *checkable* against the pinned build:
+    `chromatix.functional.optical_fft` computes `L_sq = lambda * z / n` and
+    `du = field.df * |L_sq|`, which is the same statement. That agreement is a
+    consistency check between two implementations of one formula, so the formula
+    is what gates; the comparison is evidence.
+
+    `shape` is the grid **actually transformed**, not the caller's window. `N`
+    is in the denominator, so padding an optical FT changes its output pitch --
+    which is why `focal_plane_transform` refuses a pad width rather than choosing
+    one.
+
+    Args:
+        sample_pitch_m: `(dy, dx)` of the input grid, in metres.
+        shape: `(ny, nx)` of the grid being transformed.
+        wavelength_m: vacuum wavelength, in metres.
+        focal_length_m: focal length, in metres. The sign of the transform
+            direction does not enter: `|f|` sets the scale either way.
+        medium_index: real index of the surrounding medium. It enters as
+            `lambda / n`, the wavelength in the medium.
+    """
+    if not (math.isfinite(focal_length_m) and focal_length_m != 0.0):
+        raise ValueError(
+            f"focal_length_m={focal_length_m!r} must be a finite, non-zero length in metres"
+        )
+    if not (math.isfinite(medium_index) and medium_index > 0.0):
+        raise ValueError(f"medium_index={medium_index!r} must be positive and finite")
+    if not (math.isfinite(wavelength_m) and wavelength_m > 0.0):
+        raise ValueError(f"wavelength_m={wavelength_m!r} must be positive and finite")
+
+    scale = float(wavelength_m) * abs(float(focal_length_m)) / float(medium_index)
+    pitches = []
+    for count, pitch in zip(shape, sample_pitch_m, strict=True):
+        count = int(count)
+        pitch = float(pitch)
+        if count < 1 or not (math.isfinite(pitch) and pitch > 0.0):
+            raise ValueError(
+                f"a transformed axis needs at least one sample and a positive pitch, got "
+                f"{count!r} samples at {pitch!r} m"
+            )
+        pitches.append(scale / (count * pitch))
+    return (pitches[0], pitches[1])
 
 
 def padded_shape(shape: tuple[int, int], pad_width: int) -> tuple[int, int]:

@@ -298,6 +298,9 @@ def propagate(
         out,
         source=field,
         requested=requested,
+        # ASM preserves sampling, so the declaration is the source pitch -- the
+        # same refusal this boundary made before it took a declaration at all.
+        expected_pitch_m=field.sample_pitch_m,
         reference_surface=ReferenceSurface(
             name=target_surface,
             z_m=surface.z_m + distance,

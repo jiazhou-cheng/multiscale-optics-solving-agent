@@ -61,6 +61,8 @@ CHROMATIX_NAMES = frozenset(
     {
         "Field",
         "asm_propagate",
+        "optical_fft",
+        "ff_lens",
         "compute_asm_propagator",
         "kernel_propagate",
         "compute_padding_transfer",

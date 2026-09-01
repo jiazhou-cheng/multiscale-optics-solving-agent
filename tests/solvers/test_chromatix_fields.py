@@ -31,6 +31,7 @@ from solvers.chromatix import fields
 from solvers.chromatix.fields import (
     NATIVE_DTYPE,
     edge_energy_fraction,
+    fourier_plane_pitch_m,
     from_native,
     native_state,
     padded_field_bytes,
@@ -189,12 +190,13 @@ def test_pad_width_and_crop_state_travel_with_the_field() -> None:
 
 
 def test_a_backend_regrid_is_refused_rather_than_reported_as_the_declared_pitch() -> None:
-    """The pitch check, driven directly: a native pitch that is not float32 rounding.
+    """The pitch check, driven directly: a native pitch nobody declared.
 
-    Reached with a stand-in rather than a real propagation because nothing this
-    package calls can produce it -- `output_dx` is not exposed. The check exists so
-    that if a later ticket exposes it, the mismatch is a refusal instead of an
-    extent that is wrong by the ratio and looks entirely plausible.
+    Reached with a stand-in rather than a real propagation because the ASM path
+    cannot produce it -- `output_dx` is not exposed. What the refusal means changed
+    at CHE-208 (R06.3): it is no longer "the pitch moved" but "the pitch is not the
+    one the operation predicted", which is why the declaration passed in here is
+    the source pitch and the stand-in returns twice it.
     """
     source = a_field()
     requested = ArrayState(NATIVE_DTYPE, DevicePlacement.parse("cpu"), ArrayNamespace.NUMPY)
@@ -206,6 +208,7 @@ def test_a_backend_regrid_is_refused_rather_than_reported_as_the_declared_pitch(
             regridded,
             source=source,
             requested=requested,
+            expected_pitch_m=source.sample_pitch_m,
             reference_surface=source.reference_surface,
             validity=frozenset(),
             pad_width=0,
@@ -221,11 +224,188 @@ def test_a_backend_regrid_is_refused_rather_than_reported_as_the_declared_pitch(
         rounded,
         source=source,
         requested=requested,
+        expected_pitch_m=source.sample_pitch_m,
         reference_surface=source.reference_surface,
         validity=frozenset(),
         pad_width=0,
         padded=False,
     ).sample_pitch_m == PITCH_M
+
+
+# ---------------------------------------------------------------------------
+# 2b. The declaration is the operation's, and it is not optional (CHE-208)
+# ---------------------------------------------------------------------------
+
+
+def test_a_declared_regrid_is_carried_when_the_backend_agrees() -> None:
+    """R06.3 criterion 1's boundary half: a *predicted* change is not a refusal.
+
+    The same stand-in that is refused above is accepted once the operation says
+    the change is the one it expects -- and what comes back is the **declared
+    float64** value, not the float32 the stand-in carried. This is the whole
+    difference R06.3 makes: `focal_plane_transform` cannot exist while any change
+    of sampling is an error.
+    """
+    source = a_field()
+    requested = ArrayState(NATIVE_DTYPE, DevicePlacement.parse("cpu"), ArrayNamespace.NUMPY)
+    declared = (PITCH_M[0], PITCH_M[1] * 2.0)
+    regridded = SimpleNamespace(
+        u=np.asarray(source.u), dx=np.asarray(declared, dtype=np.float32).reshape(1, 2)
+    )
+
+    out = from_native(
+        regridded,
+        source=source,
+        requested=requested,
+        expected_pitch_m=declared,
+        reference_surface=source.reference_surface,
+        validity=frozenset(),
+        pad_width=0,
+        padded=False,
+    )
+    assert out.sample_pitch_m == declared
+    assert out.sample_pitch_m != source.sample_pitch_m
+    # The declared float64 value, not the float32 the backend actually stored --
+    # which differs from it, so this is a real distinction and not a tautology.
+    stored = float(np.asarray(regridded.dx).reshape(-1)[1])
+    assert stored != declared[1]
+    assert out.sample_pitch_m[1] == declared[1]
+
+
+def test_the_declaration_has_no_default_and_cannot_be_inferred() -> None:
+    """R06.3's failing-open risk, pinned as a signature fact.
+
+    A declaration the boundary could fill in for itself would make the check a
+    tautology, and the errors it exists to catch -- a factor of `N`, of `n`, of
+    `2 pi` -- all produce a native pitch that a self-filled declaration would
+    match exactly.
+    """
+    source = a_field()
+    requested = ArrayState(NATIVE_DTYPE, DevicePlacement.parse("cpu"), ArrayNamespace.NUMPY)
+    native = SimpleNamespace(u=np.asarray(source.u), dx=np.asarray(PITCH_M).reshape(1, 2))
+    with pytest.raises(TypeError, match="expected_pitch_m"):
+        from_native(  # type: ignore[call-arg]
+            native,
+            source=source,
+            requested=requested,
+            reference_surface=source.reference_surface,
+            validity=frozenset(),
+            pad_width=0,
+            padded=False,
+        )
+
+    with pytest.raises(ContractError) as caught:
+        from_native(
+            native,
+            source=source,
+            requested=requested,
+            expected_pitch_m=(0.0, PITCH_M[1]),
+            reference_surface=source.reference_surface,
+            validity=frozenset(),
+            pad_width=0,
+            padded=False,
+        )
+    assert caught.value.code == "MISSING_DECLARATION"
+
+
+# ---------------------------------------------------------------------------
+# 2c. The Fourier-plane sampling relation, as pure arithmetic (CHE-208)
+# ---------------------------------------------------------------------------
+
+FOCAL_LENGTH_M = 20e-3
+
+
+def test_the_fourier_pitch_is_lambda_f_over_n_times_the_extent() -> None:
+    """`dx_out = lambda f / (n N dx_in)`, per axis, on a doubly asymmetric grid.
+
+    The oracle is the discrete Fourier relation itself -- `df = 1/(N dx)` scaled
+    onto position by `x = lambda f f_x / n` -- computed here in float64 from the
+    definition rather than from the implementation. The grid is asymmetric in both
+    sample count and pitch, so a transposed axis cannot pass.
+    """
+    shape = (48, 64)
+    got = fourier_plane_pitch_m(
+        PITCH_M,
+        shape,
+        wavelength_m=WAVELENGTH_M,
+        focal_length_m=FOCAL_LENGTH_M,
+        medium_index=1.0,
+    )
+    expected = tuple(
+        WAVELENGTH_M * FOCAL_LENGTH_M / (1.0 * n * d)
+        for n, d in zip(shape, PITCH_M, strict=True)
+    )
+    assert got == pytest.approx(expected, rel=1e-15)
+    # The two axes differ, which is what makes the transposition check below mean
+    # something: 48 x 0.30 um and 64 x 0.25 um have different extents.
+    assert got[0] != got[1]
+
+
+def test_a_transposed_declaration_is_a_different_number() -> None:
+    """The falsifiable twin. Swapping the axes moves the answer well past tolerance."""
+    shape = (48, 64)
+    upright = fourier_plane_pitch_m(
+        PITCH_M, shape, wavelength_m=WAVELENGTH_M, focal_length_m=FOCAL_LENGTH_M, medium_index=1.0
+    )
+    transposed = fourier_plane_pitch_m(
+        (PITCH_M[1], PITCH_M[0]),
+        shape,
+        wavelength_m=WAVELENGTH_M,
+        focal_length_m=FOCAL_LENGTH_M,
+        medium_index=1.0,
+    )
+    for got, other in zip(upright, transposed, strict=True):
+        assert abs(got / other - 1.0) > 0.1, "a transposed pitch has to be visible here"
+
+
+def test_the_relation_inverts_itself_exactly() -> None:
+    """Applying it twice returns the input pitch -- exactly, in float64.
+
+    This is the arithmetic behind R06.4's round trip: the declared value a `+f`
+    then `-f` pair predicts is the input's own pitch, so the round trip's pitch
+    claim is an identity rather than a tolerance.
+    """
+    shape = (48, 64)
+    once = fourier_plane_pitch_m(
+        PITCH_M, shape, wavelength_m=WAVELENGTH_M, focal_length_m=FOCAL_LENGTH_M, medium_index=1.0
+    )
+    twice = fourier_plane_pitch_m(
+        once, shape, wavelength_m=WAVELENGTH_M, focal_length_m=FOCAL_LENGTH_M, medium_index=1.0
+    )
+    assert twice == pytest.approx(PITCH_M, rel=1e-15)
+
+
+def test_the_medium_index_enters_as_lambda_over_n() -> None:
+    """`n` is not decoration: a water-immersion index halves nothing by accident."""
+    shape = (48, 64)
+    vacuum = fourier_plane_pitch_m(
+        PITCH_M, shape, wavelength_m=WAVELENGTH_M, focal_length_m=FOCAL_LENGTH_M, medium_index=1.0
+    )
+    medium = fourier_plane_pitch_m(
+        PITCH_M, shape, wavelength_m=WAVELENGTH_M, focal_length_m=FOCAL_LENGTH_M, medium_index=1.33
+    )
+    assert medium == pytest.approx(tuple(v / 1.33 for v in vacuum), rel=1e-15)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"focal_length_m": 0.0},
+        {"focal_length_m": math.inf},
+        {"medium_index": 0.0},
+        {"wavelength_m": -1.0},
+    ],
+)
+def test_the_relation_refuses_arguments_it_cannot_scale(kwargs: dict[str, float]) -> None:
+    """Each argument is a physical quantity, and none of them has a sane zero."""
+    call = {
+        "wavelength_m": WAVELENGTH_M,
+        "focal_length_m": FOCAL_LENGTH_M,
+        "medium_index": 1.0,
+        **kwargs,
+    }
+    with pytest.raises(ValueError):
+        fourier_plane_pitch_m(PITCH_M, (48, 64), **call)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------

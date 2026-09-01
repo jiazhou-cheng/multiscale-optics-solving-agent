@@ -42,8 +42,14 @@ def a_model(**overrides: object) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def test_one_public_entry_point() -> None:
-    """`propagate` is the API. Everything else exported is a declaration or a diagnostic."""
+def test_the_public_entry_points_are_the_two_operations() -> None:
+    """Two operations, and everything else exported is a declaration or a diagnostic.
+
+    `propagate` (CHE-184) is free-space evolution by a distance; CHE-209 added
+    `focal_plane_transform`, the ideal lens between its two focal planes. They are
+    separate entry points because they are separate physics -- one preserves the
+    sampling and the other must change it -- and neither is a mode of the other.
+    """
     callables = {
         name
         for name in chromatix.__all__
@@ -51,8 +57,10 @@ def test_one_public_entry_point() -> None:
     }
     assert callables == {
         "propagate",
+        "focal_plane_transform",
         "carrier_phase_rad",
         "edge_energy_fraction",
+        "fourier_plane_pitch_m",
         "padded_field_bytes",
         "padded_shape",
     }

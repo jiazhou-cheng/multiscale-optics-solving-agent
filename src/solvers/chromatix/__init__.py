@@ -21,6 +21,10 @@ Two modules, in dependency order:
 * `solver` -- CHE-184. The propagation itself, and the carrier-phase answer: a
   returned field states in its typed `validity` whether its phase is absolute or
   carrier-removed, because the two differ by a constant that `|U|^2` cannot see.
+* `focal_plane` -- CHE-209. The ideal lens as the transformation between its two
+  focal planes: the one operation here that legitimately *changes* the sample
+  pitch, which it declares in float64 and the boundary then checks the backend
+  against.
 
 Importing this package imports **no backend**: `chromatix` and `jax` are imported
 inside `fields.import_backend`, which is called from inside the functions that
@@ -35,9 +39,11 @@ from solvers.chromatix.fields import (
     CAPABILITIES,
     EDGE_ENERGY_REPORTING_THRESHOLD,
     edge_energy_fraction,
+    fourier_plane_pitch_m,
     padded_field_bytes,
     padded_shape,
 )
+from solvers.chromatix.focal_plane import DIRECTIONS, focal_plane_transform
 from solvers.chromatix.solver import (
     DERIVATIVE,
     MODELS,
@@ -48,10 +54,13 @@ from solvers.chromatix.solver import (
 __all__ = [
     "CAPABILITIES",
     "DERIVATIVE",
+    "DIRECTIONS",
     "EDGE_ENERGY_REPORTING_THRESHOLD",
     "MODELS",
     "carrier_phase_rad",
     "edge_energy_fraction",
+    "focal_plane_transform",
+    "fourier_plane_pitch_m",
     "padded_field_bytes",
     "padded_shape",
     "propagate",
