@@ -81,6 +81,58 @@ propagation direction to give a ray -- so it is reported as a named fraction. A
 large fraction is the signature of a field that should not be turned into rays at
 all.
 
+The stochastic estimator, and the axis it samples
+--------------------------------------------------
+CHE-190 (R08.2). Three draw rules, all unbiased for any density, differing only in
+how `N` draws are spread over the bins. Every one of them reduces to a single
+formula, which is the only thing a reader has to trust. Writing `pi_m` for the
+**expected number of times bin `m` is drawn** by the whole scheme,
+
+    E[ (1/N) sum_i w_i a_i ]  =  (1/N) sum_m pi_m w_m a_m  ==  sum_m a_m
+      =>  w_m = N / pi_m.
+
+* `iid` -- independent draws from `q`. `pi_m = N q_m`, so `w_m = 1 / q_m`: the
+  textbook importance weight, and what the reference implementation did.
+* `stratified_cdf` -- one draw from each of `N` equal-**probability** intervals of
+  `q`'s CDF. Marginally still `pi_m = N q_m`, so the weight is *identical* to the
+  i.i.d. one; what changes is that the clumping is gone. This is how
+  stratification and importance sampling compose.
+* `jittered_grid` -- one draw from each of `N` equal-**count** intervals of the bin
+  index axis. Then `pi_m = N / D` for every bin whatever `q` is, so `w_m = D` and
+  the density has been cancelled. That is measured rather than argued, and it is
+  kept because the cancellation is a real property worth having on record: equal
+  *area* strata with one draw each fix the between-stratum allocation to uniform,
+  and only the within-stratum choice can still follow the density.
+
+The variance-optimal density, and the size of the prize
+-------------------------------------------------------
+For an estimator of `sum_m U~[m]` drawn from `q`, the second moment is
+`sum_m |U~_m|^2 / q_m` and Cauchy-Schwarz puts its minimum at `q ~ |U~|` -- which
+is `SamplingDensity` `"magnitude"`. `predicted_variance_ratio` evaluates the gain
+in closed form,
+
+    D sum f^2 / [ (sum m) (sum f^2 / m) ],   f = |U~|,
+
+which is 1 for a uniform density and maximal at `m = f`. It is a **prediction to
+be measured, not a result**: it is reported per configuration rather than asserted
+once, because it is a property of how concentrated that spectrum is and nothing
+transfers between fields.
+
+What is *not* here, and why
+---------------------------
+The reference implementation's positional machinery -- candidate index grids over
+a dilated aperture, window-energy and spectral-L1 maps over a DOE field, patch
+windows in pixels -- is not ported. It belongs to the **patch** estimator, which
+R10.3 owns, and none of it has a consumer in this tree: there is no patch
+operation, no DOE field type and no cascade. Landing it here would be production
+code with no caller. The draw rules themselves are density-agnostic, so they are
+ported onto the axis this coupler actually samples -- the spectral one -- and
+`DrawRule` is named for what it does rather than for the axis the old tree applied
+it to.
+
+There is also no chunking framework. If a workload needs chunking that is the
+executor's concern or the caller's, not the coupler's.
+
 Sampling is an input, not a side effect
 ---------------------------------------
 Indices are drawn from an explicitly seeded generator and the kernel that turns
@@ -113,6 +165,7 @@ This module imports no solver and no backend.
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
@@ -136,9 +189,13 @@ from representations import (
 )
 
 __all__ = [
+    "DRAW_RULES",
     "SAMPLING_DENSITIES",
+    "SELECTION_RULES",
+    "DrawRule",
     "SamplingDensity",
     "SamplingDiagnostics",
+    "predicted_variance_ratio",
     "scalar_to_ray",
 ]
 
@@ -161,6 +218,37 @@ __all__ = [
 SamplingDensity = Literal["uniform", "magnitude"]
 
 SAMPLING_DENSITIES: tuple[SamplingDensity, ...] = ("uniform", "magnitude")
+
+#: How the `N` draws are spread over the bins. See the module docstring for the
+#: one formula all three reduce to.
+#:
+#: A `Literal` for the same reason `SamplingDensity` is: the ticket budgets R08.2
+#: at **0** production classes, and this gate counts a `StrEnum` as one.
+#:
+#: `iid`
+#:     Independent draws from the density. The reference implementation's rule and
+#:     the default, so the existing path is unchanged.
+#: `stratified_cdf`
+#:     One draw from each of `N` equal-probability intervals of the CDF. Same
+#:     weight as `iid`, clumping removed. The way to combine stratification with
+#:     importance sampling.
+#: `jittered_grid`
+#:     One draw from each of `N` equal-count intervals of the bin index axis.
+#:     **Cancels the density**, by construction, and the weight becomes the bin
+#:     count. Kept because that cancellation is a measured property, not because
+#:     it is the way to combine the two levers.
+DrawRule = Literal["iid", "stratified_cdf", "jittered_grid"]
+
+DRAW_RULES: tuple[DrawRule, ...] = ("iid", "stratified_cdf", "jittered_grid")
+
+#: What `SamplingDiagnostics.draw` may say: a `DrawRule`, or `"exhaustive"`.
+#:
+#: The fourth value exists because an enumeration has no draw rule -- it selects
+#: every bin once by definition -- and reporting the ignored default would be a
+#: record claiming a decision that had no effect. Enumerated so a consumer
+#: validating the field has something to validate against; `DRAW_RULES` alone would
+#: reject every enumeration.
+SELECTION_RULES: tuple[str, ...] = (*DRAW_RULES, "exhaustive")
 
 #: Axial direction cosine below which a surviving mode is *counted* as grazing.
 #:
@@ -211,6 +299,24 @@ class SamplingDiagnostics:
     #: limit; a stochastic draw records its seed so the ensemble is reproducible.
     selection: str
     density: str
+    draw: str
+    #: The variance reduction against uniform that the scheme **actually
+    #: realizes**, from `predicted_variance_ratio`. A prediction to be measured,
+    #: not a result.
+    #:
+    #: Realized, not requested, and the distinction is load-bearing:
+    #: `jittered_grid` cancels the density by construction, so
+    #: `density="magnitude", draw="jittered_grid"` reports **1.0** here rather than
+    #: the 44x the density would buy under a rule that used it. A record stamping a
+    #: 44x reduction it did not get would be the same silent wrong answer this
+    #: module refuses `count=None` with a non-uniform density for.
+    predicted_variance_ratio: float
+
+    #: Mean of the emitted `measure_weight`. Diagnostic only, and deliberately not
+    #: offered as evidence of anything: `E[mean w] = D` for all three rules, so it
+    #: distinguishes them only by being *exactly* `D` under `jittered_grid`, which a
+    #: reader of a stamped record cannot see.
+    mean_measure_weight: float
     seed: int | None
     drawn_mode_count: int
     launch_position_count: int
@@ -311,18 +417,105 @@ def _density_over(
     return density
 
 
-def _draw_indices(density: Any, count: int, rng: np.random.Generator) -> np.ndarray[Any, Any]:
-    """Draw `count` spectral-bin indices from `density`.
+def predicted_variance_ratio(amplitudes: Any, density: Any) -> float:
+    """The variance reduction `density` predicts against uniform, in closed form.
+
+    The quantity predicted is the mean squared error of the **reconstructed
+    field**, which by Parseval is the sum over modes of each coefficient's own
+    variance. Coefficient `m` is estimated by the draws that landed on bin `m`, so
+    `Var(c_m) = (f_m^2 / q_m - f_m^2) / N` with `f = |U~|`, and summing gives
+    `(sum f^2/q - sum f^2) / N`. With `q = m / sum m`,
+
+        ratio  =  ( D sum f^2 - sum f^2 )  /  ( (sum m)(sum f^2/m) - sum f^2 ).
+
+    It is 1 for a uniform density, and Cauchy-Schwarz puts its maximum at `m = f`.
+
+    Note which estimand this is. The variance of the estimate of the *single
+    number* `S = sum_m U~[m]` -- the field at the coordinate origin -- carries
+    `|S|^2` in place of `sum f^2`, and the two are very different for a
+    phase-aligned spectrum: on this module's Gaussian fixture the field-MSE ratio
+    is 47 and the point-estimate ratio is 1.7e4, because a Gaussian's spectrum is
+    real and positive so `S = sum f` and the point estimator is very nearly exact.
+    The field is what a caller reconstructs, so the field is what is predicted.
+
+    **The `- sum f^2` terms are kept, and that is a departure from the reference
+    implementation.** `patch_positions.predicted_variance_ratio` evaluated the
+    second-moment ratio `D sum f^2 / [(sum m)(sum f^2/m)]`, which is this
+    expression's `sum f^2 -> 0` limit and is what a *very* noisy estimator
+    approaches. The difference is not always negligible: on this module's Gaussian
+    fixture the second-moment form gives 44.48 against 47.17 here, a 6 %
+    underestimate, while on a white-noise field the two agree to 0.03 %. Dropping
+    the terms would make the prediction systematically low in exactly the
+    concentrated regime the number exists to describe.
+    `tests/physics/test_scalar_to_ray_estimator.py` reproduces the reference form as
+    the stated limit, so the ported quantity is still checkable.
+
+    Returns `inf` when the density makes the estimator exact -- `m = f` on a
+    spectrum with a single nonzero mode, where every draw returns that mode and
+    every coefficient's variance is identically zero. That is a real answer rather
+    than an overflow.
+
+    **A prediction to be measured, not a result.** It is a property of how
+    concentrated one spectrum is, so nothing about it transfers between fields and
+    it is reported per configuration rather than asserted once.
+
+    Public because a caller sizing a ray budget needs it *before* drawing, and pure
+    over arrays rather than over a field so it can be checked against a hand-worked
+    case. Note that it reads its arguments on the host, so on a device path it is
+    one synchronization of `D` elements.
+    """
+    a = np.asarray(amplitudes)
+    f = np.abs(a).astype(np.float64)
+    m = np.asarray(density, dtype=np.float64)
+    if f.shape != m.shape:
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"amplitudes {f.shape} must align with the density {m.shape}",
+            declaration="density",
+        )
+    support = m > 0.0
+    if np.any(f[~support] > 0.0):
+        raise ContractError(
+            "MISSING_DECLARATION",
+            "the density is zero on a bin where the spectrum is nonzero, so its "
+            "variance is infinite rather than merely large",
+            declaration="density",
+        )
+    # The subtracted term is `sum f^2`, not `|sum a|^2`: this predicts the field's
+    # mean squared error, which sums each mode coefficient's own variance.
+    self_power = float(np.sum(f**2))
+    numerator = float(f.size) * self_power - self_power
+    denominator = (
+        float(np.sum(m)) * float(np.sum(f[support] ** 2 / m[support])) - self_power
+    )
+    if denominator <= 0.0:
+        # Cauchy-Schwarz makes the denominator non-negative, and zero exactly when
+        # this density drives every coefficient's variance to zero. `inf` is then
+        # the ratio, not a failure.
+        return math.inf
+    return numerator / denominator
+
+
+def _select_modes(
+    density: Any, count: int, rng: np.random.Generator, rule: DrawRule
+) -> tuple[np.ndarray[Any, Any], np.ndarray[Any, Any]]:
+    """`(indices, per-draw measure weight)` for `count` draws under `rule`.
+
+    Returns the weight as well as the indices because the two are one decision:
+    `w_m = N / pi_m` and `pi_m` is a property of the *scheme*, not of the density
+    it was built from. Returning only indices and leaving the caller to write
+    `1 / q` would silently be wrong for `jittered_grid`, which is exactly the
+    failure the module docstring's single formula exists to prevent.
 
     The draw is host work by construction: `numpy.random.Generator` is what pins
     the seed, and bitwise reproducibility across devices is worth more here than
-    avoiding one copy of a probability vector. `np.asarray` is written out rather
-    than left to happen inside `rng.choice`, so the host read is visible in the
-    source and not a surprise in a profile.
+    avoiding one copy of a probability vector. The host read is written out rather
+    than left to happen inside `rng.choice`, so it is visible in the source and not
+    a surprise in a profile.
 
-    The renormalization after the widening is not cosmetic: NumPy requires `p` to
-    sum to 1 within a tight tolerance, and a complex64 spectrum's float32 density
-    does not once it is cast to float64.
+    The renormalization after the widening is not cosmetic: a complex64 spectrum's
+    float32 density does not sum to 1 within NumPy's tolerance once cast to
+    float64.
     """
     if count <= 0:
         raise ContractError(
@@ -330,9 +523,38 @@ def _draw_indices(density: Any, count: int, rng: np.random.Generator) -> np.ndar
             f"the mode count must be positive, got {count}",
             declaration="count",
         )
+    if rule not in DRAW_RULES:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"draw must be one of {list(DRAW_RULES)}, got {rule!r}",
+            declaration="draw",
+        )
     host = np.asarray(density, dtype=np.float64)
     host = host / host.sum()
-    return rng.choice(host.size, size=count, p=host)
+    bins = host.size
+
+    if rule == "iid":
+        # pi_m = N q_m.
+        indices = rng.choice(bins, size=count, p=host)
+        return indices, 1.0 / host[indices]
+
+    # Both stratified rules place one draw in each of `count` equal intervals of
+    # [0, 1) and jitter within it, so the marginal of `u` is Uniform(0, 1) exactly
+    # -- which is what keeps them unbiased. What differs is the axis the intervals
+    # are equal on.
+    jitter = (np.arange(count, dtype=np.float64) + rng.random(count)) / count
+
+    if rule == "stratified_cdf":
+        # Equal *probability* intervals: pi_m = N q_m, the same as i.i.d.
+        indices = np.searchsorted(np.cumsum(host), jitter, side="right")
+        indices = np.clip(indices, 0, bins - 1)
+        return indices, 1.0 / host[indices]
+
+    # Equal *count* intervals of the bin index axis: pi_m = N / D for every bin,
+    # whatever the density, so the weight is the bin count and the density has
+    # been cancelled.
+    indices = np.clip((jitter * bins).astype(np.int64), 0, bins - 1)
+    return indices, np.full(count, float(bins), dtype=np.float64)
 
 
 def _require_seed_matches(rng: np.random.Generator, seed: int | None) -> None:
@@ -370,6 +592,7 @@ def scalar_to_ray(
     surface: ReferenceSurface | None = None,
     count: int | None = None,
     density: SamplingDensity = "uniform",
+    draw: DrawRule = "iid",
     rng: np.random.Generator | None = None,
     seed: int | None = None,
     launch_positions_xy_m: Any = None,
@@ -390,6 +613,10 @@ def scalar_to_ray(
         draws that many modes, and then `rng` is required.
     density
         `"uniform"` or `"magnitude"`. See `SamplingDensity`.
+    draw
+        How the draws are spread over the bins: `"iid"` (the default),
+        `"stratified_cdf"` or `"jittered_grid"`. See `DrawRule`. Ignored under an
+        exhaustive enumeration, which selects every bin once by definition.
     rng, seed
         The generator to draw from, and the seed to record. Supply `rng` for a
         stochastic draw; `seed` is recorded in the diagnostics so an ensemble can
@@ -414,6 +641,15 @@ def scalar_to_ray(
     field on the representation that quietly becomes load-bearing.
     """
     emitted_surface = _require_declared_surface(field, surface)
+    if draw not in DRAW_RULES:
+        # Checked here rather than inside the draw, so an exhaustive enumeration --
+        # which never reaches `_select_modes` -- cannot accept a rule that does not
+        # exist and then record `"exhaustive"` as though nothing were wrong.
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"draw must be one of {list(DRAW_RULES)}, got {draw!r}",
+            declaration="draw",
+        )
 
     ny, nx = field.shape
     dy, dx = field.sample_pitch_m
@@ -498,6 +734,9 @@ def scalar_to_ray(
                 ),
             )
         indices = np.arange(int(amplitudes.shape[0]), dtype=np.int64)
+        # Every bin drawn exactly once, so `pi_m = 1` and `w_m = N = D` -- which
+        # is `1 / q_m` under the uniform density, the only one this branch admits.
+        selected_weight = np.full(int(amplitudes.shape[0]), float(amplitudes.shape[0]))
         selection = "exhaustive"
     else:
         if rng is None:
@@ -510,13 +749,12 @@ def scalar_to_ray(
                 remedy="Pass numpy.random.default_rng(seed), and pass the same seed.",
             )
         _require_seed_matches(rng, seed)
-        indices = _draw_indices(probabilities, count, rng)
+        indices, selected_weight = _select_modes(probabilities, count, rng, draw)
         selection = "stochastic"
 
     selected_transverse = transverse[indices]
     selected_axial = axial[indices]
     selected_amplitudes = amplitudes[indices]
-    selected_probabilities = probabilities[indices]
     directions = xp.column_stack([selected_transverse, selected_axial]).astype(real_np)
 
     if launch_positions_xy_m is None:
@@ -562,7 +800,7 @@ def scalar_to_ray(
             f"zero at the emitting surface {emitted_surface.name!r}; the accumulated "
             "path restarts here"
         ),
-        measure_weight=xp.tile(1.0 / selected_probabilities, launch_count).astype(real_np),
+        measure_weight=xp.tile(xp.asarray(selected_weight, dtype=real_np), launch_count),
         # This ensemble is a Monte-Carlo estimate of an integral -- of a *sum* of
         # modes when the selection is exhaustive, which is the same estimator with
         # zero variance -- so a coherent reconstruction from it owes the 1/N of SI
@@ -584,6 +822,16 @@ def scalar_to_ray(
         min_axial_direction_cosine=float(xp.min(axial)),
         selection=selection,
         density=density,
+        draw="exhaustive" if selection == "exhaustive" else draw,
+        # The density the scheme realizes: `jittered_grid` cancels whatever was
+        # asked for, so uniform is what its variance actually follows.
+        predicted_variance_ratio=predicted_variance_ratio(
+            np.asarray(amplitudes),
+            np.ones(int(amplitudes.shape[0]))
+            if draw == "jittered_grid" and selection == "stochastic"
+            else np.asarray(probabilities),
+        ),
+        mean_measure_weight=float(xp.mean(rays.measure_weight)),
         seed=seed,
         drawn_mode_count=mode_count,
         launch_position_count=launch_count,

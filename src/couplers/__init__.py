@@ -25,9 +25,10 @@ Two modules, one per direction:
   `RayBundle -> ScalarField`, with the projection convention, the sampling measure
   and the grazing-mode phase floor each stated and refusable rather than defaulted,
   and two numerical realizations of the same sum selected by an argument.
-* `scalar_to_ray` (CHE-189, R08.1) -- the angular-spectrum decomposition
-  `ScalarField -> RayBundle`, emitting modes whose amplitude and measure the
-  wavelet sum accepts.
+* `scalar_to_ray` (CHE-189/190, R08.1-R08.2) -- the angular-spectrum
+  decomposition `ScalarField -> RayBundle`, emitting modes whose amplitude and
+  measure the wavelet sum accepts, with three draw rules over the spectral axis
+  and the variance each predicts.
 
 **There is no round-trip operation, and there will not be one.** A ray -> wave ->
 ray conversion with no physical transformation in between changes no state; it is
@@ -37,8 +38,12 @@ would advertise a physical capability that is really a test fixture.
 Not here either: `AngularSpectrum` as a public type. It is an intermediate, not a
 boundary artifact -- nothing outside `scalar_to_ray` consumes one, and making it
 public would add a third representation to a tree whose whole point is that there
-are two. Also avoided on the scalar-to-ray side: `SamplingPerturbation`,
-`PositionPlan`, `PatchPlan` and `Ensemble`.
+are two. Also avoided on the scalar-to-ray side: `SamplingPerturbation`, `PositionPlan`,
+`PatchPlan`, `Ensemble`, `PositionalAngularSampler`, `LaunchGeometry`,
+`ChunkWorkItem`, `StreamingResult` and `StreamingReconstruction` -- nine classes
+for what is a sampling function plus a diagnostics record. **And no chunking
+framework**: if a workload needs chunking that is the executor's concern or the
+caller's, not the coupler's.
 
 Not here, deliberately: `RayToWaveCoupler` and the 533-LOC node wrapper around it,
 `CoherentHandoff`, `DeclaredHandoffPlane`, `Perturbation`, `HandoffPerturbation`,
@@ -65,18 +70,23 @@ from couplers.ray_to_scalar import (
     ray_to_scalar,
 )
 from couplers.scalar_to_ray import (
+    DRAW_RULES,
     SAMPLING_DENSITIES,
+    DrawRule,
     SamplingDensity,
     SamplingDiagnostics,
+    predicted_variance_ratio,
     scalar_to_ray,
 )
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
     "DEFAULT_PHASE_BUDGET_RAD",
+    "DRAW_RULES",
     "REFUSALS",
     "SAMPLING_DENSITIES",
     "SCALE_NOTE",
+    "DrawRule",
     "GrazingPolicy",
     "Normalization",
     "Projection",
@@ -86,6 +96,7 @@ __all__ = [
     "SamplingDiagnostics",
     "grazing_floor_for_phase_budget",
     "grid_nyquist_direction_limit",
+    "predicted_variance_ratio",
     "ray_to_scalar",
     "scalar_to_ray",
 ]

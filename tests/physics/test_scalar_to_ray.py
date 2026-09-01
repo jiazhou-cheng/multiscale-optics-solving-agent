@@ -669,7 +669,10 @@ def test_the_decomposition_registers_as_a_coupler(isolated_registry: None) -> No
                 "represented",
                 "exhaustive enumeration is exact only under the uniform density",
             ),
-            evidence=("tests/physics/test_scalar_to_ray.py",),
+            evidence=(
+                "tests/physics/test_scalar_to_ray.py",
+                "tests/physics/test_scalar_to_ray_estimator.py",
+            ),
             capabilities=None,
             derivative="forward_only",
         )
