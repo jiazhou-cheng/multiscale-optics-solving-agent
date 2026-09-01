@@ -97,6 +97,40 @@ the sum a Monte-Carlo estimator of a spectrum and owes the `1/N` of SI eqs
 S3/S5. Both are stated by `measure_kind`, so a second argument saying the same
 thing could only ever disagree with it.
 
+**An undeclared measure is refused, and that refusal is not fussiness.**
+`sum_i dA_i -> pi a^2` as the ring count grows, so the reconstructed discrete
+power *converges* under ray refinement. Without the area element the sum is pinned
+to the ray count instead of to the aperture: measured on a hexapolar fan from 217
+to 49 537 rays, `d log P / d log N` is **2.0038** with an equal weight per ray and
+**-0.0002** with the area element. Peak-normalized metrics cannot see the
+difference, which is exactly why the wrong convention survived three milestones.
+
+**What the weight is not.** Not an apodization, and not a substitute for one: it
+is fixed by how the pupil was *sampled*, not by the physics of the aperture. So
+the non-uniform launch amplitude it produces at the rim does **not** exercise this
+kernel's response to a physically apodized, vignetted or Fresnel-weighted pupil.
+Those remain untested and must not be claimed. It is also not the cause of
+sampling artifacts: on the reference implementation's frozen configuration the
+weight appears to shift the measured first-null radius by 3.6 %, and grid
+refinement showed that to be 2.44 pixels per Airy radius rather than the weight.
+That, like the paragraph below, is a **transcribed** finding -- nothing in the new
+tree has re-measured it.
+
+**Open item, carried forward rather than closed (CHE-187 criterion 6).** On an
+off-axis field of the reference implementation's four-element benchmark lens, the
+residual against the analytic Airy profile went from `1.48e-3` to `1.11e-2` when
+the weight was introduced, and removing the weight improves it 7.5x. On axis the
+same metric barely moved (`5.87e-3 -> 5.51e-3`). The rim taper is a *plausible*
+cause -- a uniform-pupil Airy oracle sees a tapered pupil as a mismatch, and an
+off-axis pupil is sampled asymmetrically -- but that is a **hypothesis, not a
+measurement**, and it is not resolved by widening a tolerance. Neither that
+system nor an off-axis Airy oracle exists in the new tree, so nothing here
+re-measures it. The numbers are recorded so the ticket that lands the comparison
+inherits them; the system is named in
+`tests/physics/test_ray_to_scalar_refusals.py`, because a benchmark lens is
+measured evidence and `tests/problems/test_fixtures.py` keeps its name out of
+production for exactly that reason.
+
 The absolute scale, and what it is not
 --------------------------------------
 Ray-density-independent but **not** SI-absolute. The kernel omits the
@@ -237,6 +271,7 @@ from representations import (
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
+    "REFUSALS",
     "SCALE_NOTE",
     "Normalization",
     "Projection",
@@ -359,6 +394,63 @@ _NORMALIZATION_FOR_MEASURE: dict[str, Normalization] = {
 #: then reports `not_computed_above_scan_limit` instead of a number, because a
 #: fabricated estimate of a sampling condition is worse than an absent one.
 _NEAREST_NEIGHBOUR_SCAN_LIMIT = 4096
+
+#: Every contract code raised *in this module*, plus the two `RayBundle` raises on
+#: the way in -- with what each means at this boundary.
+#:
+#: Deliberately not "everything a caller can catch". A `ContractError` can also
+#: arrive from `ScalarField.__post_init__` on the way out -- `NON_FINITE` if a
+#: coherent sum overflows the compute dtype, for instance -- and enumerating another
+#: type's intake here would be a copy that drifts. What this table is complete over
+#: is the refusals this function *decides*, which is the set a caller branches on to
+#: fix its own declaration.
+#:
+#: A dict and not a class: it is a table, and R07.3 budgets no class. Enumerated
+#: for the reason `representations.CONTRACT_CODES` and `numerics.REFUSAL_CODES` are
+#: -- a declared failure a caller could branch on, with nothing able to raise it,
+#: is a claim about a path that does not exist. The reference implementation caught
+#: a real one that way (`test_contract_code_reachability.py`), and
+#: `tests/physics/test_ray_to_scalar_refusals.py` ports the principle in both
+#: directions: every code here is reachable *through this function*, and every
+#: `ContractError` code raised anywhere in this module is listed here.
+#:
+#: The last two are raised by `RayBundle.require_coherent()` rather than by this
+#: module, and they are in the table because they are part of *this* boundary's
+#: contract: a caller of `ray_to_scalar` branches on them here, and where the
+#: `raise` statement physically lives is not something it can see.
+REFUSALS: dict[str, str] = {
+    "MEASURE_UNDECLARED": (
+        "the bundle states no integration measure, so the quadrature the sum is taken "
+        "with is unknown. Refused, never defaulted to uniform."
+    ),
+    "UNKNOWN_MEASURE_KIND": (
+        "the bundle declares a measure kind this coupler has no normalization rule for. "
+        "Whether the sum owes a 1/N is a property of the measure."
+    ),
+    "FRAME_MISMATCH": (
+        "the caller expected a surface the bundle is not on, the surface is not "
+        "perpendicular to the propagation axis, or the rays are not on it. This coupler "
+        "does not propagate."
+    ),
+    "SHAPE_MISMATCH": (
+        "the output grid is non-positive, cannot represent the steepest wavelet ramp per "
+        "axis, or is larger than the k-grid it would have to be cropped out of."
+    ),
+    "UNIT_NOT_SI": (
+        "a sample pitch is not a positive length in metres. Checked here rather than left "
+        "to the emitted field, because the pitch is divided by to get the Nyquist limit "
+        "before the field exists."
+    ),
+    "COHERENT_STATE_INCOMPLETE": (
+        "the bundle carries no complex amplitude or no optical path. A real intensity "
+        "weight is not an amplitude and this boundary will not choose the mapping."
+    ),
+    "OPL_REFERENCE_UNVERIFIED": (
+        "the optical path is carried with its reference declared 'unverified', so its "
+        "sign is not established. A wrong sign conjugates the wavefront."
+    ),
+}
+
 
 #: The one sentence about what the reported powers are. Stated once, carried on
 #: every diagnostics record, and asserted by `tests/physics/test_ray_to_scalar.py`
@@ -540,7 +632,12 @@ def _resolve_measure(rays: RayBundle) -> tuple[Any, Normalization]:
             ),
         )
     normalization = _NORMALIZATION_FOR_MEASURE.get(rays.measure_kind)
-    if normalization is None:  # pragma: no cover - a new measure kind lands with its row
+    if normalization is None:
+        # Unreachable through `RayBundle`, which validates `measure_kind` against
+        # `MEASURE_KINDS` -- and all three of those have a row. This is the window
+        # between a fourth kind landing in `representations/` and its row landing
+        # here, which R08 may open. `tests/physics/test_ray_to_scalar_refusals.py`
+        # reaches it through this helper, so it is covered rather than claimed.
         raise ContractError(
             "UNKNOWN_MEASURE_KIND",
             f"measure_kind {rays.measure_kind!r} has no declared normalization in this "
@@ -941,6 +1038,16 @@ def ray_to_scalar(
             f"grid_shape must be positive, got {grid_shape!r}",
             declaration="grid_shape",
         )
+    if not (dy > 0.0 and dx > 0.0) or not (math.isfinite(dy) and math.isfinite(dx)):
+        # Checked here and not left to `ScalarField`, which would also refuse it:
+        # the pitch is divided by to get the Nyquist limit several steps earlier, so
+        # a zero would surface as a bare `ZeroDivisionError` with no code on it.
+        raise ContractError(
+            "UNIT_NOT_SI",
+            f"sample_pitch_m must be two positive finite lengths in metres, got "
+            f"{sample_pitch_m!r}",
+            declaration="sample_pitch_m",
+        )
 
     # The one place the execution representation is chosen. Everything below is
     # written against `xp` and the two dtypes, so the same source runs on the
@@ -953,11 +1060,15 @@ def ray_to_scalar(
     precision = _compute_precision(rays)
     real_dtype = precision.real_dtype
     complex_dtype = precision.complex_dtype
-    if complex_dtype is None:  # pragma: no cover - guarded by the FP32 floor
-        raise ContractError(
-            "MISSING_DECLARATION",
-            f"{precision} has no complex dtype to reconstruct a field in",
-            declaration="compute_precision",
+    if complex_dtype is None:  # pragma: no cover - unreachable behind the FP32 floor
+        # Not a `ContractError`. FP16 is the only family with no complex dtype and
+        # `_compute_precision` floors at `PHASE_ACCUMULATION_FLOOR` (FP32), so
+        # reaching here means that floor changed, which is a programming error in
+        # this module rather than a bad declaration by a caller. Declaring it as a
+        # refusal code would put a branch in `REFUSALS` that no test can reach.
+        raise RuntimeError(
+            f"{precision} has no complex dtype to reconstruct a field in; the phase "
+            "accumulation floor must stay at FP32 or above"
         )
     real_np, complex_np = numpy_dtype(real_dtype), numpy_dtype(complex_dtype)
 

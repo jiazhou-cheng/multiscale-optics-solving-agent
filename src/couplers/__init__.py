@@ -19,7 +19,7 @@ solver, a problem or a backend -- the coupler core is the physics under test, an
 if it could reach an engine a coupler defect could be misattributed to engine
 behaviour.
 
-One module, landed by CHE-185 (R07.1) and CHE-186 (R07.2):
+One module, landed by CHE-185 (R07.1), CHE-186 (R07.2) and CHE-187 (R07.3):
 
 * `ray_to_scalar` -- the coherent wavelet sum `RayBundle -> ScalarField`, with
   the projection convention and the sampling measure each stated and refusable
@@ -41,6 +41,7 @@ so they exercise the kernel that ships.
 
 from couplers.ray_to_scalar import (
     DEFAULT_KSPACE_OVERSAMPLE,
+    REFUSALS,
     SCALE_NOTE,
     Normalization,
     Projection,
@@ -52,6 +53,7 @@ from couplers.ray_to_scalar import (
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
+    "REFUSALS",
     "SCALE_NOTE",
     "Normalization",
     "Projection",
