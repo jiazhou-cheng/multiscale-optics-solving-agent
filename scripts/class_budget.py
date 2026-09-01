@@ -27,7 +27,10 @@ labels this a judgement call for exactly that reason.
 
 `PROJECT_CEILING` is the second half. Without it, a package could raise its own
 budget indefinitely and every individual raise would look local; the ceiling makes
-the sum of the budgets fail against the project's declared target of 22.
+the sum of the budgets fail against a project-wide target. That target started at
+22 and is not restated here -- it has ratcheted since, and a second copy of the
+number in this docstring went stale the first time it moved. `PROJECT_CEILING`
+below is the value, and the note attached to it is the history of every raise.
 
 **Why this is a script *and* a test.** Same two-layer split as
 `scripts/check_dependencies.py`, for the same reason:
@@ -352,7 +355,34 @@ BUDGETS: dict[str, int] = {
 #: `PsfNormalization` is a `Literal` rather than the `StrEnum` the ticket names,
 #: for the reason R08.1 established: this gate counts a `StrEnum` as a class, the
 #: two readings of "+1" differ by one, and the stricter one is taken.
-PROJECT_CEILING = 25
+#:
+#: **25 -> 26 for CHE-200 (R13.2), and this is the first raise that does *not*
+#: land in the commit that adds the class.** The class is `Executor`, in
+#: `src/runtime/executor.py`, on rule 3 -- the one genuine mutable resource
+#: lifecycle in the new architecture: process-global solver backend, device and
+#: precision state, plus the memory guard the shared-server policy requires. That
+#: ticket names it as rule 3 explicitly and calls it the only class in the tree
+#: justified that way, so the justification is not being invented here.
+#:
+#: Why the raise is split, stated plainly because the split is the irregular part.
+#: The other half of it is `BUDGETS["runtime"] = 1`, and that half cannot land
+#: yet: `runtime` is not in `check_dependencies.LANDED` and `src/runtime/` is not
+#: on disk, so declaring a budget for it trips the structural check above ("a
+#: budget for a package that does not exist reads as headroom nobody is using"),
+#: and declaring it at 1 against 0 counted files fails the per-package equality
+#: test as well. So between this commit and R13.2 the declared total is 25 against
+#: a ceiling of 26, which is one unit of exactly the standing headroom the note
+#: above argues against.
+#:
+#: That is a real, if small, weakening of the ratchet, and it is recorded rather
+#: than smoothed over: the ceiling was raised on the owner's instruction, ahead of
+#: the code, with the forcing class named in advance. What is preserved is that
+#: the raise is still the size of one class and still names which class and which
+#: rule. R13.2 owes the matching `BUDGETS["runtime"] = 1` and the `LANDED` entry in
+#: the commit that adds `executor.py`; until then this line is a pre-authorization
+#: and nothing here can consume it, because per-package equality still forbids any
+#: package from growing.
+PROJECT_CEILING = 26
 
 
 @dataclass(frozen=True)
