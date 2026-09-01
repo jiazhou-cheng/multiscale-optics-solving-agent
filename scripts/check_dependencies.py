@@ -68,6 +68,7 @@ ALLOWED: dict[str, frozenset[str]] = {
     "problems": frozenset({"representations", "numerics"}),
     "operations": frozenset({"numerics"}),
     "solvers": frozenset({"problems", "representations", "numerics"}),
+    "sources": frozenset({"problems", "representations", "numerics"}),
     "couplers": frozenset({"representations", "numerics"}),
     "operators": frozenset({"representations", "couplers", "numerics"}),
     "measurements": frozenset({"representations", "numerics"}),
@@ -125,10 +126,41 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   a solver would be a problem statable only by someone who has that solver
 #:   installed, which is the entanglement R04 exists to undo.
 #:
+#: * `operators` -- landed by CHE-211 (R06.6): `transmission.py`, the single thin
+#:   element `U * A * exp(i phi)` and the mask builders that feed it. It imports
+#:   `representations` and `numerics`; it does **not** import `couplers`, which its
+#:   row permits, because an elementwise multiply at one surface needs no change of
+#:   representation. The forbidden edge that matters is `operators -> solvers`: a
+#:   thin element needs no backend at all, and importing one would put JAX behind
+#:   every mask multiply and end the package's backend neutrality
+#:   (`tests/solvers/test_chromatix_boundary.py` walks it).
+#:
+#: * `sources` -- landed by CHE-210 (R06.5): `plane_wave.py`. **A new row in
+#:   `ALLOWED`, and therefore a deliberate architecture change**, decided by the
+#:   owner on that ticket rather than assumed here. A source maps a problem
+#:   statement into a representation -- the definition of a `solver`, which is what
+#:   its operations register as -- but it has no external backend, and
+#:   `solvers/<backend>/` is organized per backend. The three alternatives were each
+#:   worse: `representations/` would own physics it exists only to declare,
+#:   `operators/` is wrong by definition because an operator *consumes* a
+#:   representation, and widening an existing package's remit to make a source fit
+#:   is the move this allowlist exists to prevent. It imports `representations` and
+#:   `numerics`; the declared `problems` edge is not exercised yet, and is declared
+#:   so that moving an illumination *declaration* into `problems/` later is not a
+#:   second architecture change.
+#:
 #: Every later ticket adds its package here as it authors it, in the same change.
 #: When the graph is complete this equals `ALLOWED.keys()`.
 LANDED: frozenset[str] = frozenset(
-    {"numerics", "operations", "problems", "representations", "solvers"}
+    {
+        "numerics",
+        "operations",
+        "operators",
+        "problems",
+        "representations",
+        "solvers",
+        "sources",
+    }
 )
 
 #: Target-architecture names that the deleted reference tree also used.

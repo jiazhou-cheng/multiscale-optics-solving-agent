@@ -214,12 +214,28 @@ SRC = ROOT / "src"
 #: `HandoffPlaneError` as a separate exception type -- an unresolvable plane is a
 #: `ContractError` with a code, because a coupler branches on the code and not on
 #: the class. `solvers/optiland/baseline.py` did not land either, in its entirety.
+#: `operators` is 0, declared by CHE-211 (R06.6), and `sources` is 0, declared by
+#: CHE-210 (R06.5). Both are genuinely zero rather than budgeted-at-zero-for-now: a
+#: mask is an array plus the grid it was built on and the grid already lives on the
+#: `ScalarField`, and an illumination is three keyword arguments and a return
+#: value. Nine class names did **not** land against those two packages, and the
+#: tests name them: `ThinElement`, `PhaseMask`, `AmplitudeMask`, `Pupil` and
+#: `Grating` as separate operators or result types, and `Illumination`,
+#: `PlaneWaveSource`, `IlluminationAngle` and `SourceResult` on the source side.
+#: The `Illumination` frozen dataclass is the one that has a real argument -- lambda,
+#: `k_t` and the medium index are coupled by `|k_t| <= n k0`, which is rule 1 -- and
+#: it did not land because the coupling is checked *at the point the field is
+#: built*, where the grid's Nyquist limit is also known and is the second refusal;
+#: a declaration object could not check that half, so it would validate less than
+#: the function does while adding a type.
 BUDGETS: dict[str, int] = {
     "numerics": 7,
     "operations": 2,
+    "operators": 0,
     "problems": 3,
     "representations": 5,
     "solvers": 2,
+    "sources": 0,
 }
 
 #: The project's declared target for the whole production tree. The reference

@@ -136,6 +136,7 @@ representations/     -> numerics
 problems/            -> representations, numerics
 operations/          -> numerics
 solvers/<backend>/   -> problems, representations, numerics (+ its backend)
+sources/             -> problems, representations, numerics
 couplers/            -> representations, numerics
 operators/           -> representations, couplers, numerics
 measurements/        -> representations, numerics
@@ -157,6 +158,19 @@ Four properties are load-bearing:
    metadata and import paths; it does not import solver/coupler implementations.
 4. **`representations/` is backend-neutral.** A representation must not know
    which backend produced it.
+
+**`sources/` was added to this graph by CHE-210 (R06.5)**, as a deliberate
+architecture change and not as a convenience. A source maps a problem statement
+into a representation, which is this document's definition of a *solver* -- and a
+source's operations register as `solver`-kind for that reason -- but it has no
+external backend, and `solvers/<backend>/` is organized per backend. The three
+homes that already existed were each wrong in a specific way:
+`representations/` would own field-construction physics it exists only to
+*declare*; `operators/` is wrong by definition, because an operator consumes a
+representation and a source does not; and `problems/` may hold the illumination
+*declaration* but the constructor is not the problem. Widening an existing
+package's remit to make a source fit is the move the allowlist exists to
+prevent, so the row was added instead.
 
 *[LANDING GATE]* Dependency enforcement is package-by-package. The change that
 introduces a package must add it to the dependency classifier/checker if one has

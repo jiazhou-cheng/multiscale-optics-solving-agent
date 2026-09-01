@@ -199,6 +199,16 @@ def test_importing_pulls_no_backend() -> None:
         "from solvers.chromatix import propagate",
         "import solvers.chromatix.fields",
         "import solvers.chromatix.solver",
+        # CHE-211 / CHE-210. `operators/` and `sources/` are the two packages that
+        # compose *against* the wave path without owning it: a thin element is an
+        # elementwise multiply and a plane wave is arithmetic on the project's own
+        # grid, so neither may pull JAX in. Named here rather than left to the AST
+        # walk because the failure is transitive -- a mask builder that reached for
+        # `jnp` three levels down would satisfy every import rule above.
+        "import operators",
+        "import operators.transmission",
+        "import sources",
+        "import sources.plane_wave",
     )
     for statement in statements:
         probe = (

@@ -69,9 +69,11 @@ where = ["src"]
 include = [
   "numerics*",
   "operations*",
+  "operators*",
   "problems*",
   "representations*",
   "solvers*",
+  "sources*",
 ]
 
 [tool.pytest.ini_options]
