@@ -44,8 +44,8 @@ benchmarks/
 ```
 
 One module per system, one record per configuration, records beside the script
-that writes them. `benchmarks/observables.py` holds the project's single
-`intensity()` path — see "The intensity path" below.
+that writes them. The project's single `|U|^2` is `measurements.psf` — see "The
+intensity path" below.
 
 ## How it is invoked
 
@@ -100,13 +100,23 @@ half of it now would be a second place to change later.
 
 ## The intensity path
 
-`benchmarks/observables.py::intensity` is the **only** `|U|^2` in the tree.
-R11 (CHE-163) has not landed `measurements/`, so CHE-213's forward model computes
-its observable locally and says so — which is what that ticket permits. When
-`measurements/` lands, this function moves there and this file is deleted; what
-must not happen is two production intensity implementations, which is the same
-rule R11 applies to PSF. `tests/benchmarks/test_records.py` counts the
-implementations.
+`measurements.psf(field, normalization="raw").intensity` is the **only** `|U|^2`
+in the tree, and it is a measurement rather than a benchmark helper.
+
+Until R11.1 (CHE-197) it was `benchmarks/observables.py::intensity`, computed
+locally because `measurements/` had not landed — which is what CHE-213 permitted,
+on the condition, written into that file, that it be deleted the moment the
+package existed. R11.2 (CHE-198) deleted it and pointed the Fourier-ptychography
+forward model here. The forward model still widens the result to host float64
+before summing over a large grid, and `_raw_intensity` says why; the squaring
+itself stays in the field's own precision, where the measurement puts it.
+
+What must not happen is two intensity implementations, which is the same rule R11
+applies to PSF. `tests/benchmarks/test_records.py` counts them — and counts
+*definitions*, so an inline `np.abs(u) ** 2` with no function around it is not
+caught. `b4f_ideal.py` still has five of those, from before `measurements/`
+existed; converting them is a follow-up on CHE-198, not something the count
+already covers.
 
 ## What is not here
 

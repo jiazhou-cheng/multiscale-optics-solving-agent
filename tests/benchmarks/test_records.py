@@ -132,12 +132,19 @@ def test_a_record_claims_a_clean_run_decided_by_closed_forms(record_path: Path) 
 
 
 def test_exactly_one_intensity_path_exists_in_the_tree() -> None:
-    """R06.8 criterion 5, the same rule R11 applies to PSF.
+    """R06.8 criterion 5, the same rule R11 applies to PSF -- now discharged.
 
-    `|U|^2` is a measurement. `measurements/` has not landed, so R06.8 computes it
-    locally and its record says so; what is not acceptable is two
-    implementations. The count is over `src/` and `benchmarks/`, and it is a count
-    of *definitions* -- a call site is fine, a second `def intensity` is not.
+    `|U|^2` is a measurement, and until R11.1 (CHE-197) there was no
+    `measurements/` to put it in, so CHE-213 computed it locally in
+    `benchmarks/observables.py` and its record said so. That file's own docstring
+    set the condition for its deletion -- "when `measurements/` lands, this
+    function moves there and this module is deleted" -- and R11.2 (CHE-198) did
+    it.
+
+    So the assertion inverts: there is now **no** local intensity definition
+    anywhere in `src/` or `benchmarks/`, because the one that exists is
+    `measurements.psf`. The count is of *definitions*; a call site is fine, a
+    second `def intensity` is not.
     """
     definitions = [
         f"{path.relative_to(ROOT)}::{node.name}"
@@ -147,7 +154,18 @@ def test_exactly_one_intensity_path_exists_in_the_tree() -> None:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.FunctionDef) and node.name in ("intensity", "to_intensity")
     ]
-    assert definitions == ["benchmarks/observables.py::intensity"], (
-        "there must be exactly one intensity implementation in the tree, and it is "
-        f"benchmarks/observables.py::intensity until measurements/ lands. Found: {definitions}"
+    assert definitions == [], (
+        "there must be exactly one intensity implementation in the tree and it is "
+        f"measurements.psf; these are local re-implementations: {definitions}"
     )
+    # What this does *not* catch, stated rather than implied: an inline
+    # `np.abs(u) ** 2` with no function around it. `benchmarks/systems/b4f_ideal.py`
+    # has five of those, predating `measurements/`, and they are a follow-up on
+    # CHE-198 rather than something this assertion silently covers.
+    assert not (BENCHMARKS / "observables.py").exists()
+    # ...and every record that names an intensity path names that one.
+    for record in RECORDS:
+        payload = json.loads(record.read_text(encoding="utf-8"))
+        declared = payload.get("system", {}).get("intensity_path")
+        if declared is not None:
+            assert "measurements.psf" in declared, record.name

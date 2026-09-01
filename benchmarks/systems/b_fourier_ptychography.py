@@ -23,7 +23,7 @@ The physical graph
       -> focal-plane transform, f1       [solvers.chromatix.focal_plane_transform]
       -> finite-NA pupil                 [operators.complex_transmission]   at the Fourier plane
       -> focal-plane transform, f2       [solvers.chromatix.focal_plane_transform]
-      -> intensity                       [benchmarks.observables.intensity]
+      -> intensity                       [measurements.psf, normalization='raw']
 
 repeated over a set of illumination wavevectors.
 
@@ -115,8 +115,8 @@ from typing import Any
 
 import numpy as np
 
-from benchmarks.observables import intensity
 from benchmarks.record import control, gate, write_record
+from measurements import psf
 from operators import (
     circular_aperture_amplitude,
     complex_transmission,
@@ -196,6 +196,22 @@ CONFIGURATIONS: tuple[dict[str, Any], ...] = (
 # ---------------------------------------------------------------------------
 # The object, as three coefficients and as a thin element
 # ---------------------------------------------------------------------------
+
+
+def _raw_intensity(field: ScalarField) -> np.ndarray[Any, np.dtype[Any]]:
+    """`measurements.psf(..., 'raw').intensity`, widened to host float64.
+
+    The widening is the one thing this wrapper adds and it is deliberate: the
+    measurement keeps `|u|^2` in the field's own precision, which is complex64
+    here, and the harmonic readings below sum over a large grid where float32
+    accumulation loses digits they need. Squaring stays where the measurement puts
+    it -- in the field's precision -- so nothing is recomputed on the host.
+
+    This is not a second intensity path. `benchmarks/observables.py` was one, and
+    R11.1 landing `measurements/` is the condition under which its own docstring
+    said it would be deleted; it was, in the same change as this line.
+    """
+    return np.asarray(psf(field, normalization="raw").intensity, dtype=np.float64)
 
 
 def object_coefficients() -> dict[int, complex]:
@@ -337,7 +353,7 @@ def _measure(
             target_surface="pupil",
         )
         image = _leg(stopped, f2, "image", direction=second_leg)
-    return intensity(image), image
+    return _raw_intensity(image), image
 
 
 def _harmonics(measured: Array) -> dict[int, complex]:
@@ -737,7 +753,7 @@ def _measure_phantom(
         fourier, amplitude=_stop(fourier.sample_pitch_m, radius_m), target_surface="pupil"
     )
     image = _leg(stopped, f2, "image")
-    return intensity(image), image
+    return _raw_intensity(image), image
 
 
 # ---------------------------------------------------------------------------
@@ -877,7 +893,7 @@ def _controls(
             radius_m,
         ),
     )
-    unconverted_intensity = intensity(_leg(stopped, f2, "image"))
+    unconverted_intensity = _raw_intensity(_leg(stopped, f2, "image"))
     controls.append(
         control(
             "illumination_angle_read_as_spatial_frequency",
@@ -1050,12 +1066,13 @@ def run(configuration: dict[str, Any]) -> dict[str, Any]:
             "solvers.chromatix.focal_plane_transform",
             "operators.complex_transmission",
             "solvers.chromatix.focal_plane_transform",
-            "benchmarks.observables.intensity",
+            "measurements.psf",
         ],
         "intensity_path": (
-            "benchmarks/observables.py::intensity -- computed locally, because R11 "
-            "(CHE-163) has not landed measurements/. It is the only |U|^2 in the tree and "
-            "it moves to measurements/ when that package exists"
+            "measurements.psf(field, normalization='raw').intensity -- the project's "
+            "only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own "
+            "local implementation was deleted in the same change that pointed it here, "
+            "which is what benchmarks/observables.py said would happen"
         ),
         "approximation_the_method_rests_on": (
             "O(x) exp(i k_j x) has spectrum O~(k - k_j) exactly, because the object is a "

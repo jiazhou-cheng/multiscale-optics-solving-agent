@@ -1,5 +1,5 @@
 {
-  "written_at_utc": "2026-09-01T04:31:34Z",
+  "written_at_utc": "2026-09-01T11:43:58Z",
   "environment": {
     "numpy": "2.2.6",
     "scipy": "1.15.3",
@@ -16,9 +16,9 @@
     "solvers.chromatix.focal_plane_transform",
     "operators.complex_transmission",
     "solvers.chromatix.focal_plane_transform",
-    "benchmarks.observables.intensity"
+    "measurements.psf"
   ],
-  "intensity_path": "benchmarks/observables.py::intensity -- computed locally, because R11 (CHE-163) has not landed measurements/. It is the only |U|^2 in the tree and it moves to measurements/ when that package exists",
+  "intensity_path": "measurements.psf(field, normalization='raw').intensity -- the project's only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own local implementation was deleted in the same change that pointed it here, which is what benchmarks/observables.py said would happen",
   "approximation_the_method_rests_on": "O(x) exp(i k_j x) has spectrum O~(k - k_j) exactly, because the object is a thin, angle-independent transmission (operators.complex_transmission's declared approximation). The equivalence between tilting the illumination and shifting the object spectrum would not hold for a thick or angle-dependent sample",
   "parameters": {
     "wavelength_m": 5.32e-07,
@@ -88,16 +88,16 @@
       "beams": 3,
       "measured": {
         "0": [
-          0.13228302095852898,
+          0.1322830209537642,
           0.0
         ],
         "1": [
-          0.021517148018427253,
-          0.03985854772023879
+          0.021517148080533097,
+          0.03985854777377377
         ],
         "2": [
-          -0.004585016392808687,
-          0.002758332779441275
+          -0.0045850164321219935,
+          0.0027583329109130373
         ]
       },
       "analytic": {
@@ -114,7 +114,7 @@
           0.00275833076479975
         ]
       },
-      "residual": 2.4525710906608822e-08,
+      "residual": 2.4520946134698463e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -129,16 +129,16 @@
       "beams": 3,
       "measured": {
         "0": [
-          0.13228297454364357,
+          0.1322829745913623,
           0.0
         ],
         "1": [
-          0.021517143297410675,
-          0.03985853495072665
+          0.021517143045645427,
+          0.03985853529123251
         ],
         "2": [
-          -0.004585016532118597,
-          0.0027583296069821827
+          -0.0045850167612916165,
+          0.002758329618527844
         ]
       },
       "analytic": {
@@ -155,7 +155,7 @@
           0.00275833076479975
         ]
       },
-      "residual": 2.1889174500744346e-08,
+      "residual": 2.1841455782878327e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -170,16 +170,16 @@
       "beams": 3,
       "measured": {
         "0": [
-          0.13228296935007272,
+          0.13228296949819196,
           0.0
         ],
         "1": [
-          0.021517142588532635,
-          0.03985853523605997
+          0.021517142469629977,
+          0.039858535582957044
         ],
         "2": [
-          -0.0045850166440563524,
-          0.00275833028952119
+          -0.0045850168201649,
+          0.0027583303174753553
         ]
       },
       "analytic": {
@@ -196,7 +196,7 @@
           0.00275833076479975
         ]
       },
-      "residual": 2.7082745351902915e-08,
+      "residual": 2.6934626112806725e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -211,16 +211,16 @@
       "beams": 3,
       "measured": {
         "0": [
-          0.13228297935817346,
+          0.13228297962632496,
           0.0
         ],
         "1": [
-          0.021517148640223256,
-          0.03985853753763278
+          0.021517148558932872,
+          0.03985853768942545
         ],
         "2": [
-          -0.004585017630582926,
-          0.002758329241925753
+          -0.004585017782531078,
+          0.002758329191907774
         ]
       },
       "analytic": {
@@ -237,7 +237,7 @@
           0.00275833076479975
         ]
       },
-      "residual": 1.7074644614867296e-08,
+      "residual": 1.6806493113863397e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -251,16 +251,16 @@
       "beams": 2,
       "measured": {
         "0": [
-          0.12158143507873745,
+          0.12158143502892926,
           0.0
         ],
         "1": [
-          -0.00576616259086211,
-          0.016878123172676604
+          -0.005766162743754364,
+          0.016878122970545417
         ],
         "2": [
-          7.073497567537909e-10,
-          5.009834731232512e-10
+          8.025890282035764e-10,
+          4.425011725856472e-10
         ]
       },
       "analytic": {
@@ -277,7 +277,7 @@
           0.0
         ]
       },
-      "residual": 1.5575245912446967e-08,
+      "residual": 1.5625054097800906e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -291,16 +291,16 @@
       "beams": 2,
       "measured": {
         "0": [
-          0.12158143325854637,
+          0.12158143300621305,
           0.0
         ],
         "1": [
-          -0.0057661605786913294,
-          0.01687812162016153
+          -0.005766160613891427,
+          0.016878121286485435
         ],
         "2": [
-          -2.677287131977563e-09,
-          2.536059744517963e-09
+          -2.663551823820105e-09,
+          2.583209588266879e-09
         ]
       },
       "analytic": {
@@ -317,7 +317,7 @@
           0.0
         ]
       },
-      "residual": 1.7395436993639102e-08,
+      "residual": 1.7647770314543898e-08,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -330,16 +330,16 @@
       "beams": 1,
       "measured": {
         "0": [
-          0.0026753866046683177,
+          0.0026753866072795063,
           0.0
         ],
         "1": [
-          9.483625953285222e-11,
-          -5.287081166815336e-11
+          9.539608303330074e-11,
+          -5.2028099950639815e-11
         ],
         "2": [
-          -2.05974419001896e-10,
-          4.1981809522518125e-11
+          -2.0632047825882928e-10,
+          4.127726191269584e-11
         ]
       },
       "analytic": {
@@ -356,7 +356,7 @@
           0.0
         ]
       },
-      "residual": 2.1020926148472528e-10,
+      "residual": 2.1040901145141415e-10,
       "image_pitch_m": [
         1.2e-06,
         1e-06
@@ -413,7 +413,7 @@
             0,
             1
           ],
-          "residual": 2.4525710906608822e-08
+          "residual": 2.4520946134698463e-08
         },
         "20.0": {
           "beams": 3,
@@ -422,7 +422,7 @@
             0,
             1
           ],
-          "residual": 2.1889174500744346e-08
+          "residual": 2.1841455782878327e-08
         },
         "40.0": {
           "beams": 3,
@@ -431,7 +431,7 @@
             0,
             1
           ],
-          "residual": 2.7082745351902915e-08
+          "residual": 2.6934626112806725e-08
         },
         "52.0": {
           "beams": 3,
@@ -440,7 +440,7 @@
             0,
             1
           ],
-          "residual": 1.7074644614867296e-08
+          "residual": 1.6806493113863397e-08
         },
         "53.0": {
           "beams": 2,
@@ -448,7 +448,7 @@
             -1,
             0
           ],
-          "residual": 1.5575245912446967e-08
+          "residual": 1.5625054097800906e-08
         },
         "65.0": {
           "beams": 2,
@@ -456,14 +456,14 @@
             -1,
             0
           ],
-          "residual": 1.7395436993639102e-08
+          "residual": 1.7647770314543898e-08
         },
         "90.0": {
           "beams": 1,
           "surviving_orders": [
             -1
           ],
-          "residual": 2.1020926148472528e-10
+          "residual": 2.1040901145141415e-10
         }
       },
       "expected": 0.0,
@@ -477,13 +477,13 @@
       "oracle_kind": "closed_form",
       "measured": {
         "second_harmonic_by_bin": {
-          "0.0": 0.005350773312752524,
-          "20.0": 0.005350771796718239,
-          "40.0": 0.0053507722444861945,
-          "52.0": 0.0053507725497930645,
-          "53.0": 8.667918543239101e-10,
-          "65.0": 3.6877453023246004e-09,
-          "90.0": 2.1020926148472528e-10
+          "0.0": 0.005350773414213564,
+          "20.0": 0.005350771999045841,
+          "40.0": 0.005350772409802041,
+          "52.0": 0.005350772654211427,
+          "53.0": 9.164913725357342e-10,
+          "65.0": 3.710455510458163e-09,
+          "90.0": 2.1040901145141415e-10
         },
         "step_between_bins": [
           52,
@@ -505,9 +505,9 @@
       "oracle_kind": "closed_form",
       "measured": {
         "90.0": {
-          "first_harmonic": 1.0857826139993146e-10,
-          "second_harmonic": 2.1020926148472528e-10,
-          "dc": 0.0026753866046683177,
+          "first_harmonic": 1.086615656180702e-10,
+          "second_harmonic": 2.1040901145141415e-10,
+          "dc": 0.0026753866072795063,
           "analytic_dc": 0.0026753864447086797
         }
       },
@@ -532,9 +532,9 @@
       "oracle_kind": "diagnostic",
       "measured": {
         "40.5": {
-          "second_harmonic": 0.005711983828895469,
+          "second_harmonic": 0.005711983972622537,
           "three_beam_second_harmonic": 0.00535077288941736,
-          "first_harmonic": 0.04461402430330814,
+          "first_harmonic": 0.044614024474037714,
           "three_beam_first_harmonic": 0.0452955945147917,
           "bracketing_on_grid_first_harmonics": {
             "40.0": 0.0452955945147917,
@@ -552,12 +552,12 @@
               1
             ]
           },
-          "deviation_from_the_three_beam_prediction": 0.0010657677337699894
+          "deviation_from_the_three_beam_prediction": 0.0010657676545237154
         },
         "52.5": {
-          "second_harmonic": 0.0022011651440283866,
+          "second_harmonic": 0.002201165063148433,
           "three_beam_second_harmonic": 0.00535077288941736,
-          "first_harmonic": 0.028589953473522892,
+          "first_harmonic": 0.028589953644610686,
           "three_beam_first_harmonic": 0.0452955945147917,
           "bracketing_on_grid_first_harmonics": {
             "52.0": 0.0452955945147917,
@@ -574,7 +574,7 @@
               0
             ]
           },
-          "deviation_from_the_three_beam_prediction": 0.02010414140239177
+          "deviation_from_the_three_beam_prediction": 0.020104141260023706
         }
       },
       "expected": "reported, not gated",
@@ -587,7 +587,7 @@
       "oracle": "ifft2(P * fft2(u)) in float64 NumPy, mirrored and scaled by (f1/f2)^2 per the two-forward-leg composition identity",
       "oracle_kind": "diagnostic",
       "measured": {
-        "relative_residual": 5.403336349912707e-07,
+        "relative_residual": 5.450953839781909e-07,
         "illumination_bin": 40.0
       },
       "expected": 0.0,
@@ -602,8 +602,8 @@
       "changed": "k_j at bin -65.0 instead of 65.0",
       "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
       "measured": {
-        "first_harmonic": 0.035671821431410566,
-        "residual_against_the_unflipped_prediction": 0.03360812511797837
+        "first_harmonic": 0.0356718212343357,
+        "residual_against_the_unflipped_prediction": 0.03360812497320978
       },
       "reference": {
         "unflipped_first_harmonic": 0.0178359096313912,
@@ -616,8 +616,8 @@
       "changed": "the same stop applied after leg two instead of between the legs",
       "breaks_gate": "the_second_harmonic_steps_to_zero_at_the_analytic_cutoff",
       "measured": {
-        "second_harmonic": 0.0053507723376930655,
-        "residual": 0.03567181369257537
+        "second_harmonic": 0.005350772438931128,
+        "residual": 0.035671813956898425
       },
       "reference": {
         "two_beam_second_harmonic": 0.0
@@ -629,8 +629,8 @@
       "changed": "radius computed with medium_index=1.33 instead of 1.0",
       "breaks_gate": "the_second_harmonic_steps_to_zero_at_the_analytic_cutoff",
       "measured": {
-        "second_harmonic": 4.0814273212767393e-10,
-        "residual": 0.03567182021219212,
+        "second_harmonic": 5.268872742656745e-10,
+        "residual": 0.035671820449194605,
         "radius_m": 0.002255639097744361
       },
       "reference": {
@@ -644,8 +644,8 @@
       "changed": "radius multiplied by 2 pi, the cycles/m vs rad/m confusion",
       "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
       "measured": {
-        "second_harmonic": 0.0053507723376930655,
-        "residual": 0.03567181369257537
+        "second_harmonic": 0.005350772438931128,
+        "residual": 0.035671813956898425
       },
       "reference": {
         "two_beam_second_harmonic": 0.0
@@ -657,8 +657,8 @@
       "changed": "k_j divided by 2 pi, i.e. cycles/m handed over as rad/m",
       "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
       "measured": {
-        "second_harmonic": 0.005894440426605075,
-        "residual": 0.03528264429998139,
+        "second_harmonic": 0.005894440502451605,
+        "residual": 0.0352826443620299,
         "effective_bin": 10.345071300973197
       },
       "reference": {
@@ -671,8 +671,8 @@
       "changed": "the bin-65.0 carrier put on k_y instead of k_x",
       "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
       "measured": {
-        "dc": 0.11991748610886603,
-        "residual": 0.038384080854753005,
+        "dc": 0.11991748658329016,
+        "residual": 0.03838408112356491,
         "carrier_position_on_y_m": 0.0027015625,
         "carrier_position_in_y_samples": 14.624999999999998,
         "stop_radius_in_y_samples": 16.240601503759397
@@ -703,7 +703,7 @@
       "breaks_gate": "the field-level composition identity; the intensity harmonics are blind to it, which is the point of recording it",
       "measured": {
         "field_difference": 1.8368453979492188,
-        "harmonic_residual": 0.03375623850754331
+        "harmonic_residual": 0.03375623820961886
       },
       "reference": {
         "field_difference_if_identical": 0.0
