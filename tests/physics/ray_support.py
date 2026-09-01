@@ -25,6 +25,11 @@ and the oracle each one exists for:
     the ensemble the projection-convention finding was measured on, and the one
     that reaches grazing incidence when the grid pitch is fine enough.
 
+`a_random_field`
+    A seeded random complex field on a small non-square grid. The source of the
+    round-trip gates: a random field has content in every propagating mode, so a
+    decomposition that drops or mis-weights any of them shows up.
+
 `converging_bundle`
     A hexapolar-sampled uniform pupil converging at `focal_m`, declared **at the
     focal plane**. The oracle is stationary phase:
@@ -331,3 +336,52 @@ def single_mode_bundle(
         measure_weight=np.ones(1, dtype=dtype),
         measure_kind="quadrature_area_m2",
     )
+
+
+def a_random_field(
+    *,
+    shape: tuple[int, int] = (24, 32),
+    sample_pitch_m: tuple[float, float] = (0.40e-6, 0.35e-6),
+    wavelength_m: float = WAVELENGTH_M,
+    dtype: Any = np.complex128,
+    seed: int = 8,
+):
+    """A seeded random complex field. Non-square in both count and pitch, on purpose.
+
+    Imported here rather than in the test files so the round-trip gates on both
+    sides of the coupler pair compare against the same object. `ScalarField` is
+    imported lazily inside the function for no reason other than keeping this
+    module's import list to the two names the ray builders need -- see below.
+    """
+    from representations import ScalarField
+
+    rng = np.random.default_rng(seed)
+    u = (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)).astype(dtype)
+    return ScalarField(
+        u=u,
+        sample_pitch_m=sample_pitch_m,
+        wavelength_m=wavelength_m,
+        reference_surface=a_surface("plane"),
+    )
+
+
+def propagating_only(field: Any) -> Any:
+    """`field` with its evanescent modes removed -- the oracle a round trip must hit.
+
+    An evanescent mode has no propagation direction to give a ray, so a
+    `ScalarField -> RayBundle -> ScalarField` round trip cannot return it and must
+    not be graded as though it could. Written here from the closed-form transform
+    rather than by calling `scalar_to_ray`, so the oracle is not the code under
+    test: centred DFT, strict `radial < 1` cut, centred inverse.
+    """
+    u = np.asarray(field.u)
+    ny, nx = u.shape
+    dy, dx = field.sample_pitch_m
+    spectrum = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(u)))
+    direction_v, direction_u = np.meshgrid(
+        np.fft.fftshift(np.fft.fftfreq(ny, dy)) * field.wavelength_m,
+        np.fft.fftshift(np.fft.fftfreq(nx, dx)) * field.wavelength_m,
+        indexing="ij",
+    )
+    keep = direction_u**2 + direction_v**2 < 1.0
+    return np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(np.where(keep, spectrum, 0.0))))

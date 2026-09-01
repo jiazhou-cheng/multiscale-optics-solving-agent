@@ -19,12 +19,26 @@ solver, a problem or a backend -- the coupler core is the physics under test, an
 if it could reach an engine a coupler defect could be misattributed to engine
 behaviour.
 
-One module, landed by CHE-185, CHE-186, CHE-187 and CHE-188 (R07.1-R07.4):
+Two modules, one per direction:
 
-* `ray_to_scalar` -- the coherent wavelet sum `RayBundle -> ScalarField`, with the
-  projection convention, the sampling measure and the grazing-mode phase floor each
-  stated and refusable rather than defaulted, and two numerical realizations of the
-  same sum selected by an argument.
+* `ray_to_scalar` (CHE-185/186/187/188, R07.1-R07.4) -- the coherent wavelet sum
+  `RayBundle -> ScalarField`, with the projection convention, the sampling measure
+  and the grazing-mode phase floor each stated and refusable rather than defaulted,
+  and two numerical realizations of the same sum selected by an argument.
+* `scalar_to_ray` (CHE-189, R08.1) -- the angular-spectrum decomposition
+  `ScalarField -> RayBundle`, emitting modes whose amplitude and measure the
+  wavelet sum accepts.
+
+**There is no round-trip operation, and there will not be one.** A ray -> wave ->
+ray conversion with no physical transformation in between changes no state; it is
+a representation-consistency check and its home is `tests/physics/`. Shipping it
+would advertise a physical capability that is really a test fixture.
+
+Not here either: `AngularSpectrum` as a public type. It is an intermediate, not a
+boundary artifact -- nothing outside `scalar_to_ray` consumes one, and making it
+public would add a third representation to a tree whose whole point is that there
+are two. Also avoided on the scalar-to-ray side: `SamplingPerturbation`,
+`PositionPlan`, `PatchPlan` and `Ensemble`.
 
 Not here, deliberately: `RayToWaveCoupler` and the 533-LOC node wrapper around it,
 `CoherentHandoff`, `DeclaredHandoffPlane`, `Perturbation`, `HandoffPerturbation`,
@@ -50,18 +64,28 @@ from couplers.ray_to_scalar import (
     grid_nyquist_direction_limit,
     ray_to_scalar,
 )
+from couplers.scalar_to_ray import (
+    SAMPLING_DENSITIES,
+    SamplingDensity,
+    SamplingDiagnostics,
+    scalar_to_ray,
+)
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
     "DEFAULT_PHASE_BUDGET_RAD",
     "REFUSALS",
+    "SAMPLING_DENSITIES",
     "SCALE_NOTE",
     "GrazingPolicy",
     "Normalization",
     "Projection",
     "Reconstruction",
     "ReconstructionDiagnostics",
+    "SamplingDensity",
+    "SamplingDiagnostics",
     "grazing_floor_for_phase_budget",
     "grid_nyquist_direction_limit",
     "ray_to_scalar",
+    "scalar_to_ray",
 ]
