@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from couplers import ray_to_scalar
 from representations import (
     CONTRACT_CODES,
     ContractError,
@@ -123,6 +124,26 @@ TRIGGERS: dict[str, Callable[[], object]] = {
     "UNKNOWN_MEASURE_KIND": lambda: _bundle(measure_weight=np.ones(4), measure_kind="equal_weight"),
     "UNKNOWN_VALIDITY_FLAG": lambda: _field(validity=frozenset({"probably_fine"})),
     "PAD_STATE_UNKNOWN": lambda: _field(padded=True, pad_width=0),
+    # The one code whose only raiser is a *consumer* rather than a representation's
+    # own `__post_init__`: whether a mode's constant phase can be represented
+    # depends on the compute precision the consumer chose, so nothing here can
+    # decide it at construction (CHE-188). Its trigger is a one-ray bundle whose
+    # 0.5 m optical path over a 1e-4 axial cosine costs 1.5 rad of float32 phase
+    # against a 0.01 rad budget. It lives in this file because this file *is* the
+    # enumeration; the physics is in `tests/physics/test_grazing_phase_floor.py`.
+    "GRAZING_PHASE_UNREPRESENTABLE": lambda: ray_to_scalar(
+        _bundle(
+            positions_m=np.array([[0.5, 0.0, 0.0]], dtype=np.float32),
+            directions=np.array([[1.0 - 5e-9, 0.0, 1e-4]], dtype=np.float32),
+            amplitude=np.ones(1, dtype=np.complex64),
+            optical_path_m=np.array([0.5], dtype=np.float32),
+            optical_path_reference="the plane z = 0",
+            measure_weight=np.ones(1, dtype=np.float32),
+            measure_kind="quadrature_area_m2",
+        ),
+        grid_shape=(4, 4),
+        sample_pitch_m=(0.25e-6, 0.25e-6),
+    ),
 }
 
 

@@ -216,6 +216,68 @@ measurement into an interpolation error, with neither route at fault. **A caller
 that owns an enumeration passes `kspace_grid_shape` outright** rather than relying
 on `kspace_oversample`.
 
+The grazing-mode phase floor, and the decision this module takes
+----------------------------------------------------------------
+The kernel forms each ray's constant phase as `k (OPL_i - d_i . x0_i)`. For a mode
+with axial direction cosine `d_n` propagating an axial distance `Z`, **both** terms
+scale as `Z / d_n` while their difference is only `Z d_n`. So the *relative*
+precision of the inputs sets the *absolute* error of the phase:
+
+    delta_phi  ~  eps k Z / d_n
+
+Measured by CHE-70 on a 100x100, 250 nm-pitch, 500 nm grid: eight bins land on
+`d_u^2 + d_v^2 = 1` exactly -- the (30, 40) and (40, 30) Pythagorean triples and
+their sign variants -- and survive a strict `radial < 1` evanescent cut at
+`d_n = 1.05e-8`. Over a 50 um propagation their optical path is **4745 m**. In
+float64 that is a phase of `5.4e10` rad carrying `~1e-5` rad of representation
+error; in float32 the same path is `~7e3` rad of error and those bins are **pure
+noise**. This is a correctness requirement for any float32 path, not a tidying
+step.
+
+It survived three milestones because it is invisible unless three things coincide:
+a spectrum wide enough to reach grazing, a propagation long enough for `Z / d_n` to
+dominate the float budget, and a **complex-field** comparison -- the affected bins
+carry too little power to move `|U|^2`.
+
+**The decision: this coupler refuses by default, and band-limits only when asked.**
+`grazing="refuse"` is the default; `grazing="band_limit"` zero-weights the offending
+rays and reports what it excluded, in both count and power. The check is *per ray*
+and needs no declaration from the caller, because the kernel can bound its own
+arithmetic directly:
+
+    delta_phi_i  <=  eps k ( |OPL_i| + |d_i . x0_i| )
+
+which reduces to `2 eps k Z / d_n` in the case above -- the same expression, with
+both terms contributing, and with each `eps` taken from the dtype **that term was
+stored in** rather than from the compute precision, because the rounding happened
+in the producer. `grazing_floor_for_phase_budget` solves the *one-term* form for
+`d_n` and is public because a caller planning a band limit needs a floor before it
+builds a spectrum; it is therefore up to `2x` optimistic against this gate, which
+its own docstring states and a test pins.
+
+The three options not taken, with the reason each was rejected:
+
+1. **Caller-side band limit** (what the reference implementation did). Rejected: it
+   stated plainly that *"nothing in the kernel currently warns them"*, and the
+   caller-side helper that made it survivable lived in a module the rewrite
+   deletes. A greenfield coupler that omits the limit is **worse** than the
+   implementation it replaces.
+2. **The kernel band-limits itself, silently, by default.** Rejected as the
+   *default* and kept as an opt-in. Excluding modes discards power, and a coupler
+   that quietly narrows its own band is deciding physics on the caller's behalf --
+   the same move as treating an undeclared measure as uniform. As an explicit
+   request that reports its cost it is exactly right, which is why it is available.
+4. **Reformulate the constant phase so the cancellation does not occur.**
+   Rejected as *unavailable to this module*, which is a stronger statement than
+   "not now". `OPL_i` arrives already rounded to relative precision `eps`, so its
+   absolute error is `eps Z / d_n` before the kernel sees it; the subtraction
+   itself is exact (both operands are within a factor of two, so Sterbenz applies).
+   No arithmetic here can recover information the input does not carry. The real
+   remedy is for the **producer** to supply a path measured from a reference its own
+   geometry makes small -- which is what `solvers.optiland`'s chief-ray-relative
+   optical path already does -- and that is a change to `RayBundle` and its
+   producers, not to this kernel.
+
 Grid Nyquist is a refusal, not a warning
 -----------------------------------------
 A wavelet with transverse direction cosine `d_t` writes a ramp of spatial
@@ -242,7 +304,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -271,12 +333,15 @@ from representations import (
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
+    "DEFAULT_PHASE_BUDGET_RAD",
     "REFUSALS",
     "SCALE_NOTE",
+    "GrazingPolicy",
     "Normalization",
     "Projection",
     "Reconstruction",
     "ReconstructionDiagnostics",
+    "grazing_floor_for_phase_budget",
     "grid_nyquist_direction_limit",
     "ray_to_scalar",
 ]
@@ -395,6 +460,73 @@ _NORMALIZATION_FOR_MEASURE: dict[str, Normalization] = {
 #: fabricated estimate of a sampling condition is worse than an absent one.
 _NEAREST_NEIGHBOUR_SCAN_LIMIT = 4096
 
+#: What to do about a mode whose constant phase cannot be represented.
+#:
+#: A `Literal`, not an enum: R07.4 adds no class, and the declared budgets already
+#: sum to the project ceiling. It is also genuinely two words rather than two
+#: physical operators, which is the distinction `Projection` is an enum for.
+#:
+#: `refuse`
+#:     The default. An ensemble containing a mode below the floor is refused with
+#:     `GRAZING_PHASE_UNREPRESENTABLE`, because discarding power is the caller's
+#:     decision to make.
+#: `band_limit`
+#:     Zero-weight those modes and report the count and the power fraction
+#:     excluded. An explicit request that states its own cost.
+GrazingPolicy = Literal["refuse", "band_limit"]
+
+#: Phase budget the grazing floor is derived against, in radians.
+#:
+#: The reference implementation's value, reused. A hundredth of a radian is about
+#: 1/600 of a wave: far below anything a PSF comparison at NCC 0.99 can resolve,
+#: and far above the float32 noise floor of the modes that matter.
+DEFAULT_PHASE_BUDGET_RAD = 1.0e-2
+
+
+def grazing_floor_for_phase_budget(
+    *,
+    wavelength_m: float,
+    max_optical_path_m: float,
+    precision: Precision,
+    phase_budget_rad: float = DEFAULT_PHASE_BUDGET_RAD,
+) -> float:
+    """The smallest admissible axial direction cosine, derived rather than chosen.
+
+    `delta_phi ~ eps k Z / d_n`, so requiring `delta_phi <= phase_budget_rad` gives
+
+        d_n  >=  eps k Z / phase_budget_rad
+
+    `max_optical_path_m` is the **axial** extent the rays traverse, not the grazing
+    optical path -- the grazing path is the quantity this bound exists to keep
+    finite.
+
+    Public because a caller choosing how wide a spectrum to launch needs the floor
+    *before* it builds one, and because the kernel's own per-ray check cannot
+    answer that question: it reports what a bundle already costs, not what a bundle
+    should be. Ported from
+    `pre-rewrite-2026-08-30:src/couplers/streaming.py:123`; float32 over 50 um at a
+    0.01 rad budget gives `7.49e-3`, which the reference implementation froze at
+    `1e-2`.
+
+    **This is the one-term form, and the kernel's gate is up to 2x stricter.** The
+    per-ray check bounds `k (eps |OPL| + eps |d . x0|)`, and for a ray launched at
+    the point an advanced angular spectrum puts it -- where `|d . x0| = (1 - d_n^2)
+    |OPL|` -- the two terms are nearly equal, so the smallest admitted `d_n` is
+    about `2x` this floor. The one-term value is exact only for a ray launched at
+    the coordinate origin, where `d . x0 = 0`. It is returned in the one-term form
+    because that is the derivation the reference implementation froze `1e-2` from,
+    and reproducing that number is what makes the two comparable; a caller sizing a
+    spectrum against the kernel's gate should use `2 *` this.
+    `tests/physics/test_grazing_phase_floor.py` pins the factor rather than leaving
+    it to be discovered.
+    """
+    if not (phase_budget_rad > 0.0):
+        raise ValueError(f"phase_budget_rad must be positive, got {phase_budget_rad!r}")
+    epsilon = float(np.finfo(numpy_dtype(precision.real_dtype)).eps)
+    wavenumber = 2.0 * math.pi / wavelength_m
+    return epsilon * wavenumber * float(max_optical_path_m) / phase_budget_rad
+
+
 #: Every contract code raised *in this module*, plus the two `RayBundle` raises on
 #: the way in -- with what each means at this boundary.
 #:
@@ -440,6 +572,12 @@ REFUSALS: dict[str, str] = {
         "a sample pitch is not a positive length in metres. Checked here rather than left "
         "to the emitted field, because the pitch is divided by to get the Nyquist limit "
         "before the field exists."
+    ),
+    "GRAZING_PHASE_UNREPRESENTABLE": (
+        "a mode's constant phase k (OPL - d . x0) cannot be represented in the compute "
+        "precision to within the declared budget, because both terms scale as Z / d_n "
+        "while their difference is only Z d_n. Refused under grazing='refuse'; "
+        "band-limited and reported under grazing='band_limit'."
     ),
     "COHERENT_STATE_INCOMPLETE": (
         "the bundle carries no complex amplitude or no optical path. A real intensity "
@@ -543,6 +681,12 @@ class ReconstructionDiagnostics:
     #: never silently dropped: a reconstruction missing 30 % of its rays and one
     #: missing none must not produce the same record.
     kspace: dict[str, Any] | None = None
+
+    #: The grazing-mode phase floor: the policy, the budget, the worst phase error
+    #: measured, and the count and launch-power fraction excluded. Always present,
+    #: including when nothing was excluded -- "the check ran and found nothing" and
+    #: "the check did not run" are different facts, and only one of them is safe.
+    grazing: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         """A JSON-shaped mapping. `asdict` is enough because every field is plain."""
@@ -963,6 +1107,118 @@ def _reconstruct_kspace(
     return u, record
 
 
+def _stored_epsilon(*arrays: Any) -> float:
+    """The relative round-off of the **coarsest** dtype these arrays are stored at.
+
+    Not the compute dtype's. The defect is that `OPL_i` arrives already rounded to
+    the relative precision of the buffer it was written into, and no arithmetic
+    downstream recovers that -- so reading the epsilon off the compute precision
+    would use a number smaller than the error actually present and produce a bound
+    that undershoots.
+
+    The two differ in practice, not just in principle:
+    `RayBundle.require_same_representation` deliberately does **not** unify dtype
+    across an artifact, and `solvers.optiland` emits exactly the mixed case -- it
+    preserves the trace dtype for the geometry while `declare_optical_path_m`
+    returns float64. `_compute_precision` takes the *max* over the artifact, so a
+    float32 trace with a float64 path computes in FP64, and a bound taken from that
+    would be eight orders too small for the float32 half.
+    """
+    return max(
+        float(np.finfo(numpy_dtype(dtype_of(array).precision.real_dtype)).eps)
+        for array in arrays
+    )
+
+
+def _apply_grazing_floor(
+    xp: Any,
+    *,
+    coefficient: Any,
+    optical_path: Any,
+    launch_ramp: Any,
+    axial_direction: Any,
+    wavenumber: float,
+    optical_path_epsilon: float,
+    geometry_epsilon: float,
+    complex_dtype: DType,
+    policy: GrazingPolicy,
+    phase_budget_rad: float,
+) -> tuple[Any, dict[str, Any]]:
+    """Refuse, or band-limit and report, the modes whose constant phase is noise.
+
+    The bound is the kernel's own arithmetic rather than a caller declaration, and
+    it is taken **per term at the precision that term was stored in**:
+
+        delta_phi_i  <=  k ( eps_opl |OPL_i| + eps_geom |d_i . x0_i| )
+
+    Both terms are needed. `k OPL_i` alone understates the error whenever the ray
+    was launched far off axis, and for a near-grazing mode the two are nearly equal
+    and nearly cancel -- which is the whole defect. Two epsilons rather than one
+    because a bundle may legitimately carry a float32 geometry beside a float64
+    optical path, and using either dtype for both halves would be wrong in one
+    direction or the other.
+
+    `grazing_floor_for_phase_budget` solves the **one-term** form of the same bound
+    for `d_n`, so for a ray launched at the point that makes both terms equal --
+    which is every mode of an advanced angular spectrum -- this gate is up to a
+    factor of two stricter than that floor. See the helper's own docstring.
+
+    `phase_budget_rad = inf` admits everything and is how the *unbanded* number in
+    the exactness table is measured. It is deliberately expressible and
+    deliberately not the default: it lands in the record, so a run made that way
+    says so.
+    """
+    if not (phase_budget_rad > 0.0):
+        raise ValueError(f"phase_budget_rad must be positive, got {phase_budget_rad!r}")
+    if policy not in ("refuse", "band_limit"):
+        raise ValueError(f"grazing must be 'refuse' or 'band_limit', got {policy!r}")
+
+    phase_error = wavenumber * (
+        optical_path_epsilon * xp.abs(optical_path) + geometry_epsilon * xp.abs(launch_ramp)
+    )
+    representable = phase_error <= phase_budget_rad
+
+    total_power = float(xp.sum(xp.abs(coefficient) ** 2))
+    excluded = int(xp.sum(~representable))
+    excluded_power = float(
+        xp.sum(xp.abs(coefficient * (~representable).astype(numpy_dtype(complex_dtype))) ** 2)
+    )
+    record: dict[str, Any] = {
+        "policy": policy,
+        "phase_budget_rad": phase_budget_rad,
+        "optical_path_epsilon": optical_path_epsilon,
+        "geometry_epsilon": geometry_epsilon,
+        "max_phase_error_rad": float(xp.max(phase_error)),
+        "max_optical_path_m": float(xp.max(xp.abs(optical_path))),
+        "min_axial_direction_cosine": float(xp.min(xp.abs(axial_direction))),
+        "excluded_ray_count": excluded,
+        "excluded_power_fraction": (excluded_power / total_power) if total_power > 0.0 else 0.0,
+    }
+    if excluded == 0:
+        return coefficient, record
+
+    if policy == "refuse":
+        raise ContractError(
+            "GRAZING_PHASE_UNREPRESENTABLE",
+            f"{excluded} of {int(representable.shape[0])} rays carry a constant phase this "
+            f"compute precision cannot represent to within {phase_budget_rad} rad: the worst "
+            f"is {record['max_phase_error_rad']:.3e} rad, on an optical path of "
+            f"{record['max_optical_path_m']:.3e} m with an axial direction cosine of "
+            f"{record['min_axial_direction_cosine']:.3e}. Both k*OPL and k*(d.x0) scale as "
+            "Z/d_n while their difference is only Z*d_n, so those modes reconstruct as noise "
+            f"while carrying {record['excluded_power_fraction']:.3e} of the launch power -- "
+            "too little to move |U|^2, which is why this is invisible in an intensity check.",
+            declaration="optical_path_m",
+            remedy=(
+                "Restrict the spectrum with grazing_floor_for_phase_budget, pass "
+                "grazing='band_limit' to exclude them and have the cost reported, compute in "
+                "a higher precision, or have the producer declare the optical path from a "
+                "reference its own geometry makes small."
+            ),
+        )
+    return coefficient * representable.astype(numpy_dtype(complex_dtype)), record
+
+
 def ray_to_scalar(
     rays: RayBundle,
     *,
@@ -973,6 +1229,8 @@ def ray_to_scalar(
     reconstruction: Reconstruction = Reconstruction.DIRECT,
     kspace_oversample: float = DEFAULT_KSPACE_OVERSAMPLE,
     kspace_grid_shape: tuple[int, int] | None = None,
+    grazing: GrazingPolicy = "refuse",
+    phase_budget_rad: float = DEFAULT_PHASE_BUDGET_RAD,
 ) -> tuple[ScalarField, ReconstructionDiagnostics]:
     """Reconstruct the scalar field a ray bundle describes on its own surface.
 
@@ -1009,6 +1267,11 @@ def ray_to_scalar(
         the k-grid period equals the grid the modes were enumerated on, and an
         oversampling factor that happens to miss that period converts an
         exactness measurement into an interpolation error.
+    grazing, phase_budget_rad
+        What to do about a mode whose constant phase the compute precision cannot
+        carry, and the budget that decides which those are. `"refuse"` is the
+        default. See the module docstring's grazing section for the derivation and
+        for the three options not taken.
 
     Returns
     -------
@@ -1125,10 +1388,24 @@ def ray_to_scalar(
 
     # Constant per-ray phase: the optical path, minus the ramp evaluated back at
     # the ray's own intersection point, so `dr_i` is measured from there.
-    constant_phase = optical_path_m.astype(real_np) - xp.sum(
-        directions_xy * positions_xy, axis=1
-    )
+    optical_path = optical_path_m.astype(real_np)
+    launch_ramp = xp.sum(directions_xy * positions_xy, axis=1)
+    constant_phase = optical_path - launch_ramp
     coefficient = launch * weight * _cis(xp, wavenumber * constant_phase, complex_dtype)
+
+    coefficient, grazing_record = _apply_grazing_floor(
+        xp,
+        coefficient=coefficient,
+        optical_path=optical_path,
+        launch_ramp=launch_ramp,
+        axial_direction=rays.directions[:, 2].astype(real_np),
+        wavenumber=wavenumber,
+        optical_path_epsilon=_stored_epsilon(optical_path_m),
+        geometry_epsilon=_stored_epsilon(rays.positions_m, rays.directions),
+        complex_dtype=complex_dtype,
+        policy=grazing,
+        phase_budget_rad=phase_budget_rad,
+    )
 
     # Grid coordinates on the `n // 2` origin, built here because the field they
     # belong to does not exist yet. `Frame.origin_index` is the one
@@ -1216,5 +1493,6 @@ def ray_to_scalar(
         reconstruction=str(reconstruction),
         reconstructed_discrete_power=field.discrete_power(),
         kspace=kspace_record,
+        grazing=grazing_record,
     )
     return field, diagnostics

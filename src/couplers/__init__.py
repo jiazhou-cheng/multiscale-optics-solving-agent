@@ -19,15 +19,12 @@ solver, a problem or a backend -- the coupler core is the physics under test, an
 if it could reach an engine a coupler defect could be misattributed to engine
 behaviour.
 
-One module, landed by CHE-185 (R07.1), CHE-186 (R07.2) and CHE-187 (R07.3):
+One module, landed by CHE-185, CHE-186, CHE-187 and CHE-188 (R07.1-R07.4):
 
-* `ray_to_scalar` -- the coherent wavelet sum `RayBundle -> ScalarField`, with
-  the projection convention and the sampling measure each stated and refusable
-  rather than defaulted, and two numerical realizations of the same sum selected
-  by an argument.
-
-The grazing-mode phase floor (R07.4) is named by the parent ticket and has **not**
-landed; this docstring lists it when it does.
+* `ray_to_scalar` -- the coherent wavelet sum `RayBundle -> ScalarField`, with the
+  projection convention, the sampling measure and the grazing-mode phase floor each
+  stated and refusable rather than defaulted, and two numerical realizations of the
+  same sum selected by an argument.
 
 Not here, deliberately: `RayToWaveCoupler` and the 533-LOC node wrapper around it,
 `CoherentHandoff`, `DeclaredHandoffPlane`, `Perturbation`, `HandoffPerturbation`,
@@ -41,24 +38,30 @@ so they exercise the kernel that ships.
 
 from couplers.ray_to_scalar import (
     DEFAULT_KSPACE_OVERSAMPLE,
+    DEFAULT_PHASE_BUDGET_RAD,
     REFUSALS,
     SCALE_NOTE,
+    GrazingPolicy,
     Normalization,
     Projection,
     Reconstruction,
     ReconstructionDiagnostics,
+    grazing_floor_for_phase_budget,
     grid_nyquist_direction_limit,
     ray_to_scalar,
 )
 
 __all__ = [
     "DEFAULT_KSPACE_OVERSAMPLE",
+    "DEFAULT_PHASE_BUDGET_RAD",
     "REFUSALS",
     "SCALE_NOTE",
+    "GrazingPolicy",
     "Normalization",
     "Projection",
     "Reconstruction",
     "ReconstructionDiagnostics",
+    "grazing_floor_for_phase_budget",
     "grid_nyquist_direction_limit",
     "ray_to_scalar",
 ]

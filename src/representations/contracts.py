@@ -65,11 +65,20 @@ __all__ = [
     "require_same_representation",
 ]
 
-#: Every structured failure a representation can raise.
+#: Every structured failure a representation, or a consumer of one, can raise.
 #:
 #: Enumerated, not free-form, because these are the strings a coupler branches on
 #: and a diagnostic reports. Each one has a test that triggers it; adding a code
 #: without a trigger fails that test.
+#:
+#: `GRAZING_PHASE_UNREPRESENTABLE` is the first code whose only raiser is a
+#: **consumer** rather than a representation's own `__post_init__`. It belongs to
+#: `couplers.ray_to_scalar` (CHE-188): whether a mode's constant phase can be
+#: represented depends on the compute precision the *consumer* chose, so no
+#: representation can decide it at construction. The vocabulary lives here anyway,
+#: because a shared failure alphabet is what lets one `except ContractError` handle
+#: a boundary end to end -- and because a code invented locally by each consumer is
+#: how the free-form provenance string this module replaced came back.
 CONTRACT_CODES: tuple[str, ...] = (
     "MISSING_DECLARATION",
     "UNIT_NOT_SI",
@@ -87,6 +96,7 @@ CONTRACT_CODES: tuple[str, ...] = (
     "UNKNOWN_MEASURE_KIND",
     "UNKNOWN_VALIDITY_FLAG",
     "PAD_STATE_UNKNOWN",
+    "GRAZING_PHASE_UNREPRESENTABLE",
 )
 
 

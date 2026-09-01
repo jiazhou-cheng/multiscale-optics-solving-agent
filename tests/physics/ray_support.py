@@ -194,7 +194,13 @@ def mode_bundle(
             directions=np.column_stack([d_u, d_v, d_n]).astype(dtype),
             wavelength_m=wavelength_m,
             reference_surface=a_surface("plane", z_m=z_m + propagate_m),
-            amplitude=spectrum[retained].astype(np.complex128),
+            # The complex counterpart of `dtype`, so a float32 request really is a
+            # float32 bundle: `_compute_precision` takes the max over geometry,
+            # amplitude and optical path, and a complex128 amplitude beside float32
+            # geometry would silently pull the whole reconstruction to FP64.
+            amplitude=spectrum[retained].astype(
+                np.complex64 if np.dtype(dtype) == np.float32 else np.complex128
+            ),
             optical_path_m=(propagate_m / d_n).astype(dtype),
             optical_path_reference="the plane z_m, along each mode's own direction",
             measure_weight=np.full(count, count / (ny * nx), dtype=dtype),
@@ -291,3 +297,37 @@ def focal_peak_oracle(
 def plateau_radius_m(*, focal_m: float = FOCAL_M, wavelength_m: float = WAVELENGTH_M) -> float:
     """The pupil radius at which the truncation factor is exactly 1: `a^2 = lambda R / 3`."""
     return math.sqrt(wavelength_m * focal_m / 3.0)
+
+
+def single_mode_bundle(
+    *,
+    axial_cosine: float,
+    propagate_m: float,
+    wavelength_m: float,
+    dtype: Any = np.float64,
+) -> RayBundle:
+    """One plane-wave mode with axial cosine `d_n`, caught `propagate_m` downstream.
+
+    The sharpest possible form of the grazing-mode defect, because there is nothing
+    else in the ensemble to average it away. The ray leaves the origin, so its
+    intersection point is `(d_u Z / d_n, 0, Z)` and its optical path is `Z / d_n`:
+    both scale as `1 / d_n` while the constant phase they differ by is `k Z d_n`,
+    which *shrinks* as `d_n` does. The analytic value at the coordinate origin is
+    therefore `exp(+i k Z d_n)` exactly, with no truncation and no quadrature -- so
+    the realized phase error can be read off directly rather than inferred from a
+    field residual.
+    """
+    transverse = math.sqrt(1.0 - axial_cosine * axial_cosine)
+    lateral = transverse * propagate_m / axial_cosine
+    complex_dtype = np.complex64 if np.dtype(dtype) == np.float32 else np.complex128
+    return RayBundle(
+        positions_m=np.array([[lateral, 0.0, propagate_m]]).astype(dtype),
+        directions=np.array([[transverse, 0.0, axial_cosine]]).astype(dtype),
+        wavelength_m=wavelength_m,
+        reference_surface=a_surface("plane", z_m=propagate_m),
+        amplitude=np.ones(1, dtype=complex_dtype),
+        optical_path_m=np.array([propagate_m / axial_cosine]).astype(dtype),
+        optical_path_reference="the plane z = 0, along the mode's own direction",
+        measure_weight=np.ones(1, dtype=dtype),
+        measure_kind="quadrature_area_m2",
+    )
