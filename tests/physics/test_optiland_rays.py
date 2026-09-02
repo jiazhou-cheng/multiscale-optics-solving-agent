@@ -58,7 +58,7 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from problems.ray_trace import OpticalSetup, SourceSpec
+from problems.ray_trace import OpticalSetup, SourceSpec, SurfaceSpec
 from representations import ContractError, direction_norm_tolerance
 from solvers.optiland import trace
 from solvers.optiland.launch import launch
@@ -447,6 +447,146 @@ def test_a_clipped_ray_is_dropped_and_counted() -> None:
     # index was assignable, and the dropped rows take their own weights with them.
     assert bundle.measure_kind == "quadrature_area_m2"
     assert bundle.measure_weight.shape == (bundle.count,)
+
+
+# --- A really vignetted fan, and what its measure is worth (CHE-220 / R05.9) ---
+#
+# The decision this section records, because R05.8 and R05.9 had to agree about it:
+# **a vignetted fan still has a declared quadrature measure.** Each surviving ray
+# keeps the entrance-pupil cell area it was *launched* with, and the clipped cells
+# are power the system genuinely did not collect -- which is the physically right
+# answer for a quadrature over the pupil, not a degradation.
+#
+# It is R05.8 that makes it true rather than a claim: `launch._declare_measure`
+# assigns the area element from the pupil coordinates the fan was **generated**
+# from, while the complete sample and every ring identity are still known, so the
+# declaration does not depend on the traced output at all. Had the measure still
+# been reconstructed after the trace -- from a traced row count, or by recovering a
+# ring index from surviving rays -- a clipped ring would have made it `undeclared`
+# and every downstream reconstruction would have refused. That would have looked
+# like an R05.9 regression and been an R05.8 artifact.
+#
+# The alternative -- refusing, on the grounds that a vignetted fan is no longer the
+# sample the quadrature was derived for -- was rejected: the cells that survive are
+# unchanged, and a refusal would make physical vignetting unreconstructable rather
+# than merely lossy.
+
+#: A purpose-built two-surface system for the vignetting case, so no fixture's
+#: frozen numbers are involved. Surface 0 is the stop with a rim wide enough to
+#: satisfy the stop consistency rule; surface 1 is a plane whose rim falls *between*
+#: the two outer rings of a 2-ring fan.
+#:
+#: Both surfaces are planes in air, so a collimated on-axis ray keeps its launch
+#: radius all the way to surface 1 and the clipped set is analytic: ring `j` of a
+#: 2-ring fan sits at `rho = j / 2`, i.e. at 0, 0.25 and 0.5 mm for a 1 mm entrance
+#: pupil, and a 0.4 mm rim removes ring 2 and nothing else.
+VIGNETTE_ENTRANCE_PUPIL_MM = 1.0
+VIGNETTE_RIM_MM = 0.4
+VIGNETTE_RINGS = 2
+
+
+def _vignetting_setup() -> OpticalSetup:
+    return OpticalSetup(
+        name="VignettingProbe",
+        description=(
+            "CHE-220: two planes in air, the second with a rim between the two outer "
+            "rings of a 2-ring hexapolar fan."
+        ),
+        surfaces=(
+            SurfaceSpec(thickness_mm=1.0, comment="the stop, unapertured"),
+            SurfaceSpec(
+                thickness_mm=5.0,
+                clear_semi_diameter_mm=VIGNETTE_RIM_MM,
+                comment="the vignetting rim",
+            ),
+        ),
+        stop_index=0,
+        entrance_pupil_diameter_mm=VIGNETTE_ENTRANCE_PUPIL_MM,
+        reference_wavelength_um=WAVELENGTH_UM,
+    )
+
+
+def test_a_real_aperture_vignettes_the_fan_by_exactly_the_outer_ring() -> None:
+    """The setup for the measure claim below: the clipped set is the one intended.
+
+    Established first and separately, because "the measure survived vignetting" is
+    only evidence if the vignetting was the analytic one. A 2-ring fan is 19 rays --
+    1 + 6 + 12 -- so removing ring 2 leaves 7.
+    """
+    lens = build_lens(_vignetting_setup())
+    _, declaration = launch(lens, ON_AXIS, num_rings=VIGNETTE_RINGS)
+    native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=VIGNETTE_RINGS)
+    bundle, diagnostics = to_ray_bundle(
+        lens, native, launch=declaration, reference_surface="image_surface"
+    )
+
+    assert diagnostics["traced_ray_count"] == hexapolar_ray_count(VIGNETTE_RINGS) == 19
+    assert diagnostics["clipped_ray_count"] == 12, "ring 2 of a 2-ring fan is 12 rays"
+    assert diagnostics["alive_ray_count"] == 7
+    assert bundle.count == 7
+    # Every survivor is inside the rim, in metres, which is the geometric statement
+    # that the aperture is what removed them.
+    radius_m = np.hypot(*np.asarray(bundle.positions_m)[:, :2].T)
+    assert float(np.max(radius_m)) <= VIGNETTE_RIM_MM * NATIVE_LENGTH_M
+
+
+def test_a_vignetted_fan_keeps_the_cell_areas_it_was_launched_with() -> None:
+    """Acceptance criterion 6: a stated measure, and the missing power stays missing.
+
+    The survivors' weights are the *launch* cells for rings 0 and 1 -- `3/4` and `1`
+    of the nominal `pi a^2 / (3 n^2)` -- not a rescaled quadrature over 7 rays, and
+    not the rim correction ring 1 would have been given had it become the outermost
+    surviving ring. That last distinction is the one worth testing: a measure
+    recomputed from the survivors would have called ring 1 the rim and halved it.
+    """
+    lens = build_lens(_vignetting_setup())
+    _, declaration = launch(lens, ON_AXIS, num_rings=VIGNETTE_RINGS)
+    native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=VIGNETTE_RINGS)
+    bundle, diagnostics = to_ray_bundle(
+        lens, native, launch=declaration, reference_surface="image_surface"
+    )
+
+    assert bundle.measure_kind == "quadrature_area_m2", (
+        "a vignetted fan is unweighted only if the measure is reconstructed from the "
+        "trace; it is declared at launch, so it survives"
+    )
+    weight = np.asarray(bundle.measure_weight)
+    assert weight.shape == (7,)
+
+    aperture_radius_m = (VIGNETTE_ENTRANCE_PUPIL_MM / 2.0) * NATIVE_LENGTH_M
+    nominal_m2 = math.pi * aperture_radius_m**2 / (3.0 * VIGNETTE_RINGS**2)
+    assert float(np.sum(weight)) == pytest.approx(
+        (0.75 + 6.0) * nominal_m2, rel=1e-14
+    ), "one centre cell at 3/4 and six ring-1 cells at 1x, unchanged by the clipping"
+    assert float(np.min(weight)) == pytest.approx(0.75 * nominal_m2, abs=0.0)
+    assert float(np.max(weight)) == pytest.approx(nominal_m2, abs=0.0)
+    # `np.any(array == pytest.approx(scalar))` would be a scalar all-comparison and
+    # could not fail here, so the elementwise form is the one that discriminates.
+    assert not bool(np.isclose(weight, 0.5 * nominal_m2).any()), (
+        "ring 1 must not be given the RIM correction: it is the outermost SURVIVING "
+        "ring, not the outermost ring of the fan the pupil was sampled with"
+    )
+
+    # The missing cells are missing power, which is the physical content of the
+    # decision. The whole fan sums to `pi a^2 (1 + 1/(4n^2))`; ring 2 carried 12
+    # half-cells, and the survivors are short by exactly that.
+    whole_fan_m2 = math.pi * aperture_radius_m**2 * (1.0 + 1.0 / (4.0 * VIGNETTE_RINGS**2))
+    assert float(np.sum(weight)) == pytest.approx(
+        whole_fan_m2 - 12.0 * 0.5 * nominal_m2, rel=1e-14
+    )
+    # And the caller is told, in the same declaration the measure travels in. The
+    # launch note quotes the sum over the WHOLE fan and its exact `1 + 1/(4 n^2)`
+    # ratio, which is true of the sampling and false of this bundle, so the traced
+    # note has to say which of the two it is quoting.
+    note = str(diagnostics["measure"])
+    assert "quadrature_area_m2" in note
+    assert "VIGNETTED" in note
+    assert "12 of 19" in note
+    assert f"{float(np.sum(weight)):.9e}" in note, (
+        "the surviving sum has to be in the note, or the only number a caller reads "
+        "is the launch fan's"
+    )
+    assert diagnostics["clipped_ray_count"] == 12
 
 
 def test_a_fully_clipped_trace_is_refused_rather_than_returned_empty() -> None:

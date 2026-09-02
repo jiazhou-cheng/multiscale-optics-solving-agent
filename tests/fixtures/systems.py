@@ -40,11 +40,34 @@ the run is recorded on CHE-156.
 The singlet's derived quantities stay **derived**. `SINGLET_BACK_FOCAL_LENGTH_MM`
 is computed from the index and the radius, exactly as the reference had it, so a
 change to one of the frozen protocol inputs cannot leave a stale spacing behind.
+
+Clear apertures, and why only the singlet has one
+-------------------------------------------------
+CHE-220 (R05.9) gave `SurfaceSpec` a physical rim. The two singlet systems declare
+one, `SINGLET_CLEAR_SEMI_DIAMETER_MM`, chosen against the element's own geometry
+and measured to clip nothing on the frozen protocol -- see that constant.
+
+**M3-REVERSE-TELEPHOTO stays `UNAPERTURED` on every surface, deliberately.** Its
+prescription is the bundled `optiland.samples.objectives.ReverseTelephoto`, and
+that sample declares no aperture on any of its fifteen surfaces -- read from the
+pinned 0.6.0 source, not inferred -- so there is no rim to transcribe from the same
+place the radii came from. Choosing thirteen per-surface rims would be inventing
+geometry, and inventing it on the one system CHE-182's frozen ray numbers are
+gated against. The surfaces therefore carry the *declared* absence rather than a
+guess, which is exactly the state `UNAPERTURED` exists to express. Two facts make
+the guess unattractive rather than merely unnecessary: the largest radius the
+committed protocol reaches on surface 1 is 0.865 mm against a base radius of
+0.944 mm, so the beam nearly fills that sphere and a rim with any headroom would
+exceed the surface it belongs to; and the system is traced out to 45 degrees of
+field, where several elements are filled well past what a physical rim would allow.
+Transcribing real rims for it means finding a source that states them.
 """
 
 from __future__ import annotations
 
-from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
+import math
+
+from problems.ray_trace import UNAPERTURED, Material, OpticalSetup, SourceSpec, SurfaceSpec
 
 __all__ = [
     "FINITE_CONJUGATE_MAGNIFICATION",
@@ -53,6 +76,8 @@ __all__ = [
     "REVERSE_TELEPHOTO_REFERENCE_WAVELENGTH_UM",
     "SINGLET_BACK_FOCAL_LENGTH_MM",
     "SINGLET_CENTER_THICKNESS_MM",
+    "SINGLET_CLEAR_SEMI_DIAMETER_MM",
+    "SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM",
     "SINGLET_EFFECTIVE_FOCAL_LENGTH_MM",
     "SINGLET_ENTRANCE_PUPIL_DIAMETER_MM",
     "SINGLET_F_NUMBER",
@@ -88,6 +113,38 @@ SINGLET_BACK_FOCAL_LENGTH_MM = (
 )
 SINGLET_ENTRANCE_PUPIL_DIAMETER_MM = SINGLET_EFFECTIVE_FOCAL_LENGTH_MM / SINGLET_F_NUMBER
 
+#: The radius at which this plano-convex element's edge thickness reaches zero, so
+#: the physical upper bound on any rim it can be given. The convex face's sag is
+#: `R - sqrt(R^2 - r^2)`, and the element runs out of glass where that equals the
+#: centre thickness: `r = sqrt(R^2 - (R - t)^2)`. Derived rather than measured, and
+#: derived rather than written as 0.9798 mm, so a change to the radius or the centre
+#: thickness moves it instead of leaving a stale bound behind.
+SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM = math.sqrt(
+    SINGLET_RADIUS_MM**2 - (SINGLET_RADIUS_MM - SINGLET_CENTER_THICKNESS_MM) ** 2
+)
+
+#: The physical clear semi-diameter both faces of the M3 singlet are declared with.
+#: One value for both, because they are two faces of one element.
+#:
+#: Chosen, not transcribed -- the frozen protocol never stated a rim -- and the
+#: choice is bounded from both sides:
+#:
+#: * **above** by `SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM` (0.9798 mm), past which the
+#:   element does not exist at all;
+#: * **below** by what the committed protocol actually fills. The largest radius any
+#:   traced ray reaches on either face, measured over the on-axis, 3 deg and 6 deg
+#:   collimated cases and the on-axis, 2 deg and (1, 2) deg finite-conjugate cases at
+#:   2, 6 and 12 rings, is 0.2571 mm. The paraxial marginal ray at the stop is
+#:   0.2494 mm = EPD/2.
+#:
+#: 0.75 mm sits at 2.9x the largest filled radius and inside the edge-zero bound, so
+#: the frozen protocol is provably unvignetted and CHE-182's parity gate keeps its
+#: meaning. `tests/physics/test_optiland_rays.py::
+#: test_nothing_is_clipped_on_the_fixture_systems` is what holds that to a
+#: measurement rather than to this comment; clipping is demonstrated on a
+#: purpose-built system in `tests/solvers/test_optiland_system.py` instead.
+SINGLET_CLEAR_SEMI_DIAMETER_MM = 0.75
+
 
 def singlet_ref() -> OpticalSetup:
     """M3-SINGLET-REF: plano-convex singlet with an analytic Airy oracle.
@@ -111,12 +168,17 @@ def singlet_ref() -> OpticalSetup:
             SurfaceSpec(
                 radius_mm=SINGLET_RADIUS_MM,
                 thickness_mm=SINGLET_CENTER_THICKNESS_MM,
+                clear_semi_diameter_mm=SINGLET_CLEAR_SEMI_DIAMETER_MM,
                 material={"kind": "ideal", "refractive_index": SINGLET_REFRACTIVE_INDEX},
                 comment="convex front face, and the aperture stop",
             ),
             # Rear vertex: glass -> air, then the image plane one back focal
             # length on.
-            SurfaceSpec(thickness_mm=SINGLET_BACK_FOCAL_LENGTH_MM, comment="plane rear face"),
+            SurfaceSpec(
+                thickness_mm=SINGLET_BACK_FOCAL_LENGTH_MM,
+                clear_semi_diameter_mm=SINGLET_CLEAR_SEMI_DIAMETER_MM,
+                comment="plane rear face",
+            ),
         ),
         stop_index=0,
         entrance_pupil_diameter_mm=SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
@@ -208,7 +270,14 @@ REVERSE_TELEPHOTO = OpticalSetup(
             material=_glass("FK3", "glass/schott/FK3.yml"),
         ),
         SurfaceSpec(radius_mm=-4.06933311, thickness_mm=0.2001384),
-        SurfaceSpec(thickness_mm=0.06688, comment="plane aperture stop"),
+        # The one surface where the absence is worth writing out rather than
+        # defaulted: it is the stop, and a stop with no rim is the idealization in
+        # which the declared EPD is the only aperture in the system.
+        SurfaceSpec(
+            thickness_mm=0.06688,
+            clear_semi_diameter_mm=UNAPERTURED,
+            comment="plane aperture stop, declared unapertured -- see the module docstring",
+        ),
         SurfaceSpec(
             radius_mm=-2.61246583,
             thickness_mm=0.064372,
@@ -343,11 +412,13 @@ def finite_conjugate_singlet(
             SurfaceSpec(
                 radius_mm=SINGLET_RADIUS_MM,
                 thickness_mm=SINGLET_CENTER_THICKNESS_MM,
+                clear_semi_diameter_mm=SINGLET_CLEAR_SEMI_DIAMETER_MM,
                 material={"kind": "ideal", "refractive_index": SINGLET_REFRACTIVE_INDEX},
                 comment="convex front face, and the aperture stop",
             ),
             SurfaceSpec(
                 thickness_mm=finite_conjugate_image_distance_mm(object_distance_mm),
+                clear_semi_diameter_mm=SINGLET_CLEAR_SEMI_DIAMETER_MM,
                 comment="plane rear face",
             ),
         ),

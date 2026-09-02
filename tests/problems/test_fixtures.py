@@ -15,6 +15,7 @@ can still be defined, and a prescription can be reintroduced in any module.
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,9 @@ import pytest
 from fixtures.systems import (
     REVERSE_TELEPHOTO,
     SINGLET_BACK_FOCAL_LENGTH_MM,
+    SINGLET_CENTER_THICKNESS_MM,
+    SINGLET_CLEAR_SEMI_DIAMETER_MM,
+    SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM,
     SINGLET_EFFECTIVE_FOCAL_LENGTH_MM,
     SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
     SINGLET_RADIUS_MM,
@@ -30,7 +34,7 @@ from fixtures.systems import (
     singlet_ref,
 )
 
-from problems.ray_trace import OpticalSetup, SourceSpec
+from problems.ray_trace import UNAPERTURED, OpticalSetup, SourceSpec
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
@@ -112,6 +116,48 @@ def test_the_singlet_derived_quantities_stay_derived() -> None:
     singlet = singlet_ref()
     assert singlet.surfaces[1].thickness_mm == SINGLET_BACK_FOCAL_LENGTH_MM
     assert singlet.entrance_pupil_diameter_mm == SINGLET_ENTRANCE_PUPIL_DIAMETER_MM
+
+
+def test_the_singlet_rim_is_inside_the_radius_where_the_element_stops_existing() -> None:
+    """CHE-220: the upper half of the rim's justification, made load-bearing.
+
+    `SINGLET_CLEAR_SEMI_DIAMETER_MM` is a chosen number -- the frozen protocol never
+    stated a rim -- and its justification has two sides. The lower one is measured
+    and is asserted where it belongs, by
+    `tests/physics/test_optiland_rays.py::test_nothing_is_clipped_on_the_fixture_systems`.
+    The upper one is *derived*: past
+    `SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM = sqrt(R^2 - (R - t)^2)` the plano-convex
+    element's edge thickness has gone negative and there is no glass to have a rim
+    on. Asserted rather than left in a comment, so a change to the radius or the
+    centre thickness that invalidates the choice fails here instead of leaving a
+    derivation that only looks derived.
+    """
+    # Checked in the other direction, so this is not the same arithmetic twice: at
+    # that radius the convex face's sag `R - sqrt(R^2 - r^2)` has consumed the whole
+    # centre thickness, which is what "the element stops existing" means.
+    sag_at_edge_zero_mm = SINGLET_RADIUS_MM - math.sqrt(
+        SINGLET_RADIUS_MM**2 - SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM**2
+    )
+    assert sag_at_edge_zero_mm == pytest.approx(SINGLET_CENTER_THICKNESS_MM, rel=1e-12)
+    assert 0.0 < SINGLET_CLEAR_SEMI_DIAMETER_MM < SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM
+    # Both faces of one element carry the same rim, because they are one element.
+    singlet = singlet_ref()
+    assert singlet.surfaces[0].clear_semi_diameter_mm == SINGLET_CLEAR_SEMI_DIAMETER_MM
+    assert singlet.surfaces[1].clear_semi_diameter_mm == SINGLET_CLEAR_SEMI_DIAMETER_MM
+
+
+def test_the_reverse_telephoto_declares_its_absent_rims_rather_than_defaulting_them() -> None:
+    """The other CHE-220 decision, recorded where a reader would look for it.
+
+    The bundled `optiland.samples.objectives.ReverseTelephoto` this prescription was
+    transcribed from declares no aperture on any of its surfaces, so there is no rim
+    to transcribe from the source the radii came from. Every surface therefore
+    carries `UNAPERTURED` -- the declared idealization -- rather than a chosen
+    number on the one system CHE-182's frozen ray records are gated against.
+    """
+    for index, surface in enumerate(REVERSE_TELEPHOTO.surfaces):
+        assert surface.clear_semi_diameter_mm == UNAPERTURED, f"surfaces[{index}]"
+        assert surface.has_clear_aperture is False
 
 
 def test_the_transcribed_systems_are_the_measured_ones() -> None:

@@ -969,6 +969,22 @@ def to_ray_bundle(
     measure_weight = launch["measure_weight"]
     measure_kind: MeasureKind = launch["measure_kind"]
     measure_note = launch["measure_note"]
+    if measure_weight is not None and alive_count != traced_count:
+        # The launch note quotes the sum over the WHOLE fan and its exact
+        # `1 + 1/(4 n^2)` ratio, which is the right statement about the sampling and
+        # the wrong statement about this bundle: the surviving cells sum to less.
+        # Reachable only since CHE-220 gave a surface a rim -- before it, no
+        # committed path could vignette -- and left unqualified it would be a
+        # diagnostic that misstates what was measured.
+        surviving_m2 = float(np.asarray(measure_weight)[alive].sum())
+        measure_note = (
+            f"{measure_note} VIGNETTED: {traced_count - alive_count} of {traced_count} "
+            f"rays were clipped, so the sum quoted above is the LAUNCH fan's, not this "
+            f"bundle's. The bundle carries the {alive_count} surviving cells, summing to "
+            f"{surviving_m2:.9e} m^2. Each survivor keeps the area element it was launched "
+            "with and the clipped cells are power the system did not collect, which is why "
+            "the total no longer converges on pi a^2."
+        )
 
     positions = np.stack([column[alive] for column in position_mm], axis=1) * NATIVE_LENGTH_M
     directions = np.stack([native[name][alive] for name in ("L", "M", "N")], axis=1)

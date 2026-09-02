@@ -91,6 +91,7 @@ from typing import Literal, NotRequired, TypedDict
 
 __all__ = [
     "MATERIAL_KINDS",
+    "UNAPERTURED",
     "UNITS",
     "Material",
     "OpticalSetup",
@@ -104,6 +105,11 @@ UNITS: dict[str, str] = {
     "radius": "mm",
     "curvature": "1/mm",
     "thickness": "mm",
+    # A SEMI-diameter: the clear *radius* of the surface, not its diameter. The
+    # name carries that because the pinned solver's own aperture helper reads a
+    # bare scalar as a diameter and halves it, so a value handed to the wrong
+    # argument clips at half the intended radius with no error.
+    "clear_semi_diameter": "mm",
     "object_distance": "mm",
     "entrance_pupil_diameter": "mm",
     "wavelength": "um",
@@ -116,6 +122,17 @@ UNITS: dict[str, str] = {
 
 #: The three media a surface can be followed by.
 MATERIAL_KINDS: tuple[str, ...] = ("air", "ideal", "catalog")
+
+#: `SurfaceSpec.clear_semi_diameter_mm` when the surface is declared to have **no**
+#: rim: its sag surface exists at every radius a ray can reach it at.
+#:
+#: A named sentinel rather than `None` because an absent aperture is a physical
+#: idealization and has to read as one. "Deliberately unapertured" is legitimate --
+#: it is what every system in this repository was, measured, before CHE-220 -- and
+#: a surface that prints `clear_semi_diameter_mm='unapertured'` says so, where one
+#: printing `None` reads as a number nobody filled in. `None` is refused for that
+#: reason: there is no third state.
+UNAPERTURED: Literal["unapertured"] = "unapertured"
 
 
 class Material(TypedDict):
@@ -249,6 +266,38 @@ class SurfaceSpec:
 
     A planar base with aspheric terms is a legitimate aspheric plate and is
     accepted: the sag is then the polynomial alone, verified exactly.
+
+    The clear aperture, and the two traps it closes
+    ----------------------------------------------
+    CHE-220 (R05.9). `clear_semi_diameter_mm` is **how much of the sag surface
+    actually exists**: the physical rim of the element, as a *radius* measured from
+    the surface's vertex in the same millimetres as `radius_mm`. Before it, every
+    surface of every system this repository built was unapertured -- measured, by
+    reading the constructed lens back -- so rays were refracted at radii the glass
+    did not have, using the sag polynomial extrapolated past the edge, and arrived
+    at the image plane as ordinary survivors.
+
+    Three things stay distinct, and this field is only the first:
+
+    * **physical surface aperture** -- this field. Geometry of the element.
+    * **aperture stop** -- `OpticalSetup.stop_index`: which surface limits the axial
+      bundle, and therefore what the pupils are images of.
+    * **ray survival** -- what a solver does to a ray outside an aperture. Not
+      represented here at all; the backend clips and this project owns no second
+      clipping implementation.
+
+    The name says `semi_diameter` because the radius/diameter question is a silent
+    factor of two. The pinned solver's `configure_aperture` reads a bare number as a
+    **diameter** and halves it, and its `Surface.set_semi_aperture` sets a
+    *different* attribute that is used for drawing and does not clip at all. Either
+    mistake produces a system that looks configured and behaves as if it were not,
+    with no error. `solvers/optiland/system.py` therefore constructs the aperture
+    object explicitly rather than passing a scalar, and `UNITS["clear_semi_diameter"]`
+    is what a test asserts that against.
+
+    An omitted value is `UNAPERTURED`, not `None`, and that is a declaration rather
+    than a hole -- see that constant. The default is the idealization every system
+    here was already using; what changes is that it now says so.
     """
 
     thickness_mm: float
@@ -261,6 +310,11 @@ class SurfaceSpec:
     #: through one of its fields -- the same reason `material` gets a fresh dict
     #: per surface rather than a shared default.
     aspheric_coefficients: tuple[float, ...] = ()
+    #: The physical clear **radius** of this surface in mm, or `UNAPERTURED`. See
+    #: the class docstring: this is the element's rim, not the stop and not a
+    #: survival rule, and it is a semi-diameter because a bare number handed to the
+    #: pinned solver's aperture helper is read as a diameter.
+    clear_semi_diameter_mm: float | Literal["unapertured"] = UNAPERTURED
     # A fresh dict per surface, not a shared module-level constant: the dataclass
     # is frozen but a dict is not, so one shared default would let a caller who
     # mutated one surface's material change the default for every other.
@@ -315,7 +369,47 @@ class SurfaceSpec:
                 )
         object.__setattr__(self, "aspheric_coefficients", coefficients)
 
+        # `UNAPERTURED` or a finite positive length, and nothing else. `None` is
+        # refused by name rather than treated as an absence, because the whole
+        # point of the sentinel is that "no rim" is a declaration: a schema that
+        # accepted both would have two spellings of one state and one of them
+        # would read as a field nobody filled in.
+        aperture = self.clear_semi_diameter_mm
+        if aperture != UNAPERTURED:
+            if aperture is None or isinstance(aperture, bool | str):
+                raise ValueError(
+                    f"clear_semi_diameter_mm={aperture!r} is not a clear aperture. It is "
+                    f"a finite positive SEMI-diameter in {UNITS['clear_semi_diameter']} -- "
+                    "the radius the surface physically exists out to -- or the literal "
+                    f"{UNAPERTURED!r} for a surface declared to have no rim."
+                )
+            try:
+                radius_mm = float(aperture)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"clear_semi_diameter_mm={aperture!r} is not a number and is not "
+                    f"{UNAPERTURED!r}"
+                ) from exc
+            if not math.isfinite(radius_mm) or radius_mm <= 0.0:
+                raise ValueError(
+                    f"clear_semi_diameter_mm={aperture!r} is not a finite positive "
+                    f"semi-diameter in {UNITS['clear_semi_diameter']}. A zero or negative "
+                    "rim is not an unapertured surface: declare "
+                    f"{UNAPERTURED!r} for that, so an absent aperture cannot be spelled as "
+                    "a degenerate one."
+                )
+            object.__setattr__(self, "clear_semi_diameter_mm", radius_mm)
+
         _check_material(self.material, where="surface")
+
+    @property
+    def has_clear_aperture(self) -> bool:
+        """Whether this surface declares a physical rim.
+
+        The predicate an adapter branches on, so that `UNAPERTURED` is compared in
+        exactly one place rather than at every construction site.
+        """
+        return self.clear_semi_diameter_mm != UNAPERTURED
 
     @property
     def has_planar_base(self) -> bool:

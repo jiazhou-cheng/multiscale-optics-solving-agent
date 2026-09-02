@@ -21,8 +21,9 @@ statable by a caller that has no ray tracer installed.
 One module, landed by CHE-156 (R04):
 
 * `ray_trace` -- `OpticalSetup`, `SourceSpec` and `SurfaceSpec`, the sequential
-  ray-trace problem. Material is a `TypedDict`; the aperture, the stop, the field
-  angle and the wavelength are plain fields and frozen tuples.
+  ray-trace problem. Material is a `TypedDict`; the entrance pupil, the stop, each
+  surface's clear semi-diameter, the field angle and the wavelength are plain
+  fields and frozen tuples.
 
 Concrete lens prescriptions are **not** here and are not anywhere under `src/`,
 and nothing resolves a prescription name into a lens. The benchmark systems live
@@ -32,6 +33,7 @@ evidence used by tests, not a capability the production tree offers by name.
 
 from problems.ray_trace import (
     MATERIAL_KINDS,
+    UNAPERTURED,
     UNITS,
     Material,
     OpticalSetup,
@@ -41,6 +43,7 @@ from problems.ray_trace import (
 
 __all__ = [
     "MATERIAL_KINDS",
+    "UNAPERTURED",
     "UNITS",
     "Material",
     "OpticalSetup",

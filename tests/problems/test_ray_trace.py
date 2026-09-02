@@ -36,6 +36,7 @@ import pytest
 from problems import ray_trace
 from problems.ray_trace import (
     MATERIAL_KINDS,
+    UNAPERTURED,
     UNITS,
     OpticalSetup,
     SourceSpec,
@@ -149,6 +150,9 @@ def test_the_declared_units_are_exported_and_complete() -> None:
         "radius": "mm",
         "curvature": "1/mm",
         "thickness": "mm",
+        # CHE-220. A SEMI-diameter -- the clear radius -- because the pinned
+        # solver's aperture helper reads a bare scalar as a diameter and halves it.
+        "clear_semi_diameter": "mm",
         "object_distance": "mm",
         "entrance_pupil_diameter": "mm",
         "wavelength": "um",
@@ -171,7 +175,14 @@ def test_the_field_names_are_physical() -> None:
     source_fields = {f.name for f in dataclasses.fields(SourceSpec)}
     assert {"wavelength_um", "field_angle_deg", "object_distance_mm"} <= source_fields
     surface_fields = {f.name for f in dataclasses.fields(SurfaceSpec)}
-    assert {"radius_mm", "curvature_per_mm", "conic", "thickness_mm", "material"} <= surface_fields
+    assert {
+        "radius_mm",
+        "curvature_per_mm",
+        "conic",
+        "thickness_mm",
+        "clear_semi_diameter_mm",
+        "material",
+    } <= surface_fields
 
 
 # ---------------------------------------------------------------------------
@@ -368,6 +379,80 @@ def test_a_non_finite_thickness_or_conic_is_refused(bad: float) -> None:
         SurfaceSpec(thickness_mm=bad)
     with pytest.raises(ValueError, match="conic"):
         SurfaceSpec(thickness_mm=1.0, conic=bad)
+
+
+# ---------------------------------------------------------------------------
+# The clear aperture (CHE-220 / R05.9)
+# ---------------------------------------------------------------------------
+
+
+def test_an_omitted_clear_aperture_is_a_declared_absence_not_none() -> None:
+    """Acceptance criterion 1's other half: what "no rim" is spelled as.
+
+    `UNAPERTURED`, not `None`. "Deliberately unapertured" is a legitimate physical
+    idealization -- it is what every system in this repository was before this
+    ticket -- and it has to read as a declaration rather than as a number nobody
+    filled in, including when a surface is printed or compared.
+    """
+    plain = SurfaceSpec(thickness_mm=1.0)
+    assert plain.clear_semi_diameter_mm == UNAPERTURED == "unapertured"
+    assert plain.has_clear_aperture is False
+    assert "unapertured" in repr(plain)
+
+    apertured = SurfaceSpec(thickness_mm=1.0, clear_semi_diameter_mm=3.0)
+    assert apertured.clear_semi_diameter_mm == 3.0
+    assert apertured.has_clear_aperture is True
+
+
+def test_a_clear_aperture_given_as_an_integer_is_normalized_to_a_float() -> None:
+    """The same normalization `aspheric_coefficients` gets, for the same reason.
+
+    A prescription transcribed by hand carries `4` as often as `4.0`, and a field
+    whose type depends on how the caller typed it is a field two comparisons
+    disagree about.
+    """
+    surface = SurfaceSpec(thickness_mm=1.0, clear_semi_diameter_mm=4)
+    assert isinstance(surface.clear_semi_diameter_mm, float)
+    assert surface.clear_semi_diameter_mm == 4.0
+
+
+@pytest.mark.parametrize("bad", [0.0, -1.0, -0.5, math.nan, math.inf, -math.inf])
+def test_a_clear_aperture_that_is_not_a_finite_positive_length_is_refused(
+    bad: float,
+) -> None:
+    """Acceptance criterion 1: refused at construction, not at the solver boundary.
+
+    A zero or negative rim is deliberately *not* read as an unapertured surface. If
+    it were, an absent aperture would have two spellings and one of them would look
+    like a number, which is the exact confusion `UNAPERTURED` exists to prevent.
+    """
+    with pytest.raises(ValueError, match="clear_semi_diameter_mm"):
+        SurfaceSpec(thickness_mm=1.0, clear_semi_diameter_mm=bad)
+
+
+@pytest.mark.parametrize("bad", [None, "", "none", "inf", True, [1.0]])
+def test_a_clear_aperture_that_is_not_a_length_or_the_sentinel_is_refused(
+    bad: object,
+) -> None:
+    """`None` in particular: there is no third state between a rim and no rim."""
+    with pytest.raises(ValueError, match="clear_semi_diameter_mm"):
+        SurfaceSpec(thickness_mm=1.0, clear_semi_diameter_mm=bad)  # type: ignore[arg-type]
+
+
+def test_the_clear_aperture_is_a_semi_diameter_and_the_schema_says_so() -> None:
+    """The factor of two, pinned in the declared units rather than in prose.
+
+    The pinned solver's own aperture helper reads a bare number as a **diameter**
+    and halves it, so the unit entry and the field name are what a reader and a
+    test have to go on. Both say semi-diameter.
+    """
+    assert UNITS["clear_semi_diameter"] == "mm"
+    names = {f.name for f in dataclasses.fields(SurfaceSpec)}
+    assert "clear_semi_diameter_mm" in names
+    assert "clear_diameter_mm" not in names, (
+        "a diameter-named field beside a semi-diameter unit is the ambiguity this "
+        "naming exists to remove"
+    )
 
 
 # ---------------------------------------------------------------------------

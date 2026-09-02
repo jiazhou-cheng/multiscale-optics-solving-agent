@@ -57,6 +57,52 @@ first `Optic` is touched -- a rejected problem never leaves a half-built lens.
 refuses a material key the schema does not define, which is the only layer that
 can catch a misspelling before it reaches the filter.
 
+The clear aperture, and the two silent traps
+--------------------------------------------
+CHE-220 (R05.9). `problems.SurfaceSpec.clear_semi_diameter_mm` is the physical rim
+of a surface, and this is where it becomes something the backend clips against.
+`Surface._trace_real` calls `self.aperture.clip(rays)` **only** `if self.aperture`,
+so before this ticket -- with `aperture=None` on every surface of every system,
+measured by reading the constructed lens back -- the backend's clipping machinery
+never ran and every element was effectively infinite.
+
+Both of the pinned backend's traps here are silent, and both are closed by
+constructing the aperture object rather than passing a number:
+
+* `configure_aperture(x)` on a plain number treats it as a **diameter** and stores
+  `RadialAperture(r_max=x / 2)`. A semi-diameter handed to that argument clips at
+  half the intended radius with no error, which is why `_geometry_arguments` builds
+  the `RadialAperture` itself: the radius convention is written here, in our code,
+  instead of inherited from a helper's reading of a scalar.
+* `Surface.set_semi_aperture` sets a *different* attribute, `semi_aperture`, used
+  for layout and drawing, which **does not clip**. Setting the one you did not mean
+  gives a system that looks configured and behaves as if it were not, so
+  `build_lens` reads `Surface.aperture` back and refuses if it is not the object
+  that was passed -- the same class of guard as the keyword filter below, from the
+  other direction.
+
+This project owns no clipping implementation. The backend clips; this module
+supplies the aperture it clips against, and `rays._ALIVE_RULE` already reads the
+result correctly (Optiland zeroes `RealRays.i` and freezes the row).
+
+Stop, EPD and clear aperture
+----------------------------
+Three separate declarations that can contradict each other, so the rule is stated
+and enforced rather than left emergent: **the paraxial marginal ray the declared
+entrance pupil launches must fall inside the stop surface's own clear aperture.**
+`_require_stop_clear_aperture` checks it against the backend's own
+`paraxial.marginal_ray()`, and refuses rather than tracing, because a stop whose
+rim is inside the pupil it is supposed to define makes "entrance pupil diameter"
+a fiction: the fan is clipped at the stop and the pupil is whatever survived.
+
+What the rule deliberately does *not* do is require equality. A rim wider than the
+marginal ray is the ordinary case in which the EPD is an analysis aperture -- the
+system is being traced at less than its full opening -- and it is not a
+contradiction. It is also paraxial: a real marginal ray lands a little off its
+paraxial height, so a rim set at exactly the marginal height may still clip real
+rays near it. That is physical vignetting, not an inconsistent system, and the
+tolerance below is round-off-scale rather than a margin for it.
+
 Units
 -----
 `problems.UNITS` and Optiland's native units agree, so there is no conversion in
@@ -86,6 +132,7 @@ __all__ = [
     "FIELD_VIGNETTING_FACTORS",
     "FIELD_WEIGHT",
     "NATIVE_UNITS",
+    "STOP_FILL_RELATIVE_TOLERANCE",
     "WAVELENGTH_WEIGHT",
     "build_lens",
 ]
@@ -131,6 +178,21 @@ FIELD_VIGNETTING_FACTORS: tuple[float, float] = (0.0, 0.0)
 FIELD_WEIGHT = 1.0
 WAVELENGTH_WEIGHT = 1.0
 
+#: Relative slack on the stop consistency rule. Round-off, not margin: the two
+#: quantities compared are both *declared* -- the setup's own semi-diameter and the
+#: backend's paraxial marginal ray height under the setup's own EPD -- so they
+#: disagree only by the arithmetic that produced the second one, which is a
+#: surface-by-surface paraxial accumulation whose precision follows whatever
+#: `configure_execution` set.
+#:
+#: `1e-6` is stated as a round-off bound rather than measured per precision. It is
+#: sub-nanometre on a millimetre rim, and six orders of magnitude below the
+#: factor-of-two error the rule exists to catch, so it cannot absorb a real
+#: inconsistency; and it is one-sided in the safe direction, because the only thing
+#: it can do is refuse a system whose stop is matched to its pupil to within a part
+#: in a million. Widening it would start admitting stops the pupil overfills.
+STOP_FILL_RELATIVE_TOLERANCE = 1.0e-6
+
 #: The unit each `problems.UNITS` entry must declare for this module to pass the
 #: problem through unconverted. Checked, not assumed: mm-for-m is the error that
 #: scales `k * OPL` by 1000 and shows up downstream as dense phase wraps, and it
@@ -139,6 +201,11 @@ NATIVE_UNITS: dict[str, str] = {
     "radius": "mm",
     "curvature": "1/mm",
     "thickness": "mm",
+    # `RadialAperture(r_max=...)` is in the prescription's own length unit, and it
+    # is a RADIUS. Nothing here converts, so a schema rebased on metres would hand
+    # `7.5e-4` to a millimetre rim and clip **everything**: the direction is a rim a
+    # thousand times too small, not too large.
+    "clear_semi_diameter": "mm",
     "object_distance": "mm",
     "entrance_pupil_diameter": "mm",
     "wavelength": "um",
@@ -167,7 +234,7 @@ def _require_native_units() -> None:
         )
 
 
-def _import_optiland_construction() -> tuple[Any, Any, Any, Any]:
+def _import_optiland_construction() -> tuple[Any, Any, Any, Any, Any]:
     """Import exactly what construction needs, and nothing else.
 
     Kept inside the function so importing this module imports no solver:
@@ -180,13 +247,14 @@ def _import_optiland_construction() -> tuple[Any, Any, Any, Any]:
         from optiland.materials import IdealMaterial
         from optiland.materials import Material as CatalogMaterial
         from optiland.optic import Optic
+        from optiland.physical_apertures.radial import RadialAperture
     except ImportError as exc:  # pragma: no cover - environment failure
         raise ImportError(
             f"optiland could not be imported: {type(exc).__name__}: {exc}. Install it "
             "with this project's 'torch' extra (`pip install .[torch]`), which pins "
             "optiland>=0.6.0 and torch together."
         ) from exc
-    return be, Optic, IdealMaterial, CatalogMaterial
+    return be, Optic, IdealMaterial, CatalogMaterial, RadialAperture
 
 
 def _resolve_catalog_material(material: Material, material_cls: Any, *, where: str) -> Any:
@@ -271,7 +339,9 @@ def _material_argument(
     )
 
 
-def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, Any]]:
+def _geometry_arguments(
+    surface: SurfaceSpec, be: Any, aperture_cls: Any
+) -> tuple[str, dict[str, Any]]:
     """The Optiland surface type for one surface, and its complete keyword set.
 
     The two are decided together and returned together, because they are one
@@ -291,6 +361,15 @@ def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, A
     produced here and never stored. The test is `has_planar_base` rather than
     `is_plane`, because an aspheric plate has a planar base and is not a plane.
 
+    `aperture` is named here for the same reason and carries the second half of
+    CHE-220: the value passed is a constructed `RadialAperture(r_max=...)`, never
+    the schema's number. `configure_aperture` would accept the number and read it as
+    a **diameter**, halving it silently, so the semi-diameter convention is applied
+    in this line rather than inherited. A surface that declares no rim contributes
+    no key at all, which is what leaves `Surface.aperture` as `None` and the
+    backend's `if self.aperture` clipping branch unentered -- the declared
+    idealization, reaching the backend as an absence rather than as an infinity.
+
     Nothing is forwarded from the problem that is not named below. That is the
     whole guard against the filter -- an unrecognized key cannot be discarded by
     Optiland if it was never assembled.
@@ -299,6 +378,8 @@ def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, A
         "radius": be.inf if surface.has_planar_base else surface.resolved_radius_mm,
         "conic": surface.conic,
     }
+    if surface.has_clear_aperture:
+        arguments["aperture"] = aperture_cls(r_max=float(surface.clear_semi_diameter_mm))
     if not surface.has_aspheric_terms:
         return _SURFACE_TYPE_STANDARD, arguments
     # A list, not the schema's tuple: the pinned geometry stores what it is handed
@@ -307,6 +388,96 @@ def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, A
     # multiplies r**(2*(i+1)) -- crosses this boundary unchanged.
     arguments["coefficients"] = list(surface.aspheric_coefficients)
     return _SURFACE_TYPE_EVEN_ASPHERE, arguments
+
+
+def _require_apertures_were_set(optic: Any, setup: OpticalSetup, plans: list[Any]) -> None:
+    """Refuse if a declared aperture is not the object the backend ended up holding.
+
+    Not defensive noise: the pinned factory reaches the surface as
+    `aperture=kwargs.get("aperture")` through the same `**kwargs` that
+    `GeometryFactory.create` filters silently, and `Surface.__init__` then passes it
+    through `configure_aperture`. Two failures are therefore possible without an
+    error -- the key dropped, so the surface never clips, or the value reinterpreted,
+    so it clips at half the declared radius -- and both produce a system that looks
+    configured. Identity is the strongest available check: `configure_aperture`
+    returns a `BaseAperture` unchanged, so the object read back is the object passed
+    unless something reinterpreted it.
+
+    The mirror-image trap is `Surface.set_semi_aperture`, which sets `semi_aperture`
+    -- a layout attribute that does not clip -- and is indistinguishable from the
+    outside. Reading `aperture` by name here is what makes the two distinguishable.
+    """
+    for offset, (_surface, _surface_type, geometry_kwargs, _material) in enumerate(plans):
+        declared = geometry_kwargs.get("aperture")
+        if declared is None:
+            continue
+        actual = getattr(optic.surfaces.surfaces[offset + 1], "aperture", None)
+        if actual is not declared:
+            raise ValueError(
+                f"{setup.name}: surfaces[{offset}] declared a clear aperture "
+                f"{declared!r}, but the constructed surface holds {actual!r}. The pinned "
+                "backend either discarded the keyword -- in which case the surface does "
+                "not clip at all -- or reinterpreted the value, in which case it clips at "
+                "a radius this project did not declare. Neither is visible from a trace."
+            )
+
+
+def _require_stop_clear_aperture(optic: Any, setup: OpticalSetup) -> None:
+    """The stop / EPD / clear-aperture consistency rule, enforced.
+
+    **Rule:** the paraxial marginal ray the declared entrance pupil launches must
+    fall inside the stop surface's own clear aperture. See the module docstring for
+    why it is an inequality rather than an equality, and why it is paraxial.
+
+    The marginal ray comes from the backend's own `paraxial.marginal_ray()` -- the
+    ray from the axial object point through the edge of the pupil the declared EPD
+    defines -- so this project computes no pupil geometry of its own. Its return is
+    one height per *optic* surface, and the object surface is index 0, so the
+    setup's surface `i` is optic surface `i + 1`.
+
+    A stop that declares no rim is not checked and is not a failure: an unapertured
+    stop is the declared idealization in which the EPD is the only aperture, and
+    there is no second quantity for it to contradict.
+    """
+    stop = setup.surfaces[setup.stop_index]
+    if not stop.has_clear_aperture:
+        return
+    rim_mm = float(stop.clear_semi_diameter_mm)
+    try:
+        heights, _slopes = optic.paraxial.marginal_ray()
+        filled_mm = abs(float(_to_host(heights).ravel()[setup.stop_index + 1]))
+    except Exception as exc:
+        raise ValueError(
+            f"{setup.name}: the paraxial marginal ray height at the stop surface "
+            f"(surfaces[{setup.stop_index}]) could not be read, so the declared entrance "
+            f"pupil diameter {setup.entrance_pupil_diameter_mm!r} mm cannot be checked "
+            f"against that surface's clear semi-diameter {rim_mm!r} mm: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    if filled_mm > rim_mm * (1.0 + STOP_FILL_RELATIVE_TOLERANCE):
+        raise ValueError(
+            f"{setup.name}: the declared entrance pupil diameter "
+            f"{setup.entrance_pupil_diameter_mm!r} mm fills the stop surface "
+            f"(surfaces[{setup.stop_index}]) to a paraxial marginal ray height of "
+            f"{filled_mm!r} mm, which is outside that surface's declared clear "
+            f"semi-diameter {rim_mm!r} mm. The stop would clip the pupil it is supposed "
+            "to define, so the 'entrance pupil diameter' would be a fiction rather than "
+            "the aperture the trace was asked for. Widen the stop's clear "
+            "semi-diameter, reduce the entrance pupil diameter, or name a different "
+            "stop_index -- note that a clear SEMI-diameter is a radius, so a rim "
+            "transcribed as a diameter reads as half the intended one."
+        )
+
+
+def _to_host(value: Any) -> Any:
+    """One backend array as a host numpy array, without importing numpy at module level.
+
+    `optiland.backend.utils.to_numpy` is the backend's own bridge, so a torch or a
+    numpy backend both come back readable and no precision is forced.
+    """
+    import optiland.backend.utils as be_utils
+
+    return be_utils.to_numpy(value)
 
 
 def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
@@ -339,8 +510,11 @@ def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
     Raises:
         TypeError: `setup` or `source` is not the type this builder takes.
         ValueError: the setup is outside the set this builder can construct, or a
-            catalog glass did not resolve as the setup recorded. Raised before any
-            surface is added.
+            catalog glass did not resolve as the setup recorded -- both raised before
+            any surface is added; or the declared clear apertures and the declared
+            entrance pupil contradict each other, or an aperture did not survive the
+            backend's keyword handling, both of which can only be read back from a
+            constructed lens and so are raised at the end.
         ImportError: optiland is not installed.
     """
     if not isinstance(setup, OpticalSetup):
@@ -358,14 +532,14 @@ def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
         )
     _require_native_units()
 
-    be, optic_cls, ideal_cls, material_cls = _import_optiland_construction()
+    be, optic_cls, ideal_cls, material_cls, aperture_cls = _import_optiland_construction()
 
     # 1. Resolve everything that can fail before touching Optiland, so a rejected
     #    setup never leaves a partially constructed lens behind.
     plans: list[tuple[SurfaceSpec, str, dict[str, Any], Any]] = []
     for index, surface in enumerate(setup.surfaces):
         where = f"{setup.name}: surfaces[{index}]"
-        surface_type, geometry_kwargs = _geometry_arguments(surface, be)
+        surface_type, geometry_kwargs = _geometry_arguments(surface, be, aperture_cls)
         plans.append(
             (
                 surface,
@@ -435,5 +609,12 @@ def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
         unit=_WAVELENGTH_UNIT,
         weight=WAVELENGTH_WEIGHT,
     )
+
+    # 4. What the backend actually holds, and whether the three aperture
+    #    declarations agree. Both are read back rather than assumed, and both are
+    #    after the aperture/field/wavelength block because the paraxial marginal ray
+    #    is not defined until the EPD and the primary wavelength are set.
+    _require_apertures_were_set(optic, setup, plans)
+    _require_stop_clear_aperture(optic, setup)
 
     return optic

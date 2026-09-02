@@ -46,7 +46,7 @@ from fixtures.systems import (
     singlet_ref,
 )
 
-from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
+from problems.ray_trace import UNAPERTURED, Material, OpticalSetup, SourceSpec, SurfaceSpec
 from solvers.optiland import system as system_module
 from solvers.optiland.system import NATIVE_UNITS, build_lens
 
@@ -555,6 +555,7 @@ def test_the_surface_type_and_its_keywords_are_decided_together() -> None:
     `surface_kwargs_are_silently_filtered` hazard, reached from the other side.
     """
     import optiland.backend as be
+    from optiland.physical_apertures.radial import RadialAperture
 
     from solvers.optiland.system import _geometry_arguments
 
@@ -563,19 +564,38 @@ def test_the_surface_type_and_its_keywords_are_decided_together() -> None:
         thickness_mm=1.0,
         aspheric_coefficients=ASPHERE_COEFFICIENTS,
     )
-    surface_type, kwargs = _geometry_arguments(aspheric, be)
+    surface_type, kwargs = _geometry_arguments(aspheric, be, RadialAperture)
     assert surface_type == "even_asphere"
     assert set(kwargs) == {"radius", "conic", "coefficients"}
     assert kwargs["coefficients"] == list(ASPHERE_COEFFICIENTS)
     assert isinstance(kwargs["coefficients"], list), "the pinned geometry indexes a list"
 
     conic = SurfaceSpec(radius_mm=ASPHERE_RADIUS_MM, thickness_mm=1.0)
-    surface_type, kwargs = _geometry_arguments(conic, be)
+    surface_type, kwargs = _geometry_arguments(conic, be, RadialAperture)
     assert surface_type == "standard"
     assert set(kwargs) == {"radius", "conic"}, (
         "a conic surface must not be handed `coefficients`; the solver would discard it "
         "silently, so the guard is that it is never assembled"
     )
+
+    # CHE-220: `aperture` joins the same named set, and an unapertured surface
+    # contributes no key at all rather than an infinite rim.
+    assert "aperture" not in kwargs, (
+        "an unapertured surface must not assemble an `aperture` key: the backend's "
+        "clipping branch is `if self.aperture`, so the declared absence has to reach it "
+        "as an absence"
+    )
+    apertured = SurfaceSpec(
+        radius_mm=ASPHERE_RADIUS_MM, thickness_mm=1.0, clear_semi_diameter_mm=3.0
+    )
+    surface_type, kwargs = _geometry_arguments(apertured, be, RadialAperture)
+    assert surface_type == "standard"
+    assert set(kwargs) == {"radius", "conic", "aperture"}
+    assert isinstance(kwargs["aperture"], RadialAperture), (
+        "the aperture must be constructed here, not left as a scalar for "
+        "`configure_aperture` to read as a DIAMETER and halve"
+    )
+    assert kwargs["aperture"].r_max == 3.0
 
 
 def test_an_aspheric_system_traces() -> None:
@@ -684,3 +704,314 @@ def test_ideal_material_is_dispersionless_and_lossless() -> None:
     for wavelength in (0.4, 0.55, 0.7):
         assert float(_host(glass.n(wavelength)).ravel()[0]) == SINGLET_REFRACTIVE_INDEX
     assert float(_host(glass.k(0.55)).ravel()[0]) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# 7. The clear aperture (CHE-220 / R05.9)
+# ---------------------------------------------------------------------------
+#
+# A purpose-built system, not a fixture. The clipping radius has to be
+# *analytically* known for the geometry predicate below to mean anything, and the
+# fixtures' rims are chosen to clip nothing precisely so that CHE-182's frozen ray
+# numbers keep their meaning (`tests/fixtures/systems.py` states the measurement).
+#
+# TWO rays, not a fan: this is a predicate about where a boundary is, not a
+# convergence study. And both sides of the boundary, because a test that only
+# showed a clipped ray could not tell an aperture from an unrelated failure.
+
+#: The declared clear semi-diameter of the purpose-built system's one surface, in
+#: mm. A plane surface, so the clipping radius is the declared radius exactly --
+#: there is no sag to displace the intersection off the launch radius, which is
+#: what makes the boundary analytic rather than measured.
+CLIP_SEMI_DIAMETER_MM = 1.0
+
+#: The relative offset the boundary is probed at from both sides. 1e-9 is nine
+#: orders of magnitude inside the factor of two that a diameter-for-radius error
+#: would produce, so this is a test of *the* radius rather than of roughly it, and
+#: it is still five orders above float64 round-off on a millimetre.
+CLIP_PROBE_RELATIVE = 1.0e-9
+
+
+def _clip_setup(
+    *,
+    clear_semi_diameter_mm: float | str = CLIP_SEMI_DIAMETER_MM,
+    entrance_pupil_diameter_mm: float = 1.0,
+) -> OpticalSetup:
+    """One plane surface with a declared rim, then the image plane.
+
+    The default 1 mm entrance pupil fills this stop to a paraxial marginal ray
+    height of 0.5 mm, half its 1 mm rim, so the system is comfortably on the
+    accepted side of the stop consistency rule and the only thing under test is
+    where the clipping boundary is. The rays the probe injects are placed on the
+    surface directly and do not come from the pupil at all.
+    """
+    return OpticalSetup(
+        name="ClearApertureProbe",
+        description="CHE-220: one plane surface whose clipping radius is its declared rim.",
+        surfaces=(
+            SurfaceSpec(
+                thickness_mm=10.0,
+                clear_semi_diameter_mm=clear_semi_diameter_mm,
+                comment="the apertured plane, and the stop",
+            ),
+        ),
+        stop_index=0,
+        entrance_pupil_diameter_mm=entrance_pupil_diameter_mm,
+        reference_wavelength_um=0.55,
+    )
+
+
+def _survives(lens: object, radius_mm: float) -> bool:
+    """Whether one ray launched parallel to the axis at `radius_mm` survives surface 1.
+
+    Native rays on purpose: this file is `NATIVE_EXEMPT` because the claim is about
+    what the *backend* does to a row it clipped, and no neutral type carries it.
+    Optiland clips by zeroing `RealRays.i` and keeping the row, which is the rule
+    `rays._ALIVE_RULE` states.
+    """
+    import optiland.backend as be
+    from optiland.rays import RealRays
+
+    one = be.array([radius_mm])
+    zero = be.array([0.0])
+    rays = RealRays(
+        x=one,
+        y=be.array([0.0]),
+        z=be.array([-1.0]),
+        L=zero,
+        M=zero,
+        N=be.array([1.0]),
+        intensity=be.array([1.0]),
+        wavelength=be.array([0.55]),
+    )
+    traced = lens.surfaces.surfaces[1].trace(rays)  # type: ignore[attr-defined]
+    return float(_host(traced.i).ravel()[0]) > 0.0
+
+
+def test_a_declared_clear_aperture_clips_and_an_undeclared_one_does_not() -> None:
+    """Acceptance criterion 2: both sides of the boundary, on the same surface.
+
+    The negative arm is the same system with the rim removed. Without it, a test
+    that only showed the outside ray dying could not distinguish an aperture from
+    the surface being unreachable for some other reason -- which is exactly the
+    state the whole repository was in before this ticket, where every surface was
+    unapertured and nothing clipped anywhere.
+    """
+    apertured = build_lens(_clip_setup())
+    outside_mm = CLIP_SEMI_DIAMETER_MM * 2.0
+    inside_mm = CLIP_SEMI_DIAMETER_MM * 0.5
+    assert _survives(apertured, inside_mm), "a ray inside the declared rim must survive"
+    assert not _survives(apertured, outside_mm), "a ray outside the declared rim must be clipped"
+
+    unapertured = build_lens(_clip_setup(clear_semi_diameter_mm=UNAPERTURED))
+    assert _survives(unapertured, outside_mm), (
+        "with no rim declared the same ray must survive: the aperture is what clips it, "
+        "not the geometry. `Surface._trace_real` only clips `if self.aperture`, so a "
+        "declared absence has to reach the backend as `None`"
+    )
+
+
+def test_the_clipping_radius_is_the_declared_semi_diameter_not_its_double() -> None:
+    """Acceptance criterion 3, and the factor of two it exists to catch.
+
+    `configure_aperture` reads a bare number as a **diameter** and stores
+    `r_max = number / 2`. Had the schema's semi-diameter been passed as that
+    scalar, the boundary would sit at `a / 2` and a ray at `0.9 a` would die. The
+    probe is at `(1 -+ 1e-9) a`, so nothing but the declared radius passes it.
+    """
+    lens = build_lens(_clip_setup())
+    a = CLIP_SEMI_DIAMETER_MM
+    assert _survives(lens, a * (1.0 - CLIP_PROBE_RELATIVE))
+    assert not _survives(lens, a * (1.0 + CLIP_PROBE_RELATIVE))
+    # The falsifier stated as a test rather than as a comment: a diameter-read rim
+    # would clip here, and it must not.
+    assert _survives(lens, a * 0.9), (
+        "a ray at 0.9 of the declared SEMI-diameter must survive; if it does not, the "
+        "value reached the backend as a diameter and the rim is half what was declared"
+    )
+
+
+def test_the_surface_holds_the_aperture_that_was_set_not_a_layout_attribute() -> None:
+    """Acceptance criterion 4, asserted on the constructed surface.
+
+    `Surface.set_semi_aperture` sets `semi_aperture`, which is used for layout and
+    **does not clip**, and the two are indistinguishable from outside the package.
+    So the attribute is read by name, its type is checked, and `r_max` is checked
+    against the declaration -- the three things that together say the clipping
+    aperture is the one the problem asked for.
+    """
+    from optiland.physical_apertures.radial import RadialAperture
+
+    lens = build_lens(_clip_setup())
+    surface = lens.surfaces.surfaces[1]
+    assert isinstance(surface.aperture, RadialAperture)
+    assert surface.aperture.r_max == CLIP_SEMI_DIAMETER_MM
+    assert surface.aperture.r_min == 0.0, "an annulus was not declared"
+
+    unapertured = build_lens(_clip_setup(clear_semi_diameter_mm=UNAPERTURED))
+    assert unapertured.surfaces.surfaces[1].aperture is None
+
+
+def test_an_aperture_the_backend_did_not_keep_is_refused() -> None:
+    """The readback guard, on both shapes of the silent failure.
+
+    Two things can happen through the pinned factory's `**kwargs` without an error:
+    the key is filtered away, so the surface never clips, or the value is
+    reinterpreted, so it clips at a radius nobody declared. Neither is visible in a
+    trace. The guard is called directly on a lens whose surface has been put into
+    each of those states, which is the only way to reach them -- the pinned backend
+    cannot be made to do either from outside.
+    """
+    from optiland.physical_apertures.radial import RadialAperture
+
+    setup = _clip_setup()
+    surface_spec = setup.surfaces[0]
+
+    for damaged in (None, RadialAperture(r_max=CLIP_SEMI_DIAMETER_MM / 2.0)):
+        lens = build_lens(setup)
+        surface = lens.surfaces.surfaces[1]
+        declared = surface.aperture
+        assert declared is not None
+        plans = [(surface_spec, "standard", {"aperture": declared}, None)]
+        # A clean lens passes, so the failure below is the damage and not the check.
+        system_module._require_apertures_were_set(lens, setup, plans)
+        surface.aperture = damaged
+        with pytest.raises(ValueError, match="declared a clear aperture"):
+            system_module._require_apertures_were_set(lens, setup, plans)
+
+
+# --- The stop / EPD / clear-aperture consistency rule ----------------------
+
+
+def test_an_entrance_pupil_that_overfills_the_stop_is_refused() -> None:
+    """Acceptance criterion 5: an inconsistent system is refused, not traced.
+
+    The stop's rim is half the pupil the EPD declares, so the fan would be clipped
+    at the stop and the "entrance pupil diameter" would describe an aperture the
+    system does not have. That is a contradiction between two declarations rather
+    than a numerical problem, so it is refused at construction.
+    """
+    with pytest.raises(ValueError, match="fills the stop surface"):
+        build_lens(_clip_setup(clear_semi_diameter_mm=0.25, entrance_pupil_diameter_mm=1.0))
+
+
+def test_a_stop_filled_exactly_to_its_rim_is_accepted() -> None:
+    """The rule is an inequality, and its boundary is where the pupil meets the rim.
+
+    A stop at the front vertex with the object at infinity has a paraxial marginal
+    ray height of exactly `EPD / 2`, so this is the exact-equality case and it must
+    pass: a system whose stop rim *is* its pupil is the ordinary matched design, not
+    an error.
+    """
+    lens = build_lens(_clip_setup(clear_semi_diameter_mm=0.5, entrance_pupil_diameter_mm=1.0))
+    assert lens.surfaces.surfaces[1].aperture.r_max == 0.5
+
+
+def test_a_stop_rim_wider_than_the_pupil_is_accepted() -> None:
+    """Under-filling is not a contradiction, and the rule says so deliberately.
+
+    A rim wider than the marginal ray is the case where the declared EPD is an
+    analysis aperture: the system is being traced at less than its full opening.
+    Refusing it would force every setup to state a rim equal to its pupil, which is
+    a different and stronger claim than the one the schema makes.
+    """
+    lens = build_lens(_clip_setup(clear_semi_diameter_mm=5.0, entrance_pupil_diameter_mm=1.0))
+    assert lens.surfaces.surfaces[1].aperture.r_max == 5.0
+
+
+def test_an_unapertured_stop_is_not_checked_and_is_not_a_failure() -> None:
+    """The declared idealization: the EPD is the only aperture in the system.
+
+    This is the state M3-REVERSE-TELEPHOTO is in, and the state every system in the
+    repository was in before this ticket. It has to stay constructible, or the
+    consistency rule would be a requirement that every surface carry a rim.
+    """
+    lens = build_lens(
+        _clip_setup(clear_semi_diameter_mm=UNAPERTURED, entrance_pupil_diameter_mm=1.0)
+    )
+    assert lens.surfaces.surfaces[1].aperture is None
+
+
+#: A two-surface system whose stop is the *second* surface, built to discriminate
+#: the one convention the rule depends on: `paraxial.marginal_ray()` returns one
+#: height per **optic** surface with the object surface at index 0, so the setup's
+#: surface `i` is optic surface `i + 1`.
+#:
+#: On a one-surface system with the object at infinity `heights[0] == heights[1] ==
+#: EPD/2`, so an off-by-one there is invisible -- which is the same class of silent
+#: error as the factor of two this ticket exists to catch. Here the first surface
+#: has power, so the marginal ray height at the stop is well below its height at
+#: the surface before it, and a rim placed between the two is accepted under the
+#: right index and refused under the wrong one.
+INTERIOR_STOP_RADIUS_MM = 2.0
+INTERIOR_STOP_THICKNESS_MM = 2.0
+INTERIOR_STOP_INDEX_MM = 1.5
+INTERIOR_STOP_RIM_MM = 0.4
+INTERIOR_STOP_EPD_MM = 1.0
+
+
+def _interior_stop_setup(*, clear_semi_diameter_mm: float = INTERIOR_STOP_RIM_MM) -> OpticalSetup:
+    return OpticalSetup(
+        name="InteriorStopProbe",
+        description="CHE-220: a powered first surface, and the stop behind it.",
+        surfaces=(
+            SurfaceSpec(
+                radius_mm=INTERIOR_STOP_RADIUS_MM,
+                thickness_mm=INTERIOR_STOP_THICKNESS_MM,
+                material={"kind": "ideal", "refractive_index": INTERIOR_STOP_INDEX_MM},
+                comment="powered front face, not the stop",
+            ),
+            SurfaceSpec(
+                thickness_mm=5.0,
+                clear_semi_diameter_mm=clear_semi_diameter_mm,
+                comment="the stop, one surface in",
+            ),
+        ),
+        stop_index=1,
+        entrance_pupil_diameter_mm=INTERIOR_STOP_EPD_MM,
+        reference_wavelength_um=0.55,
+    )
+
+
+def test_the_stop_rule_reads_the_marginal_height_at_the_stop_not_before_it() -> None:
+    """The `+1` optic-surface offset, pinned by a system where it is observable.
+
+    Both arms are needed, and the first is what makes the second mean anything: the
+    marginal height at the setup's stop must be *strictly below* the height at the
+    surface before it, with the declared rim between them. Then a build that read
+    the height one surface too early would refuse a system this one accepts.
+    """
+    setup = _interior_stop_setup()
+    lens = build_lens(setup)
+    heights = _host(lens.paraxial.marginal_ray()[0]).ravel()
+    before_mm = abs(float(heights[setup.stop_index]))
+    at_stop_mm = abs(float(heights[setup.stop_index + 1]))
+
+    assert at_stop_mm < INTERIOR_STOP_RIM_MM < before_mm, (
+        "the probe is only a discriminator if the rim separates the two heights; got "
+        f"at_stop={at_stop_mm!r}, rim={INTERIOR_STOP_RIM_MM!r}, before={before_mm!r}"
+    )
+    # The accepted arm is the whole point: `build_lens` returned above rather than
+    # refusing, which it would have done had it compared the rim against
+    # `before_mm`. The refused arm confirms the same system is rejected once the rim
+    # falls below the height at the stop, so acceptance is not vacuous.
+    with pytest.raises(ValueError, match="fills the stop surface"):
+        build_lens(_interior_stop_setup(clear_semi_diameter_mm=at_stop_mm * 0.9))
+
+
+def test_the_fixture_stops_satisfy_the_consistency_rule() -> None:
+    """The rule holds on the systems the repository actually measures.
+
+    Not a tautology: `build_lens` enforces it, so what this adds is that the
+    *fixtures* are on the accepted side of it with room to spare, which is the same
+    fact `tests/fixtures/systems.py` states as a comment.
+    """
+    for setup in (singlet_ref(), REVERSE_TELEPHOTO):
+        lens = build_lens(setup)
+        stop = setup.surfaces[setup.stop_index]
+        heights, _slopes = lens.paraxial.marginal_ray()
+        filled_mm = abs(float(_host(heights).ravel()[setup.stop_index + 1]))
+        if stop.has_clear_aperture:
+            assert filled_mm < float(stop.clear_semi_diameter_mm)
+        else:
+            assert stop.clear_semi_diameter_mm == UNAPERTURED
