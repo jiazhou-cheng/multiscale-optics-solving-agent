@@ -18,7 +18,7 @@ backend-free can pull one three levels down.
 
 Registration is *pulled*, never *pushed*
 ----------------------------------------
-The tempting arrangement is for `solvers/optiland/solver.py` to call a
+The tempting arrangement is for `backends/optiland/solver.py` to call a
 `register(...)` at import time. That inverts the dependency -- an implementation
 would import `operations/` -- and it defeats the property above the moment
 anything imports the implementation package for any other reason, because then
@@ -29,7 +29,7 @@ no import-time scan, no filename convention and no entry-point discovery.
 put the fourteen landed operations there, and this module builds its by-id index
 from `catalog.CATALOG` at import. That needs no dependency edge in either
 direction, because `implementation` is a string: the catalog *names*
-`solvers.optiland.solver:trace` without importing it.
+`backends.optiland.solver:trace` without importing it.
 
 So there is no public `register()` any more. `_build_index` below is what replaced
 it, and it kept the one behaviour that mattered -- a duplicate id is refused

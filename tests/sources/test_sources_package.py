@@ -9,7 +9,7 @@ its `__all__` -- with nothing anywhere to catch it.
 
 CHE-219 (R05.8) adds the second half, and it is a *semantic* rule rather than a
 dependency-direction one: **no system-launch ray initialization lives in
-`sources/`**. The dependency check already forbids `sources -> solvers`, and that
+`sources/`**. The dependency check already forbids `sources -> backends`, and that
 was never the hazard. The hazard is a function in this package that returns a
 `RayBundle` while importing nothing at all -- built from caller-supplied points and
 a shared direction, with no optical system in scope, and therefore unable to say
@@ -17,7 +17,7 @@ whether those points are the entrance pupil, the stop, the first traced surface,
 valid finite-conjugate aim, or anything in the constructed system. That is what
 `collimated_bundle` was, and its removal is what section 2 below pins: two ways to
 initialize rays -- one system-independent here, one system-aware in
-`solvers/optiland/launch.py` -- would preserve exactly the ambiguity R05.8
+`backends/optiland/launch.py` -- would preserve exactly the ambiguity R05.8
 removed.
 
 So this file asserts the halves against each other and against that rule. It is
@@ -182,7 +182,7 @@ def test_no_pupil_stop_or_aiming_resolution_happens_here() -> None:
     them would be guessing at geometry it cannot see, and it would be doing so
     without importing anything the dependency gate could catch.
 
-    Docstrings are excluded, as `tests/solvers/test_optiland_boundary.py` excludes
+    Docstrings are excluded, as `tests/backends/test_optiland_boundary.py` excludes
     them for the same reason: this package's `__init__` explains at length *why*
     the stop and the aim are the solver's, and flagging that sentence would make
     the only correct response "stop explaining the rule". Every other string
@@ -270,7 +270,7 @@ def test_the_removal_is_recorded_as_a_decision_rather_than_an_absence() -> None:
     docstring = sources.__doc__ or ""
     assert "CHE-219 (R05.8) removed ray initialization from this package" in docstring
     assert "A source may be described without a system. A ray launch may not" in docstring
-    assert "solvers.optiland.launch" in docstring
+    assert "backends.optiland.launch" in docstring
 
 
 def test_the_docstring_records_the_layer_decomposition_and_the_examples() -> None:
@@ -310,7 +310,7 @@ def test_the_package_imports_no_backend_and_no_downstream_package() -> None:
     that consumes state, so reaching for `couplers`, `operators`, `measurements` or
     a solver backend would invert the graph.
     """
-    forbidden = {"solvers", "couplers", "operators", "measurements", "optiland", "chromatix"}
+    forbidden = {"backends", "couplers", "operators", "measurements", "optiland", "chromatix"}
     for path in sorted(PACKAGE.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

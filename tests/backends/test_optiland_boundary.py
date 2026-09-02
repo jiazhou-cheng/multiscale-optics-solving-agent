@@ -2,7 +2,7 @@
 
 CHE-157 (R05) acceptance criterion 2: no `RealRays`, `.i`, `.opd`, `opd_native`,
 `optiland_intensity` or millimetre concept is observable outside
-`solvers/optiland/` -- by an AST walk **and** a runtime check, the way the old
+`backends/optiland/` -- by an AST walk **and** a runtime check, the way the old
 tree asserted the coupler core's solver-freedom.
 
 Why both halves are needed
@@ -35,7 +35,7 @@ annotation and not the boundary.
 CHE-217 (R05.6) extends the last section to the second entry point and changes
 nothing else: the AST walk and the `sys.modules` check are unaltered, and the
 supplied-bundle path and its own test file are held to them as written -- which
-is why `tests/solvers/test_optiland_bundle_trace.py` is in neither exemption set
+is why `tests/backends/test_optiland_bundle_trace.py` is in neither exemption set
 and states its lengths in SI.
 """
 
@@ -50,13 +50,13 @@ import numpy as np
 import pytest
 from fixtures.systems import singlet_ref, singlet_source
 
+from backends.optiland import trace, trace_rays
 from representations import RayBundle, ReferenceSurface
-from solvers.optiland import trace, trace_rays
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 TESTS = ROOT / "tests"
-PACKAGE = SRC / "solvers" / "optiland"
+PACKAGE = SRC / "backends" / "optiland"
 
 #: Native ray attributes. `.i`, `.opd` and `.w` are the ticket's; `.L`, `.M` and
 #: `.N` are added because they are how the native ray object spells a direction,
@@ -81,7 +81,7 @@ MILLIMETRE_FRAGMENTS = ("_mm", "mm_", "millimet")
 #: unit optical prescriptions are written in, and a schema whose numbers no longer
 #: match the literature they were transcribed from is a worse schema. That is a
 #: declared and tested unit on a problem statement, not native solver state
-#: leaking out -- and `solvers/optiland/system.py` checks the declaration before
+#: leaking out -- and `backends/optiland/system.py` checks the declaration before
 #: passing a single number through.
 MILLIMETRE_EXEMPT = frozenset(
     {
@@ -94,9 +94,9 @@ MILLIMETRE_EXEMPT = frozenset(
         # The tests that verify this boundary, and the parity tests that compare
         # against records frozen in native units. A test that may not name what it
         # forbids cannot check that it is forbidden.
-        TESTS / "solvers" / "test_optiland_boundary.py",
-        TESTS / "solvers" / "test_optiland_system.py",
-        TESTS / "solvers" / "test_optiland_solver.py",
+        TESTS / "backends" / "test_optiland_boundary.py",
+        TESTS / "backends" / "test_optiland_system.py",
+        TESTS / "backends" / "test_optiland_solver.py",
         TESTS / "physics" / "test_optiland_opl_convention.py",
         TESTS / "physics" / "test_optiland_rays.py",
         # CHE-207. It measures the finite-object *launch state*, which is native
@@ -118,8 +118,8 @@ MILLIMETRE_EXEMPT = frozenset(
 #: which is the check working rather than the exemption weakening it.
 NATIVE_EXEMPT = frozenset(
     {
-        TESTS / "solvers" / "test_optiland_boundary.py",
-        TESTS / "solvers" / "test_optiland_system.py",
+        TESTS / "backends" / "test_optiland_boundary.py",
+        TESTS / "backends" / "test_optiland_system.py",
         TESTS / "physics" / "test_optiland_opl_convention.py",
         TESTS / "physics" / "test_optiland_rays.py",
         TESTS / "physics" / "test_optiland_finite_conjugate.py",
@@ -216,7 +216,7 @@ def test_no_native_ray_name_outside_the_package() -> None:
         for name in sorted(NATIVE_NAMES & code_tokens(path.read_text(encoding="utf-8")))
     ]
     assert offenders == [], (
-        "native Optiland ray state is named outside solvers/optiland/:\n  "
+        "native Optiland ray state is named outside backends/optiland/:\n  "
         + "\n  ".join(offenders)
     )
 
@@ -230,7 +230,7 @@ def test_no_native_ray_attribute_read_outside_the_package() -> None:
         for attribute in sorted(native_attributes(path.read_text(encoding="utf-8")))
     ]
     assert offenders == [], (
-        "a native ray attribute is read outside solvers/optiland/:\n  " + "\n  ".join(offenders)
+        "a native ray attribute is read outside backends/optiland/:\n  " + "\n  ".join(offenders)
     )
 
 
@@ -244,7 +244,7 @@ def test_no_millimetre_concept_outside_the_package_or_the_prescription() -> None
         if any(fragment in token for fragment in MILLIMETRE_FRAGMENTS)
     ]
     assert offenders == [], (
-        "a millimetre concept appears in code outside solvers/optiland/ and the "
+        "a millimetre concept appears in code outside backends/optiland/ and the "
         "prescription schema:\n  " + "\n  ".join(offenders)
     )
 
@@ -276,11 +276,11 @@ def test_the_walk_would_actually_catch_a_violation() -> None:
         "import representations",
         "import problems",
         "import operations",
-        "import solvers.optiland",
-        "from solvers.optiland import trace",
-        "from solvers.optiland import trace_rays",
-        "import solvers.optiland.rays",
-        "import solvers.optiland.system",
+        "import backends.optiland",
+        "from backends.optiland import trace",
+        "from backends.optiland import trace_rays",
+        "import backends.optiland.rays",
+        "import backends.optiland.system",
     ],
 )
 def test_importing_pulls_no_solver(statement: str) -> None:

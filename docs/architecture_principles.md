@@ -83,7 +83,7 @@ version requirements may appear.
 
 **Boundary against *coupler*:** a solver is where an external solver enters the
 system; a coupler is repository-owned physics between representations. Backend
-imports belong in `solvers/<backend>/` once that adapter exists.
+imports belong in `backends/<backend>/` once that adapter exists.
 
 ### source
 
@@ -114,7 +114,7 @@ system in scope, cannot say whether those points are the entrance pupil, the
 stop, the first traced surface, a valid finite-conjugate aim, or anything in the
 constructed system at all. That is why ray launch is a **solver** operation —
 backend ownership beats taxonomy — and why it takes the constructed system as a
-required argument. It is `solvers/optiland/launch.py` today.
+required argument. It is `backends/optiland/launch.py` today.
 
 Note precisely what this does and does not narrow. `sources/` may still
 initialize any representation whose state is genuinely determined by source
@@ -141,7 +141,7 @@ source. A source may read a problem; it is not one.
 
 **Kind:** `solver`. A source maps a problem statement into a representation, which
 is this document's definition of a solver, and there is no fifth operation kind.
-What separates `sources/` from `solvers/<backend>/` is that a source has **no
+What separates `sources/` from `backends/<backend>/` is that a source has **no
 external backend**: it is the project's own arithmetic on the project's own grid,
 so per-backend organization has nothing to organize.
 
@@ -161,7 +161,7 @@ convenience.
 *[LANDING GATE]* No operation in `sources/` produces a system-launch `RayBundle`,
 and the package resolves no pupil, stop, entrance-pupil, aiming or launch-surface
 quantity. This is a semantic rule and not a dependency-direction one: the
-dependency graph already forbids `sources/ -> solvers/`, and the hazard is a
+dependency graph already forbids `sources/ -> backends/`, and the hazard is a
 function that returns a launch `RayBundle` while importing nothing at all.
 `tests/sources/test_sources_package.py` checks it.
 
@@ -239,7 +239,7 @@ numerics/            -> (nothing in the project)
 representations/     -> numerics
 problems/            -> representations, numerics
 operations/          -> numerics
-solvers/<backend>/   -> problems, representations, numerics (+ its backend)
+backends/<backend>/  -> problems, representations, numerics (+ its backend)
 sources/             -> problems, representations, numerics
 couplers/            -> representations, numerics
 operators/           -> representations, couplers, numerics
@@ -275,7 +275,7 @@ the packages that already existed could hold it without changing what they are.
 `representations/` would own initialization physics it exists only to *declare*;
 `operators/` is wrong by definition, because an operator consumes a representation
 and a source does not; `problems/` may hold a source *declaration* but the
-constructor is not the problem; and `solvers/<backend>/` is organized per backend,
+constructor is not the problem; and `backends/<backend>/` is organized per backend,
 which a source has none of. Widening an existing package's remit to make a source
 fit is the move the allowlist exists to prevent, so the row was added instead.
 
@@ -283,7 +283,7 @@ The row is `sources/ -> problems, representations, numerics`. It reaches
 `representations/` because it constructs one, `numerics/` because an initialized
 state must respect the same dtype and device policy as everything downstream of
 it, and `problems/` because a source may read a physical source declaration. It
-may **not** import `solvers/`, `couplers/`, `operators/` or `measurements/`: a
+may **not** import `backends/`, `couplers/`, `operators/` or `measurements/`: a
 source is upstream of all of them by construction, and an edge in the other
 direction would describe an initial state that cannot be created without the
 thing that consumes it.

@@ -4,8 +4,8 @@ CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3), CHE-217 (R05.6) and
 CHE-219 (R05.8). The public surface is two functions, one per kind of input:
 
 ```python
-solvers.optiland.trace(setup, source, sampling=..., execution=..., aiming=...) -> RayBundle
-solvers.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
+backends.optiland.trace(setup, source, sampling=..., execution=..., aiming=...) -> RayBundle
+backends.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
 ```
 
 `trace` launches its rays into the constructed system from a field angle and a
@@ -23,7 +23,7 @@ independent, so a setup can be traced at a field angle nothing enumerated in
 advance and a supplied bundle needs no source parameters invented for it.
 Nothing else about Optiland crosses this line: no `RealRays`, no `.i`, no `.opd`,
 no `opd_native`, no millimetre.
-`tests/solvers/test_optiland_boundary.py` asserts that with an AST walk over every
+`tests/backends/test_optiland_boundary.py` asserts that with an AST walk over every
 module outside this package and a `sys.modules` check in a fresh interpreter.
 
 Four modules, and the order is the dependency order:
@@ -64,11 +64,11 @@ this package's physics to the frozen records, and `launch` additionally for a
 caller that wants a launch bundle without a trace -- it takes native solver state
 (the constructed `Optic`) and so is package-facing by construction. `trace` and
 `trace_rays` are the API. A consumer outside
-`solvers/` uses one of those two, and the rest of this package is native-facing by
+`backends/` uses one of those two, and the rest of this package is native-facing by
 construction.
 """
 
-from solvers.optiland.solver import (
+from backends.optiland.solver import (
     CAPABILITIES,
     DERIVATIVE,
     Execution,

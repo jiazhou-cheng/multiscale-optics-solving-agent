@@ -291,7 +291,7 @@ def test_the_operator_returns_the_namespace_it_was_given() -> None:
     """Criterion 5. A NumPy field and a JAX field, same operator, same answer.
 
     The AST and `sys.modules` halves of this criterion live in
-    `tests/solvers/test_chromatix_boundary.py`, which walks every module under
+    `tests/backends/test_chromatix_boundary.py`, which walks every module under
     `src/` and now names `operators` in its fresh-interpreter probe. This half is
     about the object a caller receives.
     """

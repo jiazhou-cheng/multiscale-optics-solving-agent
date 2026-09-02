@@ -11,8 +11,8 @@ empty at import, so "enumerating it imported nothing" would have been true of a
 registry that imported everything -- and each subprocess below therefore
 *fabricated* four descriptors naming `optiland`, `chromatix`, `jax` and `torch`
 just to give the check something to catch. CHE-221 (R03.4) put the real catalog in
-`operations/catalog.py`, and it names `solvers.optiland.solver:trace` and
-`solvers.chromatix.solver:propagate` outright. So the check now runs against the
+`operations/catalog.py`, and it names `backends.optiland.solver:trace` and
+`backends.chromatix.solver:propagate` outright. So the check now runs against the
 production records, the fabrication is gone, and what is asserted is a property of
 the shipped catalog rather than of a test fixture.
 """
@@ -89,7 +89,7 @@ def test_resolving_every_operation_still_loads_no_backend() -> None:
 
     `resolve` is the only call in `operations/` *permitted* to import a backend.
     It turns out that resolving all fourteen imports none, because every adapter
-    defers its own backend import into a function body: `solvers/optiland/system.py`
+    defers its own backend import into a function body: `backends/optiland/system.py`
     has `_import_optiland_construction`, and importing the module gives a caller
     the neutral signature without paying for torch.
 
@@ -128,7 +128,7 @@ import operations
 descriptor = operations.find(input="ray_bundle", kind="solver")[0]
 implementation = operations.resolve(descriptor.operation_id)
 assert callable(implementation)
-assert descriptor.implementation.startswith("solvers.optiland")
+assert descriptor.implementation.startswith("backends.optiland")
 
 # What executing it would do. Imported explicitly so the probe below is testing
 # the probe, not the adapter's laziness.

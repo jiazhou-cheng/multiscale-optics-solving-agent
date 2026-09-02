@@ -1,9 +1,9 @@
 """The anti-corruption boundary around the wave backend, asserted structurally.
 
 CHE-183 (R06.1) acceptance criterion 3 and CHE-158 (R06) acceptance criterion 2:
-no chromatix or JAX object is observable outside `solvers/chromatix/` -- by an AST
+no chromatix or JAX object is observable outside `backends/chromatix/` -- by an AST
 walk **and** a runtime check, the same two halves
-`tests/solvers/test_optiland_boundary.py` applies to the ray backend, and
+`tests/backends/test_optiland_boundary.py` applies to the ray backend, and
 `code_tokens` is imported from there rather than written again so its meta-test
 covers both walks.
 
@@ -12,7 +12,7 @@ Four rules
 1. **Nobody else imports the backend.** No module outside the package may
    `import chromatix` or `import jax` -- checked as a top-level import rather than
    as a token, because `chromatix` is also the name of *this* subpackage and
-   `from solvers.chromatix import propagate` is the sanctioned route in.
+   `from backends.chromatix import propagate` is the sanctioned route in.
    `numerics/` is the one production exception for JAX: it is the project's
    array-namespace bridge, `ArrayNamespace.JAX` is a declared compute namespace,
    and `numerics.arrays._to_jax` is the only sanctioned conversion into it, so
@@ -41,13 +41,13 @@ import numpy as np
 from chromatix_support import a_scalar_field
 from test_optiland_boundary import code_tokens
 
+from backends.chromatix import propagate
 from representations import ScalarField
-from solvers.chromatix import propagate
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
 TESTS = ROOT / "tests"
-PACKAGE = SRC / "solvers" / "chromatix"
+PACKAGE = SRC / "backends" / "chromatix"
 
 #: Backend symbols in any code position: an identifier, an attribute, a keyword
 #: argument, or a runtime string. `Field` is the backend's own field type and is
@@ -55,7 +55,7 @@ PACKAGE = SRC / "solvers" / "chromatix"
 #: exists to emit -- does not match it.
 #:
 #: The bare name `chromatix` is **not** here: it is also this subpackage's name,
-#: so `from solvers.chromatix import propagate` would trip it. The import rule
+#: so `from backends.chromatix import propagate` would trip it. The import rule
 #: below is what covers the distribution.
 CHROMATIX_NAMES = frozenset(
     {
@@ -85,8 +85,8 @@ BACKEND_IMPORTS = frozenset({"chromatix", "jax", "jaxlib"})
 #: boundary walk, which enumerates the same names to forbid them.
 SYMBOL_EXEMPT = frozenset(
     {
-        TESTS / "solvers" / "test_chromatix_boundary.py",
-        TESTS / "solvers" / "test_optiland_boundary.py",
+        TESTS / "backends" / "test_chromatix_boundary.py",
+        TESTS / "backends" / "test_optiland_boundary.py",
     }
 )
 
@@ -147,7 +147,7 @@ def test_no_chromatix_symbol_outside_the_package() -> None:
         for name in sorted(CHROMATIX_NAMES & code_tokens(path.read_text(encoding="utf-8")))
     ]
     assert offenders == [], (
-        "a chromatix symbol appears outside solvers/chromatix/:\n  " + "\n  ".join(offenders)
+        "a chromatix symbol appears outside backends/chromatix/:\n  " + "\n  ".join(offenders)
     )
 
 
@@ -161,7 +161,7 @@ def test_nothing_in_production_imports_the_backend_except_numerics() -> None:
             forbidden -= {"jax", "jaxlib"}
         offenders.extend(f"{path.relative_to(ROOT)}: {name!r}" for name in sorted(forbidden))
     assert offenders == [], (
-        "a backend is imported in production outside solvers/chromatix/:\n  "
+        "a backend is imported in production outside backends/chromatix/:\n  "
         + "\n  ".join(offenders)
     )
 
@@ -176,7 +176,7 @@ def test_the_walk_would_actually_catch_a_violation() -> None:
     assert BACKEND_IMPORTS & _top_level_imports("from jax import numpy\n")
     # ...and the import every caller of this package makes is not a violation.
     assert not (
-        BACKEND_IMPORTS & _top_level_imports("from solvers.chromatix import propagate\n")
+        BACKEND_IMPORTS & _top_level_imports("from backends.chromatix import propagate\n")
     )
 
 
@@ -194,11 +194,11 @@ def test_importing_pulls_no_backend() -> None:
     and the statements are independent.
     """
     statements = (
-        "import solvers",
-        "import solvers.chromatix",
-        "from solvers.chromatix import propagate",
-        "import solvers.chromatix.fields",
-        "import solvers.chromatix.solver",
+        "import backends",
+        "import backends.chromatix",
+        "from backends.chromatix import propagate",
+        "import backends.chromatix.fields",
+        "import backends.chromatix.solver",
         # CHE-211 / CHE-210. `operators/` and `sources/` are the two packages that
         # compose *against* the wave path without owning it: a thin element is an
         # elementwise multiply and a plane wave is arithmetic on the project's own

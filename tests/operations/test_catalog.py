@@ -47,7 +47,7 @@ SRC = ROOT / "src"
 
 #: Every package surface that declares `OPERATIONS`, as an import path.
 #:
-#: `solvers/` has no package-level `__init__` operation surface -- it is a
+#: `backends/` has no package-level `__init__` operation surface -- it is a
 #: namespace over backend subpackages -- so the two backends declare their own and
 #: the gate walks both. Discovered rather than listed: any package under `src/`
 #: whose `__init__.py` defines `OPERATIONS` is in scope, so a seventh
@@ -76,8 +76,8 @@ def test_the_gate_found_the_surfaces_it_is_supposed_to_walk() -> None:
         "couplers",
         "measurements",
         "operators",
-        "solvers.chromatix",
-        "solvers.optiland",
+        "backends.chromatix",
+        "backends.optiland",
         "sources",
     }, SURFACES
 
@@ -156,7 +156,7 @@ def _catalog_by_package() -> dict[str, set[tuple[str, OperationKind]]]:
     """`{package: {(attribute, kind)}}` from the catalog's implementation strings.
 
     The package is the implementation module's own package, which for
-    `solvers.optiland.solver:trace` is `solvers.optiland` and not `solvers`: the
+    `backends.optiland.solver:trace` is `backends.optiland` and not `backends`: the
     surface that declares `OPERATIONS` is the backend subpackage.
     """
     grouped: dict[str, set[tuple[str, OperationKind]]] = {}
@@ -277,17 +277,17 @@ def test_the_optiland_launch_is_excluded_on_purpose() -> None:
     """Acceptance criterion 10, with the package's own reason cited.
 
     `launch` takes native solver state -- a constructed `Optic` -- and is
-    package-facing by construction, which `src/solvers/optiland/__init__.py`
+    package-facing by construction, which `src/backends/optiland/__init__.py`
     records. It is neither in `__all__` nor in `OPERATIONS`, and no catalog record
     names it. A public launch operation needs a neutral signature first.
     """
-    import solvers.optiland as optiland_package
+    import backends.optiland as optiland_package
 
     assert "launch" not in optiland_package.OPERATIONS
     assert "launch" not in optiland_package.__all__
     assert not any("launch" in record.implementation for record in CATALOG)
 
-    reason = (SRC / "solvers" / "optiland" / "__init__.py").read_text(encoding="utf-8")
+    reason = (SRC / "backends" / "optiland" / "__init__.py").read_text(encoding="utf-8")
     assert "launch" in reason, "the exclusion has to be written down where the package is"
 
 
@@ -298,7 +298,7 @@ def test_configure_execution_is_not_an_operation() -> None:
     derived from `__all__` would have demanded a descriptor with an `input` and an
     `output` for it, and there is no honest pair of semantic types to give.
     """
-    import solvers.optiland as optiland_package
+    import backends.optiland as optiland_package
 
     assert "configure_execution" in optiland_package.__all__
     assert "configure_execution" not in optiland_package.OPERATIONS
@@ -340,7 +340,7 @@ def test_two_records_may_share_one_callable_and_stay_distinct() -> None:
     for record in CATALOG:
         counts[record.implementation] = counts.get(record.implementation, 0) + 1
     assert {name for name, n in counts.items() if n > 1} == {
-        "solvers.chromatix.solver:propagate"
+        "backends.chromatix.solver:propagate"
     }
 
 
@@ -353,7 +353,7 @@ def test_the_three_operations_that_had_no_descriptor_now_have_one() -> None:
     """
     by_implementation = {record.implementation: record for record in CATALOG}
     for implementation in (
-        "solvers.optiland.solver:trace_rays",
+        "backends.optiland.solver:trace_rays",
         "sources.gaussian_beam:gaussian_beam",
         "sources.spherical_wave:spherical_wave",
     ):
@@ -385,10 +385,10 @@ def test_the_capability_citations_are_the_two_measured_rows_or_none() -> None:
     the chromatix row would claim a measurement taken about something else.
     """
     cited = {r.implementation.rsplit(".", 1)[0]: r.capabilities for r in CATALOG}
-    assert cited["solvers.optiland"] == "M_RAY_OPTILAND"
-    assert cited["solvers.chromatix"] == "M_WAVE_CHROMATIX"
+    assert cited["backends.optiland"] == "M_RAY_OPTILAND"
+    assert cited["backends.chromatix"] == "M_WAVE_CHROMATIX"
     for record in CATALOG:
-        if not record.implementation.startswith("solvers."):
+        if not record.implementation.startswith("backends."):
             assert record.capabilities is None, record.operation_id
 
 

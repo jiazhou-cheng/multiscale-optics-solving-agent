@@ -142,7 +142,7 @@ SINGLET_EDGE_ZERO_SEMI_DIAMETER_MM = math.sqrt(
 #: meaning. `tests/physics/test_optiland_rays.py::
 #: test_nothing_is_clipped_on_the_fixture_systems` is what holds that to a
 #: measurement rather than to this comment; clipping is demonstrated on a
-#: purpose-built system in `tests/solvers/test_optiland_system.py` instead.
+#: purpose-built system in `tests/backends/test_optiland_system.py` instead.
 SINGLET_CLEAR_SEMI_DIAMETER_MM = 0.75
 
 

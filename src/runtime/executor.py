@@ -44,9 +44,9 @@ and chromatix's platform pin -- and that it "applies its own before every node".
 That was false in a way worth recording rather than quietly deleting, because it
 was also the justification checked into `scripts/class_budget.py`: this package
 **cannot** touch backend configuration, since `check_dependencies` gives `runtime`
-only `{planning, operations, representations}` and there is no `solvers` import
+only `{planning, operations, representations}` and there is no `backends` import
 here. The ordering safety is real and is owned where it belongs:
-`solvers.optiland.configure_execution` sets all three on **every call** and never
+`backends.optiland.configure_execution` sets all three on **every call** and never
 inherits what a previous call left behind, which its own docstring states. So two
 executors are safe with respect to the backend because the solver operation makes
 them safe, not because this class sequences anything.

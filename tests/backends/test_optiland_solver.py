@@ -27,7 +27,7 @@ and no allocation.
 
 On criterion 4, and where the descriptor is
 -------------------------------------------
-`operations/` may not import `solvers/` and `solvers/` may not import
+`operations/` may not import `backends/` and `backends/` may not import
 `operations/`, so the descriptor for this trace cannot live in either package
 today and no package that could hold a registration site has landed. What is
 checked here is the whole of the claim that can be executed: the record is
@@ -53,17 +53,17 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from numerics import ArrayNamespace, DevicePlacement, Precision, load_capabilities
-from operations import CATALOG, OperationKind, resolve
-from representations import RayBundle
-from solvers import optiland
-from solvers.optiland import (
+from backends import optiland
+from backends.optiland import (
     CAPABILITIES,
     DERIVATIVE,
     configure_execution,
     trace,
     trace_rays,
 )
+from numerics import ArrayNamespace, DevicePlacement, Precision, load_capabilities
+from operations import CATALOG, OperationKind, resolve
+from representations import RayBundle
 
 ROOT = Path(__file__).resolve().parents[2]
 CPU64 = {"device": "cpu", "precision": "fp64"}
@@ -114,7 +114,7 @@ def test_the_public_entry_points_are_the_two_kinds_of_input() -> None:
 
 
 def test_no_adapter_facade_anywhere_in_the_package() -> None:
-    package = ROOT / "src" / "solvers" / "optiland"
+    package = ROOT / "src" / "backends" / "optiland"
     for module in sorted(package.rglob("*.py")):
         source = module.read_text(encoding="utf-8")
         for name in AVOIDED_NAMES:
@@ -278,7 +278,7 @@ def test_the_refusal_happens_before_the_solver_is_imported() -> None:
         "import sys, json\n"
         "sys.path.insert(0, 'tests')\n"
         "from fixtures.systems import singlet_ref, singlet_source\n"
-        "from solvers.optiland import trace\n"
+        "from backends.optiland import trace\n"
         "try:\n"
         "    trace(singlet_ref(), singlet_source(),\n"
         "          sampling={'num_rings': 8, 'reference_surface': 'exit_pupil'},\n"
@@ -382,8 +382,8 @@ def test_field_degrees_convert_to_the_solvers_normalized_coordinate() -> None:
     the first step of aiming a declarative source into a particular system, which
     is what that module owns.
     """
-    from solvers.optiland.launch import normalized_field as _normalized_field
-    from solvers.optiland.system import build_lens
+    from backends.optiland.launch import normalized_field as _normalized_field
+    from backends.optiland.system import build_lens
 
     for field_deg, expected in (
         ((0.0, 6.0), (0.0, 1.0)),
@@ -418,7 +418,7 @@ def test_the_descriptor_says_forward_only() -> None:
     """Criterion 4, executed end to end against the PRODUCTION record.
 
     The descriptor used to be constructed here, inside a fixture that emptied the
-    registry, because `solvers/` may not import `operations/` and there was no
+    registry, because `backends/` may not import `operations/` and there was no
     production registration site anywhere. CHE-221 (R03.4) put one *inside*
     `operations/`: the catalog names the implementation as a
     `"module.path:attribute"` string, so it needs no dependency edge in either
@@ -433,7 +433,7 @@ def test_the_descriptor_says_forward_only() -> None:
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND")
     assert descriptor.kind is OperationKind.SOLVER
-    assert descriptor.implementation == "solvers.optiland.solver:trace"
+    assert descriptor.implementation == "backends.optiland.solver:trace"
     assert descriptor.derivative == DERIVATIVE == "forward_only"
     assert descriptor.derivative_evidence is None
     assert descriptor.capabilities == CAPABILITIES
@@ -451,7 +451,7 @@ def test_the_supplied_bundle_entry_point_has_its_own_record() -> None:
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND_BUNDLE")
     assert descriptor.kind is OperationKind.SOLVER
-    assert descriptor.implementation == "solvers.optiland.solver:trace_rays"
+    assert descriptor.implementation == "backends.optiland.solver:trace_rays"
     assert descriptor.capabilities == CAPABILITIES
     assert descriptor.derivative == DERIVATIVE
     assert descriptor.validity, "the supplied-bundle path has real preconditions"
@@ -480,7 +480,7 @@ def test_there_is_no_gradient_knob() -> None:
         "execution",
         "aiming",
     }
-    package = ROOT / "src" / "solvers" / "optiland"
+    package = ROOT / "src" / "backends" / "optiland"
     for module in sorted(package.rglob("*.py")):
         source = module.read_text(encoding="utf-8")
         assert "requires_grad" not in source

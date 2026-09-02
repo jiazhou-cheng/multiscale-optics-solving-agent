@@ -3,7 +3,7 @@
 CHE-184 (R06.2). One public function:
 
 ```python
-solvers.chromatix.propagate(field, *, distance_m, model) -> ScalarField
+backends.chromatix.propagate(field, *, distance_m, model) -> ScalarField
 ```
 
 A `representations.ScalarField` goes in and a `ScalarField` comes out. This is
@@ -73,9 +73,7 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
-from representations import ReferenceSurface, ScalarField, ValidityFlag
-from representations.contracts import ContractError
-from solvers.chromatix.fields import (
+from backends.chromatix.fields import (
     CAPABILITIES,
     EDGE_ENERGY_REPORTING_THRESHOLD,
     edge_energy_fraction,
@@ -85,6 +83,8 @@ from solvers.chromatix.fields import (
     padded_shape,
     to_native,
 )
+from representations import ReferenceSurface, ScalarField, ValidityFlag
+from representations.contracts import ContractError
 
 __all__ = [
     "CAPABILITIES",

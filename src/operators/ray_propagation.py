@@ -19,7 +19,7 @@ and each of them is a decision this module makes rather than inherits:
   selectable* operation belongs, and it is selectable: it is CHE-50's declared
   remedy (below), and it is the step a caller takes between two reconstructions.
 * Wave propagation is **not** here. Chromatix owns those numerics and
-  `solvers.chromatix.propagate` exposes them; a wrapper in this package added
+  `backends.chromatix.propagate` exposes them; a wrapper in this package added
   purely to relocate semantic ownership would do no numerical work, and R09.1
   bans exactly that.
 

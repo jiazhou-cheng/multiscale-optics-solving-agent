@@ -44,9 +44,9 @@ import math
 import numpy as np
 import pytest
 
+from backends.chromatix import propagate
 from operators import complex_transmission
 from representations import ReferenceSurface, ScalarField
-from solvers.chromatix import propagate
 from sources import plane_wave, transverse_wavevector_from_angle
 
 WAVELENGTH_M = 0.532e-6

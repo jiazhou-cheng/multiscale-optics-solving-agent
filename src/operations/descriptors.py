@@ -91,7 +91,7 @@ Semantic identity is not implementation identity
 ------------------------------------------------
 Two descriptors may name one callable and remain two distinct planning choices.
 `S_WAVE_CHROMATIX` (`solver`) and `O_ASM_PROPAGATE` (`physical_operator`) both
-resolve to `solvers.chromatix.solver:propagate` with different `approximation` and
+resolve to `backends.chromatix.solver:propagate` with different `approximation` and
 `validity`: one answers "what backend does this project drive", the other "what
 happens to the physical state". **Nothing may deduplicate the catalog by
 implementation string.** The id is the planning identity.

@@ -4,22 +4,22 @@ CHE-223 (R03.6). `numerics/precision.py` used to hold `OPTILAND_CAPABILITIES` an
 `CHROMATIX_CAPABILITIES` as module constants, with a `COMPONENT_CAPABILITIES` dict
 and two name-bound helpers over them. Its own comment called that a bootstrap
 anchor: R02.1 needed something real for `negotiate()` to negotiate against, and
-neither `solvers/` nor `operations/` existed yet.
+neither `backends/` nor `operations/` existed yet.
 
 Why the rows are data and not solver-package state
 --------------------------------------------------
-CHE-206 planned to move each row into `solvers/<backend>/`. **That plan is
+CHE-206 planned to move each row into `backends/<backend>/`. **That plan is
 superseded, and not because it was wrong when written** -- it was written before
 either consumer existed. There are now two, on opposite sides of the dependency
 graph:
 
-* **solver runtime** -- `solvers/optiland/solver.py` reads the row at roughly
-  fifteen refusal sites; `solvers/chromatix/fields.py` negotiates against it;
+* **solver runtime** -- `backends/optiland/solver.py` reads the row at roughly
+  fifteen refusal sites; `backends/chromatix/fields.py` negotiates against it;
 * **backend-free discovery** -- `operations/` cites a component id, and the whole
   point of that package is that reading it loads no backend.
 
 Solver-local ownership cannot be the single source for both. It would force one of
-`operations -> solvers` (which `scripts/check_dependencies.py` names as the edge
+`operations -> backends` (which `scripts/check_dependencies.py` names as the edge
 that ends the only property `operations/` has), a duplicate copy inside
 `operations/`, or a backend-adjacent import behind every capability query.
 

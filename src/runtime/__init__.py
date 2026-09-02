@@ -16,7 +16,7 @@ Two modules:
   lifecycle. The resource is **a memory sampling thread**, started on `__enter__`
   and joined on `__exit__`, and the shared-server policy's swap-growth stop
   condition is what it exists for. It does *not* own backend configuration: this
-  package cannot import `solvers/`, and `configure_execution` sets device and
+  package cannot import `backends/`, and `configure_execution` sets device and
   precision on every call rather than inheriting -- `executor.py` records that
   correction, because an earlier version of this note claimed otherwise.
 

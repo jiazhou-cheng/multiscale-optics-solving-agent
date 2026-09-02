@@ -27,13 +27,13 @@ Why the catalog lives here and needs no dependency change
 ---------------------------------------------------------
 `scripts/check_dependencies.py::ALLOWED` gives `operations` one edge, to
 `numerics`, and gives no implementation package an edge to `operations`. That is
-deliberate and load-bearing: `operations -> solvers` would end the one property
-this package exists to provide, and `solvers -> operations` would end it from the
+deliberate and load-bearing: `operations -> backends` would end the one property
+this package exists to provide, and `backends -> operations` would end it from the
 other side, because listing the registry would then have loaded torch and JAX.
 
 The escape is not a widening. `implementation` is already a `"module.path:attribute"`
 string, so a catalog *inside* `operations/` needs no edge at all -- it names
-`solvers.optiland.solver:trace` without importing it, and `operations.resolve` is
+`backends.optiland.solver:trace` without importing it, and `operations.resolve` is
 still the only function in the package that imports anything.
 
 Registration therefore stays **pulled, never pushed**. No implementation package
@@ -68,7 +68,7 @@ unguarded prose; nothing can derive those.
 Two records may name one callable
 ---------------------------------
 `S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` both resolve to
-`solvers.chromatix.solver:propagate`, and they are two records on purpose. One
+`backends.chromatix.solver:propagate`, and they are two records on purpose. One
 answers "what backend does this project drive, and in which measured capability
 row"; the other answers "what happens to the physical state". Their `kind`,
 `approximation` and `validity` all differ. The completeness gate is written to
@@ -77,11 +77,11 @@ and at least one record per name in `OPERATIONS`.
 
 What is deliberately absent from the catalog
 --------------------------------------------
-* `solvers.optiland.launch:launch` -- not in `solvers.optiland.__all__`, and
-  `src/solvers/optiland/__init__.py` records why: it takes native solver state (a
+* `backends.optiland.launch:launch` -- not in `backends.optiland.__all__`, and
+  `src/backends/optiland/__init__.py` records why: it takes native solver state (a
   constructed `Optic`) and is package-facing by construction. A public launch
   operation needs a neutral signature first.
-* `solvers.optiland.solver:configure_execution` and every other public name that
+* `backends.optiland.solver:configure_execution` and every other public name that
   is not a semantic operation -- mask builders, unit converters, diagnostics
   records, enums, declaration tables. This is why completeness is checked against
   `OPERATIONS` rather than against `__all__`: `couplers.__all__` has 20 names of
@@ -117,13 +117,13 @@ __all__ = ["CATALOG"]
 #: `find()` sorts by id and the index is a dict, so nothing depends on this
 #: sequence.
 CATALOG: tuple[OperationDescriptor, ...] = (
-    # --- solvers/optiland ---------------------------------------------------
+    # --- backends/optiland ---------------------------------------------------
     OperationDescriptor(
         operation_id="S_RAY_OPTILAND",
         kind=OperationKind.SOLVER,
         inputs=(),
         returns=("ray_bundle",),
-        implementation="solvers.optiland.solver:trace",
+        implementation="backends.optiland.solver:trace",
         requires=("setup", "source", "sampling", "execution"),
         optional=("aiming",),
         approximation=(
@@ -140,7 +140,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         kind=OperationKind.SOLVER,
         inputs=("ray_bundle",),
         returns=("ray_bundle",),
-        implementation="solvers.optiland.solver:trace_rays",
+        implementation="backends.optiland.solver:trace_rays",
         requires=("setup", "execution"),
         approximation=(
             "the same sequential geometric ray trace as S_RAY_OPTILAND, over an "
@@ -163,17 +163,17 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "with the caller's arrays row for row -- but a trace in which NO supplied "
             "ray survives is refused rather than returned as an all-zero bundle",
         ),
-        evidence=("tests/solvers/test_optiland_bundle_trace.py",),
+        evidence=("tests/backends/test_optiland_bundle_trace.py",),
         capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
-    # --- solvers/chromatix --------------------------------------------------
+    # --- backends/chromatix --------------------------------------------------
     OperationDescriptor(
         operation_id="S_WAVE_CHROMATIX",
         kind=OperationKind.SOLVER,
         inputs=("scalar_field",),
         returns=("scalar_field",),
-        implementation="solvers.chromatix.solver:propagate",
+        implementation="backends.chromatix.solver:propagate",
         requires=("distance_m", "model"),
         approximation=(
             "scalar diffraction: one complex amplitude per sample, no polarization "
@@ -189,7 +189,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("scalar_field",),
         returns=("scalar_field",),
-        implementation="solvers.chromatix.solver:propagate",
+        implementation="backends.chromatix.solver:propagate",
         requires=("distance_m", "model"),
         approximation=(
             "the exact (non-paraxial) angular spectrum in a homogeneous isotropic "
@@ -210,7 +210,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("scalar_field",),
         returns=("scalar_field",),
-        implementation="solvers.chromatix.focal_plane:focal_plane_transform",
+        implementation="backends.chromatix.focal_plane:focal_plane_transform",
         requires=("focal_length_m", "model"),
         approximation=(
             "the ideal thin lens between its two focal planes: one optical Fourier "

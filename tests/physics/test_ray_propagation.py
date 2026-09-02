@@ -346,14 +346,14 @@ def test_propagating_the_reconstructed_field_instead_is_refused_by_the_tree() ->
     The alternative -- reconstruct at the original surface and propagate the field
     -- is not merely less accurate here, it is **structurally refused**:
     `couplers.ray_to_scalar` emits every field with `surface_only` in its typed
-    validity (CHE-50), and `solvers.chromatix.propagate` refuses a `surface_only`
+    validity (CHE-50), and `backends.chromatix.propagate` refuses a `surface_only`
     field. Two packages, one declaration, and a caller cannot compose the wrong
     route by accident.
 
     That is CHE-50's remedy made executable rather than documented, and it is why
     `propagate_rays` had to be correct: it is the only route left.
     """
-    from solvers.chromatix import propagate
+    from backends.chromatix import propagate
 
     rays, _, _ = collimated_bundle(
         shape=SHAPE, sample_pitch_m=PITCH_M, direction=(0.0, 0.0, 1.0)
@@ -393,7 +393,7 @@ def test_where_the_two_routes_would_agree_they_do() -> None:
 
     Where they diverge is the next test, and it is measured rather than transcribed.
     """
-    from solvers.chromatix import propagate
+    from backends.chromatix import propagate
 
     step_m = 6.0e-6
     # An exact spectral bin of the output grid: d_u = lambda * m / (nx dx).
@@ -459,7 +459,7 @@ def test_where_the_two_routes_diverge_the_advance_is_the_one_that_is_right(
     The advance is exact to 5e-4; the field route is **20-24 % high in peak
     amplitude** and differs from the advance by 21-37 % of peak. So this is not a
     tolerance to be tightened: one route answers the question and the other does
-    not, which is why `solvers.chromatix.propagate` refuses a `surface_only` field
+    not, which is why `backends.chromatix.propagate` refuses a `surface_only` field
     outright rather than doing it less accurately.
 
     The geometry is chosen so the measurement means something. R07's own focal
@@ -474,7 +474,7 @@ def test_where_the_two_routes_diverge_the_advance_is_the_one_that_is_right(
     """
     from ray_support import hexapolar_disc
 
-    from solvers.chromatix import propagate
+    from backends.chromatix import propagate
 
     shape, pitch = (64, 64), (0.2e-6, 0.2e-6)
     rho, phi, area = hexapolar_disc(16, radius_m)
@@ -812,10 +812,10 @@ def test_the_module_defines_no_class() -> None:
 def test_no_wave_propagation_forwarding_wrapper_landed() -> None:
     """R09.1 criterion 4. Chromatix owns wave propagation and exposes it itself.
 
-    A function in `operators/` that only called `solvers.chromatix.propagate` would
+    A function in `operators/` that only called `backends.chromatix.propagate` would
     do no numerical work; relocating semantic ownership is not a reason for a
     function to exist. Checked as an import rule, which is also what the allowlist
-    says: `operators -> solvers` is forbidden.
+    says: `operators -> backends` is forbidden.
     """
     package = SRC / "operators"
     for module in sorted(package.rglob("*.py")):
@@ -827,4 +827,4 @@ def test_no_wave_propagation_forwarding_wrapper_landed() -> None:
                 names = {node.module.split(".")[0]}
             else:
                 continue
-            assert "solvers" not in names, module.relative_to(SRC)
+            assert "backends" not in names, module.relative_to(SRC)

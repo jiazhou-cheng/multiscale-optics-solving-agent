@@ -15,10 +15,10 @@ writes a **record** of what it measured.
 Three properties, in decreasing obviousness:
 
 1. **It uses the public vocabulary and calls no backend directly.** `sources`,
-   `operators`, `solvers.chromatix` — never `chromatix.functional`. A benchmark
+   `operators`, `backends.chromatix` — never `chromatix.functional`. A benchmark
    that reaches past the boundary is testing the backend, not this project.
 2. **The composition happens in the script, not in `src/`.** The dependency
-   allowlist forbids `operators/ -> solvers/`, so no production package can hold
+   allowlist forbids `operators/ -> backends/`, so no production package can hold
    a graph that uses both. A benchmark is therefore four public calls in order.
    Do **not** add a `systems/` package, a `Pipeline`, or a composite operator to
    make it read better: the composition layer is R12/R13's design question

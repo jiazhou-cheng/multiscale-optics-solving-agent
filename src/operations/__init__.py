@@ -2,7 +2,7 @@
 
 `operations/` is a sibling of the packages that implement operations, not a layer
 above them. It imports `numerics/` and nothing else in this project -- in
-particular not `solvers/`, `couplers/`, `operators/`, `measurements/` or
+particular not `backends/`, `couplers/`, `operators/`, `measurements/` or
 `representations/` -- which `scripts/check_dependencies.py` enforces. That is
 what makes "reading the registry imports no backend" a structural fact instead of
 a discipline someone maintains.

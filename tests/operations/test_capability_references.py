@@ -71,7 +71,7 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
     }
     for record in CATALOG:
         if record.capabilities is None:
-            assert not record.implementation.startswith("solvers."), record.operation_id
+            assert not record.implementation.startswith("backends."), record.operation_id
 
 
 def test_several_descriptors_may_cite_one_record() -> None:

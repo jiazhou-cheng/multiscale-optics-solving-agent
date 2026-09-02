@@ -136,13 +136,13 @@ from typing import Any
 
 import numpy as np
 
+from backends.chromatix import fourier_plane_pitch_m
 from benchmarks.record import control, describe_plan, gate, write_record
 from operations import CATALOG
 from operators import circular_aperture_amplitude, numerical_aperture_radius_m
 from planning import ENTRY, capability_graph
 from representations import ReferenceSurface, ScalarField
 from runtime import Executor, PlanNode, normalize_plan
-from solvers.chromatix import fourier_plane_pitch_m
 
 BENCHMARK_ID = "B-FP-FORWARD"
 RECORDS = Path(__file__).resolve().parent / "records"

@@ -11,14 +11,14 @@ the only operation in the graph with no input representation.
 architecture change with the owner's decision. Its operations register as
 `solver`-kind, because mapping a problem statement into a representation is what
 that document calls a solver and there is no fifth operation kind; what separates
-this package from `solvers/<backend>/` is that a source has no external backend,
+this package from `backends/<backend>/` is that a source has no external backend,
 so per-backend organization has nothing to organize. Section 3 records why each
 alternative home was worse.
 
 The allowlist row is `sources/ -> problems, representations, numerics`. Only the
 last two are exercised today: a source *declaration* belongs in `problems/` when
 something needs one, and the edge is declared so that landing it is not a second
-architecture change. There is deliberately no edge to `solvers/`, `couplers/`,
+architecture change. There is deliberately no edge to `backends/`, `couplers/`,
 `operators/` or `measurements/`: a source is upstream of everything that consumes
 state.
 
@@ -52,7 +52,7 @@ So there is exactly one rule and no middle state:
 * **wave-source construction** that does not describe an optical-system ray launch
   stays here: an analytic field at a declared surface is not aimed at anything;
 * a **system-launch `RayBundle`** is produced by the solver that owns the aiming --
-  `solvers.optiland.launch` -- and by nothing in this package.
+  `backends.optiland.launch` -- and by nothing in this package.
 
 `direction_from_angle` left with it, having been audited under the same rule: its
 production purpose was to turn a source field into a launched ray direction, so
@@ -107,7 +107,7 @@ one right one:
   finite-conjugate aim, the ray aimer and its mode. None of that is knowable from
   source parameters alone, none of it is inferred here, and as of CHE-219 (R05.8)
   none of it is *approximated* here either: the operation that materializes a
-  launch is `solvers.optiland.launch`, which takes the constructed system as a
+  launch is `backends.optiland.launch`, which takes the constructed system as a
   required argument.
 
 Prefer composition over a new constructor
@@ -176,7 +176,7 @@ Still not here:
   construction.
 * **pupil-aware or finite-conjugate launches** -- aiming needs the stop, the pupil
   and the system NA, which is the solver/problem layer (CHE-207, R05.5), and as of
-  CHE-219 (R05.8) is `solvers.optiland.launch`.
+  CHE-219 (R05.8) is `backends.optiland.launch`.
 * **ray initialization of any kind** -- see the rule above. Not "not yet": a
   system-launch `RayBundle` is not a thing this package can correctly produce.
 * **automatic aperture or NA inference** -- no source here inspects a downstream

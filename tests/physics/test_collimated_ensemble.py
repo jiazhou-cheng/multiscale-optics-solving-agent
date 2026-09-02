@@ -9,7 +9,7 @@ and it is now `fixtures.ray_bundles.collimated_bundle`: a launch `RayBundle` bui
 from caller-supplied points and a shared direction has no optical system in scope,
 so it cannot say whether those points are the entrance pupil, the stop, the first
 traced surface, a valid finite-conjugate aim, or anything in the constructed
-system -- and a system launch is `solvers.optiland.launch`'s. Nothing about the
+system -- and a system launch is `backends.optiland.launch`'s. Nothing about the
 arithmetic or these assertions changed with the move; two tests that asserted
 properties of a *production* module went with it, and are noted below.
 
@@ -399,7 +399,7 @@ def test_no_backend_is_on_the_path() -> None:
     up dynamically; and dynamically, because reaching for a solver at call time is
     what would make this ensemble a launch. It is arithmetic on the caller's own
     points and nothing else -- aiming one at an entrance pupil needs the stop, the
-    pupil, the system NA and the aimer, which is `solvers.optiland.launch`.
+    pupil, the system NA and the aimer, which is `backends.optiland.launch`.
 
     This survived the CHE-219 move because it is the assertion that keeps the
     builder honest about what it is *not*. What did not survive was a class-budget
@@ -415,7 +415,7 @@ def test_no_backend_is_on_the_path() -> None:
             imported.add(node.module.split(".")[0])
 
     assert imported <= {"__future__", "math", "typing", "numpy", "numerics", "representations"}
-    for forbidden in ("optiland", "chromatix", "solvers", "couplers", "operators", "problems"):
+    for forbidden in ("optiland", "chromatix", "backends", "couplers", "operators", "problems"):
         assert forbidden not in imported
 
     for forbidden in ("optiland", "chromatix"):

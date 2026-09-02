@@ -275,7 +275,7 @@ The three options not taken, with the reason each was rejected:
    itself is exact (both operands are within a factor of two, so Sterbenz applies).
    No arithmetic here can recover information the input does not carry. The real
    remedy is for the **producer** to supply a path measured from a reference its own
-   geometry makes small -- which is what `solvers.optiland`'s chief-ray-relative
+   geometry makes small -- which is what `backends.optiland`'s chief-ray-relative
    optical path already does -- and that is a change to `RayBundle` and its
    producers, not to this kernel.
 
@@ -321,7 +321,7 @@ serves every device: the array module is taken from the bundle, so a NumPy
 bundle executes on the host and a JAX bundle executes wherever its arrays live.
 `tests/physics/test_ray_to_scalar.py` asserts both halves -- `sys.modules` in a
 fresh interpreter, and an AST walk of this package's own imports, on top of the
-walks in `tests/solvers/test_optiland_boundary.py` that already read every module
+walks in `tests/backends/test_optiland_boundary.py` that already read every module
 here for native names.
 """
 
@@ -1148,7 +1148,7 @@ def _stored_epsilon(*arrays: Any) -> float:
 
     The two differ in practice, not just in principle:
     `RayBundle.require_same_representation` deliberately does **not** unify dtype
-    across an artifact, and `solvers.optiland` emits exactly the mixed case -- it
+    across an artifact, and `backends.optiland` emits exactly the mixed case -- it
     preserves the trace dtype for the geometry while `declare_optical_path_m`
     returns float64. `_compute_precision` takes the *max* over the artifact, so a
     float32 trace with a float64 path computes in FP64, and a bound taken from that

@@ -462,15 +462,15 @@ def test_item_4_a_unit_scale_error_is_not_a_small_error() -> None:
 def test_the_coupler_imports_no_solver_and_no_backend() -> None:
     """Criterion 4, the AST half.
 
-    `scripts/check_dependencies.py` already forbids `couplers -> solvers` as an
-    allowlist edge, and the walks in `tests/solvers/test_optiland_boundary.py` and
+    `scripts/check_dependencies.py` already forbids `couplers -> backends` as an
+    allowlist edge, and the walks in `tests/backends/test_optiland_boundary.py` and
     `test_chromatix_boundary.py` already read every module here for native names.
     This is the direct statement of the same rule against this package's own
     imports, kept local so the reason travels with the coupler: if the coupler
     core could reach an engine, a coupler defect could be misattributed to engine
     behaviour.
     """
-    forbidden = {"optiland", "chromatix", "jax", "torch", "solvers", "problems"}
+    forbidden = {"optiland", "chromatix", "jax", "torch", "backends", "problems"}
     offenders = []
     for module in sorted(PACKAGE.rglob("*.py")):
         tree = ast.parse(module.read_text(encoding="utf-8"), filename=str(module))

@@ -23,10 +23,10 @@ import numpy as np
 import pytest
 from chromatix_support import WAVELENGTH_M, a_scalar_field
 
+from backends import chromatix
+from backends.chromatix import CAPABILITIES, DERIVATIVE, MODELS, carrier_phase_rad, propagate
 from operations import CATALOG, OperationKind, registry, resolve
 from representations import ContractError, ScalarField
-from solvers import chromatix
-from solvers.chromatix import CAPABILITIES, DERIVATIVE, MODELS, carrier_phase_rad, propagate
 
 DISTANCE_M = 30e-6
 
@@ -265,7 +265,7 @@ def test_the_solver_and_the_propagation_register_as_themselves() -> None:
     and heavy numerics is not what decides the question.
 
     The descriptor used to be constructed here, inside a fixture that emptied the
-    registry, because `solvers/` may not import `operations/` and there was no
+    registry, because `backends/` may not import `operations/` and there was no
     production registration site anywhere. CHE-221 (R03.4) put one *inside*
     `operations/`: the catalog names the implementation as a
     `"module.path:attribute"` string, so it needs no dependency edge in either

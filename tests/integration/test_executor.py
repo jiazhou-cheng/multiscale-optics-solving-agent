@@ -588,7 +588,7 @@ def test_two_executors_in_one_process_do_not_interfere() -> None:
     overclaimed: this runs the backend-free wave plan, so it establishes
     independence of *this class's* state and nothing about the backend. The
     executor does not configure a backend -- it cannot, `runtime` may not import
-    `solvers` -- and the reason two runs asking for different precisions are safe
+    `backends` -- and the reason two runs asking for different precisions are safe
     is that `configure_execution` sets all three on every call rather than
     inheriting. That guarantee belongs to the solver operation and is tested there.
     """

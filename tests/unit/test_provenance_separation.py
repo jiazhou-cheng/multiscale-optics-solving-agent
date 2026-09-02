@@ -338,7 +338,7 @@ def test_nothing_physical_may_import_the_runtime() -> None:
         "operators",
         "measurements",
         "sources",
-        "solvers",
+        "backends",
     )
     for package in physical:
         assert "runtime" not in ALLOWED[package], (

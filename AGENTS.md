@@ -69,7 +69,7 @@ hierarchies**. A source is `solver`-kind; there is no fifth kind.
 
 - **representation** — physical state with explicit conventions. The initial public target is one ray representation and one scalar-field representation. PSF is a measurement, not a representation. Coherence is a stronger contract by default, not a subtype.
 - **solver** — maps a problem into a representation and owns external-backend API, compatibility, and version-specific behavior.
-- **source** — owns the physically meaningful **initialization** of a representation. A representation defines the structure and conventions of physical state at a declared boundary; a source defines how that state is initialized from physical source parameters — a plane-wave source initializes a `ScalarField`'s complex amplitude and phase from its wavelength, propagation direction, amplitude, sampling grid and reference surface. **A source does not consume an existing physical representation; it creates the initial state of one.** But **a source may be described without an optical system and a ray launch may not**: the launch positions and directions of a source into a system depend on the stop, the entrance pupil, the surfaces before the stop, the object distance, the field, the backend's pupil map and the ray aimer, so ray launch is a `solvers/<backend>/` operation taking the constructed system as a required argument, and `sources/` produces no system-launch `RayBundle`. CHE-219 (R05.8) decided this; see `docs/architecture_principles.md` §2. It registers as `solver`-kind, and what separates it from `solvers/<backend>/` is that it has no external backend.
+- **source** — owns the physically meaningful **initialization** of a representation. A representation defines the structure and conventions of physical state at a declared boundary; a source defines how that state is initialized from physical source parameters — a plane-wave source initializes a `ScalarField`'s complex amplitude and phase from its wavelength, propagation direction, amplitude, sampling grid and reference surface. **A source does not consume an existing physical representation; it creates the initial state of one.** But **a source may be described without an optical system and a ray launch may not**: the launch positions and directions of a source into a system depend on the stop, the entrance pupil, the surfaces before the stop, the object distance, the field, the backend's pupil map and the ray aimer, so ray launch is a `backends/<backend>/` operation taking the constructed system as a required argument, and `sources/` produces no system-launch `RayBundle`. CHE-219 (R05.8) decided this; see `docs/architecture_principles.md` §2. It registers as `solver`-kind, and what separates it from `backends/<backend>/` is that it has no external backend.
 - **coupler** — changes *representation* while preserving the same physical state at the same boundary. Heavy numerics do not make it an operator.
 - **physical operator** — changes physical state. Propagation and surface interactions are operators, not couplers.
 - **measurement** — derives an observable from state.
@@ -82,7 +82,7 @@ numerics/            -> (nothing in the project)
 representations/     -> numerics
 problems/            -> representations, numerics
 operations/          -> numerics
-solvers/<backend>/   -> problems, representations, numerics (+ its backend)
+backends/<backend>/  -> problems, representations, numerics (+ its backend)
 sources/             -> problems, representations, numerics
 couplers/            -> representations, numerics
 operators/           -> representations, couplers, numerics
@@ -104,7 +104,7 @@ representation-explicit at every public operation**: it may initialize a
 source parameters alone, but each public operation's return representation must be
 unambiguous in the signature and in its descriptor. No subpackage per representation, and no constructor whose return
 representation depends on its arguments. `sources/` is upstream of everything that
-consumes state, so it may not import `solvers/`, `couplers/`, `operators/` or
+consumes state, so it may not import `backends/`, `couplers/`, `operators/` or
 `measurements/`.
 
 A class must justify itself by a shared invariant, versioned public data model,

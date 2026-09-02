@@ -58,13 +58,13 @@ import pytest
 from fixtures.systems import singlet_ref
 from test_optiland_boundary import code_tokens
 
-from couplers import ray_to_scalar, scalar_to_ray
-from representations import UNVERIFIED, ContractError, RayBundle, ReferenceSurface, ScalarField
-from solvers.optiland import trace_rays
-from solvers.optiland.rays import (
+from backends.optiland import trace_rays
+from backends.optiland.rays import (
     COMPOSED_OPL_REFERENCE_VERSION,
     require_declared_optical_path,
 )
+from couplers import ray_to_scalar, scalar_to_ray
+from representations import UNVERIFIED, ContractError, RayBundle, ReferenceSurface, ScalarField
 
 CPU64 = {"device": "cpu", "precision": "fp64"}
 
@@ -245,8 +245,8 @@ def test_no_source_specification_is_constructed_in_the_call_path() -> None:
     `test_optiland_boundary.py` exempts them: this module's own explanation of
     what it forbids is not a use of it.
     """
-    from solvers.optiland import rays as rays_module
-    from solvers.optiland import solver as solver_module
+    from backends.optiland import rays as rays_module
+    from backends.optiland import solver as solver_module
 
     functions = (
         solver_module.trace_rays,

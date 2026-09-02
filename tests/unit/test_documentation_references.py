@@ -17,7 +17,7 @@ docstrings, with the same ticket citations:
 
 | pack item | where it is now |
 | -- | -- |
-| H1, the traced path's sign and reference (CHE-30/CHE-41) | `solvers/optiland/rays.py` |
+| H1, the traced path's sign and reference (CHE-30/CHE-41) | `backends/optiland/rays.py` |
 | H2, `intensity` is a weight not an amplitude | `AMPLITUDE_MAPPING`, same module |
 | H3, the wave backend returns padded arrays | `pad_width`/`padded` on `representations/scalar.py` |
 | H4, near-grazing phase cancellation (CHE-70) | `grazing_floor_for_phase_budget` |
@@ -80,7 +80,7 @@ _PATH_LIKE = re.compile(r"^[A-Za-z0-9_./-]+(?:\.(?:md|py|json|yaml|yml|sh|toml)|
 
 #: Tokens that look like paths and are not references to be resolved.
 #:
-#: `solvers/<backend>/` is a template -- the angle brackets are the tell, and the
+#: `backends/<backend>/` is a template -- the angle brackets are the tell, and the
 #: regex above already excludes them. The rest are named in order to say they must
 #: **not** exist: `src/io/` because a top-level `io` package would shadow the
 #: standard library's, and the junk-drawer names because a package that names no
@@ -186,7 +186,7 @@ def test_the_extractor_finds_paths_and_not_prose() -> None:
     """The meta-check: an extractor that found nothing would pass everything."""
     found = _paths_in(
         "See `docs/architecture_principles.md` and `src/numerics/arrays.py`, or "
-        "`and/or` which is not one, or `solvers/<backend>/` which is a template."
+        "`and/or` which is not one, or `backends/<backend>/` which is a template."
     )
     assert found == {"docs/architecture_principles.md", "src/numerics/arrays.py"}
     # And the real files yield a useful number, so the parametrized test is not
@@ -294,7 +294,7 @@ def test_the_carried_pack_items_are_in_the_code() -> None:
         "H2 -- intensity is a weight, not an amplitude": "AMPLITUDE_MAPPING",
         "the omitted Kirchhoff prefactor": "Kirchhoff",
         # Cited by ticket rather than by the native attribute's name: that name is
-        # confined to `solvers/optiland/` by `test_optiland_boundary.py`, and
+        # confined to `backends/optiland/` by `test_optiland_boundary.py`, and
         # widening its exemption for a documentation test would be the wrong
         # direction. `CHE-41` is the ticket that characterized the reference
         # surface, and is just as distinctive.

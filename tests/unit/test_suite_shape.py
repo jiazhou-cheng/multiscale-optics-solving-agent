@@ -58,7 +58,7 @@ from operations import CATALOG  # noqa: E402
 #: The one module exempt from the rules below: this one.
 #:
 #: A file that names what it forbids has to be able to name it, which is the same
-#: exemption `tests/solvers/test_optiland_boundary.py` takes for the millimetre
+#: exemption `tests/backends/test_optiland_boundary.py` takes for the millimetre
 #: rule and takes for the same reason -- "a test that may not name what it forbids
 #: cannot check that it is forbidden". Exactly one file, so the exemption cannot
 #: quietly widen. Note that the path rule below needs it for a narrower reason than
@@ -91,7 +91,7 @@ def _test_modules() -> list[Path]:
 #    legitimate historical citation: `tests/fixtures/systems.py` recording that the
 #    M3 protocol was frozen in `benchmarks/protocols/slice_protocol.yaml`,
 #    `tests/physics/test_psf.py` recording that the PSF reduction came from
-#    `core/boundary.py:1508`, `tests/solvers/test_optiland_system.py` listing
+#    `core/boundary.py:1508`, `tests/backends/test_optiland_system.py` listing
 #    `_resolve_lens` among the names that did *not* land.
 #
 # 2. *require every path a test names to resolve now or at the frozen tag.* This
@@ -114,10 +114,10 @@ def _test_modules() -> list[Path]:
 def test_every_mock_patch_target_a_test_names_resolves() -> None:
     """Criterion 3, generalized past the two names the ticket lists.
 
-    `solvers.optiland.adapter._import_optiland` and `._resolve_lens` were pinned by
+    `backends.optiland.adapter._import_optiland` and `._resolve_lens` were pinned by
     mock-patch tests, which made two private names of a deleted module part of what
     a rewrite had to preserve. Rather than ban those two strings -- which
-    `tests/solvers/test_optiland_system.py` legitimately *lists* as names that did
+    `tests/backends/test_optiland_system.py` legitimately *lists* as names that did
     not land -- this resolves every `monkeypatch.setattr` and `mock.patch` target a
     test actually uses. A patch target that does not resolve is the same defect
     whatever it is called.

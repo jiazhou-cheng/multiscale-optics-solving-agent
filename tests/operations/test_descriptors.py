@@ -213,6 +213,20 @@ def test_there_is_no_yaml_or_manifest_mirror_of_the_registry() -> None:
 
 
 def test_implementation_is_a_string_and_is_not_imported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Constructing a descriptor resolves nothing, asserted as a delta and not a state.
+
+    The last assertion used to be `"chromatix" not in sys.modules`, which is a claim
+    about the whole interpreter rather than about this construction, and it held only
+    while nothing earlier in the session had imported the backend. CHE-224 (R15.1)
+    renamed `tests/solvers/` to `tests/backends/`, which moved those modules ahead of
+    this one in collection order, and the assertion started failing on a test that
+    had not changed -- so what it was really pinning was the alphabet.
+
+    The before/after difference is the property the test is named for. The absolute
+    version of it is a real property and it is checked where it can be:
+    `test_registry_imports_no_backend.py` runs a **fresh interpreter** per probe,
+    which is the only place `sys.modules` means what this line wanted it to mean.
+    """
     import importlib
     import sys
 
@@ -220,10 +234,11 @@ def test_implementation_is_a_string_and_is_not_imported(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         importlib, "import_module", lambda name, *a, **k: calls.append(name)  # type: ignore[misc]
     )
+    before = set(sys.modules)
     descriptor = a_descriptor(implementation="chromatix.functional:transfer_propagate")
     assert isinstance(descriptor.implementation, str)
     assert calls == []
-    assert "chromatix" not in sys.modules
+    assert set(sys.modules) - before == set()
 
 
 @pytest.mark.parametrize("bad", ["chromatix.functional", "", ":run"])

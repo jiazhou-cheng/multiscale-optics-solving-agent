@@ -58,18 +58,18 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from problems.ray_trace import OpticalSetup, SourceSpec, SurfaceSpec
-from representations import ContractError, direction_norm_tolerance
-from solvers.optiland import trace
-from solvers.optiland.launch import launch
-from solvers.optiland.rays import (
+from backends.optiland import trace
+from backends.optiland.launch import launch
+from backends.optiland.rays import (
     NATIVE_LENGTH_M,
     hexapolar_area_weight_m2,
     hexapolar_ray_count,
     hexapolar_ring_index,
     to_ray_bundle,
 )
-from solvers.optiland.system import build_lens
+from backends.optiland.system import build_lens
+from problems.ray_trace import OpticalSetup, SourceSpec, SurfaceSpec
+from representations import ContractError, direction_norm_tolerance
 
 WAVELENGTH_UM = 0.55
 NUM_RINGS = 16

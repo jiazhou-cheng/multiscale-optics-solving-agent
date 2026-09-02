@@ -33,7 +33,7 @@ direction.
 It needs **no backend**. An elementwise multiply happens in whatever array
 namespace the field already carries, so this module imports NumPy for a mask grid
 and nothing else -- a NumPy field and a JAX field both work and both come back in
-the namespace they arrived in. `tests/solvers/test_chromatix_boundary.py`'s AST
+the namespace they arrived in. `tests/backends/test_chromatix_boundary.py`'s AST
 and `sys.modules` walks already cover `operators/` for that, because they walk
 every module under `src/`.
 

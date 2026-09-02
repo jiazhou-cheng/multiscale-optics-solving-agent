@@ -57,12 +57,10 @@ import numpy as np
 import pytest
 from fixtures.systems import REVERSE_TELEPHOTO, singlet_ref
 
-from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
-from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
-from solvers.optiland import rays as rays_module
-from solvers.optiland import trace_rays
-from solvers.optiland.launch import capture_launch_rays, launch
-from solvers.optiland.rays import (
+from backends.optiland import rays as rays_module
+from backends.optiland import trace_rays
+from backends.optiland.launch import capture_launch_rays, launch
+from backends.optiland.rays import (
     COMPOSED_OPL_REFERENCE_VERSION,
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
@@ -73,7 +71,9 @@ from solvers.optiland.rays import (
     require_declared_optical_path,
     to_ray_bundle,
 )
-from solvers.optiland.system import build_lens
+from backends.optiland.system import build_lens
+from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
+from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
 
 WAVELENGTH_UM = 0.55
 WAVELENGTH_M = WAVELENGTH_UM * 1.0e-6
@@ -268,7 +268,7 @@ def _declared_pupil_opl(
     # CHE-219 (R05.8): the term is measured on the launch state `capture_launch_rays`
     # took, not on one regenerated after the trace. Driven through the shipping
     # functions so this oracle reads the same term the adapter applies.
-    from solvers.optiland.launch import _launch_columns, _object_space_reference
+    from backends.optiland.launch import _launch_columns, _object_space_reference
 
     native_launch, _, _ = capture_launch_rays(
         lens, field=field, wavelength_um=WAVELENGTH_UM, num_rings=num_rings

@@ -62,10 +62,12 @@ include-package-data = true
 where = ["src"]
 # Explicit rather than discovered, so a stray scratch directory under src/ cannot
 # silently become a shipped package. R01 landed the first two and the deletion of
-# the old tree left them as the whole of it; `solvers*` is R05's, and the trailing
-# glob is what picks up the `solvers.optiland` subpackage. Later tickets add
+# the old tree left them as the whole of it; `backends*` is R05's (as `solvers*`
+# until CHE-224 renamed the package), and the trailing
+# glob is what picks up the `backends.optiland` subpackage. Later tickets add
 # theirs, and `scripts/check_dependencies.py` holds the full declared set.
 include = [
+  "backends*",
   "couplers*",
   # CHE-201 (R14.1) added this one. It was missing from the day `measurements/`
   # landed (CHE-197 / R11.1), so a built wheel would not have contained it -- the
@@ -80,7 +82,6 @@ include = [
   "problems*",
   "representations*",
   "runtime*",
-  "solvers*",
   "sources*",
 ]
 
@@ -180,6 +181,7 @@ ignore_missing_imports = true
 # not being measured. A coverage source list that lags the tree reports a number
 # about a fraction of it.
 source = [
+  "backends",
   "couplers",
   "measurements",
   "numerics",
@@ -189,7 +191,6 @@ source = [
   "problems",
   "representations",
   "runtime",
-  "solvers",
   "sources",
 ]
 branch = true

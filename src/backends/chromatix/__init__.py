@@ -3,12 +3,12 @@
 CHE-183 / CHE-184 (R06.1 / R06.2). The public surface is one function:
 
 ```python
-solvers.chromatix.propagate(field, *, distance_m, model) -> ScalarField
+backends.chromatix.propagate(field, *, distance_m, model) -> ScalarField
 ```
 
 A `representations.ScalarField` goes in and a `ScalarField` comes out. No
 chromatix type and no JAX buffer crosses this line: a NumPy caller gets a NumPy
-field back, and `tests/solvers/test_chromatix_boundary.py` asserts that with an
+field back, and `tests/backends/test_chromatix_boundary.py` asserts that with an
 AST walk over every module outside this package plus a `sys.modules` check in a
 fresh interpreter.
 
@@ -35,7 +35,7 @@ that hold this package to its capability row; everything else in it is
 native-facing by construction.
 """
 
-from solvers.chromatix.fields import (
+from backends.chromatix.fields import (
     CAPABILITIES,
     EDGE_ENERGY_REPORTING_THRESHOLD,
     edge_energy_fraction,
@@ -43,8 +43,8 @@ from solvers.chromatix.fields import (
     padded_field_bytes,
     padded_shape,
 )
-from solvers.chromatix.focal_plane import DIRECTIONS, focal_plane_transform
-from solvers.chromatix.solver import (
+from backends.chromatix.focal_plane import DIRECTIONS, focal_plane_transform
+from backends.chromatix.solver import (
     DERIVATIVE,
     MODELS,
     carrier_phase_rad,

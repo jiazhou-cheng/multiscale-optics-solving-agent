@@ -567,7 +567,7 @@ def test_the_package_reasons_over_metadata_and_imports_no_representation() -> No
     route from quietly becoming something that holds a `RayBundle`.
     """
     code = _code_of(PACKAGE / "graph.py") + _code_of(PACKAGE / "__init__.py")
-    for forbidden in ("representations", "RayBundle", "ScalarField", "numerics", "solvers"):
+    for forbidden in ("representations", "RayBundle", "ScalarField", "numerics", "backends"):
         assert forbidden not in code, f"planning/ imports or names {forbidden!r}"
 
 

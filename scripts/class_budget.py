@@ -218,7 +218,7 @@ SRC = ROOT / "src"
 #: `core/optical_assembly.py`'s three and every builder.
 #: `tests/problems/test_ray_trace.py` asserts their absence, and now also asserts
 #: that `RayTraceProblem` is gone rather than aliased.
-#: `solvers` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
+#: `backends` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
 #: neither is a public class**: R05 budgets "0 public classes, at most 1 private",
 #: and the private one (`_OptilandTraceBatch`, for grouped native ray state) did
 #: not land -- the native columns are a local dict inside one function, and no
@@ -244,7 +244,7 @@ SRC = ROOT / "src"
 #: `OptilandRayFailure` / `OptilandRayResult`, `PatchEmitterCostModel`, and
 #: `HandoffPlaneError` as a separate exception type -- an unresolvable plane is a
 #: `ContractError` with a code, because a coupler branches on the code and not on
-#: the class. `solvers/optiland/baseline.py` did not land either, in its entirety.
+#: the class. `backends/optiland/baseline.py` did not land either, in its entirety.
 #: `operators` is **1**, raised from 0 by CHE-194 (R10.2), which adds
 #: `DiffractiveSurface` -- rules 1 and 2. Rule 1: the transmission, the pitch it is
 #: sampled at and the surface it lives on are one physical object, and the failure
@@ -328,6 +328,7 @@ SRC = ROOT / "src"
 #: `PositionPlan`, `PatchPlan` and `Ensemble`.
 #:
 BUDGETS: dict[str, int] = {
+    "backends": 2,
     "couplers": 4,
     "measurements": 1,
     "numerics": 7,
@@ -367,7 +368,6 @@ BUDGETS: dict[str, int] = {
     #: real lifetime; the raise is unchanged and the justification is now the one
     #: the code supports.
     "runtime": 3,
-    "solvers": 2,
     "sources": 0,
 }
 

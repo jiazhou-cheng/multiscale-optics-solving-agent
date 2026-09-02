@@ -28,7 +28,7 @@ A plan through the executor, and no `System` class
 That listing is not prose: it is the plan this module hands to `runtime.Executor`,
 step by step, each step a catalogued operation id paired with its own request. The
 benchmark imports no operation. `sources.plane_wave`, `operators.complex_transmission`
-and `solvers.chromatix.focal_plane_transform` are named by id and resolved through
+and `backends.chromatix.focal_plane_transform` are named by id and resolved through
 `operations.CATALOG`, so what composes the system is the catalog and the executor
 rather than this file's import list.
 
@@ -47,7 +47,7 @@ reported every node `completed` -- a different optical system, recorded as this
 one. The record's `node_requests` is what that is verified from afterwards.
 
 Still no `systems/` package, no composite-operator framework and no `Pipeline`.
-`operators/` may not import `solvers/` under the dependency allowlist, so nothing
+`operators/` may not import `backends/` under the dependency allowlist, so nothing
 in `src/` holds this graph; what holds it is a plan, which is data, and the
 executor, which is generic. Where the plan comes from -- this file today, an agent
 later -- is the planner's question and not the executor's.
@@ -115,13 +115,13 @@ from typing import Any
 import numpy as np
 from scipy.special import jv
 
+from backends.chromatix import fourier_plane_pitch_m
 from benchmarks.record import control, describe_plan, gate, write_record
 from operations import CATALOG
 from operators import circular_aperture_amplitude, numerical_aperture_radius_m
 from planning import ENTRY, capability_graph
 from representations import ReferenceSurface, ScalarField
 from runtime import Executor, PlanNode, normalize_plan
-from solvers.chromatix import fourier_plane_pitch_m
 
 BENCHMARK_ID = "B-4F-IDEAL"
 RECORDS = Path(__file__).resolve().parent / "records"
@@ -184,7 +184,7 @@ CONFIGURATIONS: tuple[dict[str, Any], ...] = (
 #
 # Every node below is `(operation_id, request)`. Nothing here calls an operation:
 # the ids are resolved by `operations.resolve` inside the executor, which is why
-# this module imports no `sources`, `operators` or `solvers` operation at all. The
+# this module imports no `sources`, `operators` or `backends` operation at all. The
 # two `operators` names it does import -- `circular_aperture_amplitude` and
 # `numerical_aperture_radius_m` -- are mask builders and are not operations;
 # `operators/__init__.py` says so where it declares `OPERATIONS`, and they consume

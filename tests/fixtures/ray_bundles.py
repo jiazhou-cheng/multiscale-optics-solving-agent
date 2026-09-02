@@ -20,7 +20,7 @@ rule is that a source may be described without a system while a ray *launch* may
 not. The actual launch positions and directions depend on the stop, the entrance
 pupil's location and diameter, every surface preceding the stop, the object
 distance, the field, the backend's pupil map and the ray aimer, so a system-launch
-`RayBundle` is produced by `solvers.optiland.launch` and nowhere else.
+`RayBundle` is produced by `backends.optiland.launch` and nowhere else.
 
 Keeping this here rather than deleting it costs nothing and loses no coverage: it
 is what `tests/physics/ray_support.py` builds its plane-wave-mode ensembles from

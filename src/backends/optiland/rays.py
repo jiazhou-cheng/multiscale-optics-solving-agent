@@ -754,7 +754,7 @@ def to_ray_bundle(
 ) -> tuple[RayBundle, dict[str, Any]]:
     """Translate one native trace into a neutral `RayBundle` plus diagnostics.
 
-    `launch` is the declaration `solvers.optiland.launch.launch` returned for the
+    `launch` is the declaration `backends.optiland.launch.launch` returned for the
     rays this trace was run on. **CHE-219 (R05.8) made that an input rather than
     something reconstructed here.** This function used to receive
     `field + wavelength_um + num_rings` and rebuild, from the traced output, two

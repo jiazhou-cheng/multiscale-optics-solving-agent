@@ -16,9 +16,9 @@ import numpy as np
 import pytest
 from chromatix_support import PITCH_M, SHAPE, a_scalar_field
 
+from backends.chromatix import CAPABILITIES, DIRECTIONS, focal_plane_transform
 from operations import CATALOG, OperationKind, resolve
 from representations import ContractError, ScalarField
-from solvers.chromatix import CAPABILITIES, DIRECTIONS, focal_plane_transform
 
 FOCAL_LENGTH_M = 20e-3
 
@@ -179,7 +179,7 @@ def test_the_transform_registers_as_a_physical_operator() -> None:
     operation would still be an operator without one.
 
     The descriptor used to be constructed here, inside a fixture that emptied the
-    registry, because `solvers/` may not import `operations/` and there was no
+    registry, because `backends/` may not import `operations/` and there was no
     production registration site anywhere. CHE-221 (R03.4) put one *inside*
     `operations/`: the catalog names the implementation as a
     `"module.path:attribute"` string, so it needs no dependency edge in either
@@ -201,6 +201,6 @@ def test_the_module_defines_no_class() -> None:
     from pathlib import Path
 
     source = (
-        Path(__file__).resolve().parents[2] / "src" / "solvers" / "chromatix" / "focal_plane.py"
+        Path(__file__).resolve().parents[2] / "src" / "backends" / "chromatix" / "focal_plane.py"
     ).read_text(encoding="utf-8")
     assert [n.name for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef)] == []

@@ -54,13 +54,13 @@ import numpy as np
 import pytest
 from scipy.special import jv
 
+from backends.chromatix import focal_plane_transform
 from operators import (
     circular_aperture_amplitude,
     complex_transmission,
     numerical_aperture_radius_m,
 )
 from representations import ReferenceSurface, ScalarField
-from solvers.chromatix import focal_plane_transform
 from sources import plane_wave
 
 WAVELENGTH_M = 0.532e-6
