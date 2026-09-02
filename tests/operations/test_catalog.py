@@ -396,15 +396,40 @@ def test_the_capability_citations_are_the_two_measured_rows_or_none() -> None:
 # 5. The fixture-owned copies are gone, and cannot come back quietly
 # ---------------------------------------------------------------------------
 
-#: Where a descriptor may legitimately be constructed under `tests/`.
+#: Where a descriptor may legitimately be constructed under `tests/`, with the
+#: reason for each.
 #:
-#: Only this directory, where the subjects are the schema and the index
-#: themselves: `test_descriptors.py` builds records to prove which ones are
-#: *refused*, and `test_registry.py` builds a dummy to test `find`/`resolve`
-#: behaviour over a synthetic index. Everywhere else, a constructed descriptor is a
-#: production record living in a test -- which is the state CHE-221 ended -- and it
-#: has to be kept in step with the real one by hand.
-DESCRIPTOR_HOME = Path("tests") / "operations"
+#: The rule this enforces is "no **production** record living in a test", which is
+#: the state CHE-221 ended: eleven real descriptors defined in implementation test
+#: modules, each of which had to be kept in step with the code by hand. A record
+#: built to be *refused*, or to stand in for the catalog while an algorithm over it
+#: is tested, is the opposite -- it is the subject rather than a copy.
+#:
+#: Every entry has to be argued in. Two so far:
+DESCRIPTOR_HOMES: dict[Path, str] = {
+    # The schema and the index themselves: `test_descriptors.py` builds records to
+    # prove which ones are refused, and `test_registry.py` builds a dummy to test
+    # `find`/`resolve` behaviour over a synthetic index.
+    Path("tests") / "operations": "the schema and the registry are the subjects",
+    # CHE-164 (R12). `tests/planning/` routes over a synthetic three-operation
+    # catalog, which is what makes the routing algorithm testable independently of
+    # what the tree happens to ship -- the ids are `X_*` and no production record
+    # is restated. Without it the only way to test the algorithm would be against
+    # the live catalog, so a change to what is catalogued would change what the
+    # graph tests mean.
+    Path("tests") / "planning": "the routing algorithm over a catalog is the subject",
+}
+
+#: Where the **private registry index** may be touched: only this directory.
+#:
+#: A narrower set than `DESCRIPTOR_HOMES`, and the narrowing is the point. The
+#: `tests/planning` entry above is argued entirely in terms of *constructing* a
+#: synthetic catalog, and `planning.routes` takes a `catalog=` argument precisely so
+#: that no test ever needs to reach into `registry._BY_ID`. Letting one exemption
+#: grant the other would hand out a permission its own reason disclaims.
+INDEX_HOMES: dict[Path, str] = {
+    Path("tests") / "operations": "the registry itself is the subject",
+}
 
 
 def _names_the_descriptor(func: ast.expr) -> bool:
@@ -414,18 +439,19 @@ def _names_the_descriptor(func: ast.expr) -> bool:
     return isinstance(func, ast.Attribute) and func.attr == "OperationDescriptor"
 
 
-def _test_modules_outside_operations() -> list[Path]:
+def _test_modules_outside(homes: dict[Path, str]) -> list[Path]:
+    """Every test module not inside one of `homes`."""
+    resolved = {ROOT / home for home in homes}
     found = sorted(
         path
         for path in (ROOT / "tests").rglob("*.py")
-        if "__pycache__" not in str(path)
-        and ROOT / DESCRIPTOR_HOME not in path.parents
+        if "__pycache__" not in str(path) and not resolved & set(path.parents)
     )
     assert len(found) > 40, "the walk found almost nothing, so it cannot fail"
     return found
 
 
-def test_no_test_outside_tests_operations_constructs_a_descriptor() -> None:
+def test_no_test_outside_a_declared_home_constructs_a_descriptor() -> None:
     """Acceptance criterion 8. Eleven of these existed at `a7db487`.
 
     Checked on the AST rather than on the text, so a mention in a docstring or a
@@ -436,7 +462,7 @@ def test_no_test_outside_tests_operations_constructs_a_descriptor() -> None:
     past a check written for the bare form.
     """
     offenders = []
-    for path in _test_modules_outside_operations():
+    for path in _test_modules_outside(DESCRIPTOR_HOMES):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and _names_the_descriptor(node.func):
@@ -448,7 +474,7 @@ def test_no_test_outside_tests_operations_constructs_a_descriptor() -> None:
     )
 
 
-def test_no_test_outside_tests_operations_touches_the_private_index() -> None:
+def test_no_test_outside_a_declared_home_touches_the_private_index() -> None:
     """Acceptance criterion 8's other half: the ten `isolated_registry` copies.
 
     `isolated_registry` -- save `dict(registry._REGISTERED)`, clear, yield, restore
@@ -456,10 +482,15 @@ def test_no_test_outside_tests_operations_touches_the_private_index() -> None:
     incidental duplication: it is the shape a test takes when a production home
     does not exist. The home exists, so the copies are gone, and reaching into the
     index from outside this directory is what would bring them back.
+
+    `INDEX_HOMES` and not `DESCRIPTOR_HOMES`: `tests/planning/` may construct a
+    synthetic descriptor -- that is the routing algorithm's subject -- and may not
+    touch the index, because `planning.routes` takes a `catalog=` argument so that
+    it never has to. One exemption must not grant the other.
     """
     offenders = [
         f"{path.relative_to(ROOT)}: {name}"
-        for path in _test_modules_outside_operations()
+        for path in _test_modules_outside(INDEX_HOMES)
         for name in ("_REGISTERED", "_BY_ID", "isolated_registry")
         if name in path.read_text(encoding="utf-8")
     ]

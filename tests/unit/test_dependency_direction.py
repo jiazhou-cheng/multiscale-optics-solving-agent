@@ -170,19 +170,29 @@ def test_operations_may_not_import_a_solver_or_a_coupler() -> None:
         assert rule is not None, f"operations/ -> {target}/ was not flagged"
 
 
-def test_an_allowed_direction_to_an_unlanded_package_is_still_refused() -> None:
+def test_an_allowed_direction_to_an_unlanded_package_is_still_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A legal direction is not the same fact as a package to import.
 
-    `planning/` is an allowed target for `runtime/`, and nothing has landed under
-    either name. Passing the import because the *direction* is legal would let a
-    ticket depend on a package it had not written. `LANDED` is the second
-    condition, and this pins that it is applied.
+    Passing an import because the *direction* is legal would let a ticket depend on
+    a package it had not written. `LANDED` is the second condition, and this pins
+    that it is applied.
 
-    This used to be stated with `operators/ -> couplers/`, which CHE-185 (R07.1)
-    landed; the pair moved rather than the rule.
+    **The exemplar has run out of real pairs, so the rule is exercised rather than
+    observed.** It was `operators/ -> couplers/` until CHE-185 (R07.1) landed
+    `couplers`, then `runtime/ -> planning/` until CHE-164 (R12) landed `planning`.
+    `runtime` is now the only unlanded package and nothing may import it, so no
+    pair of real packages can demonstrate the rule any more. `planning` is
+    un-landed for the length of this test -- the same technique the test below
+    already uses -- because what is pinned is the rule, not which packages happen
+    to exist today. The next package to land makes this test's *pair* stale again
+    and its rule no less true.
     """
     assert "planning" in ALLOWED["runtime"]
-    assert "planning" not in LANDED
+    monkeypatch.setattr(
+        check_dependencies, "LANDED", LANDED - {"planning"}, raising=True
+    )
     rule = _classify("runtime", "planning")
     assert rule is not None
     assert "has not been landed" in rule

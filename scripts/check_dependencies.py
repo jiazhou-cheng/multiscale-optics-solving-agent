@@ -217,6 +217,7 @@ LANDED: frozenset[str] = frozenset(
         "numerics",
         "operations",
         "operators",
+        "planning",  # CHE-164 (R12): `graph.py`, routes over the operation catalog.
         "problems",
         "representations",
         "solvers",

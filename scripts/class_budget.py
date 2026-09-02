@@ -333,6 +333,18 @@ BUDGETS: dict[str, int] = {
     "numerics": 7,
     "operations": 2,
     "operators": 1,
+    #: `planning` is 0, and that is the reviewed number rather than a placeholder.
+    #: CHE-164 (R12) budgeted one class, `CapabilityGraph`, and asked that it be
+    #: justified against a named rule first. It cannot be: a capability graph is
+    #: derived from the catalog on every call, holds no invariant the catalog does
+    #: not already enforce, is not serialized, owns no resource and has one
+    #: implementation -- rules 1 through 5, all failed. So `capability_graph()`
+    #: returns a plain mapping and `routes()` is a function.
+    #:
+    #: The budget note directly below is why that mattered beyond tidiness: the
+    #: project's last authorized unit is reserved for `runtime.Executor`, and a
+    #: record failing every rule must not be what spends it.
+    "planning": 0,
     "problems": 4,
     "representations": 5,
     "solvers": 2,
