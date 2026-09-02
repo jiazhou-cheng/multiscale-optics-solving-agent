@@ -67,26 +67,32 @@ import pytest
 from fixtures.systems import (
     FINITE_CONJUGATE_MAGNIFICATION,
     FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+    REVERSE_TELEPHOTO,
     SINGLET_EFFECTIVE_FOCAL_LENGTH_MM,
     finite_conjugate_image_distance_mm,
     finite_conjugate_singlet,
     finite_conjugate_source,
+    reverse_telephoto_source,
     singlet_ref,
     singlet_source,
 )
 
 from representations import RayBundle
 from solvers.optiland import trace
+from solvers.optiland.launch import (
+    _object_space_reference,
+    capture_launch_rays,
+    launch,
+    normalized_field,
+)
 from solvers.optiland.rays import (
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
     NATIVE_LENGTH_M,
     OPL_REFERENCE_VERSION,
-    _object_space_reference,
     require_declared_optical_path,
     to_ray_bundle,
 )
-from solvers.optiland.solver import _normalized_field
 from solvers.optiland.system import build_lens
 
 WAVELENGTH_UM = 0.55
@@ -113,36 +119,29 @@ def _scalar(value: object) -> float:
 def _launch_state(
     setup: object, source: object, *, field_deg: tuple[float, float]
 ) -> dict[str, np.ndarray]:
-    """Regenerate the launch state the way the adapter does, and hand back the columns.
+    """The launch state the adapter captures, handed back as columns.
 
-    Through the solver's own public generator over the same hexapolar distribution
-    `Optic.trace` builds, because `Optic.trace` retains no launch state. Section 1
-    checks that the regeneration is faithful before anything is concluded from it.
+    **CHE-219 (R05.8) changed what this helper is.** It used to reproduce the
+    adapter's regeneration by hand -- build the distribution, repeat the field,
+    call the ray generator -- because the launch state was reconstructed after the
+    trace and no shipping function returned it. It now calls the shipping capture,
+    `launch.capture_launch_rays`, so what the measurements below read is the state
+    that actually feeds the trace rather than a hand-built twin of it.
 
     CHE-218 (R05.7): the setup and the source are separate arguments, and both
     reach the lens because both matter here -- the object distance places the
     object surface and the field angle is what `max_field` normalizes against.
     """
-    import optiland.backend as be
-    from optiland.distribution import create_distribution
-
     lens = build_lens(setup, source)
-    field = _normalized_field(lens, field_deg)
-    distribution = create_distribution("hexapolar")
-    distribution.generate_points(NUM_RINGS)
-    points = int(_host(distribution.x).size)
-    launch = lens.ray_tracer.ray_generator.generate_rays(
-        be.repeat(be.atleast_1d(be.array(float(field[0]))), points),
-        be.repeat(be.atleast_1d(be.array(float(field[1]))), points),
-        distribution.x,
-        distribution.y,
-        WAVELENGTH_UM,
+    field = normalized_field(lens, field_deg)
+    native, _, _ = capture_launch_rays(
+        lens, field=field, wavelength_um=WAVELENGTH_UM, num_rings=NUM_RINGS
     )
     return {
         "lens": lens,
         "field": field,
         **{
-            name: np.asarray(_host(getattr(launch, attribute)), dtype=np.float64)
+            name: np.asarray(_host(getattr(native, attribute)), dtype=np.float64)
             for name, attribute in (
                 ("x", "x"),
                 ("y", "y"),
@@ -153,8 +152,28 @@ def _launch_state(
                 ("accumulator", "opd"),
             )
         },
-        "launch": launch,
+        "launch": native,
     }
+
+
+def _captured_columns(lens: object, field_deg: tuple[float, float]) -> dict[str, np.ndarray]:
+    """The captured launch state as the float64 columns `_object_space_reference` takes.
+
+    CHE-219 gave that function its launch state as an argument instead of
+    regenerating one, so a test that drives it directly has to supply the capture.
+    Through the shipping `capture_launch_rays` and the shipping `_launch_columns`,
+    not a hand-built pair, so the term is measured on exactly what `launch` feeds
+    it.
+    """
+    from solvers.optiland.launch import _launch_columns
+
+    native, _, _ = capture_launch_rays(
+        lens,
+        field=normalized_field(lens, field_deg),
+        wavelength_um=WAVELENGTH_UM,
+        num_rings=NUM_RINGS,
+    )
+    return _launch_columns(native)
 
 
 # ---------------------------------------------------------------------------
@@ -230,27 +249,61 @@ def test_the_finite_object_bundle_diverges_rather_than_being_collimated() -> Non
     assert max(float(np.ptp(collimated[axis])) for axis in ("x", "y")) > 1.0e-3
 
 
-@pytest.mark.parametrize("field_deg", [(0.0, 0.0), (0.0, 2.0), (1.0, 1.0)])
-def test_the_regenerated_launch_state_reproduces_the_trace(
+@pytest.mark.parametrize(
+    ("setup_factory", "source_factory", "field_deg", "aiming"),
+    [
+        (finite_conjugate_singlet, finite_conjugate_source, (0.0, 0.0), "paraxial"),
+        (finite_conjugate_singlet, finite_conjugate_source, (0.0, 2.0), "paraxial"),
+        (finite_conjugate_singlet, finite_conjugate_source, (1.0, 1.0), "paraxial"),
+        (singlet_ref, singlet_source, (0.0, 0.0), "paraxial"),
+        (singlet_ref, singlet_source, (0.0, 3.0), "paraxial"),
+        (lambda: REVERSE_TELEPHOTO, reverse_telephoto_source, (0.0, 0.0), "paraxial"),
+        (lambda: REVERSE_TELEPHOTO, reverse_telephoto_source, (0.0, 21.0), "paraxial"),
+        # The modes where aiming actually does something, on the field where it
+        # does the most. `trace(aiming=...)` is public API as of R05.8, so the
+        # property has to hold for a mode that iterates and not only for the
+        # closed-form one -- an aimer that kept a warm start between calls, or
+        # converged to a different root on the second invocation, would break the
+        # row-for-row correspondence precisely where the launch matters most.
+        (lambda: REVERSE_TELEPHOTO, reverse_telephoto_source, (0.0, 21.0), "iterative"),
+        (lambda: REVERSE_TELEPHOTO, reverse_telephoto_source, (0.0, 21.0), "robust"),
+        (finite_conjugate_singlet, finite_conjugate_source, (1.0, 1.0), "iterative"),
+    ],
+)
+def test_the_captured_launch_state_reproduces_the_trace(
+    setup_factory: object,
+    source_factory: object,
     field_deg: tuple[float, float],
+    aiming: str,
 ) -> None:
     """Bit-identical, which is what lets a per-ray term measured from it be used.
 
-    The same property CHE-41 established for the infinite case, re-established
-    here for the finite one rather than assumed to carry over.
+    **CHE-219 (R05.8) acceptance criterion 9, in the case where path unification
+    was deferred.** `solvers.optiland.trace` still runs `Optic.trace`, which
+    regenerates its own rays internally, so the launch declaration only describes
+    the traced rows if the captured state and the trace's own launch agree row for
+    row. They do, exactly: the captured state traced through the system reproduces
+    `Optic.trace` with zero difference in position and in accumulated path.
+
+    Extended from the finite conjugate to **both fixture systems, on and off
+    axis**, because R05.8 is what made the property load-bearing for every
+    generated trace rather than for the finite-conjugate reference term alone. It
+    is the same property CHE-41 established for the infinite case, re-established
+    rather than assumed to carry over.
     """
-    state = _launch_state(
-        finite_conjugate_singlet(),
-        finite_conjugate_source(field_angle_deg=field_deg),
-        field_deg=field_deg,
+    source = source_factory(field_angle_deg=field_deg, wavelength_um=WAVELENGTH_UM)
+    lens = build_lens(setup_factory(), source)
+    field = normalized_field(lens, field_deg)
+    native, _, _ = capture_launch_rays(
+        lens,
+        field=field,
+        wavelength_um=WAVELENGTH_UM,
+        num_rings=NUM_RINGS,
+        aiming=aiming,
     )
-    lens = state["lens"]
-    traced = lens.surfaces.trace(state["launch"], skip=1)
+    traced = lens.surfaces.trace(native, skip=1)
     reference = lens.trace(
-        Hx=state["field"][0],
-        Hy=state["field"][1],
-        wavelength=WAVELENGTH_UM,
-        num_rays=NUM_RINGS,
+        Hx=field[0], Hy=field[1], wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS
     )
     for attribute in ("x", "y", "z", "opd"):
         np.testing.assert_array_equal(
@@ -271,14 +324,7 @@ def test_the_object_space_term_is_available_and_exactly_zero(
     lens = build_lens(
         finite_conjugate_singlet(), finite_conjugate_source(field_angle_deg=field_deg)
     )
-    field = _normalized_field(lens, field_deg)
-    term = _object_space_reference(
-        lens,
-        field=field,
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=NUM_RINGS,
-        traced_count=1 + 3 * NUM_RINGS * (NUM_RINGS + 1),
-    )
+    term = _object_space_reference(lens, _captured_columns(lens, field_deg), index=1.0)
     assert term["available"] is True, term["reason"]
     assert term["reason"] is None
     assert term["launch_geometry"] == LAUNCH_POINT_SOURCE
@@ -293,13 +339,7 @@ def test_the_object_space_term_is_available_and_exactly_zero(
 def test_the_infinite_object_term_is_unchanged_and_still_names_its_own_geometry() -> None:
     """The control: adding the finite branch must not touch the collimated one."""
     lens = build_lens(singlet_ref(), singlet_source())
-    term = _object_space_reference(
-        lens,
-        field=(0.0, 0.0),
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=NUM_RINGS,
-        traced_count=1 + 3 * NUM_RINGS * (NUM_RINGS + 1),
-    )
+    term = _object_space_reference(lens, _captured_columns(lens, (0.0, 0.0)), index=1.0)
     assert term["available"] is True
     assert term["launch_geometry"] == LAUNCH_PLANE_WAVEFRONT
     assert "launch_direction" in term and "launch_plane_z_native" in term
@@ -315,7 +355,7 @@ def test_an_extended_finite_source_is_refused_rather_than_approximated() -> None
     no problem this schema can state produces an extended source -- and a refusal
     with no reachable case is a claim about a path that does not exist.
     """
-    from solvers.optiland.rays import _point_source_reference
+    from solvers.optiland.launch import _point_source_reference
 
     coincident = np.zeros(5)
     good = _point_source_reference(coincident, coincident, coincident - 9.0, index=1.0)
@@ -413,14 +453,10 @@ def test_the_chief_ray_piston_is_removed_for_a_finite_conjugate_too() -> None:
     does for the collimated case rather than being a no-op.
     """
     lens = build_lens(finite_conjugate_singlet(), finite_conjugate_source())
+    _, declaration = launch(lens, finite_conjugate_source(), num_rings=NUM_RINGS)
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
     bundle, diagnostics = to_ray_bundle(
-        lens,
-        native,
-        field=(0.0, 0.0),
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=NUM_RINGS,
-        reference_surface="exit_pupil",
+        lens, native, launch=declaration, reference_surface="exit_pupil"
     )
     optical_path = np.asarray(bundle.optical_path_m)
     assert float(np.min(np.abs(optical_path))) == 0.0, "the chief ray is the zero"

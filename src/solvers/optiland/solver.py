@@ -1,28 +1,40 @@
 """The public trace entry points, and the one genuinely stateful thing in this package.
 
-CHE-181 (R05.3), CHE-217 (R05.6), CHE-218 (R05.7):
+CHE-181 (R05.3), CHE-217 (R05.6), CHE-218 (R05.7), CHE-219 (R05.8):
 
 ```python
-trace(setup, source, *, sampling=..., execution=...) -> RayBundle
+trace(setup, source, *, sampling=..., execution=..., aiming=...) -> RayBundle
 trace_rays(setup, rays, *, execution=...) -> RayBundle
 ```
 
 One neutral setup in, one neutral bundle out, and no facade class in between.
 
+Where `trace`'s rays come from
+------------------------------
+`launch.launch(lens, source, num_rings=..., aiming=...)`, called before the
+trace, which is R05.8's whole subject. `trace` used to hand a field coordinate
+and a ring count to a translator that rebuilt the launch state from the traced
+output afterwards; now the launch state is captured once, and the declaration it
+produces -- the pupil quadrature, the object-space optical-path reference, the
+aiming mode -- is what describes the traced rays. `aiming` is the one argument
+that grew out of it, and its default is the backend's own, measured
+bit-identical.
+
 The setup and the illumination are independent inputs
 -----------------------------------------------------
 R05.7 split them. What the setup no longer carries is a field *list* and a
-wavelength *list*, and the consequence is visible in `_normalized_field`: the
-refusal that used to fire when a caller asked for a field the record had not
-enumerated is gone, because `build_lens` declares exactly the field being traced.
-"Trace this system at 3 degrees" no longer means editing the optical system.
+wavelength *list*, and the consequence is visible in `launch.normalized_field`
+(which lived here until R05.8): the refusal that used to fire when a caller asked
+for a field the record had not enumerated is gone, because `build_lens` declares
+exactly the field being traced. "Trace this system at 3 degrees" no longer means
+editing the optical system.
 
 Two entry points, and why the second is not a parameter on the first
 --------------------------------------------------------------------
 The source at the second argument position is one of two things: a declarative
 `problems.SourceSpec`, or an already-materialized `representations.RayBundle`.
-They differ in what the rays *are*, not in how the trace runs: `trace` builds them
-inside the solver from a normalized field coordinate and a hexapolar ring count,
+They differ in what the rays *are*, not in how the trace runs: `trace` launches
+them into the constructed system from a field angle and a hexapolar ring count,
 and `trace_rays` consumes a representation declared at a boundary. Folding them
 into one function behind an optional `rays=` would make `sampling=` mean nothing
 on half its calls and would put a `sqrt(intensity)` and a regenerated pupil
@@ -78,7 +90,6 @@ across a framework boundary that this rewrite has not validated.
 
 from __future__ import annotations
 
-import math
 from typing import Any, Literal, TypedDict
 
 from numerics import (
@@ -91,6 +102,7 @@ from numerics import (
 )
 from problems import OpticalSetup, SourceSpec
 from representations import RayBundle
+from solvers.optiland.launch import AIMING_MODES, DEFAULT_AIMING, launch
 from solvers.optiland.rays import (
     NATIVE_WAVELENGTH_M,
     REFERENCE_SURFACES,
@@ -424,61 +436,13 @@ def configure_execution(
     }
 
 
-def _normalized_field(lens: Any, field_deg: tuple[float, float]) -> tuple[float, float]:
-    """The solver's normalized field coordinates for a field angle in degrees.
-
-    The solver aims a ray with `field = max_field * H`, so the coordinate it wants
-    is the angle divided by the largest field the constructed system declares. The
-    conversion therefore needs the lens rather than the setup alone, and it is done
-    here, once, instead of at every call site.
-
-    **The refusal this used to carry is gone, and that is CHE-218's point.** Before
-    R05.7 the system record declared a *list* of fields and `max_field` was the
-    largest of them, so a field the record had not enumerated normalized to a
-    coordinate above 1 and had to be refused -- "trace this system at 3 degrees"
-    meant editing the optical system. `build_lens` now declares exactly the field
-    being traced, so `max_field` is that field and any field angle is expressible.
-
-    What survives is a check rather than a limit. `max_field` is **read back off
-    the constructed lens** and never assumed to equal the requested angle: the
-    backend decides it (measured: for a single field it is `hypot(x, y)`), and a
-    normalized coordinate above 1 would mean it decided something this function
-    does not understand. That is refused rather than passed on, because a
-    coordinate above 1 aims at a field nobody asked for.
-    """
-    max_field = float(lens.fields.max_field)
-    x_deg, y_deg = (float(value) for value in field_deg)
-    if not (math.isfinite(x_deg) and math.isfinite(y_deg)):
-        raise ValueError(f"source field_angle_deg={field_deg!r} is not a finite (x, y) pair")
-    if max_field == 0.0:
-        # The on-axis case, and the only one where the division is not defined.
-        # `build_lens` declared the requested field, so a zero maximum means the
-        # request itself was on axis.
-        if x_deg != 0.0 or y_deg != 0.0:  # pragma: no cover - build_lens declares the field
-            raise ValueError(
-                f"source field_angle_deg={field_deg!r} was requested, but the constructed "
-                "system reports a maximum field angle of 0 deg, so the solver cannot "
-                "express it. Normalizing it to the axis would trace a different field than "
-                "the one asked for."
-            )
-        return (0.0, 0.0)
-    normalized = (x_deg / max_field, y_deg / max_field)
-    if max(abs(value) for value in normalized) > 1.0:  # pragma: no cover - see docstring
-        raise ValueError(
-            f"source field_angle_deg={field_deg!r} normalizes to {normalized!r} against the "
-            f"maximum field the constructed system reports ({max_field} deg), which exceeds "
-            "1. The system was built with exactly this field declared, so the backend's "
-            "normalization is not the one this adapter understands."
-        )
-    return normalized
-
-
 def trace(
     setup: OpticalSetup,
     source: SourceSpec,
     *,
     sampling: Sampling,
     execution: Execution,
+    aiming: str = DEFAULT_AIMING,
 ) -> RayBundle:
     """Trace `setup` under `source` and return the rays as a neutral `RayBundle`.
 
@@ -495,15 +459,34 @@ def trace(
     not equal `setup.reference_wavelength_um`, which is what the setup's exit pupil
     is located at rather than what the trace is evaluated at.
 
+    Where the rays come from, CHE-219 (R05.8)
+    -----------------------------------------
+    `launch.launch` materializes them, from the constructed lens plus the
+    declarative source, **before** the trace runs -- and its declaration is what
+    `to_ray_bundle` reads to describe the traced output. This function no longer
+    hands a field coordinate and a ring count to a translator that rebuilds the
+    launch state afterwards. The numbers are unchanged: `Optic.trace` still runs
+    the trace and still regenerates its own rays internally, from the same aiming
+    configuration `launch` set on the lens, so the launch state feeding the trace
+    *is* the captured one. See `launch`'s docstring for why the R05.6
+    supplied-bundle path was not reused here and what would have to change first.
+
+    `aiming` is the one new argument. It is not sampling and not illumination: it
+    is how the backend resolves a launch into *this* system, which before this
+    ticket was an unstated inheritance of `RealRayTracer`'s constructor default.
+    `DEFAULT_AIMING` is that same default, measured bit-identical, so the settled
+    R05.7 call sites are unaffected.
+
     Raises:
         TypeError: `setup` or `source` is not the type this entry point takes.
-        ValueError: an argument key is missing or unrecognized, or the requested
-            precision or device is outside the measured capability table (the
-            capability refusals carry a `code`). Raised before the solver is
-            imported.
-        ContractError: the trace ran but the result cannot be declared -- an
-            unresolvable exit pupil, an unreadable image-space index, an
-            undeclarable optical path, or every ray clipped.
+        ValueError: an argument key is missing or unrecognized, `aiming` is not a
+            recognized mode, or the requested precision or device is outside the
+            measured capability table (the capability refusals carry a `code`).
+            Raised before the solver is imported.
+        ContractError: the launch state or the trace result cannot be declared --
+            a non-planar or non-finite launch, an unreadable object-space or
+            image-space index, an unresolvable exit pupil, an undeclarable optical
+            path, or every ray clipped.
         ImportError: optiland is not installed.
     """
     if not isinstance(source, SourceSpec):
@@ -528,6 +511,8 @@ def trace(
             f"sampling['reference_surface']={reference_surface!r} is not one of "
             f"{list(REFERENCE_SURFACES)}"
         )
+    if aiming not in AIMING_MODES:
+        raise ValueError(f"aiming={aiming!r} is not one of {list(AIMING_MODES)}")
     # Validated by `SourceSpec` itself, so there is nothing to re-check here: one
     # finite positive wavelength and one finite field angle pair.
     wavelength_um = source.wavelength_um
@@ -537,7 +522,13 @@ def trace(
 
     configure_execution(device=device, precision=precision, namespace=namespace)
     lens = build_lens(setup, source)
-    field = _normalized_field(lens, source.field_angle_deg)
+    # The rays, materialized and declared before anything is traced. The launch
+    # bundle itself is not what goes through `Optic.trace` -- see `launch`'s
+    # docstring on the path that was deliberately not unified -- but the aiming
+    # configuration it set on the lens is what the trace's own ray generation
+    # consults, so the declaration describes the traced rows.
+    _, declaration = launch(lens, source, num_rings=num_rings, aiming=aiming)
+    field = declaration["field"]
 
     # `num_rays` is the solver's name for what this project calls a ring count.
     traced = lens.trace(
@@ -546,9 +537,7 @@ def trace(
     bundle, _ = to_ray_bundle(
         lens,
         traced,
-        field=field,
-        wavelength_um=wavelength_um,
-        num_rings=num_rings,
+        launch=declaration,
         reference_surface=reference_surface,
     )
     return bundle

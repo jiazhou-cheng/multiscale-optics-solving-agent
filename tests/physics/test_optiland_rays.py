@@ -58,9 +58,10 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from problems.ray_trace import OpticalSetup
+from problems.ray_trace import OpticalSetup, SourceSpec
 from representations import ContractError, direction_norm_tolerance
 from solvers.optiland import trace
+from solvers.optiland.launch import launch
 from solvers.optiland.rays import (
     NATIVE_LENGTH_M,
     hexapolar_area_weight_m2,
@@ -73,6 +74,11 @@ from solvers.optiland.system import build_lens
 WAVELENGTH_UM = 0.55
 NUM_RINGS = 16
 EFL_RELATIVE = 2.0e-5
+
+#: The illumination the frozen records were taken under: on axis, one wavelength,
+#: object at infinity. CHE-219 needs it explicitly because the launch is now
+#: declared before the trace rather than reconstructed from it.
+ON_AXIS = SourceSpec(wavelength_um=WAVELENGTH_UM)
 
 #: Transcribed from `exit_pupil_handoff.json`: 16 rings, on axis, 550 nm, host
 #: float64. Every value is in SI, as the record stores it.
@@ -147,16 +153,19 @@ def _traced(name: str, reference_surface: str) -> tuple[object, dict[str, object
     reference wavelength -- exactly what the record was taken under -- and the
     trace still runs at 550 nm, which for M3-REVERSE-TELEPHOTO is outside the
     wavelength set the fixture used to carry and always was.
+
+    CHE-219 (R05.8) is the other place the same obligation lands: the pupil
+    measure and the object-space reference term are now taken from the launch
+    declaration rather than reconstructed here, and the record numbers below are
+    what says that moved nothing. `ON_AXIS` is the source the launch is declared
+    for -- on axis at the record's own wavelength, which is the field a
+    source-less `build_lens` declares.
     """
     lens = build_lens(SETUPS[name])
+    _, declaration = launch(lens, ON_AXIS, num_rings=NUM_RINGS)
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
     return to_ray_bundle(
-        lens,
-        native,
-        field=(0.0, 0.0),
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=NUM_RINGS,
-        reference_surface=reference_surface,
+        lens, native, launch=declaration, reference_surface=reference_surface
     )
 
 
@@ -348,17 +357,29 @@ def test_a_non_hexapolar_pupil_cannot_be_given_a_quadrature_weight() -> None:
     assert "vignetted" in str(excinfo.value) or "invent" in str(excinfo.value)
 
 
-def test_a_ray_count_that_is_not_a_hexapolar_fan_leaves_the_measure_undeclared() -> None:
-    """`undeclared` is the honest answer and the useful one: R07 refuses on it."""
-    from solvers.optiland.rays import _declare_measure
+def test_a_launch_declaration_that_does_not_describe_the_trace_is_refused() -> None:
+    """CHE-219: what replaced "guess the quadrature from the traced row count".
 
+    Before R05.8 a trace whose row count did not match an un-vignetted fan left
+    the measure `undeclared`, because the measure was being *reconstructed* from
+    the traced output and a mismatch meant no ring index could be assigned. The
+    measure is now declared at launch, so a count mismatch is a different fact
+    entirely: the declaration in hand describes a different launch than the one
+    that was traced, and every per-ray array in it -- the measure, the
+    object-space term -- would be applied to the wrong rows.
+
+    That is refused rather than degraded. Optiland keeps a clipped ray's row and
+    zeroes its intensity rather than removing it, so a generated trace's row count
+    always equals the launch count; a mismatch cannot be a vignetted fan.
+    """
     lens = build_lens(singlet_ref())
-    weight, kind, note = _declare_measure(
-        lens, num_rings=NUM_RINGS, traced_count=816, wavelength_um=WAVELENGTH_UM
-    )
-    assert weight is None
-    assert kind == "undeclared"
-    assert "817" in note and "816" in note
+    _, declaration = launch(lens, ON_AXIS, num_rings=NUM_RINGS)
+    native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS - 1)
+    with pytest.raises(ContractError) as excinfo:
+        to_ray_bundle(lens, native, launch=declaration, reference_surface="image_surface")
+    assert excinfo.value.code == "SHAPE_MISMATCH"
+    assert str(hexapolar_ray_count(NUM_RINGS)) in str(excinfo.value)
+    assert str(hexapolar_ray_count(NUM_RINGS - 1)) in str(excinfo.value)
 
 
 def _hexapolar_disk(num_rings: int) -> tuple[np.ndarray, np.ndarray]:
@@ -413,13 +434,9 @@ def test_a_clipped_ray_is_dropped_and_counted() -> None:
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
     clipped = _StubTrace(native, zero_weight_at=(3, 7), non_finite_at=(11,))
 
+    _, declaration = launch(lens, ON_AXIS, num_rings=NUM_RINGS)
     bundle, diagnostics = to_ray_bundle(
-        lens,
-        clipped,
-        field=(0.0, 0.0),
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=NUM_RINGS,
-        reference_surface="exit_pupil",
+        lens, clipped, launch=declaration, reference_surface="exit_pupil"
     )
     assert diagnostics["traced_ray_count"] == hexapolar_ray_count(NUM_RINGS)
     assert diagnostics["clipped_ray_count"] == 3
@@ -434,15 +451,14 @@ def test_a_clipped_ray_is_dropped_and_counted() -> None:
 
 def test_a_fully_clipped_trace_is_refused_rather_than_returned_empty() -> None:
     lens = build_lens(singlet_ref())
+    _, declaration = launch(lens, ON_AXIS, num_rings=2)
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=2)
     everything = tuple(range(int(np.asarray(_as_host(native.x)).size)))
     with pytest.raises(ContractError) as excinfo:
         to_ray_bundle(
             lens,
             _StubTrace(native, zero_weight_at=everything, non_finite_at=()),
-            field=(0.0, 0.0),
-            wavelength_um=WAVELENGTH_UM,
-            num_rings=2,
+            launch=declaration,
             reference_surface="image_surface",
         )
     assert excinfo.value.code == "EMPTY_ENSEMBLE"

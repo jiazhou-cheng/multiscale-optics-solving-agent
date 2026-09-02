@@ -10,15 +10,18 @@ this repository's numerical code**: every one below is a closed form written fro
 the physics, which is what makes these gates independent evidence rather than
 characterization (`AGENTS.md`, "Scientific Non-Negotiables").
 
-One caveat, added by CHE-215 (R06.10) and stated rather than left implicit:
-`collimated_bundle` now builds its *ensemble* by delegating to the public
-`sources.collimated_bundle`, so the ensemble side of that gate is repository code
-where it used to be local arithmetic. The oracle side is unchanged and still
-independent, which is where the gate's force lives -- and the delegation is what
-makes these gates measure the shipped capability instead of a hand-built twin. The
-`n (d_hat . r)` optical path is asserted directly against the closed form in
-`tests/sources/test_collimated_bundle.py`, so a defect in the source shows up there
-as well and not only as a residual here.
+One caveat on where the *ensemble* arithmetic lives, stated rather than left
+implicit. `collimated_bundle` here delegates to `fixtures.ray_bundles`, which is
+the same code CHE-215 (R06.10) landed as `sources.collimated_bundle` and CHE-219
+(R05.8) moved out of `src/` -- a launch `RayBundle` built from caller-supplied
+points with no optical system in scope is not a source, because nothing in it can
+say whether those points are the entrance pupil, the stop, a valid aim, or the
+system at all. Nothing about these gates changed with the move: the arithmetic is
+byte-for-byte the same and the oracle side was always independent, which is where
+the gate's force lives. The `n (d_hat . r)` optical path is asserted directly
+against the closed form in `tests/physics/test_collimated_ensemble.py`, so a
+defect in the ensemble builder shows up there as well and not only as a residual
+here.
 
 The three ensembles and the oracle each one exists for:
 
@@ -87,9 +90,9 @@ import math
 from typing import Any
 
 import numpy as np
+from fixtures.ray_bundles import collimated_bundle as collimated_source
 
 from representations import RayBundle, ReferenceSurface
-from sources import collimated_bundle as collimated_source
 
 #: The M3 reference wavelength and the singlet focal length the frozen `lambda R`
 #: record was taken at, reused so the reproduced number is comparable to it.
@@ -151,10 +154,11 @@ def collimated_bundle(
     d_hat = d_hat / np.linalg.norm(d_hat)
     count = positions.shape[0]
 
-    # The honest path is the public source (CHE-215), so the ensemble these gates
-    # reconstruct from is the one a caller outside a test gets. The rectangular
-    # grid stays here on purpose: the source takes explicit (N, 3) points because
-    # binding it to a rectangular aperture model is what it exists not to do.
+    # One ensemble builder for the whole suite (`fixtures.ray_bundles`), so these
+    # gates and `test_collimated_ensemble.py` reconstruct from the same code. The
+    # rectangular grid stays here on purpose: the builder takes explicit (N, 3)
+    # points because binding it to a rectangular aperture model is what it exists
+    # not to do.
     rays = collimated_source(
         positions.astype(dtype),
         direction=direction,
@@ -165,9 +169,9 @@ def collimated_bundle(
     )
     if optical_path_sign != 1.0:
         # The conjugate twin, applied *on top* of the honest bundle rather than
-        # pushed into `src/`. A negative control has to stay test-side: a
-        # production source that could emit a conjugated wavefront on request is
-        # the failure this control exists to detect.
+        # inside the builder. A negative control has to stay at the call site: a
+        # builder that could emit a conjugated wavefront on request is the failure
+        # this control exists to detect.
         rays = dataclasses.replace(
             rays, optical_path_m=(optical_path_sign * rays.optical_path_m).astype(dtype)
         )

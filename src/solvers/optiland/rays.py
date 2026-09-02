@@ -44,7 +44,7 @@ is cited where it is used:
     the canceled CHE-46 required before the old refusal could be lifted: the
     launch origin spread is exactly 0.0 in all three coordinates, the launch `opd`
     is exactly 0.0, the launch *directions* spread (a diverging bundle, the mirror
-    image of the collimated case), and the regenerated launch state reproduces
+    image of the collimated case), and the captured launch state reproduces
     `Optic.trace` bit-identically. An origin spread that is not zero is refused
     rather than approximated: an extended finite source is a different physical
     problem.
@@ -103,18 +103,40 @@ it is the defect the second exists to avoid, and both halves of it are silent:
   clips by zeroing rather than removing, so `i in {0, 1}` is a survival flag and
   `sqrt(1) = 1`. Applied to a caller's `a_i` it returns `|a_i|` and drops every
   radian of phase. See `AMPLITUDE_SIDECAR_RULE`.
-* `_declare_measure` *regenerates* the hexapolar fan, re-reads the entrance pupil
-  and assigns a pupil area element. Pointed at a supplied bundle it would either
-  refuse on the row count or substitute a pupil quadrature for the caller's
-  importance weights -- and R05 deliberately moved the quadrature weight off the
-  amplitude so that R07's kernel applies `measure_weight` itself, which makes a
-  substituted measure a rescaling of every reconstruction downstream that nothing
-  can observe.
+* the generated path's `measure_weight` is an entrance-pupil area element for a
+  hexapolar fan. Applied to a supplied bundle it would substitute a pupil
+  quadrature for the caller's importance weights -- and R05 deliberately moved the
+  quadrature weight off the amplitude so that R07's kernel applies
+  `measure_weight` itself, which makes a substituted measure a rescaling of every
+  reconstruction downstream that nothing can observe.
 
 So on the supplied-bundle path the amplitude and the measure are the caller's,
 the trace may filter the ensemble but may not restate either, and the optical
 path is a *composition* rather than a fresh absolute declaration
 (`COMPOSED_OPL_REFERENCE_VERSION`).
+
+What CHE-219 (R05.8) took out of this module, and what it left in
+-----------------------------------------------------------------
+This module translates. It no longer *decides where rays start*.
+
+Three things left for `launch.py`, and all three were reconstructions of launch
+state that the trace had already thrown away: the post-hoc pupil measure (which
+regenerated the hexapolar fan, re-read the entrance pupil, and recovered a ring
+index from traced output), the object-space optical-path reference (which
+regenerated the entire launch state through the backend's ray generator and
+relied on the second invocation matching the first), and the field normalization
+that turns a source's field angle into the backend's pupil-field coordinate.
+`to_ray_bundle` now *consumes* the launch declaration those produce.
+
+What stayed is everything that is a translation rather than an initialization:
+`declare_optical_path_m` (which applies the object-space term rather than
+measuring it), `exit_pupil`, the hexapolar arithmetic itself
+(`hexapolar_ring_index` and `hexapolar_area_weight_m2` -- shared, with launch as
+their only caller, so there is one implementation of the quadrature), and the
+whole supplied-bundle path: `to_native_rays`, `require_launch_surface`,
+`to_traced_ray_bundle` and `compose_optical_path_m`. A supplied bundle is already
+initialized; the solver does not aim it, resample it, or assign it a pupil
+measure.
 """
 
 from __future__ import annotations
@@ -334,7 +356,7 @@ SUPPLIED_RAY_SURVIVAL_RULE = (
 #:
 #: Declared as a constant rather than written inline because it is the *absence*
 #: of a computation, and an absence has nowhere else to be stated. It is also
-#: what `_declare_measure` must not be reached from on this path: substituting
+#: what the launch quadrature must not be reached from on this path: substituting
 #: this solver's own entrance-pupil area element for a caller's importance
 #: weights rescales every reconstruction downstream by a factor nothing can
 #: observe, R05 having deliberately moved the quadrature weight off the amplitude
@@ -376,7 +398,9 @@ _RING_TOLERANCE = 1.0e-6
 
 #: The two launch geometries the pinned solver produces, named so the declared
 #: optical path can say which one its reference is, rather than leaving a reader
-#: to infer it from the problem.
+#: to infer it from the problem. They are *declared* here and *produced* by
+#: `launch._object_space_reference`, which is the CHE-219 direction: this module
+#: reads a launch geometry off the declaration it is handed and never decides one.
 #:
 #: They are mirror images, and that is the whole reason they need separate
 #: arithmetic: at infinity the launch **directions** are common and the origins
@@ -386,19 +410,6 @@ _RING_TOLERANCE = 1.0e-6
 #: is exactly zero.
 LAUNCH_PLANE_WAVEFRONT = "plane wavefront of a collimated bundle, launched on a plane normal to z"
 LAUNCH_POINT_SOURCE = "spherical wavefront diverging from a single object point"
-
-#: How closely the regenerated launch directions must agree before the incoming
-#: bundle counts as collimated.
-#:
-#: Reused verbatim from the reference implementation's float64 direction bound
-#: (`pre-rewrite-2026-08-30:src/solvers/optiland/constants.py:_DIRECTION_NORM_TOLERANCE`),
-#: and it earns its keep: the measured spread for a collimated off-axis bundle is
-#: 2.78e-17, i.e. float64 round-off in the direction generator rather than a real
-#: variation. An exact-zero test refuses a perfectly collimated bundle, which is a
-#: false refusal of the one case the term exists for -- the off-axis field where
-#: omitting it drops the whole convergence tilt. The *plane* test below stays at
-#: exact zero, because the launch z spread is measured as exactly 0.0.
-_LAUNCH_DIRECTION_TOLERANCE = 1.0e-12
 
 #: What Optiland reports for a ray it clipped: the intensity is zeroed and the
 #: row is kept with its state frozen at the clip. So a positive intensity is the
@@ -593,196 +604,6 @@ def exit_pupil(lens: Any, *, image_plane_z_mm: float) -> dict[str, Any]:
     }
 
 
-def _object_space_reference(
-    lens: Any,
-    *,
-    field: tuple[float, float],
-    wavelength_um: float,
-    num_rings: int,
-    traced_count: int,
-) -> dict[str, Any]:
-    """CHE-41: the optical path from the incoming *wavefront* to each launch point.
-
-    Every precondition the term depends on is checked rather than assumed, and a
-    failed check returns `available=False` with the reason. It never returns a
-    term it could not verify: an unavailable term becomes a refusal upstream,
-    while a wrong one is a wavefront aimed at the wrong image point.
-
-    The launch state is regenerated through the public
-    `ray_tracer.ray_generator.generate_rays` over the same hexapolar distribution
-    `Optic.trace` builds, because `Optic.trace` returns the traced rays and keeps
-    no record of where they started. That regeneration reproduces the trace
-    bit-identically (measured: max |dx| = max |dy| = max |d opd| = 0.0 over 3169
-    rays), which is the only reason a per-ray term measured from it describes the
-    exported rays row for row.
-    """
-
-    def unavailable(reason: str) -> dict[str, Any]:
-        return {"available": False, "reason": reason, "offset_native": None, "span_native": None}
-
-    try:
-        object_at_infinity = bool(lens.object_surface.is_infinite)
-    except Exception as exc:  # pragma: no cover - defensive
-        return unavailable(
-            f"the object surface could not be read ({type(exc).__name__}), so the launch "
-            "geometry is unknown"
-        )
-
-    try:
-        import optiland.backend as be
-        from optiland.distribution import create_distribution
-
-        distribution = create_distribution("hexapolar")
-        distribution.generate_points(num_rings)
-        points = int(np.asarray(_host(distribution.x)).size)
-        field_x = be.atleast_1d(be.array(float(field[0])))
-        field_y = be.atleast_1d(be.array(float(field[1])))
-        launch = lens.ray_tracer.ray_generator.generate_rays(
-            be.repeat(field_x, points),
-            be.repeat(field_y, points),
-            distribution.x,
-            distribution.y,
-            wavelength_um,
-        )
-    except Exception as exc:
-        return unavailable(
-            "the launch state could not be regenerated from "
-            f"ray_tracer.ray_generator.generate_rays ({type(exc).__name__}: {exc}); "
-            "Optic.trace does not retain it, so there is nothing to measure the "
-            "object-space reference from"
-        )
-
-    def reference(value: Any) -> np.ndarray[Any, Any]:
-        # Deliberately float64 and NOT the trace's precision. This is a
-        # piston-and-tilt correction of order 1e4 waves; computing it in float32
-        # would inject an error larger than the wavefront it corrects. Declared
-        # here rather than inherited.
-        return np.asarray(_host(value), dtype=np.float64)
-
-    x0, y0, z0 = reference(launch.x), reference(launch.y), reference(launch.z)
-    l0, m0, n0 = reference(launch.L), reference(launch.M), reference(launch.N)
-
-    if x0.size != traced_count:
-        return unavailable(
-            f"the regenerated launch state has {x0.size} rays but the trace exported "
-            f"{traced_count}; the two cannot be matched row for row"
-        )
-    if not all(np.all(np.isfinite(column)) for column in (x0, y0, z0, l0, m0, n0)):
-        return unavailable("the regenerated launch state is not finite")
-
-    index = _scalar(lambda: lens.surfaces.surfaces[0].material_post.n(wavelength_um))
-    if index is None or index <= 0.0:
-        return unavailable(
-            "the object-space refractive index could not be read from the prescription, "
-            "and the optical path from a wavefront to the launch state is index-weighted"
-        )
-
-    if not object_at_infinity:
-        # A POINT SOURCE. The launch state is one point, so it *is* a wavefront --
-        # a degenerate sphere of zero radius centred on the object -- and the
-        # optical path from that wavefront to each launch point is identically
-        # zero. See `_point_source_reference` for the checks and the measurement.
-        return _point_source_reference(x0, y0, z0, index=index)
-
-    # AN OBJECT AT INFINITY. The launch points spread over a plane and the
-    # directions are common, which is the mirror image of the point source above,
-    # and it is why the two cannot share one arithmetic.
-    direction_spread = max(float(np.ptp(l0)), float(np.ptp(m0)), float(np.ptp(n0)))
-    if direction_spread > _LAUNCH_DIRECTION_TOLERANCE:
-        return unavailable(
-            f"the launch directions are not common to every ray (spread "
-            f"{direction_spread:.3e}), so the incoming bundle is not collimated and a "
-            "single plane wavefront does not describe it"
-        )
-    plane_spread = float(np.ptp(z0))
-    if plane_spread > 0.0:
-        return unavailable(
-            f"the launch points do not lie on one plane (z spread {plane_spread:.3e} in "
-            "native units), so the seeded reference surface is not the plane this term "
-            "assumes"
-        )
-
-    # d0 . r_launch, index-weighted. The n0 * z0 part is common to every ray
-    # because the launch plane is flat; it is retained rather than dropped so the
-    # quantity is the optical path from ONE stated wavefront -- the one through
-    # the global origin, perpendicular to d0 -- rather than from an unstated one.
-    offset_native = index * (l0 * x0 + m0 * y0 + n0 * z0)
-    return {
-        "available": True,
-        "reason": None,
-        "offset_native": offset_native,
-        "span_native": float(np.ptp(offset_native)),
-        "launch_geometry": LAUNCH_PLANE_WAVEFRONT,
-        "launch_direction": (float(l0[0]), float(m0[0]), float(n0[0])),
-        "launch_plane_z_native": float(z0[0]),
-        "object_space_refractive_index": index,
-    }
-
-
-def _point_source_reference(
-    x0: np.ndarray[Any, Any],
-    y0: np.ndarray[Any, Any],
-    z0: np.ndarray[Any, Any],
-    *,
-    index: float,
-) -> dict[str, Any]:
-    """CHE-207: the object-space reference for a finite conjugate, which is zero.
-
-    Not an assumed zero. The reasoning is structural and the premise is checked:
-
-    * every ray of one field leaves the **same point**, so the launch state is a
-      single point rather than a surface;
-    * a single point is trivially a common wavefront -- the degenerate sphere of
-      zero radius centred on it -- so the optical path from that wavefront to each
-      launch point is `0` for every ray, exactly, with no arithmetic to round;
-    * being constant, it is also a piston, so `declare_optical_path_m`'s chief-ray
-      subtraction would remove it even if it were not zero. The declared path is
-      therefore referenced to the spherical wavefront diverging from the object
-      point, which is the physically meaningful surface for a finite conjugate.
-
-    **Measured directly, not inferred from the infinite-object case**, which is
-    what CHE-46 required before this refusal could be lifted. On the
-    finite-conjugate singlet at 2f, at three fields -- on axis, off axis in y, and
-    off axis in **both** x and y: the launch origin spread is **exactly 0.0** in x,
-    y and z; the launch `opd` is **exactly 0.0** with zero spread; the launch
-    *directions* spread by ~5e-2, confirming a diverging bundle rather than a
-    collimated one; and the regenerated launch state traced through the system
-    reproduces `Optic.trace` bit-identically (max |dx| = max |d opd| = 0.0).
-    `tests/physics/test_optiland_finite_conjugate.py` is where each of those is
-    asserted, so none of them is a number in a docstring.
-
-    The premise is re-checked here on every call rather than trusted, because it
-    is the whole justification: an origin spread that is not zero means the source
-    is not a point, the wavefront is not a sphere about one centre, and this zero
-    would be wrong. That case is refused rather than approximated -- an extended
-    finite source is a different physical problem, not a looser tolerance.
-    """
-    origin_spread = max(float(np.ptp(x0)), float(np.ptp(y0)), float(np.ptp(z0)))
-    if origin_spread > 0.0:
-        return {
-            "available": False,
-            "reason": (
-                f"the object is at a finite distance but the launch points do not coincide "
-                f"(origin spread {origin_spread:.3e} in native units), so the source is not "
-                "a POINT and its launch state is not a single spherical wavefront. An "
-                "extended finite source is a different physical problem and this term is "
-                "not defined for it."
-            ),
-            "offset_native": None,
-            "span_native": None,
-        }
-    return {
-        "available": True,
-        "reason": None,
-        # Exactly zero, per ray, by construction rather than by subtraction.
-        "offset_native": np.zeros_like(x0),
-        "span_native": 0.0,
-        "launch_geometry": LAUNCH_POINT_SOURCE,
-        "launch_point_native": (float(x0[0]), float(y0[0]), float(z0[0])),
-        "object_space_refractive_index": index,
-    }
-
-
 def declare_optical_path_m(
     opd_native: np.ndarray[Any, Any],
     *,
@@ -928,25 +749,35 @@ def to_ray_bundle(
     lens: Any,
     traced: Any,
     *,
-    field: tuple[float, float],
-    wavelength_um: float,
-    num_rings: int,
+    launch: dict[str, Any],
     reference_surface: str,
 ) -> tuple[RayBundle, dict[str, Any]]:
     """Translate one native trace into a neutral `RayBundle` plus diagnostics.
 
-    `field` is the normalized pupil-field coordinate pair the trace was given --
-    the solver's own spelling, which is why this function is internal to the
-    package and `solvers.optiland.trace` is the public entry point.
+    `launch` is the declaration `solvers.optiland.launch.launch` returned for the
+    rays this trace was run on. **CHE-219 (R05.8) made that an input rather than
+    something reconstructed here.** This function used to receive
+    `field + wavelength_um + num_rings` and rebuild, from the traced output, two
+    things that existed only at launch: the hexapolar ring identity each ray's
+    pupil-area measure comes from, and the whole launch state the CHE-41
+    object-space reference term is measured on. Both are now read off `launch`,
+    and neither the distribution nor the entrance pupil is consulted here at all.
+
+    The physics is unchanged -- CHE-30, CHE-41 and CHE-207 all still apply through
+    `declare_optical_path_m`, from the same term, with the same sign and the same
+    reference version. What changed is that the term describes the rays that were
+    launched instead of a second, hopefully identical, launch.
 
     Returns the bundle and a diagnostics mapping. Nothing in either is native: no
     `RealRays`, no intensity, no accumulator, no millimetre.
 
     Raises:
-        ContractError: the exit pupil could not be resolved, the image-space index
-            could not be read, the optical path could not be declared, or every
-            traced ray was clipped.
+        ContractError: the launch declaration does not describe this trace row for
+            row, the exit pupil could not be resolved, the image-space index could
+            not be read, the optical path could not be declared, or every traced
+            ray was clipped.
     """
+    wavelength_um = float(launch["wavelength_um"])
     if reference_surface not in REFERENCE_SURFACES:
         raise ContractError(
             "MISSING_DECLARATION",
@@ -982,6 +813,21 @@ def to_ray_bundle(
         raise ContractError(
             "EMPTY_ENSEMBLE",
             "the solver returned no rays; there is nothing to declare",
+            declaration="positions_m",
+        )
+    # The launch declaration is the authority on what these rays *are*, so it has
+    # to describe them row for row before any of it is applied. It is not a
+    # degradation: the measure, the amplitude and the object-space term are all
+    # per-ray arrays taken at launch, and aligning them against a different number
+    # of rows would silently attribute one ray's pupil cell to another.
+    launch_count = int(launch["ray_count"])
+    if launch_count != traced_count:
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"the launch declaration describes {launch_count} rays but the trace exported "
+            f"{traced_count}, so the two cannot be matched row for row. Optiland keeps a "
+            "clipped ray's row and zeroes its intensity rather than removing it, so a "
+            "count that differs means this declaration came from a different launch.",
             declaration="positions_m",
         )
 
@@ -1032,6 +878,31 @@ def to_ray_bundle(
             declaration="wavelength_m",
         )
     wavelength_m = float(wavelengths[0]) * NATIVE_WAVELENGTH_M
+    # The second thing the declaration has to agree with the trace about. The row
+    # count above establishes that the two describe the same *number* of rays; this
+    # establishes that they describe the same *light*, which the row count cannot.
+    # It matters because `wavelength_um` from the declaration is what both material
+    # index lookups below are evaluated at, so a declaration from another
+    # wavelength would refer the optical path through indices the trace never used.
+    #
+    # Compared in the precision the *trace* ran in, not in float64. The solver
+    # stamps the requested wavelength onto the rays through its own array
+    # constructor, so a float32 trace of 0.55 um comes back as 0.550000011920929
+    # and an exact float64 comparison would refuse every float32 trace -- measured,
+    # and caught by `test_float32_traces_in_float32_and_says_so`. Casting the
+    # declaration into the traced dtype is exact in both precisions and stays a
+    # test for "a different wavelength" rather than becoming a tolerance.
+    declared_native = float(np.asarray(wavelength_um, dtype=wavelengths.dtype))
+    if float(wavelengths[0]) != declared_native:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            f"the launch declaration is for wavelength {wavelength_um!r} but the trace "
+            f"carries {float(wavelengths[0])!r} (native units), so this declaration did "
+            "not come from the launch that was traced. Both refractive indices below are "
+            "read at the declared wavelength, so the mismatch would refer the optical "
+            "path through a medium the trace did not travel in.",
+            declaration="wavelength_m",
+        )
 
     image_z_mm = _scalar(lambda: lens.surfaces.surfaces[-1].geometry.cs.z)
     if image_z_mm is None:
@@ -1074,13 +945,7 @@ def to_ray_bundle(
             declaration="reference_surface",
         )
 
-    object_space = _object_space_reference(
-        lens,
-        field=field,
-        wavelength_um=wavelength_um,
-        num_rings=num_rings,
-        traced_count=traced_count,
-    )
+    object_space = launch["object_space"]
     # The chief ray is the smallest pupil radius among the rays that survived: a
     # clipped ray's frozen position could otherwise win the argmin and make the
     # removed piston the path of a ray nobody is allowed to read.
@@ -1095,12 +960,15 @@ def to_ray_bundle(
         plane_z_mm=plane_z_mm,
         image_space_index=image_space_index,
         object_space=object_space,
-        on_axis=field == (0.0, 0.0),
+        on_axis=tuple(launch["field"]) == (0.0, 0.0),
     )
 
-    measure_weight, measure_kind, measure_note = _declare_measure(
-        lens, num_rings=num_rings, traced_count=traced_count, wavelength_um=wavelength_um
-    )
+    # Declared at launch, by the layer that chose the sampling. Nothing here
+    # regenerates a distribution, recovers a ring index, or reads a row count to
+    # guess what the pupil quadrature was.
+    measure_weight = launch["measure_weight"]
+    measure_kind: MeasureKind = launch["measure_kind"]
+    measure_note = launch["measure_note"]
 
     positions = np.stack([column[alive] for column in position_mm], axis=1) * NATIVE_LENGTH_M
     directions = np.stack([native[name][alive] for name in ("L", "M", "N")], axis=1)
@@ -1137,6 +1005,14 @@ def to_ray_bundle(
         "amplitude_mapping": AMPLITUDE_MAPPING,
         "measure": measure_note,
         "optical_path_reference": optical_path_reference,
+        # Where the rays came from, carried through rather than re-derived --
+        # CHE-219. `aiming` in particular cannot be recovered from traced output at
+        # all, which is why it travels as a declaration.
+        "launch_ray_count": launch_count,
+        "launch_geometry": launch["launch_geometry"],
+        "launch_surface_z_m": launch["launch_surface"].z_m,
+        "launch_aiming": launch["aiming"],
+        "launch_field": tuple(launch["field"]),
         "object_space_reference_available": object_space["available"],
         "object_space_reference_reason": object_space["reason"],
         "object_space_reference_span_m": (
@@ -1169,80 +1045,6 @@ def to_ray_bundle(
         ),
     }
     return bundle, diagnostics
-
-
-def _declare_measure(
-    lens: Any, *, num_rings: int, traced_count: int, wavelength_um: float
-) -> tuple[np.ndarray[Any, Any] | None, MeasureKind, str]:
-    """The per-ray pupil area element and its kind, or an honest absence.
-
-    A missing measure is not itself a physics error the way a missing off-axis
-    tilt term is: the bundle is still coherent, it is simply unweighted. So this
-    returns `(None, "undeclared", reason)` rather than raising, and R07's coupler
-    is the thing that refuses to reconstruct from an undeclared measure.
-    """
-    expected = hexapolar_ray_count(num_rings)
-    if traced_count != expected:
-        return (
-            None,
-            "undeclared",
-            f"undeclared: the trace exported {traced_count} rays but an un-vignetted "
-            f"{num_rings}-ring hexapolar fan is {expected}, so a ring index cannot be "
-            "assigned row for row and any area element would be invented",
-        )
-    try:
-        from optiland.distribution import create_distribution
-
-        distribution = create_distribution("hexapolar")
-        distribution.generate_points(num_rings)
-        # float64 by declaration, independent of the trace: the ring assignment is
-        # a tolerance test on the ratio rho * num_rings, so it is computed at
-        # reference precision whatever the trace ran in.
-        pupil_x = np.asarray(_host(distribution.x), dtype=np.float64)
-        pupil_y = np.asarray(_host(distribution.y), dtype=np.float64)
-    except Exception as exc:
-        return (
-            None,
-            "undeclared",
-            f"undeclared: the hexapolar pupil sampling could not be regenerated "
-            f"({type(exc).__name__}: {exc})",
-        )
-    if pupil_x.size != traced_count:  # pragma: no cover - equal to `expected` by construction
-        return (
-            None,
-            "undeclared",
-            f"undeclared: the regenerated fan has {pupil_x.size} points against "
-            f"{traced_count} traced rays",
-        )
-
-    entrance_pupil_diameter_mm = _scalar(lens.paraxial.EPD)
-    if entrance_pupil_diameter_mm is None or entrance_pupil_diameter_mm <= 0.0:
-        return (
-            None,
-            "undeclared",
-            "undeclared: the entrance pupil diameter could not be read, so the physical "
-            "aperture area the relative cell areas scale to is unknown",
-        )
-    aperture_radius_m = (entrance_pupil_diameter_mm / 2.0) * NATIVE_LENGTH_M
-    try:
-        ring_index = hexapolar_ring_index(pupil_x, pupil_y, num_rings)
-    except ContractError as exc:
-        return (None, "undeclared", f"undeclared: {exc.code}: {exc}")
-    weight = hexapolar_area_weight_m2(ring_index, num_rings, aperture_radius_m)
-    return (
-        weight,
-        "quadrature_area_m2",
-        (
-            "quadrature_area_m2: the absolute per-ray entrance-pupil area element a "
-            f"{num_rings}-ring hexapolar fan represents, radial-trapezoid corrected at the "
-            "centre (3/4) and rim (1/2). Aperture radius "
-            f"{aperture_radius_m!r} m, sum {float(weight.sum()):.9e} m^2 against "
-            f"pi a^2 = {math.pi * aperture_radius_m**2:.9e} m^2 "
-            f"(ratio {float(weight.sum()) / (math.pi * aperture_radius_m**2):.12f}, exactly "
-            f"1 + 1/(4 n^2)). Wavelength {wavelength_um!r} um does not enter: the measure is "
-            "a property of how the pupil was sampled, not of the light."
-        ),
-    )
 
 
 # ---------------------------------------------------------------------------

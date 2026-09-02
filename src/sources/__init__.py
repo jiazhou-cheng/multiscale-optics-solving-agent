@@ -31,24 +31,50 @@ So this package is not partitioned by representation and must not grow a
 subpackage per representation, and no constructor here may return one of two
 representations depending on its arguments.
 
-Both landed representations are initialized here as of CHE-215 (R06.10):
-`collimated_bundle` returns a `RayBundle` and the other three return a
-`ScalarField`, side by side in one flat package rather than under a
-`sources/wave/` and `sources/ray/` split. R06.5 predicted the collimated bundle by
-name and blessed it under this same rule, so item 1 of that ticket needed no scope
-change.
+A source may be described without a system. A ray launch may not
+-----------------------------------------------------------------
+**CHE-219 (R05.8) removed ray initialization from this package**, and the decision
+is recorded here rather than left as an absence. `collimated_bundle` used to live
+here and return a `RayBundle` built from caller-supplied points and a shared
+direction. That operation creates a ray representation without knowing whether
+those points correspond to the entrance pupil, the stop, the first traced surface,
+a valid finite-conjugate aim, or the constructed system at all -- and the actual
+launch positions and directions of a source *into a system* depend on the stop,
+the entrance pupil's location and diameter, every surface preceding the stop, the
+object distance, the field, the backend's pupil map and the ray aimer's
+convergence behaviour. None of that is knowable from source parameters alone.
+
+So there is exactly one rule and no middle state:
+
+* a **declarative source description** is representation-independent and may live
+  here (or, when it is a problem statement rather than a constructor, in
+  `problems/` -- `problems.SourceSpec` is one);
+* **wave-source construction** that does not describe an optical-system ray launch
+  stays here: an analytic field at a declared surface is not aimed at anything;
+* a **system-launch `RayBundle`** is produced by the solver that owns the aiming --
+  `solvers.optiland.launch` -- and by nothing in this package.
+
+`direction_from_angle` left with it, having been audited under the same rule: its
+production purpose was to turn a source field into a launched ray direction, so
+that responsibility moved with the launch. `transverse_wavevector_from_angle`
+stays, because `k_t` on a `ScalarField` grid is not a ray aim. Both functions now
+live at `tests/fixtures/ray_bundles.py`, as the test helper they always were in
+practice -- nothing in `src/` ever called either.
+
+`sources/` therefore initializes exactly one representation today, the
+`ScalarField`, in one flat package. That is a narrowing of R06.10's position and
+not a return to R06.5's: the *rule* is unchanged -- one flat package, the return
+representation explicit per operation, no subpackage per representation -- and a
+future source of a representation that is genuinely initializable without a
+system needs no architecture change to land here.
 
 This package imports **no backend**. Every source here is arithmetic on the
 project's own grid or on the caller's own points. `chromatix.functional.plane_wave`
 and `chromatix.functional.gaussian_beam` are cross-checks, and both carry a
 `power=` amplitude renormalization this tree does not want.
 
-The four modules
-----------------
-* `collimated_bundle` -- `collimated_bundle`, one angular mode launched from `(N,
-  3)` explicit `(x, y, z)` points (normal incidence is `direction = (0, 0, 1)`,
-  not a second function), and `direction_from_angle`, the pure converter from
-  `(theta, phi)` to a direction cosine.
+The three modules
+-----------------
 * `plane_wave` -- `plane_wave`, a uniform illumination on a grid (normal incidence
   is `k_t = (0, 0)`), and `transverse_wavevector_from_angle`, the pure converter
   from `(theta, phi)` to `k_t` in rad/m.
@@ -57,7 +83,7 @@ The four modules
 * `spherical_wave` -- `spherical_wave`, an analytic diverging or converging point
   emitter with the `1/R` amplitude carried and its reference distance declared.
 
-`_grid` is private and holds what the three grid-shaped sources share: the shape
+`_grid` is private and holds what the three sources share: the shape
 and pitch declarations, the `Frame.origin_index` coordinate axes, and the two
 refusals `|k_t| <= n k0` and `|k_t| <= pi/d`. Those refusals are written once on
 purpose -- two sources with independently written copies diverge the first time one
@@ -78,8 +104,11 @@ one right one:
   distinct one: nothing here takes a `z` to propagate to.
 * a **solver/problem** resolves the *system-dependent* launch conditions -- the
   stop, the entrance pupil position and diameter, the system NA, the pupil map, a
-  finite-conjugate aim. None of that is knowable from source parameters alone and
-  none of it is inferred here.
+  finite-conjugate aim, the ray aimer and its mode. None of that is knowable from
+  source parameters alone, none of it is inferred here, and as of CHE-219 (R05.8)
+  none of it is *approximated* here either: the operation that materializes a
+  launch is `solvers.optiland.launch`, which takes the constructed system as a
+  required argument.
 
 Prefer composition over a new constructor
 ------------------------------------------
@@ -94,27 +123,11 @@ that already models it.
 Minimal examples
 ----------------
 ```python
-from numpy import column_stack, meshgrid, arange, full
 from representations import ReferenceSurface
-from sources import (collimated_bundle, direction_from_angle, gaussian_beam,
-                     plane_wave, spherical_wave, transverse_wavevector_from_angle)
+from sources import (gaussian_beam, plane_wave, spherical_wave,
+                     transverse_wavevector_from_angle)
 
 pupil = ReferenceSurface(name="entrance_pupil", z_m=0.0, medium_index=1.0)
-
-# A collimated bundle at 5 degrees, on a 32 x 48 grid of launch points. Positions
-# are (x, y, z) columns while the grid is (y, x): stack x first.
-y = (arange(32) - 16) * 2e-6
-x = (arange(48) - 24) * 2e-6
-grid_y, grid_x = meshgrid(y, x, indexing="ij")
-rays = collimated_bundle(
-    column_stack([grid_x.ravel(), grid_y.ravel(), full(grid_x.size, 0.0)]),
-    direction=direction_from_angle(0.0873, 0.0),
-    wavelength_m=0.532e-6,
-    reference_surface=pupil,
-    # The measure is undeclared by default; state it when the sampling is known.
-    measure_weight=full(grid_x.size, 2e-6 * 2e-6),
-    measure_kind="quadrature_area_m2",
-)
 
 illumination = plane_wave(
     (256, 256), sample_pitch_m=(0.2e-6, 0.2e-6), wavelength_m=0.532e-6,
@@ -162,7 +175,10 @@ Still not here:
   delta whose spectrum is flat to the Nyquist limit and therefore aliased by
   construction.
 * **pupil-aware or finite-conjugate launches** -- aiming needs the stop, the pupil
-  and the system NA, which is the solver/problem layer (CHE-207, R05.5).
+  and the system NA, which is the solver/problem layer (CHE-207, R05.5), and as of
+  CHE-219 (R05.8) is `solvers.optiland.launch`.
+* **ray initialization of any kind** -- see the rule above. Not "not yet": a
+  system-launch `RayBundle` is not a thing this package can correctly produce.
 * **automatic aperture or NA inference** -- no source here inspects a downstream
   element. Truncation composes with the thin-element operator.
 * **arbitrary-`z` Gaussian beams** -- off-waist is a *paraxial* solution and
@@ -173,21 +189,18 @@ A source here is an analytic field at a declared surface, nothing more.
 
 No source registers an `OperationDescriptor` today, and CHE-215 deliberately did
 not invent registration for four functions: per `AGENTS.md` each descriptor's
-`output` representation must be unambiguous, and this package now spans two
-representations, so when sources enter the registry they go in together. Owed to
+`output` representation must be unambiguous, so when sources enter the registry
+they go in together. Owed to
 R03/R12, which also owns the fact that `sources/` may not import `operations/` and
 `operations/` may not import `sources/`, so there is no production registration
 site yet.
 """
 
-from sources.collimated_bundle import collimated_bundle, direction_from_angle
 from sources.gaussian_beam import gaussian_beam
 from sources.plane_wave import plane_wave, transverse_wavevector_from_angle
 from sources.spherical_wave import spherical_wave
 
 __all__ = [
-    "collimated_bundle",
-    "direction_from_angle",
     "gaussian_beam",
     "plane_wave",
     "spherical_wave",

@@ -61,6 +61,7 @@ from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
 from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
 from solvers.optiland import rays as rays_module
 from solvers.optiland import trace_rays
+from solvers.optiland.launch import capture_launch_rays, launch
 from solvers.optiland.rays import (
     COMPOSED_OPL_REFERENCE_VERSION,
     LAUNCH_PLANE_WAVEFRONT,
@@ -264,12 +265,16 @@ def _declared_pupil_opl(
     pupil_x_mm = x + _host(traced.L) * step_mm
     pupil_y_mm = y + _host(traced.M) * step_mm
 
-    object_space = rays_module._object_space_reference(
-        lens,
-        field=field,
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=num_rings,
-        traced_count=int(x.size),
+    # CHE-219 (R05.8): the term is measured on the launch state `capture_launch_rays`
+    # took, not on one regenerated after the trace. Driven through the shipping
+    # functions so this oracle reads the same term the adapter applies.
+    from solvers.optiland.launch import _launch_columns, _object_space_reference
+
+    native_launch, _, _ = capture_launch_rays(
+        lens, field=field, wavelength_um=WAVELENGTH_UM, num_rings=num_rings
+    )
+    object_space = _object_space_reference(
+        lens, _launch_columns(native_launch), index=1.0
     )
     if not apply_object_space:
         # The negative control for the CHE-41 term: present, measured, and *not*
@@ -605,14 +610,10 @@ def test_a_bundle_with_no_optical_path_at_all_passes() -> None:
 def test_every_emitted_bundle_satisfies_the_post_condition() -> None:
     """The check `to_ray_bundle` runs on its own output, run again from outside."""
     lens = build_lens(singlet_ref())
+    _, declaration = launch(lens, SourceSpec(wavelength_um=WAVELENGTH_UM), num_rings=8)
     traced = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=8)
     bundle, _ = to_ray_bundle(
-        lens,
-        traced,
-        field=(0.0, 0.0),
-        wavelength_um=WAVELENGTH_UM,
-        num_rings=8,
-        reference_surface="exit_pupil",
+        lens, traced, launch=declaration, reference_surface="exit_pupil"
     )
     require_declared_optical_path(bundle)
     assert str(bundle.optical_path_reference).startswith(OPL_REFERENCE_VERSION)

@@ -1,36 +1,41 @@
-"""A collimated ensemble, as a fully declared `RayBundle`.
+"""A collimated ensemble as a `RayBundle`, for the tests that need one. Not a source.
 
-CHE-215 (R06.10). Two public functions:
+CHE-219 (R05.8) moved this out of `src/sources/`, where CHE-215 (R06.10) had
+landed it as `sources.collimated_bundle`. Two functions, unchanged arithmetic:
 
 ```python
-sources.collimated_bundle(positions_m, *, direction=(0, 0, 1), wavelength_m,
-                          reference_surface, amplitude=1.0,
-                          measure_weight=None, measure_kind="undeclared") -> RayBundle
-sources.direction_from_angle(theta_rad, phi_rad) -> tuple[float, float, float]
+collimated_bundle(positions_m, *, direction=(0, 0, 1), wavelength_m,
+                  reference_surface, amplitude=1.0,
+                  measure_weight=None, measure_kind="undeclared") -> RayBundle
+direction_from_angle(theta_rad, phi_rad) -> tuple[float, float, float]
 ```
 
-Normal incidence is `direction = (0, 0, 1)` -- the same primitive, not a second
-function, exactly as `plane_wave` makes normal incidence `k_t = (0, 0)`.
+Why it is a test helper and not production architecture
+--------------------------------------------------------
+Because it builds a launch `RayBundle` from caller-supplied points and a
+direction, **with no optical system in scope**. That operation cannot say whether
+those points are the entrance pupil, the stop, the first traced surface, a valid
+finite-conjugate aim, or anything in the constructed system at all -- and R05.8's
+rule is that a source may be described without a system while a ray *launch* may
+not. The actual launch positions and directions depend on the stop, the entrance
+pupil's location and diameter, every surface preceding the stop, the object
+distance, the field, the backend's pupil map and the ray aimer, so a system-launch
+`RayBundle` is produced by `solvers.optiland.launch` and nowhere else.
 
-Why this is the first `RayBundle` source
------------------------------------------
-R06.5 landed `plane_wave` and left an asymmetry on purpose: `ScalarField` had a
-standard source and `RayBundle` had none, so every collimated ensemble in the tree
-was built by hand inside `tests/physics/ray_support.py`. That is correct for a
-test and is not a capability -- nothing outside a test could *state* a collimated
-launch. `sources/__init__.py` already blessed this operation by name before it
-existed ("a collimated `RayBundle` source ... belongs beside `plane_wave` under
-this same rule"), so no scope change was needed to land it.
+Keeping this here rather than deleting it costs nothing and loses no coverage: it
+is what `tests/physics/ray_support.py` builds its plane-wave-mode ensembles from
+and what `tests/physics/test_collimated_ensemble.py` holds to the closed form
+`OPL_j = n (d_hat . r_j)`. What it must not be is the *architecture* -- a second,
+system-independent way to initialize rays living beside the system-aware one is
+exactly the ambiguity R05.8 removed.
 
 Explicit positions, not a grid
 -------------------------------
 The primitive takes `(N, 3)` launch points and nothing else. A grid-only signature
 would be smaller to call and would be the wrong primitive twice over: it cannot
 express the hexapolar pupil sampling `tests/physics/ray_support.converging_bundle`
-already uses, and it would tie this source to a rectangular aperture model -- the
-kind of downstream-geometry assumption `sources/` exists not to make. Callers that
-want a rectangular grid build the positions themselves; that is three lines of
-`meshgrid` and it stays in the caller, where the aperture model belongs.
+already uses, and it would tie the ensemble to a rectangular aperture model.
+Callers that want a rectangular grid build the positions themselves.
 
 **Axis order is a real trap and is stated once here.** Positions are `(x, y, z)`
 *columns*, matching `RayBundle.positions_m` and the `(x, y, z)` order of
@@ -51,9 +56,9 @@ optical path is `n` times a geometric one -- the same convention
 `couplers.ray_to_scalar` reads back.
 
 `RayBundle` refuses an optical path with no declared reference, so the string is
-not optional. It is fixed by the source rather than taken as an argument: the
-source is what chose the origin, so a caller-supplied reference could only
-disagree with the arithmetic above.
+not optional. It is fixed here rather than taken as an argument: this is what
+chose the origin, so a caller-supplied reference could only disagree with the
+arithmetic above.
 
 The measure is left undeclared, deliberately
 ---------------------------------------------
@@ -61,15 +66,14 @@ The measure is left undeclared, deliberately
 defaults, which make `couplers.ray_to_scalar` refuse the bundle until someone
 states what the samples are.
 
-That refusal is the correct behaviour and not a gap. From explicit positions there
-is no `dA` to derive: the same `(N, 3)` array is a uniform grid of cell area
-`dy dx`, a hexapolar pupil whose cells are not all equal, and an importance-
-weighted draw, and those three differ by the aperture area and by whether the
-reconstruction owes a `1/N`. R05 moved the quadrature weight off the amplitude and
-R07's kernel applies `measure_weight` itself, so a silently defaulted `dA` would
-scale *every* downstream reconstruction by a factor no intensity check can see. A
-caller who knows the sampling passes the weight and its kind; this function will
-not guess.
+From explicit positions there is no `dA` to derive: the same `(N, 3)` array is a
+uniform grid of cell area `dy dx`, a hexapolar pupil whose cells are not all
+equal, and an importance-weighted draw, and those three differ by the aperture
+area and by whether the reconstruction owes a `1/N`. R05 moved the quadrature
+weight off the amplitude and R07's kernel applies `measure_weight` itself, so a
+silently defaulted `dA` would scale *every* downstream reconstruction by a factor
+no intensity check can see. A caller who knows the sampling passes the weight and
+its kind; this function will not guess.
 
 Every other convention, also declared
 --------------------------------------
@@ -90,14 +94,12 @@ Every other convention, also declared
   `RayBundle`'s own defaults.
 * **Dtype** -- read off the positions the caller passed, so a float32 request
   really is a float32 bundle. The projection `d_hat . r` is accumulated in float64
-  and cast once, the same discipline `plane_wave` applies to its phase ramp: `k`
-  is ~1.2e7 rad/m, so a millimetre of path is ~1e4 rad and float32 arithmetic in
-  the accumulation would cost far more than the cast does.
+  and cast once, the same discipline `sources.plane_wave` applies to its phase
+  ramp: `k` is ~1.2e7 rad/m, so a millimetre of path is ~1e4 rad and float32
+  arithmetic in the accumulation would cost far more than the cast does.
 
-**No backend.** No Optiland, no system geometry, no pupil, no aperture, no stop.
-A collimated launch is arithmetic on the caller's own points. Aiming a bundle at
-an entrance pupil needs the stop, the pupil position and diameter and the system
-NA, which is the Optiland problem/solver layer (CHE-207, R05.5) and not this one.
+**No backend.** No Optiland, no system geometry, no pupil, no aperture, no stop --
+which is precisely why this is not a launch.
 """
 
 from __future__ import annotations

@@ -365,13 +365,17 @@ def test_the_same_setup_traces_at_two_fields_without_being_reconstructed() -> No
 def test_field_degrees_convert_to_the_solvers_normalized_coordinate() -> None:
     """The declared field IS the maximum field, so the coordinate is the unit one.
 
-    Before R05.7 this read `_normalized_field(lens, (0.0, 6.0)) == (0.0, 0.2)`,
+    Before R05.7 this read `normalized_field(lens, (0.0, 6.0)) == (0.0, 0.2)`,
     because `max_field` was 30 -- the largest of a list the caller had to declare.
     `build_lens` now declares exactly the field being traced, so the same 6 deg
     normalizes against 6 and the round trip `max_field * H` recovers it exactly.
     `max_field` is still read off the constructed lens rather than assumed.
+
+    CHE-219 (R05.8) moved the function from `solver` to `launch`, unchanged: it is
+    the first step of aiming a declarative source into a particular system, which
+    is what that module owns.
     """
-    from solvers.optiland.solver import _normalized_field
+    from solvers.optiland.launch import normalized_field as _normalized_field
     from solvers.optiland.system import build_lens
 
     for field_deg, expected in (
@@ -453,7 +457,17 @@ def test_there_is_no_gradient_knob() -> None:
     import inspect
 
     signature = inspect.signature(trace)
-    assert set(signature.parameters) == {"setup", "source", "sampling", "execution"}
+    # `aiming` joined the four settled arguments at CHE-219 (R05.8). It is a
+    # declaration of how the backend resolves a launch into this system, which
+    # before that ticket was an unstated inheritance of the solver's constructor
+    # default -- and its own default is that same value, measured bit-identical.
+    assert set(signature.parameters) == {
+        "setup",
+        "source",
+        "sampling",
+        "execution",
+        "aiming",
+    }
     package = ROOT / "src" / "solvers" / "optiland"
     for module in sorted(package.rglob("*.py")):
         source = module.read_text(encoding="utf-8")

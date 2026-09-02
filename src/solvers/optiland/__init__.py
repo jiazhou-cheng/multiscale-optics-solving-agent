@@ -1,14 +1,14 @@
 """Optiland sequential ray tracing, behind an anti-corruption boundary.
 
-CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3) and CHE-217 (R05.6). The
-public surface is two functions, one per kind of input:
+CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3), CHE-217 (R05.6) and
+CHE-219 (R05.8). The public surface is two functions, one per kind of input:
 
 ```python
-solvers.optiland.trace(setup, source, sampling=..., execution=...) -> RayBundle
+solvers.optiland.trace(setup, source, sampling=..., execution=..., aiming=...) -> RayBundle
 solvers.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
 ```
 
-`trace` generates its rays inside the solver from a field coordinate and a
+`trace` launches its rays into the constructed system from a field angle and a
 hexapolar ring count. `trace_rays` **consumes** a `RayBundle` the project already
 holds -- what `couplers.scalar_to_ray` produces -- and carries it through the
 system with its complex amplitude and its declared quadrature intact. Neither is
@@ -26,7 +26,7 @@ no `opd_native`, no millimetre.
 `tests/solvers/test_optiland_boundary.py` asserts that with an AST walk over every
 module outside this package and a `sys.modules` check in a fresh interpreter.
 
-Three modules, and the order is the dependency order:
+Four modules, and the order is the dependency order:
 
 * `system` -- CHE-179, CHE-218. `build_lens(setup, source)`, the one generic
   construction path. Adding a system means handing it a different setup, never
@@ -44,15 +44,26 @@ Three modules, and the order is the dependency order:
   claiming to have come from here: an optical path whose reference is neither of
   this module's two declarations is the native accumulator under a plausible
   label, and it is refused rather than read as a phase.
-* `solver` -- CHE-181, CHE-217. The two trace entry points, plus the
+* `launch` -- CHE-219. `launch(lens, source, num_rings=..., aiming=...)`, the
+  system-bound materialization of a declarative source: the aimed launch state,
+  captured before the trace, with the pupil quadrature and the object-space
+  optical-path reference declared from it. A source can be described without an
+  optical system; a ray launch cannot, which is why this is the solver's
+  operation and not `sources/`'s, and why the constructed lens is a required
+  argument rather than something the function could do without. `normalized_field`
+  moved here from `solver` for the same reason.
+* `solver` -- CHE-181, CHE-217, CHE-219. The two trace entry points, plus the
   process-global backend, device and precision made explicit and idempotent.
 
 Importing this package imports **no solver**. `optiland` and `torch` are imported
 inside the functions that need them, so reading the module -- or the capability
 row it cites -- costs neither.
 
-`system` and `rays` are exported for the tests that hold this package's physics
-to the frozen records; `trace` and `trace_rays` are the API. A consumer outside
+`system`, `launch` and `rays` are reachable as submodules for the tests that hold
+this package's physics to the frozen records, and `launch` additionally for a
+caller that wants a launch bundle without a trace -- it takes native solver state
+(the constructed `Optic`) and so is package-facing by construction. `trace` and
+`trace_rays` are the API. A consumer outside
 `solvers/` uses one of those two, and the rest of this package is native-facing by
 construction.
 """

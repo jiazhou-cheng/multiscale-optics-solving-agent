@@ -646,7 +646,7 @@ def test_the_field_of_a_finite_conjugate_is_a_position() -> None:
     )
     from optiland.distribution import create_distribution
 
-    from solvers.optiland.solver import _normalized_field
+    from solvers.optiland.launch import normalized_field as _normalized_field
 
     distribution = create_distribution("hexapolar")
     distribution.generate_points(2)

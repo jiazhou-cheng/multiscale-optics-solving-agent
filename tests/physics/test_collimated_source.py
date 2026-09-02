@@ -1,9 +1,11 @@
-"""The collimated source against the analytic wavelet sum, and against `plane_wave`.
+"""The collimated ensemble against the analytic wavelet sum, and against `plane_wave`.
 
-CHE-215 (R06.10), the physics half of item 1. `tests/sources/
-test_collimated_bundle.py` holds the declaration contract; this file is the one
-that measures whether the bundle the source builds is *physically* the plane-wave
-mode it claims to be.
+CHE-215 (R06.10), the physics half of item 1, re-pointed by CHE-219 (R05.8) at
+`fixtures.ray_bundles` -- the same arithmetic, moved out of `src/sources/` because
+a launch `RayBundle` built from caller-supplied points has no optical system in
+scope and therefore cannot be a source. `test_collimated_ensemble.py` holds the
+declaration contract; this file is the one that measures whether the bundle the
+builder produces is *physically* the plane-wave mode it claims to be.
 
 Oracle discipline, stated because the two checks here are not the same kind
 of evidence (`AGENTS.md`, "Scientific Non-Negotiables")
@@ -16,9 +18,9 @@ of evidence (`AGENTS.md`, "Scientific Non-Negotiables")
 
 That number came off paper, not out of this repository, so the tolerance is dtype
 round-off rather than a choice. It is the same oracle `tests/physics/
-ray_support.collimated_bundle` documents -- which is the point: that helper now
-delegates to this source, so the reconstruction gates R07 landed are running
-against the public capability rather than against a hand-built twin.
+ray_support.collimated_bundle` documents -- which is the point: that helper
+delegates to the same builder, so the reconstruction gates R07 landed and the
+checks here run against one ensemble rather than two hand-built twins.
 
 **Not a gate**, and labelled so: the agreement between `collimated_bundle ->
 ray_to_scalar` and `sources.plane_wave` at the matching `k_t`. Both sides are
@@ -36,15 +38,11 @@ import math
 
 import numpy as np
 import pytest
+from fixtures.ray_bundles import collimated_bundle, direction_from_angle
 
 from couplers.ray_to_scalar import ray_to_scalar
 from representations import Frame, ReferenceSurface
-from sources import (
-    collimated_bundle,
-    direction_from_angle,
-    plane_wave,
-    transverse_wavevector_from_angle,
-)
+from sources import plane_wave, transverse_wavevector_from_angle
 
 WAVELENGTH_M = 0.532e-6
 

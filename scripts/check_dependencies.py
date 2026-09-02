@@ -105,7 +105,8 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   halves of that -- the structural rule and the executed check.
 #:
 #: * `solvers` -- landed by CHE-179/CHE-180/CHE-181 (R05.1/R05.2/R05.3) as
-#:   `solvers/optiland/`: `system.py`, `rays.py`, `solver.py`. The first package
+#:   `solvers/optiland/`: `system.py`, `rays.py`, `solver.py`, joined by
+#:   CHE-219 (R05.8)'s `launch.py`. The first package
 #:   with a *permitted* backend import, and the only one there will ever be a
 #:   permitted backend import from: `_classify` exempts `solvers` from the
 #:   `BACKENDS` rule, which is the same fact stated as a rule about every other
@@ -145,12 +146,20 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:
 #: * `sources` -- landed by CHE-210 (R06.5) with `plane_wave.py`, and extended by
 #:   CHE-215 (R06.10) to `collimated_bundle.py`, `gaussian_beam.py`,
-#:   `spherical_wave.py` and the private `_grid.py` they share. That second ticket
-#:   needed **no allowlist change** -- the row below already covered it -- but it did
-#:   change what this package *is*: it now initializes both landed representations
-#:   rather than only `ScalarField`, one flat package with the return representation
-#:   explicit in each signature, and no subpackage per representation. **A new row in
-#:   `ALLOWED`, and therefore a deliberate architecture change**, decided by the
+#:   `spherical_wave.py` and the private `_grid.py` they share. **CHE-219 (R05.8)
+#:   then removed `collimated_bundle.py`**, which is a narrowing rather than a
+#:   reversal: the *rule* is unchanged, and what changed is that a system-launch
+#:   `RayBundle` is now understood to be unproducible here. A launch position
+#:   depends on the stop, the entrance pupil, the surfaces before the stop, the
+#:   object distance, the field, the backend's pupil map and the ray aimer, so it
+#:   belongs to `solvers/optiland/launch.py`. Note that this gate could never have
+#:   caught the problem: the removed module imported only `numerics` and
+#:   `representations`, both allowed, and the defect was in *what it returned*.
+#:   `tests/sources/test_sources_package.py` is where the semantic rule is checked.
+#:   That earlier ticket needed **no allowlist change** -- the row below already
+#:   covered it -- but it did change what this package *is*, and R05.8 changed it
+#:   back to one representation. **A new row in `ALLOWED`, and therefore a
+#:   deliberate architecture change**, decided by the
 #:   owner on that ticket rather than assumed here. A source maps a problem
 #:   statement into a representation -- the definition of a `solver`, which is what
 #:   its operations register as -- but it has no external backend, and

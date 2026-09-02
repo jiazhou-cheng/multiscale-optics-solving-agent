@@ -159,10 +159,9 @@ def spherical_wave(
             plane's axial coordinate and its `medium_index` is the `n` in
             `n k0 R`; neither is defaulted.
         source_position_m: `(x_s, y_s, z_s)` in metres -- **`(x, y, z)` order**,
-            matching `RayBundle.positions_m` columns and `collimated_bundle`'s
-            `direction`, *not* the `(y, x)` order of this module's grid-shaped
-            arguments. Must be off the sampled plane; see the docstring on which
-            side each sign belongs on.
+            matching `RayBundle.positions_m` columns, *not* the `(y, x)` order of
+            this module's grid-shaped arguments. Must be off the sampled plane;
+            see the docstring on which side each sign belongs on.
         amplitude: the field amplitude at `R = 1 m` from the source, **not** a
             peak. Dimensional; see the module docstring.
         converging: `False` (default) gives `exp(+i n k0 R)`, diverging;

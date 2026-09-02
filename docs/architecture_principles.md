@@ -94,8 +94,33 @@ A representation defines the *structure and conventions* of physical state at a
 declared boundary. A source defines how that state is *initialized*. A plane-wave
 source initializes the complex amplitude and phase of a `ScalarField` from its
 wavelength, propagation direction, amplitude, sampling grid, and reference
-surface; a collimated ray source initializes a `RayBundle` from its spatial
-sampling and common propagation direction.
+surface.
+
+**A source may be described without an optical system. A ray launch may not.**
+This sentence used to carry "a collimated ray source initializes a `RayBundle`
+from its spatial sampling and common propagation direction" as its second
+example, and **CHE-219 (R05.8) removed it deliberately.** A source can state
+what is true of the light alone — infinite versus finite conjugate, field angle
+or object position, wavelength, source type, source-side physical parameters.
+Where the rays of that source actually *start* is not among them: the launch
+positions and directions depend on the stop, the entrance pupil's location and
+diameter, every surface preceding the stop, the object distance, the field, the
+backend's pupil mapping, and the ray aimer and its convergence behaviour. For an
+off-axis or finite-conjugate field the backend delegates the launch to its
+aimer, so the launch state is a property of **source + system + backend**.
+
+A `RayBundle` built from caller-supplied points and a shared direction, with no
+system in scope, cannot say whether those points are the entrance pupil, the
+stop, the first traced surface, a valid finite-conjugate aim, or anything in the
+constructed system at all. That is why ray launch is a **solver** operation —
+backend ownership beats taxonomy — and why it takes the constructed system as a
+required argument. It is `solvers/optiland/launch.py` today.
+
+Note precisely what this does and does not narrow. `sources/` may still
+initialize any representation whose state is genuinely determined by source
+parameters, and the rule below is unchanged. What it may not do is manufacture
+rays first and let the system decide afterwards what they meant; there is
+deliberately no middle state.
 
 **Boundary against *representation*:** the representation owns the declaration —
 units, axes, frame, handedness, phasor sign, sampling, reference surface — and
@@ -132,6 +157,13 @@ the individual operation is never ambiguous about what it produces.
 public signature and in its descriptor. A constructor that could return either of
 two representations depending on its arguments is a design error, not a
 convenience.
+
+*[LANDING GATE]* No operation in `sources/` produces a system-launch `RayBundle`,
+and the package resolves no pupil, stop, entrance-pupil, aiming or launch-surface
+quantity. This is a semantic rule and not a dependency-direction one: the
+dependency graph already forbids `sources/ -> solvers/`, and the hazard is a
+function that returns a launch `RayBundle` while importing nothing at all.
+`tests/sources/test_sources_package.py` checks it.
 
 *[LANDING GATE]* `OperationDescriptor.input` has no vocabulary for "no input
 representation", so a landed source currently names the representation it produces

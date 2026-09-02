@@ -1,15 +1,24 @@
-"""The first `RayBundle` source as a contract: every convention, and four refusals.
+"""The collimated ensemble as a contract: every convention, and four refusals.
 
 CHE-215 (R06.10), item 1. `tests/physics/test_collimated_source.py` holds the
 physics -- the analytic wavelet-sum oracle and the labelled cross-path consistency
 check -- because that needs a coupler and these need nothing.
 
-What this file guards is that **nothing is defaulted and nothing is guessed**. A
-source is the only operation in the tree that creates a representation out of
-nothing, so every convention it does not take as an argument is one it invented,
-and the two that would do real damage silently are the optical path (which is what
-makes the ensemble one mode rather than N unrelated wavelets) and the measure
-(which R05/R07 established scales every downstream reconstruction).
+**CHE-219 (R05.8) moved what this file tests.** It was `sources.collimated_bundle`
+and it is now `fixtures.ray_bundles.collimated_bundle`: a launch `RayBundle` built
+from caller-supplied points and a shared direction has no optical system in scope,
+so it cannot say whether those points are the entrance pupil, the stop, the first
+traced surface, a valid finite-conjugate aim, or anything in the constructed
+system -- and a system launch is `solvers.optiland.launch`'s. Nothing about the
+arithmetic or these assertions changed with the move; two tests that asserted
+properties of a *production* module went with it, and are noted below.
+
+What this file guards is that **nothing is defaulted and nothing is guessed**.
+This builder creates a representation out of nothing, so every convention it does
+not take as an argument is one it invented, and the two that would do real damage
+silently are the optical path (which is what makes the ensemble one mode rather
+than N unrelated wavelets) and the measure (which R05/R07 established scales every
+downstream reconstruction).
 """
 
 from __future__ import annotations
@@ -21,9 +30,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from fixtures.ray_bundles import collimated_bundle, direction_from_angle
 
 from representations import PHASOR, ContractError, Frame, RayBundle, ReferenceSurface
-from sources import collimated_bundle, direction_from_angle
 
 WAVELENGTH_M = 0.532e-6
 
@@ -32,7 +41,7 @@ WAVELENGTH_M = 0.532e-6
 SHAPE = (5, 8)
 PITCH_M = (0.30e-6, 0.25e-6)
 
-MODULE = Path(__file__).resolve().parents[2] / "src" / "sources" / "collimated_bundle.py"
+MODULE = Path(__file__).resolve().parents[1] / "fixtures" / "ray_bundles.py"
 
 
 def a_surface(*, z_m: float = 0.0, medium_index: float = 1.0) -> ReferenceSurface:
@@ -128,10 +137,10 @@ def test_every_ray_shares_one_normalized_direction() -> None:
 
 def test_normal_incidence_is_the_same_primitive() -> None:
     """`(0, 0, 1)` is the default, and there is no second function for it."""
-    import sources
+    from fixtures import ray_bundles
 
     for name in ("normal_bundle", "collimated_bundle_at_angle", "tilted_bundle"):
-        assert not hasattr(sources, name)
+        assert not hasattr(ray_bundles, name)
 
     default = a_bundle()
     explicit = a_bundle(direction=(0.0, 0.0, 1.0))
@@ -144,10 +153,14 @@ def test_normal_incidence_is_the_same_primitive() -> None:
 def test_a_tilt_is_built_from_the_angle_converter() -> None:
     """Tilted illumination, with the direction coming from `direction_from_angle`.
 
-    And the two converters in this package are asserted to describe the *same*
-    mode: `k_t = n k0 (d_y, d_x)`. They are separate functions because one returns
-    a direction cosine in `(x, y, z)` and the other a wavevector in `(y, x)`, and a
-    caller who mixed the orders would get a plausible tilt on the wrong axis.
+    And the two converters are asserted to describe the *same* mode:
+    `k_t = n k0 (d_y, d_x)`. They are separate functions because one returns a
+    direction cosine in `(x, y, z)` and the other a wavevector in `(y, x)`, and a
+    caller who mixed the orders would get a plausible tilt on the wrong axis. They
+    no longer sit in the same package -- CHE-219 kept
+    `sources.transverse_wavevector_from_angle`, because `k_t` on a `ScalarField`
+    grid is not a ray aim, and moved `direction_from_angle` out with the launch --
+    so this cross-check matters more rather than less.
     """
     from sources import transverse_wavevector_from_angle
 
@@ -383,10 +396,15 @@ def test_no_backend_is_on_the_path() -> None:
     """No Optiland and no Chromatix, asserted two ways.
 
     Statically, because an import inside a branch nobody exercised would not show
-    up dynamically; and dynamically, because a source that reached for a solver at
-    call time is exactly the failure the allowlist row exists to prevent. A
-    collimated launch is arithmetic on the caller's own points -- aiming one at an
-    entrance pupil needs the stop, the pupil and the system NA, which is CHE-207.
+    up dynamically; and dynamically, because reaching for a solver at call time is
+    what would make this ensemble a launch. It is arithmetic on the caller's own
+    points and nothing else -- aiming one at an entrance pupil needs the stop, the
+    pupil, the system NA and the aimer, which is `solvers.optiland.launch`.
+
+    This survived the CHE-219 move because it is the assertion that keeps the
+    builder honest about what it is *not*. What did not survive was a class-budget
+    check: `BUDGETS["sources"]` no longer covers this file, and
+    `tests/unit/test_class_budget.py` scans `src/` rather than `tests/`.
     """
     tree = ast.parse(MODULE.read_text(encoding="utf-8"))
     imported: set[str] = set()
@@ -407,13 +425,16 @@ def test_no_backend_is_on_the_path() -> None:
 
 
 def test_the_module_defines_no_class() -> None:
-    """`BUDGETS["sources"] == 0`, and this ticket does not change it.
+    """Two functions and no object, which is what kept the move a file move.
 
-    A `CollimatedLaunch` frozen dataclass is the candidate with a real argument --
+    A `CollimatedLaunch` frozen dataclass was the candidate with a real argument --
     the direction and the medium index are coupled, and the optical path depends on
     both. It did not land because the coupling is not an *invariant* the object
     could check: `n (d_hat . r)` is a computation over the caller's points, so the
     object would carry three fields and validate strictly less than this function.
+    Kept after CHE-219 as a property of the helper rather than as a budget check,
+    because a test fixture that grew a class hierarchy would be the same mistake
+    one directory over.
     """
     source = MODULE.read_text(encoding="utf-8")
     assert [n.name for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef)] == []
