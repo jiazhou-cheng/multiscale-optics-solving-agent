@@ -5,14 +5,20 @@ project can execute. `registry.py` derives its by-id index from this tuple at
 import; nothing else declares an operation, and no test owns a production
 descriptor any more.
 
-**Production-complete, not yet planner-ready.** Every landed public operation has
-a record here, and the mechanical gate in `tests/operations/test_catalog.py` keeps
-that true. What is *not* settled is the descriptor semantics a planner would need:
-`input` and `output` are single strings, so a source's `input` names the
-representation it produces rather than a problem type it consumes, and a graph
-built from these ports today would read a source as consuming what it emits. That
-is CHE-222 (R03.5)'s whole subject and it is a hard blocker before any planner
-work reads this file. Do not mistake completeness for sufficiency.
+**Production-complete and planner-ready, as of CHE-222 (R03.5).** Every landed
+public operation has a record, and the mechanical gate in
+`tests/operations/test_catalog.py` keeps that true. R03.4 landed this file with a
+warning at the top that it was *not* planner-ready, because `input`/`output` were
+single strings and a source's `input` named the representation it *produces* -- so
+a graph built from these ports would have read a source as consuming what it emits.
+R03.5 removed that: `inputs` is a tuple of ports with `()` for a graph entry,
+`returns` is ordered with the primary result first, and `requires`/`optional` name
+the arguments a caller must and may supply. The eight questions those fields answer
+are listed in `operations/descriptors.py`, and each has a test.
+
+What is still open is `capabilities`, which stays an eagerly validated citation
+into `numerics.COMPONENT_CAPABILITIES` -- CHE-223 (R03.6) moves that evidence to a
+knowledge pack. It is not a blocker for reading this file.
 
 Why the catalog lives here and needs no dependency change
 ---------------------------------------------------------
@@ -41,6 +47,20 @@ last of two entries sharing an id; the tuple form makes a duplicate id a
 refusal `register()` gave and for the same reason -- two descriptors under one id means
 two answers to "what does this operation do", and last-write-wins makes which one
 you get depend on nothing a reader can see.
+
+The four argument tuples are checked against the code, not just written
+------------------------------------------------------------------------
+`inputs`, `requires`, `optional` and the arity of `returns` are all derivable from
+`inspect.signature`, and `tests/operations/test_catalog_signatures.py` derives them
+for all fourteen records and compares. So this file is a *checked* restatement of
+the signatures rather than a hand-maintained one: renaming a parameter, giving one
+a default, removing one or adding a required argument fails that gate.
+
+That matters because a second source of truth beside a signature is precisely what
+drifts, and two records here were already wrong before the check existed --
+`S_SOURCE_PLANE_WAVE` and `S_RAY_OPTILAND` each declared a representation input
+their callables do not accept. `approximation`, `validity` and `evidence` remain
+unguarded prose; nothing can derive those.
 
 Two records may name one callable
 ---------------------------------
@@ -99,9 +119,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_RAY_OPTILAND",
         kind=OperationKind.SOLVER,
-        input="ray_bundle",
-        output="ray_bundle",
+        inputs=(),
+        returns=("ray_bundle",),
         implementation="solvers.optiland.solver:trace",
+        requires=("setup", "source", "sampling", "execution"),
+        optional=("aiming",),
         approximation=(
             "sequential geometric ray tracing: rays are plane wavelets, diffraction "
             "is not modelled, and a surface interaction is refraction at a real "
@@ -114,9 +136,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_RAY_OPTILAND_BUNDLE",
         kind=OperationKind.SOLVER,
-        input="ray_bundle",
-        output="ray_bundle",
+        inputs=("ray_bundle",),
+        returns=("ray_bundle",),
         implementation="solvers.optiland.solver:trace_rays",
+        requires=("setup", "execution"),
         approximation=(
             "the same sequential geometric ray trace as S_RAY_OPTILAND, over an "
             "externally supplied ensemble rather than a generated pupil fan: the "
@@ -146,9 +169,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_WAVE_CHROMATIX",
         kind=OperationKind.SOLVER,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
         implementation="solvers.chromatix.solver:propagate",
+        requires=("distance_m", "model"),
         approximation=(
             "scalar diffraction: one complex amplitude per sample, no polarization "
             "and no vectorial coupling, evaluated in complex64 because the backend "
@@ -161,9 +185,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="O_ASM_PROPAGATE",
         kind=OperationKind.PHYSICAL_OPERATOR,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
         implementation="solvers.chromatix.solver:propagate",
+        requires=("distance_m", "model"),
         approximation=(
             "the exact (non-paraxial) angular spectrum in a homogeneous isotropic "
             "medium: no Fresnel approximation and no term dropped, but the sampled "
@@ -181,9 +206,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="O_FOCAL_PLANE_TRANSFORM",
         kind=OperationKind.PHYSICAL_OPERATOR,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
         implementation="solvers.chromatix.focal_plane:focal_plane_transform",
+        requires=("focal_length_m", "model"),
         approximation=(
             "the ideal thin lens between its two focal planes: one optical Fourier "
             "transform, so spatial frequency maps linearly onto position and a plane "
@@ -203,11 +229,17 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     ),
     # --- sources ------------------------------------------------------------
     #
-    # `input` on all three names the representation the source *produces*, not a
-    # problem type it consumes -- a source consumes no representation at all. That
-    # follows the precedent the ray solver's descriptor set, and it is stated here
-    # rather than hidden; how a problem type enters the graph is CHE-222 (R03.5)'s
-    # question, and it is the reason this catalog is not planner-ready.
+    # `inputs=()` on all three: a source consumes no upstream representation, which
+    # is the whole of `docs/architecture_principles.md` §2's definition of one.
+    # Until CHE-222 (R03.5) the schema could not say that, and all three of these
+    # (well, the one that existed) declared `input="scalar_field"` -- the
+    # representation they *produce*, named on both sides. `ENTRY_KINDS` is what
+    # makes `()` a checked declaration: only a `solver` may be a graph entry.
+    #
+    # What a source consumes instead is in `requires`: a grid `shape`, a pitch, a
+    # wavelength and a reference surface, plus the one geometric parameter that
+    # distinguishes it. Those are not representations and never were, which is why
+    # naming one on `inputs` was a false claim rather than an approximation.
     #
     # `capabilities=None` on all three is the honest citation: none of them imports
     # a backend, so none has a measured device/dtype row, and citing the chromatix
@@ -215,9 +247,17 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_SOURCE_GAUSSIAN_BEAM",
         kind=OperationKind.SOLVER,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=(),
+        returns=("scalar_field",),
         implementation="sources.gaussian_beam:gaussian_beam",
+        requires=(
+            "shape",
+            "sample_pitch_m",
+            "wavelength_m",
+            "reference_surface",
+            "waist_radius_m",
+        ),
+        optional=("center_m", "transverse_wavevector_rad_per_m", "amplitude"),
         approximation=(
             "an ideal monochromatic, fully coherent, scalar Gaussian beam **at its "
             "waist plane**: A exp(-rho^2 / w0^2) times exactly the carrier ramp "
@@ -253,9 +293,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_SOURCE_PLANE_WAVE",
         kind=OperationKind.SOLVER,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=(),
+        returns=("scalar_field",),
         implementation="sources.plane_wave:plane_wave",
+        requires=("shape", "sample_pitch_m", "wavelength_m", "reference_surface"),
+        optional=("transverse_wavevector_rad_per_m", "amplitude"),
         approximation=(
             "an ideal monochromatic, fully coherent, scalar plane wave sampled at a "
             "declared surface: A exp(i(k_y y + k_x x)) with k_t in rad/m. No spectral "
@@ -281,9 +323,17 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="S_SOURCE_SPHERICAL_WAVE",
         kind=OperationKind.SOLVER,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=(),
+        returns=("scalar_field",),
         implementation="sources.spherical_wave:spherical_wave",
+        requires=(
+            "shape",
+            "sample_pitch_m",
+            "wavelength_m",
+            "reference_surface",
+            "source_position_m",
+        ),
+        optional=("amplitude", "converging"),
         approximation=(
             "the analytic spherical field of a point emitter, sampled on a plane: "
             "A (R_ref / R) exp(+/- i n k0 R) with R_ref = 1 m, exact at its declared "
@@ -321,9 +371,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="O_COMPLEX_TRANSMISSION",
         kind=OperationKind.PHYSICAL_OPERATOR,
-        input="scalar_field",
-        output="scalar_field",
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
         implementation="operators.transmission:complex_transmission",
+        optional=("amplitude", "phase_rad", "target_surface", "allow_gain"),
         approximation=(
             "an infinitely thin element acting at the field's own reference surface: "
             "U_out = U_in * A * exp(i phi), elementwise. z_m does not advance, no "
@@ -349,9 +400,28 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="O_DIFFRACTIVE_SURFACE",
         kind=OperationKind.PHYSICAL_OPERATOR,
-        input="ray_bundle",
-        output="ray_bundle",
+        inputs=("ray_bundle",),
+        returns=("ray_bundle", "diagnostics"),
         implementation="operators.diffractive_surface:diffractive_surface",
+        requires=("surface",),
+        optional=(
+            "model",
+            "reconstruction",
+            "kspace_oversample",
+            "kspace_grid_shape",
+            "allow_gain",
+            "order",
+            "patch_px",
+            "pad_factor",
+            "window",
+            "error_threshold_rad",
+            "count",
+            "density",
+            "draw",
+            "rng",
+            "seed",
+            "launch_positions_xy_m",
+        ),
         approximation=(
             "the full-field model: every incident ray is accumulated coherently onto "
             "the surface's own grid, the complex transmission is applied once as a "
@@ -383,9 +453,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="O_PROPAGATE_RAYS",
         kind=OperationKind.PHYSICAL_OPERATOR,
-        input="ray_bundle",
-        output="ray_bundle",
+        inputs=("ray_bundle",),
+        returns=("ray_bundle",),
         implementation="operators.ray_propagation:propagate_rays",
+        requires=("to",),
+        optional=("phase_budget_rad",),
         approximation=(
             "exact rather than approximate: each ray advances along its own direction "
             "by the arc length s = dz / d_z and its optical path grows by n s, which "
@@ -418,9 +490,19 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="C_RAY_TO_SCALAR",
         kind=OperationKind.COUPLER,
-        input="ray_bundle",
-        output="scalar_field",
+        inputs=("ray_bundle",),
+        returns=("scalar_field", "reconstruction_diagnostics"),
         implementation="couplers.ray_to_scalar:ray_to_scalar",
+        requires=("grid_shape", "sample_pitch_m"),
+        optional=(
+            "surface",
+            "projection",
+            "reconstruction",
+            "kspace_oversample",
+            "kspace_grid_shape",
+            "grazing",
+            "phase_budget_rad",
+        ),
         approximation=(
             "each ray is a plane wavelet contributing a linear phase ramp across the "
             "whole surface, summed as a quadrature over the declared sampling "
@@ -445,9 +527,18 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="C_SCALAR_TO_RAY",
         kind=OperationKind.COUPLER,
-        input="scalar_field",
-        output="ray_bundle",
+        inputs=("scalar_field",),
+        returns=("ray_bundle", "sampling_diagnostics"),
         implementation="couplers.scalar_to_ray:scalar_to_ray",
+        optional=(
+            "surface",
+            "count",
+            "density",
+            "draw",
+            "rng",
+            "seed",
+            "launch_positions_xy_m",
+        ),
         approximation=(
             "the field is decomposed into plane-wave modes on its own grid and each "
             "selected mode becomes a ray. Evanescent modes are discarded -- they have "
@@ -476,9 +567,10 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     OperationDescriptor(
         operation_id="M_PSF",
         kind=OperationKind.MEASUREMENT,
-        input="scalar_field",
-        output="psf",
+        inputs=("scalar_field",),
+        returns=("psf",),
         implementation="measurements.psf:psf",
+        requires=("normalization",),
         approximation=(
             "none in the reduction itself: intensity is |u|^2 exactly, and the "
             "declared normalization is an exact scaling of it. What the caller must "

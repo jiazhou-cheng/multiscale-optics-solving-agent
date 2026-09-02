@@ -484,3 +484,168 @@ def test_the_walk_would_catch_a_violation() -> None:
     # And a docstring mention is deliberately not one.
     documented = ast.parse('"""Mentions OperationDescriptor( in prose."""\n')
     assert not [n for n in ast.walk(documented) if isinstance(n, ast.Call)]
+
+
+# ---------------------------------------------------------------------------
+# 6. The eight planner questions, answered from metadata alone. CHE-222 (R03.5).
+# ---------------------------------------------------------------------------
+#
+# Each of these is one of the eight questions `operations/descriptors.py` names as
+# the specification for the schema's field list. They are asserted against the
+# **shipped catalog**, from metadata only -- no signature inspection, no import of
+# an implementation -- because that is the situation a planner is in.
+#
+# `tests/operations/test_catalog_signatures.py` is the other half: it derives the
+# same four tuples from `inspect.signature` and compares, so what is asserted here
+# as metadata is separately known to match the code.
+
+#: The four graph entries: the three analytic sources, and the problem-driven ray
+#: solve. Written out because "four" would pass with the wrong four.
+GRAPH_ENTRIES = {
+    "S_RAY_OPTILAND",
+    "S_SOURCE_GAUSSIAN_BEAM",
+    "S_SOURCE_PLANE_WAVE",
+    "S_SOURCE_SPHERICAL_WAVE",
+}
+
+#: The three operations that return a 2-tuple.
+AUXILIARY_RETURNERS = {"C_RAY_TO_SCALAR", "C_SCALAR_TO_RAY", "O_DIFFRACTIVE_SURFACE"}
+
+
+def test_question_1_is_an_upstream_representation_edge_required() -> None:
+    """Empty for the three sources and for `trace`; non-empty for the other ten.
+
+    This is the question the old schema answered *wrongly*:
+    `S_SOURCE_PLANE_WAVE` declared `input="scalar_field"` for a function that
+    consumes no field, and `S_RAY_OPTILAND` declared `input="ray_bundle"` for one
+    that consumes no bundle -- contradicting the code, `sources/__init__.py` and
+    `docs/architecture_principles.md` §2, all three of which say a source is the
+    one operation with no input.
+    """
+    entries = {record.operation_id for record in CATALOG if record.is_graph_entry}
+    assert entries == GRAPH_ENTRIES
+    assert len(CATALOG) - len(entries) == 10
+    # Every entry is `solver`-kind, which is what `ENTRY_KINDS` enforces.
+    for record in CATALOG:
+        if record.is_graph_entry:
+            assert record.kind is OperationKind.SOLVER, record.operation_id
+    assert operations.find(entry=True) == tuple(
+        sorted((r for r in CATALOG if r.is_graph_entry), key=lambda r: r.operation_id)
+    )
+
+
+def test_question_2_the_two_one_port_operations_are_distinguishable() -> None:
+    """`trace_rays` and `propagate_rays` both take one bundle. They differ in what else.
+
+    This is the case CHE-216 could only hypothesize and CHE-217 (R05.6) made real:
+    one representation port plus one required non-representation input. A schema
+    with a single `input` string made these two records identical on every field a
+    planner would use to tell them apart.
+    """
+    index = {record.operation_id: record for record in CATALOG}
+    supplied = index["S_RAY_OPTILAND_BUNDLE"]
+    advanced = index["O_PROPAGATE_RAYS"]
+
+    assert supplied.inputs == advanced.inputs == ("ray_bundle",)
+    assert supplied.primary_output == advanced.primary_output == "ray_bundle"
+    # Identical on both port fields, and distinguished by `requires` -- which is
+    # the whole point of the field. Asserted as the two exact tuples; an inequality
+    # between two literals a line above each other cannot fail.
+    assert supplied.requires == ("setup", "execution")
+    assert advanced.requires == ("to",)
+    # The premise, so the comparison above is known to be the discriminating one.
+    assert (supplied.inputs, supplied.returns) == (advanced.inputs, advanced.returns)
+
+
+def test_question_3_every_required_value_is_named() -> None:
+    """Twelve of the fourteen need a value the old schema never mentioned.
+
+    The ticket says nine, from a table written before three of these records
+    existed; the measured figure is twelve, and the two exceptions are named at the
+    bottom of this test. Asserted as the exact set rather than a count, because "n
+    records have a requirement" would pass with the wrong n. `psf` is the sharpest small case:
+    `normalization` is keyword-only with no default and which one was used is the
+    subject of three of R11's acceptance criteria, so a runtime must not pick.
+    """
+    requiring = {r.operation_id for r in CATALOG if r.requires}
+    assert requiring == {
+        "M_PSF",
+        "O_ASM_PROPAGATE",
+        "O_DIFFRACTIVE_SURFACE",
+        "O_FOCAL_PLANE_TRANSFORM",
+        "O_PROPAGATE_RAYS",
+        "S_RAY_OPTILAND",
+        "S_RAY_OPTILAND_BUNDLE",
+        "S_SOURCE_GAUSSIAN_BEAM",
+        "S_SOURCE_PLANE_WAVE",
+        "S_SOURCE_SPHERICAL_WAVE",
+        "S_WAVE_CHROMATIX",
+        "C_RAY_TO_SCALAR",
+    }
+    index = {record.operation_id: record for record in CATALOG}
+    assert index["M_PSF"].requires == ("normalization",)
+    assert index["O_ASM_PROPAGATE"].requires == ("distance_m", "model")
+    # The units in the names are part of the contract, not decoration.
+    assert index["O_FOCAL_PLANE_TRANSFORM"].requires == ("focal_length_m", "model")
+    # And the two records with no requirement at all say so: a field plus nothing
+    # else is a complete call for both.
+    assert index["O_COMPLEX_TRANSMISSION"].requires == ()
+    assert index["C_SCALAR_TO_RAY"].requires == ()
+
+
+def test_question_4_the_optional_set_is_names_and_not_values() -> None:
+    """`diffractive_surface` reports 16; `trace_rays` reports none.
+
+    Names only, checked by absence: no `optional` member carries an `=`, a repr or
+    anything else that would be a mirrored default. Seventeen mirrored defaults
+    would drift against the signature, which is the failure this restraint avoids.
+    """
+    index = {record.operation_id: record for record in CATALOG}
+    assert len(index["O_DIFFRACTIVE_SURFACE"].optional) == 16
+    assert index["S_RAY_OPTILAND_BUNDLE"].optional == ()
+    assert index["S_RAY_OPTILAND"].optional == ("aiming",)
+    for record in CATALOG:
+        for name in record.optional:
+            assert name.isidentifier(), (record.operation_id, name)
+
+
+def test_question_5_the_primary_result_is_one_field_access() -> None:
+    """No `operation_id` switch anywhere, for any of the fourteen."""
+    for record in CATALOG:
+        assert record.primary_output == record.returns[0]
+        assert record.primary_output in ("ray_bundle", "scalar_field", "psf")
+
+
+def test_question_6_auxiliary_returns_are_exactly_the_three_that_have_them() -> None:
+    """True for the two couplers and the diffractive surface; false for the other 11.
+
+    `output="ray_bundle"` used to read identically for `propagate_rays`, which
+    returns a bundle, and `diffractive_surface`, which returns a 2-tuple. A runtime
+    reading only the descriptor would have unpacked the wrong one.
+    """
+    auxiliary = {record.operation_id for record in CATALOG if record.returns_auxiliary}
+    assert auxiliary == AUXILIARY_RETURNERS
+    index = {record.operation_id: record for record in CATALOG}
+    assert index["C_RAY_TO_SCALAR"].returns == ("scalar_field", "reconstruction_diagnostics")
+    assert index["C_SCALAR_TO_RAY"].returns == ("ray_bundle", "sampling_diagnostics")
+    assert index["O_DIFFRACTIVE_SURFACE"].returns == ("ray_bundle", "diagnostics")
+    assert index["O_PROPAGATE_RAYS"].returns == ("ray_bundle",)
+    # No auxiliary name is a semantic type, so none can be mistaken for an edge.
+    for record in CATALOG:
+        for name in record.returns[1:]:
+            assert name not in ("ray_bundle", "scalar_field", "psf"), record.operation_id
+
+
+def test_question_8_no_record_declares_a_port_by_a_name_alone() -> None:
+    """The metadata half of criterion 8; the code half is test_catalog_signatures.py.
+
+    What is checkable here without importing anything: every declared port is a
+    representation and never the observable, and a graph entry declares no port at
+    all rather than a port it does not have. The claim that these agree with the
+    real signatures is the other module's, and it derives rather than restates.
+    """
+    for record in CATALOG:
+        for port in record.inputs:
+            assert port in ("ray_bundle", "scalar_field"), record.operation_id
+        if record.is_graph_entry:
+            assert record.inputs == (), record.operation_id

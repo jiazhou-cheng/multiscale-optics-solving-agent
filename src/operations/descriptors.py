@@ -33,6 +33,57 @@ two-source arrangement R03 exists to remove -- the old tree had a passing test
 asserting its two sources agreed, which made the duplication feel safe rather
 than removable. A descriptor names a row; the row stays where the evidence is.
 
+What a planner has to be able to ask, and CHE-222 (R03.5)
+---------------------------------------------------------
+R03.1 described every operation as `one representation in -> one representation
+out`. Four shapes in the landed tree are not that, and for two of them the record
+was **false**: `S_SOURCE_PLANE_WAVE` declared `input="scalar_field"` for a function
+that consumes no field, and `S_RAY_OPTILAND` declared `input="ray_bundle"` for one
+that consumes no bundle. Both contradicted the code, `sources/__init__.py` and
+`docs/architecture_principles.md` §2, which all say a source is the one operation
+with no input.
+
+The fields below are the minimum that answers eight questions and nothing else.
+The specification *is* those eight questions -- a field that answers none of them
+does not belong here, which is the discipline this record's own docstring already
+demanded and had no list to check against:
+
+1. is an upstream representation edge required?  -> `inputs`, `is_graph_entry`
+2. what representation inputs are required?      -> `inputs`, in call order
+3. what other required values must be supplied?  -> `requires`
+4. which parameters are optional?                -> `optional`
+5. what is the primary returned value?           -> `primary_output`
+6. is auxiliary data also returned?              -> `returns_auxiliary`
+7. do two records over one callable stay distinct? -> `operation_id`, below
+8. does any record claim an input its callable does not take? -> nothing here;
+   `tests/operations/test_catalog_signatures.py` derives all four tuples from the
+   resolved signature and compares, so the answer is checked against the code
+   rather than against a table.
+
+`input` and `output` are **gone**, not aliased. Shipping `input` beside `inputs`
+as a convenience would put two spellings of one fact in one dataclass, which is
+the two-source arrangement R03 exists to remove. The readers were
+`operations.catalog`, `registry.find`, `matches` and the implementation tests, and
+all four moved in the same change.
+
+This is deliberately **not a schema language.** It carries no types, no default
+*values* (`diffractive_surface` has one required parameter and sixteen optional
+ones; copying sixteen defaults would guarantee drift), and validates nothing about
+arguments. `requires` and
+`optional` are parameter *names*, and the units in those names --
+`distance_m`, `focal_length_m`, `sample_pitch_m`, `phase_budget_rad` -- are part
+of the public contract rather than decoration, which is why the names are carried
+verbatim from the signature.
+
+Semantic identity is not implementation identity
+------------------------------------------------
+Two descriptors may name one callable and remain two distinct planning choices.
+`S_WAVE_CHROMATIX` (`solver`) and `O_ASM_PROPAGATE` (`physical_operator`) both
+resolve to `solvers.chromatix.solver:propagate` with different `approximation` and
+`validity`: one answers "what backend does this project drive", the other "what
+happens to the physical state". **Nothing may deduplicate the catalog by
+implementation string.** The id is the planning identity.
+
 Nothing here imports a backend. `implementation` is a string, and
 `operations.resolve` is the only function in the package that turns one into
 code.
@@ -47,6 +98,7 @@ from numerics import COMPONENT_CAPABILITIES
 
 __all__ = [
     "DERIVATIVE_MODES",
+    "ENTRY_KINDS",
     "OBSERVABLE_TYPES",
     "SEMANTIC_TYPES",
     "OperationDescriptor",
@@ -115,6 +167,19 @@ SEMANTIC_TYPES: tuple[str, ...] = (
 #:   representation it should have consumed is still sitting upstream.
 OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
 
+#: The operation kinds that may be a **graph entry** -- `inputs=()`, no upstream
+#: representation edge.
+#:
+#: Only `solver`. Two cases are real and both are `solver`-kind per
+#: `docs/architecture_principles.md` §2: a **source**, which initializes a
+#: representation from source parameters alone, and a **problem-driven solve**
+#: (`S_RAY_OPTILAND`), which turns an `OpticalSetup` plus a `SourceSpec` into a
+#: bundle. A coupler with no input would change the representation of nothing; a
+#: physical operator with no input would change the state of nothing; a measurement
+#: with no input would observe nothing. `__post_init__` refuses all three, which is
+#: the check that makes `inputs=()` an honest declaration rather than a hole.
+ENTRY_KINDS: frozenset[str] = frozenset({"solver"})
+
 #: What may be claimed about differentiating through an operation.
 #:
 #: Two values, because the project's rule is binary: a gradient is either
@@ -140,14 +205,57 @@ class OperationDescriptor:
     Fields:
 
     `operation_id`
-        Stable identity. What `resolve` takes and what a plan records.
+        Stable identity. What `resolve` takes and what a plan records, and the
+        **planning** identity: two records may share an `implementation`.
     `kind`
         One of the four. Accepts the string form for convenience and normalizes.
-    `input` / `output`
-        Semantic types from `SEMANTIC_TYPES`. Singular, because R12's graph is
-        bipartite `state -> operation -> state`; an operation that genuinely
-        needs two inputs is a modelling question that ticket resolves with a
-        real case in front of it.
+    `inputs`
+        The **representation** ports the callable consumes, as semantic types from
+        `SEMANTIC_TYPES`, **in call order**. `()` means this operation consumes no
+        upstream representation and is a graph entry -- see `ENTRY_KINDS`, which is
+        what makes `()` a declaration rather than an omission.
+
+        A tuple rather than one string because two landed operations genuinely take
+        more than one thing: `trace_rays(setup, rays, *, execution)` has one
+        representation port and **two** required non-representation inputs, and the
+        schema has to be able to tell it from `propagate_rays(rays, *, to)`, which
+        also has one port but requires something else entirely. Written as `("ray_bundle",)` for the
+        common single-port case; nothing today has two ports, and the tuple is what
+        lets one land without a schema change.
+    `returns`
+        The returned values **in order**, element 0 being the primary semantic
+        result. `("scalar_field", "reconstruction_diagnostics")` for
+        `ray_to_scalar`; `("ray_bundle",)` for `propagate_rays`; `("psf",)` for
+        `psf`, whose callable returns a `PsfResult` record carrying the observable.
+
+        This is what `output` could not say. `output="ray_bundle"` was identical for
+        `propagate_rays`, which returns a bundle, and `diffractive_surface`, which
+        returns a 2-tuple -- so a runtime reading only the descriptor would either
+        unpack a `RayBundle` or fail to unpack a tuple, and the only way to know
+        which was a switch keyed on `operation_id`. That switch is a second
+        per-operation database, which is the thing this record exists to prevent.
+
+        `returns[0]` must be a `SEMANTIC_TYPES` member; `returns[1:]` must **not**
+        be, so an auxiliary value cannot be mistaken for a representation a planner
+        could route. A second *representation* output is therefore not expressible,
+        which is correct today -- nothing produces one -- and is a schema change for
+        the ticket that lands one rather than a state to leave ambiguous.
+    `requires`
+        Parameter **names** of the required non-representation inputs, in signature
+        order. Twelve of the fourteen landed records need one -- every record except
+        `O_COMPLEX_TRANSMISSION` and `C_SCALAR_TO_RAY`, for both of which a field
+        plus nothing else is a complete call -- and a planner that cannot see them
+        cannot call anything. `psf` is the sharpest small case --
+        `normalization` is keyword-only with no default, and which normalization
+        was used is the subject of three of R11's acceptance criteria, so a runtime
+        must not pick one for the caller.
+
+        Names, not types and not values. The unit in the name is part of the
+        contract, which is why they are carried verbatim.
+    `optional`
+        Parameter names that are part of the public contract and have defaults.
+        Names only -- mirroring `diffractive_surface`'s sixteen defaults would
+        guarantee drift against the signature.
     `implementation`
         `"module.path:attribute"`. A **string**, resolved only on request.
     `approximation`
@@ -171,11 +279,15 @@ class OperationDescriptor:
 
     operation_id: str
     kind: OperationKind
-    input: str
-    output: str
+    #: `()` for a graph entry. Required rather than defaulted, so "no upstream
+    #: representation" has to be written down.
+    inputs: tuple[str, ...]
+    returns: tuple[str, ...]
     implementation: str
     approximation: str
     evidence: tuple[str, ...]
+    requires: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()
     validity: tuple[str, ...] = ()
     capabilities: str | None = None
     cost: str | None = None
@@ -196,8 +308,8 @@ class OperationDescriptor:
         boundary; this is where that becomes a construction error rather than a
         convention.
         """
-        object.__setattr__(self, "evidence", tuple(self.evidence))
-        object.__setattr__(self, "validity", tuple(self.validity))
+        for name in ("inputs", "returns", "evidence", "requires", "optional", "validity"):
+            object.__setattr__(self, name, tuple(getattr(self, name)))
 
         problems: list[str] = []
 
@@ -211,27 +323,82 @@ class OperationDescriptor:
 
         if not self.operation_id or self.operation_id.strip() != self.operation_id:
             problems.append("`operation_id` must be a non-empty string with no surrounding space")
-        for name in ("input", "output"):
-            value = getattr(self, name)
-            if value not in SEMANTIC_TYPES:
+
+        for index, port in enumerate(self.inputs):
+            if port not in SEMANTIC_TYPES:
                 problems.append(
-                    f"`{name}` is {value!r}, which is not a declared semantic type "
+                    f"`inputs[{index}]` is {port!r}, which is not a declared semantic type "
                     f"{list(SEMANTIC_TYPES)}. Add it in the ticket that lands the boundary "
                     "it names; an operation cannot introduce one by using it."
                 )
-        if self.input in OBSERVABLE_TYPES:
+            elif port in OBSERVABLE_TYPES:
+                problems.append(
+                    f"`inputs[{index}]` is {port!r}, which is an observable and not a "
+                    "representation. Nothing consumes an observable: it is derived from "
+                    "physical state and the state it was derived from is still upstream."
+                )
+
+        # A graph entry, and the three kinds that cannot be one. `inputs=()` became
+        # expressible in CHE-222, which is what makes this refusal necessary: a
+        # coupler with no input would change the representation of nothing, an
+        # operator the state of nothing, a measurement would observe nothing.
+        if not self.inputs and str(self.kind) not in ENTRY_KINDS:
             problems.append(
-                f"`input` is {self.input!r}, which is an observable and not a "
-                "representation. Nothing consumes an observable: it is derived from "
-                "physical state and the state it was derived from is still upstream."
+                f"`inputs` is empty but `kind` is {getattr(self.kind, 'value', self.kind)!r}. "
+                f"Only {sorted(ENTRY_KINDS)} may be a graph entry: a source initializes a "
+                "representation from source parameters alone, and a problem-driven solve "
+                "turns a problem statement into one. A coupler changes the representation "
+                "of something, an operator changes the state of something, and a "
+                "measurement observes something."
             )
-        if self.output in OBSERVABLE_TYPES and self.kind is not OperationKind.MEASUREMENT:
+
+        if not self.returns:
             problems.append(
-                f"`output` is the observable {self.output!r} but `kind` is "
-                f"{getattr(self.kind, 'value', self.kind)!r}. Only a measurement produces "
-                "an observable. A coupler that produced one would be C_FIELD_TO_PSF, "
-                "which changes no representation and consults no convention it does not "
-                "already hold -- CHE-36 removed it, and R11 criterion 3 keeps it out."
+                "`returns` is empty. Every operation returns something, and element 0 is "
+                "the primary semantic result a planner routes onward."
+            )
+        else:
+            primary = self.returns[0]
+            if primary not in SEMANTIC_TYPES:
+                problems.append(
+                    f"`returns[0]` is {primary!r}, which is not a declared semantic type "
+                    f"{list(SEMANTIC_TYPES)}. The primary result is what the next operation "
+                    "consumes, so it has to be a declared boundary."
+                )
+            if primary in OBSERVABLE_TYPES and self.kind is not OperationKind.MEASUREMENT:
+                problems.append(
+                    f"`returns[0]` is the observable {primary!r} but `kind` is "
+                    f"{getattr(self.kind, 'value', self.kind)!r}. Only a measurement produces "
+                    "an observable. A coupler that produced one would be C_FIELD_TO_PSF, "
+                    "which changes no representation and consults no convention it does not "
+                    "already hold -- CHE-36 removed it, and R11 criterion 3 keeps it out."
+                )
+            for index, auxiliary in enumerate(self.returns[1:], start=1):
+                if not str(auxiliary).strip():
+                    problems.append(f"`returns[{index}]` is an empty name")
+                elif auxiliary in SEMANTIC_TYPES:
+                    problems.append(
+                        f"`returns[{index}]` is {auxiliary!r}, a declared semantic type. Only "
+                        "`returns[0]` may be one: an auxiliary value is diagnostics a caller "
+                        "reads, not a representation a planner can route, and a second "
+                        "routable output is a schema change for the ticket that lands one."
+                    )
+
+        for field_name in ("requires", "optional"):
+            for index, parameter in enumerate(getattr(self, field_name)):
+                if not str(parameter).strip():
+                    problems.append(f"`{field_name}[{index}]` is an empty parameter name")
+                elif parameter in SEMANTIC_TYPES:
+                    problems.append(
+                        f"`{field_name}[{index}]` is {parameter!r}, which is a semantic type "
+                        "rather than a parameter name. Representation ports go in `inputs`; "
+                        f"`{field_name}` names arguments the callable takes."
+                    )
+        overlap = set(self.requires) & set(self.optional)
+        if overlap:
+            problems.append(
+                f"{sorted(overlap)} appear in both `requires` and `optional`. A parameter "
+                "either has a default or it does not."
             )
         if ":" not in self.implementation or self.implementation.startswith(":"):
             problems.append(
@@ -271,12 +438,59 @@ class OperationDescriptor:
                 + "\n  ".join(problems)
             )
 
+    @property
+    def is_graph_entry(self) -> bool:
+        """Whether this operation consumes no upstream representation.
+
+        Question 1. `inputs == ()`, which `ENTRY_KINDS` restricts to `solver`-kind,
+        so this is also "is this a source or a problem-driven solve".
+        """
+        return not self.inputs
+
+    @property
+    def primary_output(self) -> str:
+        """The semantic type of the primary returned value. Question 5.
+
+        One field access for every record, with no `operation_id` switch -- which is
+        the whole reason `returns` is ordered rather than a set.
+        """
+        return self.returns[0]
+
+    @property
+    def returns_auxiliary(self) -> bool:
+        """Whether anything is returned beside the primary result. Question 6.
+
+        `True` for exactly `ray_to_scalar`, `scalar_to_ray` and
+        `diffractive_surface`, which return 2-tuples. A runtime reads this to know
+        whether to unpack.
+        """
+        return len(self.returns) > 1
+
     def matches(
-        self, *, input: str | None, output: str | None, kind: OperationKind | None
+        self,
+        *,
+        input: str | None,
+        output: str | None,
+        kind: OperationKind | None,
+        entry: bool | None = None,
     ) -> bool:
-        """Whether this descriptor satisfies a query. `None` means "do not filter"."""
+        """Whether this descriptor satisfies a query. `None` means "do not filter".
+
+        `input` matches if the named representation is on **any** of this
+        operation's ports, since a multi-port operation is a candidate for an edge
+        carrying either of them. `output` matches the **primary** result only:
+        auxiliary diagnostics are not something a planner routes onward.
+
+        `entry` is separate from `input` on purpose. `input=None` has always meant
+        "do not filter", and once `inputs` could be empty that collided with
+        "select the operations that need no input" -- a filter with two readings is
+        worse than the fake input CHE-222 removed. So graph entry is its own
+        tri-state: `None` does not filter, `True` selects entries, `False` selects
+        everything that needs an upstream edge.
+        """
         return (
-            (input is None or self.input == input)
-            and (output is None or self.output == output)
+            (input is None or input in self.inputs)
+            and (output is None or self.primary_output == output)
             and (kind is None or self.kind == kind)
+            and (entry is None or self.is_graph_entry is entry)
         )

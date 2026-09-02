@@ -522,8 +522,11 @@ def test_the_wavelet_sum_registers_as_a_coupler() -> None:
     descriptor = next(d for d in CATALOG if d.operation_id == "C_RAY_TO_SCALAR")
     assert descriptor.kind is OperationKind.COUPLER
     assert descriptor.kind is not OperationKind.PHYSICAL_OPERATOR
-    assert descriptor.input == "ray_bundle"
-    assert descriptor.output == "scalar_field"
+    assert descriptor.inputs == ("ray_bundle",)
+    assert descriptor.primary_output == "scalar_field"
+    assert descriptor.returns == ("scalar_field", "reconstruction_diagnostics")
+    assert descriptor.returns_auxiliary is True
+    assert descriptor.requires == ("grid_shape", "sample_pitch_m")
     assert descriptor.derivative == "forward_only"
     assert descriptor.capabilities is None
     assert resolve("C_RAY_TO_SCALAR") is ray_to_scalar

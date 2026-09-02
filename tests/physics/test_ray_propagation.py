@@ -785,7 +785,15 @@ def test_ray_propagation_registers_as_a_physical_operator() -> None:
     descriptor = next(d for d in CATALOG if d.operation_id == "O_PROPAGATE_RAYS")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
-    assert descriptor.input == descriptor.output == "ray_bundle"
+    assert descriptor.inputs == ("ray_bundle",)
+    assert descriptor.primary_output == "ray_bundle"
+    assert descriptor.returns == ("ray_bundle",), "one value, not a tuple to unpack"
+    assert descriptor.returns_auxiliary is False
+    # CHE-222 (R03.5), acceptance criterion 2: one representation port and one
+    # required non-representation input, which is what distinguishes this from
+    # `trace_rays` -- also one port, but requiring a `setup` rather than a `to`.
+    assert descriptor.requires == ("to",)
+    assert descriptor.optional == ("phase_budget_rad",)
     assert descriptor.capabilities is None
     assert not any("cannot yet be reconstructed" in c for c in descriptor.validity), (
         "the n != 1 reconstruction refusal was lifted by CHE-192"

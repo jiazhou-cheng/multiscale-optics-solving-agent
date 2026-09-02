@@ -40,8 +40,8 @@ def a_descriptor(**overrides: object) -> OperationDescriptor:
     fields: dict[str, object] = {
         "operation_id": "X_DUMMY",
         "kind": OperationKind.COUPLER,
-        "input": "ray_bundle",
-        "output": "scalar_field",
+        "inputs": ("ray_bundle",),
+        "returns": ("scalar_field",),
         "implementation": "tests.operations.nothing:run",
         "approximation": "none; this record exists to exercise the registry",
         "evidence": ("tests/operations/test_descriptors.py",),
@@ -241,10 +241,17 @@ def test_semantic_types_are_the_boundaries_that_landed() -> None:
     assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf")
 
 
-@pytest.mark.parametrize("field", ["input", "output"])
+@pytest.mark.parametrize("field", ["inputs", "returns"])
 def test_an_undeclared_semantic_type_is_refused(field: str) -> None:
+    """On a port and on the primary result. CHE-222 renamed both fields.
+
+    `returns` is checked on element 0 only, which is where the rule belongs: an
+    auxiliary value is diagnostics rather than a boundary, so it is held to the
+    opposite requirement -- it must NOT be a semantic type. That is
+    `test_an_auxiliary_return_may_not_be_a_semantic_type`.
+    """
     with pytest.raises(ValueError, match="declared semantic type"):
-        a_descriptor(**{field: "mueller_matrix"})
+        a_descriptor(**{field: ("mueller_matrix",)})
 
 
 def test_an_empty_approximation_is_refused() -> None:
@@ -258,8 +265,8 @@ def test_evidence_must_be_written_even_when_it_is_empty() -> None:
         OperationDescriptor(  # type: ignore[call-arg]
             operation_id="X_NO_EVIDENCE",
             kind=OperationKind.COUPLER,
-            input="ray_bundle",
-            output="scalar_field",
+            inputs=("ray_bundle",),
+            returns=("scalar_field",),
             implementation="tests.operations.nothing:run",
             approximation="none",
         )
@@ -279,7 +286,7 @@ def test_an_empty_operation_id_is_refused() -> None:
 def test_every_problem_is_reported_at_once() -> None:
     """Three faults, one exception -- not three edit-and-rerun cycles."""
     with pytest.raises(ValueError) as caught:
-        a_descriptor(operation_id="", input="mueller_matrix", approximation="")
+        a_descriptor(operation_id="", inputs=("mueller_matrix",), approximation="")
     message = str(caught.value)
     assert "operation_id" in message
     assert "semantic type" in message
@@ -327,8 +334,8 @@ def test_only_a_measurement_may_produce_an_observable(kind: OperationKind) -> No
         OperationDescriptor(
             operation_id="C_FIELD_TO_PSF",
             kind=kind,
-            input="scalar_field",
-            output="psf",
+            inputs=("scalar_field",),
+            returns=("psf",),
             implementation="couplers.field_to_psf:convert",
             approximation="none",
             evidence=(),
@@ -350,9 +357,148 @@ def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
         OperationDescriptor(
             operation_id="X_FROM_PSF",
             kind=kind,
-            input="psf",
-            output="scalar_field",
+            inputs=("psf",),
+            returns=("scalar_field",),
             implementation="nowhere:run",
             approximation="none",
             evidence=(),
         )
+
+
+# ---------------------------------------------------------------------------
+# Graph entry, ports and results. CHE-222 (R03.5).
+# ---------------------------------------------------------------------------
+
+
+def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
+    """Acceptance criterion 9. `inputs=()` became expressible, so it needs a rule.
+
+    Only `solver`-kind: a source initializes a representation from source
+    parameters alone, and a problem-driven solve turns a problem statement into
+    one. The other three kinds are refused because each would be a claim about
+    nothing -- a coupler changing the representation of nothing, an operator
+    changing the state of nothing, a measurement observing nothing.
+    """
+    entry = a_descriptor(kind=OperationKind.SOLVER, inputs=())
+    assert entry.is_graph_entry is True
+    assert not a_descriptor().is_graph_entry
+
+    for kind in (
+        OperationKind.COUPLER,
+        OperationKind.PHYSICAL_OPERATOR,
+        OperationKind.MEASUREMENT,
+    ):
+        with pytest.raises(ValueError, match="may be a graph entry"):
+            a_descriptor(kind=kind, inputs=())
+
+
+def test_inputs_is_required_so_no_upstream_edge_has_to_be_written() -> None:
+    """`inputs=()` is a declaration; a missing argument is an omission.
+
+    The same discipline `evidence` already had. A defaulted `inputs` would make
+    "this is a source" and "nobody filled the field in" the same record, which is
+    the state CHE-222 found two descriptors in from the other direction -- a fake
+    input nobody had noticed was a lie.
+    """
+    with pytest.raises(TypeError):
+        OperationDescriptor(  # type: ignore[call-arg]
+            operation_id="X_NO_PORTS",
+            kind=OperationKind.SOLVER,
+            returns=("ray_bundle",),
+            implementation="tests.operations.nothing:run",
+            approximation="none",
+            evidence=(),
+        )
+
+
+def test_an_empty_returns_is_refused() -> None:
+    """Every operation returns something, and element 0 is what a planner routes."""
+    with pytest.raises(ValueError, match="`returns` is empty"):
+        a_descriptor(returns=())
+
+
+def test_the_primary_result_is_returns_zero_with_no_operation_id_switch() -> None:
+    """Acceptance criterion 5, on the schema rather than on the catalog."""
+    descriptor = a_descriptor(returns=("scalar_field", "reconstruction_diagnostics"))
+    assert descriptor.primary_output == "scalar_field"
+    assert descriptor.returns_auxiliary is True
+    assert a_descriptor(returns=("ray_bundle",)).returns_auxiliary is False
+
+
+def test_an_auxiliary_return_may_not_be_a_semantic_type() -> None:
+    """Only `returns[0]` is routable, and the schema says so rather than implying it.
+
+    An auxiliary value is diagnostics a caller reads; a second *representation*
+    output would be a second edge a planner could follow, and nothing produces one
+    today. Refusing it makes adding one a schema change with a ticket rather than
+    a record that quietly means more than the readers assume.
+    """
+    with pytest.raises(ValueError, match="may be one"):
+        a_descriptor(returns=("scalar_field", "ray_bundle"))
+    with pytest.raises(ValueError, match="empty name"):
+        a_descriptor(returns=("scalar_field", "  "))
+    # And a non-semantic auxiliary name is accepted, which is the positive control.
+    assert a_descriptor(returns=("scalar_field", "sampling_diagnostics")).returns_auxiliary
+
+
+def test_an_observable_is_refused_on_every_port_not_just_the_first() -> None:
+    """Criterion 11: the `OBSERVABLE_TYPES` rules re-expressed against `inputs`.
+
+    They used to read a single `input`. With a tuple, the rule has to hold for
+    every port, or a two-port operation could consume a PSF in its second slot --
+    which is the kind of gap a rename introduces silently.
+    """
+    with pytest.raises(ValueError, match="observable and not a representation"):
+        a_descriptor(inputs=("scalar_field", "psf"))
+
+
+@pytest.mark.parametrize("field", ["requires", "optional"])
+def test_a_parameter_name_that_is_a_semantic_type_is_refused(field: str) -> None:
+    """`requires`/`optional` name arguments; ports go in `inputs`.
+
+    The confusion is cheap to make and invisible afterwards: a record whose
+    `requires` said `"ray_bundle"` would read to a planner as a required argument
+    literally named `ray_bundle`, and it would supply one.
+    """
+    with pytest.raises(ValueError, match="rather than a parameter name"):
+        a_descriptor(**{field: ("ray_bundle",)})
+    with pytest.raises(ValueError, match="empty parameter name"):
+        a_descriptor(**{field: ("",)})
+
+
+def test_a_parameter_cannot_be_both_required_and_optional() -> None:
+    """It either has a default or it does not."""
+    with pytest.raises(ValueError, match="both `requires` and `optional`"):
+        a_descriptor(requires=("model",), optional=("model",))
+
+
+def test_the_new_tuples_accept_lists_and_store_tuples() -> None:
+    """The same normalization `evidence` and `validity` already had.
+
+    A frozen record with a list on one of its fields is mutable through that field,
+    and a transcribed record is what a list arrives as.
+    """
+    descriptor = a_descriptor(
+        inputs=["ray_bundle"],
+        returns=["scalar_field", "reconstruction_diagnostics"],
+        requires=["grid_shape"],
+        optional=["surface"],
+    )
+    for field in ("inputs", "returns", "requires", "optional"):
+        assert isinstance(getattr(descriptor, field), tuple), field
+    assert hash(descriptor) is not None
+
+
+def test_two_records_may_share_an_implementation_and_stay_distinct() -> None:
+    """Acceptance criterion 7, at the schema level.
+
+    Nothing here refuses a duplicate `implementation`, and that is deliberate:
+    planning identity is the `operation_id`. `S_WAVE_CHROMATIX` and
+    `O_ASM_PROPAGATE` are the landed case, pinned against the real catalog by
+    `tests/operations/test_catalog.py`.
+    """
+    first = a_descriptor(operation_id="X_ONE", kind=OperationKind.SOLVER)
+    second = a_descriptor(operation_id="X_TWO", kind=OperationKind.PHYSICAL_OPERATOR)
+    assert first.implementation == second.implementation
+    assert first != second
+    assert len({first, second}) == 2, "two records, not one deduplicated by callable"

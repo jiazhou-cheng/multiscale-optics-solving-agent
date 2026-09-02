@@ -190,8 +190,16 @@ A source here is an analytic field at a declared surface, nothing more.
 All three sources are in the production operation catalog, as of CHE-221 (R03.4):
 `S_SOURCE_PLANE_WAVE`, `S_SOURCE_GAUSSIAN_BEAM` and `S_SOURCE_SPHERICAL_WAVE`. They
 went in together, which is what CHE-215 said the condition was -- per `AGENTS.md`
-each descriptor's `output` representation must be unambiguous, and all three
-declare `ScalarField`.
+each descriptor's returned representation must be unambiguous, and all three
+declare `ScalarField` as `returns=("scalar_field",)`.
+
+**And each declares `inputs=()`**, which is CHE-222 (R03.5): a source consumes no
+upstream representation, and until that ticket the descriptor had no way to say so.
+`S_SOURCE_PLANE_WAVE` carried `input="scalar_field"` -- the representation it
+*produces*, named on both sides -- which contradicted this package's own docstring,
+`docs/architecture_principles.md` §2 and the signature. The schema now refuses a
+non-`solver` kind with no input, so "produces without consuming" is a checked
+declaration rather than a convention.
 
 **This package still does not import `operations/`, and does not need to.** The
 catalog lives inside `operations/` and names each implementation as a

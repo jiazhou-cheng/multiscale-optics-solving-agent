@@ -165,14 +165,27 @@ dependency graph already forbids `sources/ -> solvers/`, and the hazard is a
 function that returns a launch `RayBundle` while importing nothing at all.
 `tests/sources/test_sources_package.py` checks it.
 
-*[LANDING GATE]* `OperationDescriptor.input` has no vocabulary for "no input
-representation", so a landed source currently names the representation it produces
-on both sides — CHE-210 registered `S_SOURCE_PLANE_WAVE` with
-`input='scalar_field'`, following the precedent R05.3 set for the ray solver,
-which also names the representation it works in rather than the problem it
-consumes. That is an imprecision in the descriptor, not in this definition. The
-ticket that gives a descriptor a way to say *produces without consuming* — R12's
-capability graph is the natural home — closes it.
+**A descriptor can say *produces without consuming*, and CHE-222 (R03.5) is what
+made it able to.** `OperationDescriptor.inputs` is a tuple of representation ports,
+and `()` means this operation consumes no upstream representation. The three
+sources and the problem-driven ray solve declare it, and `ENTRY_KINDS` restricts
+`()` to `solver`-kind — a coupler with no input would change the representation of
+nothing, an operator the state of nothing, a measurement would observe nothing.
+
+This paragraph used to be a `[LANDING GATE]` recording the opposite: that
+`OperationDescriptor.input` had no vocabulary for "no input representation", so a
+source named the representation it *produces* on both sides — CHE-210 registered
+`S_SOURCE_PLANE_WAVE` with `input='scalar_field'`, following the precedent R05.3
+set for the ray solver. Two things about that deferral were wrong and are recorded
+here rather than quietly dropped. It called the fake input "an imprecision in the
+descriptor, not in this definition", when a record contradicting both the code and
+this document is a false claim rather than an imprecision. And it named **R12's
+capability graph** as the natural home, which put the fix behind the first
+consumer: the closure belonged before a planner existed, so a planner would never
+have to be written against ports it could not trust. `input` and `output` are gone
+rather than aliased, and `find(entry=True)` selects the entry operations —
+`input=None` still means "do not filter", because a filter with two readings would
+have been worse than the fake input it replaced.
 
 ### coupler
 

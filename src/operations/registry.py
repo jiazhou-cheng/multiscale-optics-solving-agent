@@ -100,6 +100,7 @@ def find(
     input: str | None = None,
     output: str | None = None,
     kind: OperationKind | str | None = None,
+    entry: bool | None = None,
 ) -> tuple[OperationDescriptor, ...]:
     """Every registered operation matching the filters, ordered by id.
 
@@ -112,6 +113,15 @@ def find(
     that silently returns nothing is indistinguishable from a correct answer,
     and `find(input="rays")` -- with the representation named `ray_bundle` --
     is the shape of typo that would otherwise read as a missing capability.
+
+    `input` matches a representation on **any** port; `output` matches the
+    **primary** returned value only. CHE-222 (R03.5) added `entry`, which is
+    deliberately not spelled `input=None`: that has always meant "do not filter",
+    and once an operation could declare `inputs=()` the two readings collided. A
+    filter with two meanings is worse than the fake input the same ticket removed,
+    so `entry=True` selects the graph entries -- the three sources and the
+    problem-driven ray solve -- `entry=False` selects everything that needs an
+    upstream edge, and `entry=None` does not filter.
     """
     for name, value in (("input", input), ("output", output)):
         if value is not None and value not in SEMANTIC_TYPES:
@@ -125,10 +135,19 @@ def find(
             raise ValueError(
                 f"kind={kind!r} is not one of {[k.value for k in OperationKind]}"
             ) from exc
+    if entry is not None and not isinstance(entry, bool):
+        # The same rule as the two filters above, for the same reason: `matches`
+        # compares with `is`, so `entry=1` or `entry="true"` would return () and be
+        # indistinguishable from "there is no such operation".
+        raise ValueError(
+            f"entry={entry!r} must be True, False or None. True selects the graph "
+            "entries, False selects everything that needs an upstream representation, "
+            "and None does not filter."
+        )
     return tuple(
         _BY_ID[key]
         for key in sorted(_BY_ID)
-        if _BY_ID[key].matches(input=input, output=output, kind=kind)
+        if _BY_ID[key].matches(input=input, output=output, kind=kind, entry=entry)
     )
 
 

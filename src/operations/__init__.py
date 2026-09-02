@@ -28,10 +28,21 @@ declares it. Each implementation package declares `OPERATIONS`, a tuple of
 strings, and `tests/operations/test_catalog.py` walks the two against each other
 in both directions so a landed operation cannot exist without exactly one record.
 
-**Production-complete, not planner-ready.** `input`/`output` are single strings and
-a source's `input` names what it produces; CHE-222 (R03.5) is the descriptor
-semantics a planner needs, and it is a hard blocker before any planner work reads
-the catalog. `catalog.py`'s docstring says so at the top.
+**Production-complete and planner-ready, as of CHE-222 (R03.5).** A descriptor's
+`inputs` is a tuple of representation ports with `()` for a graph entry, `returns`
+is ordered with the primary result first, and `requires`/`optional` name the
+arguments a caller must and may supply. `input` and `output` are gone: single
+strings could not say "produces without consuming", and two records were false
+because of it. The eight questions those fields answer are listed in
+`descriptors.py`, each has a test, and
+`tests/operations/test_catalog_signatures.py` derives the argument tuples from
+`inspect.signature` and compares -- so the metadata is a checked restatement of
+the code rather than a hand-maintained one.
+
+`capabilities` is the one field still awaiting a ticket: it stays an eagerly
+validated citation into `numerics.COMPONENT_CAPABILITIES`, and CHE-223 (R03.6)
+moves that evidence to a knowledge pack. It is not a blocker for reading the
+catalog.
 
 Device and dtype support is not stored here. A descriptor cites a row of
 `numerics.COMPONENT_CAPABILITIES` by name, so the measurement stays with the

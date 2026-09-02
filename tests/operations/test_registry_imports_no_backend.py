@@ -69,7 +69,9 @@ for descriptor in found:
     assert descriptor.implementation and descriptor.approximation
     assert descriptor.kind in set(operations.OperationKind)
     assert descriptor.evidence is not None and descriptor.validity is not None
-    assert descriptor.derivative and descriptor.input and descriptor.output
+    assert descriptor.derivative and descriptor.returns and descriptor.primary_output
+    assert descriptor.inputs is not None and descriptor.requires is not None
+    assert descriptor.is_graph_entry in (True, False)
     _ = descriptor.capabilities, descriptor.cost, descriptor.derivative_evidence
 assert operations.find(input="ray_bundle", kind="solver")
 assert operations.find(kind="coupler")

@@ -485,8 +485,18 @@ def test_psf_registers_as_a_measurement_and_never_as_a_coupler() -> None:
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "M_PSF")
     assert descriptor.kind is OperationKind.MEASUREMENT
-    assert descriptor.input == "scalar_field"
-    assert descriptor.output == "psf"
+    assert descriptor.inputs == ("scalar_field",)
+    assert descriptor.primary_output == "psf"
+    assert descriptor.returns == ("psf",), (
+        "the callable returns a PsfResult record; the primary semantic value it "
+        "carries is the observable, and that is what a planner routes"
+    )
+    # CHE-222 (R03.5) criterion 3's sharpest case: `normalization` is keyword-only
+    # with no default, and which one was used is the subject of three of R11's
+    # acceptance criteria. A runtime must not pick one for the caller, so the
+    # descriptor has to say it is required.
+    assert descriptor.requires == ("normalization",)
+    assert descriptor.optional == ()
     assert registry.find(kind=OperationKind.MEASUREMENT) == (descriptor,), (
         "one measurement in the whole catalog, which is R11 criterion 1"
     )
@@ -502,8 +512,8 @@ def test_no_catalogued_operation_consumes_or_mis_produces_the_observable() -> No
     future record slipped an observable onto a port some other way.
     """
     for record in CATALOG:
-        assert record.input != "psf", record.operation_id
-        if record.output == "psf":
+        assert "psf" not in record.inputs, record.operation_id
+        if record.primary_output == "psf":
             assert record.kind is OperationKind.MEASUREMENT, record.operation_id
 
 

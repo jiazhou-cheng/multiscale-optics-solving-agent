@@ -541,7 +541,19 @@ def test_the_diffractive_surface_registers_as_a_physical_operator() -> None:
     descriptor = next(d for d in CATALOG if d.operation_id == "O_DIFFRACTIVE_SURFACE")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
-    assert descriptor.input == descriptor.output == "ray_bundle"
+    assert descriptor.inputs == ("ray_bundle",)
+    assert descriptor.primary_output == "ray_bundle"
+    # CHE-222 (R03.5): `output="ray_bundle"` used to read identically for this
+    # operation and for `propagate_rays`, while one returns a bundle and this one
+    # returns a 2-tuple. A runtime reading only the descriptor would have unpacked
+    # the wrong thing, and the only way to know which was a per-id switch.
+    assert descriptor.returns == ("ray_bundle", "diagnostics")
+    assert descriptor.returns_auxiliary is True
+    assert descriptor.requires == ("surface",)
+    assert len(descriptor.optional) == 16, (
+        "the sixteen strategy parameters are named, not defaulted-and-mirrored: "
+        "copying their values into metadata would drift against the signature"
+    )
     assert descriptor.capabilities is None
     assert not any("air only" in condition for condition in descriptor.validity), (
         "the air-only restriction was lifted by CHE-192; a catalog that still "

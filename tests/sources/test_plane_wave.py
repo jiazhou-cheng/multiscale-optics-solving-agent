@@ -364,12 +364,12 @@ def test_the_source_registers_as_a_solver() -> None:
     no external backend, which is *why* `src/sources/` exists as a package, and
     not a reason to call it something else.
 
-    `input='scalar_field'` follows the precedent R05.3 set for the ray solver,
-    whose descriptor also names the representation it works in rather than the
-    problem type it consumes -- `OpticalSetup` plus a source since CHE-218:
-    `SEMANTIC_TYPES` holds representations, and how a problem type enters the graph
-    is CHE-222 (R03.5)'s question. It is the reason `operations/catalog.py` calls
-    itself production-complete but not planner-ready.
+`inputs=()`, because a source consumes no upstream representation. That is
+    CHE-222 (R03.5): this record used to declare `input='scalar_field'` -- the
+    representation it *produces*, named on both sides, following the precedent
+    R05.3 set for the ray solver -- which contradicted the signature, this
+    package's docstring and `docs/architecture_principles.md` §2 at once. What the
+    function actually needs is in `requires`, and none of it is a representation.
 
     `capabilities=None` is the honest citation. There is no measured device/dtype
     row for this operation because it imports no backend; citing the chromatix row

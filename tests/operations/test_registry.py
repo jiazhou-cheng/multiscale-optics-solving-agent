@@ -109,8 +109,8 @@ def a_descriptor(**overrides: object) -> OperationDescriptor:
     fields: dict[str, object] = {
         "operation_id": "X_DUMMY",
         "kind": OperationKind.COUPLER,
-        "input": "ray_bundle",
-        "output": "scalar_field",
+        "inputs": ("ray_bundle",),
+        "returns": ("scalar_field",),
         "implementation": "somewhere:run",
         "approximation": "none; a dummy operation for the registry tests",
         "evidence": ("tests/operations/test_registry.py",),
@@ -188,8 +188,8 @@ def test_find_by_input_output_and_kind() -> None:
     backward = put(
         a_descriptor(
             operation_id="X_BACKWARD",
-            input="scalar_field",
-            output="ray_bundle",
+            inputs=("scalar_field",),
+            returns=("ray_bundle",),
             kind=OperationKind.PHYSICAL_OPERATOR,
         )
     )
@@ -199,6 +199,59 @@ def test_find_by_input_output_and_kind() -> None:
     assert registry.find(kind=OperationKind.PHYSICAL_OPERATOR) == (backward,)
     assert registry.find(input="scalar_field", output="ray_bundle") == (backward,)
     assert registry.find(input="ray_bundle", kind="physical_operator") == ()
+
+
+def test_find_distinguishes_no_input_filter_from_selecting_graph_entries() -> None:
+    """Acceptance criterion 10, which is the trap the `None` sentinel created.
+
+    `input=None` has always meant "do not filter". Once CHE-222 let an operation
+    declare `inputs=()`, the obvious spelling for "select the operations that need
+    no upstream representation" was also `input=None` -- and a filter with two
+    readings is worse than the fake input the same ticket removed. So graph entry
+    is its own tri-state argument.
+    """
+    entry = put(a_descriptor(operation_id="X_ENTRY", kind=OperationKind.SOLVER, inputs=()))
+    consuming = put(a_descriptor(operation_id="X_CONSUMING"))
+
+    # `input=None` still means "do not filter", and returns BOTH.
+    assert registry.find() == (consuming, entry)
+    assert registry.find(input=None) == (consuming, entry)
+    # `entry=` is the selector, and all three states are distinct.
+    assert registry.find(entry=True) == (entry,)
+    assert registry.find(entry=False) == (consuming,)
+    assert registry.find(entry=None) == (consuming, entry)
+    # And it composes with the other filters rather than replacing them.
+    assert registry.find(entry=True, kind="solver") == (entry,)
+    assert registry.find(entry=True, kind="coupler") == ()
+    # A non-boolean is refused rather than matching nothing, which is the rule the
+    # other two filters already follow: `matches` compares with `is`, so
+    # `entry=1` would return () and read as "there is no such operation".
+    for bad in (1, 0, "true", "entry"):
+        with pytest.raises(ValueError, match="must be True, False or None"):
+            registry.find(entry=bad)  # type: ignore[arg-type]
+
+
+def test_find_matches_a_representation_on_any_port() -> None:
+    """A multi-port operation is a candidate for an edge carrying either port.
+
+    `trace_rays` is the landed one-port-plus-a-setup case and nothing has two
+    representation ports yet, so this is asserted on a synthetic record -- which is
+    what the tuple exists to make possible without a schema change.
+    """
+    both = put(a_descriptor(operation_id="X_BOTH", inputs=("ray_bundle", "scalar_field")))
+    assert registry.find(input="ray_bundle") == (both,)
+    assert registry.find(input="scalar_field") == (both,)
+
+
+def test_find_matches_the_primary_result_and_not_an_auxiliary_one() -> None:
+    """`output=` is about what a planner routes onward, which is `returns[0]`.
+
+    An auxiliary diagnostics value is not an edge, so a query for it must not match
+    -- otherwise a planner would wire the next operation to a diagnostics record.
+    """
+    put(a_descriptor(operation_id="X_AUX", returns=("scalar_field", "ray_bundle_report")))
+    assert [d.operation_id for d in registry.find(output="scalar_field")] == ["X_AUX"]
+    assert registry.find(output="ray_bundle") == ()
 
 
 def test_a_typo_in_a_query_is_an_error_not_an_empty_result() -> None:

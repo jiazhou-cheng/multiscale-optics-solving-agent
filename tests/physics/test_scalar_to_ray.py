@@ -697,8 +697,17 @@ def test_the_decomposition_registers_as_a_coupler() -> None:
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "C_SCALAR_TO_RAY")
     assert descriptor.kind is OperationKind.COUPLER
-    assert descriptor.input == "scalar_field"
-    assert descriptor.output == "ray_bundle"
+    assert descriptor.inputs == ("scalar_field",)
+    assert descriptor.primary_output == "ray_bundle"
+    # CHE-222 (R03.5): the 2-tuple return is now in the record, so a runtime knows
+    # to unpack rather than needing a switch keyed on the operation id.
+    assert descriptor.returns == ("ray_bundle", "sampling_diagnostics")
+    assert descriptor.returns_auxiliary is True
+    assert descriptor.is_graph_entry is False
+    # Every parameter of this coupler has a default, which is a real statement
+    # about it: a field plus nothing else is a complete call.
+    assert descriptor.requires == ()
+    assert "launch_positions_xy_m" in descriptor.optional
     assert descriptor.derivative == "forward_only"
     assert descriptor.capabilities is None
     assert resolve("C_SCALAR_TO_RAY") is scalar_to_ray
