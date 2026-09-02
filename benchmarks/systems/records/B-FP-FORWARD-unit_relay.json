@@ -1,0 +1,714 @@
+{
+  "written_at_utc": "2026-09-01T11:43:57Z",
+  "environment": {
+    "numpy": "2.2.6",
+    "scipy": "1.15.3",
+    "jax": "0.6.2",
+    "chromatix": "0.6.0"
+  },
+  "benchmark": "B-FP-FORWARD",
+  "ticket": "CHE-213",
+  "configuration": "unit_relay",
+  "produced_by": "benchmarks/systems/b_fourier_ptychography.py",
+  "composition": [
+    "sources.plane_wave",
+    "operators.complex_transmission",
+    "solvers.chromatix.focal_plane_transform",
+    "operators.complex_transmission",
+    "solvers.chromatix.focal_plane_transform",
+    "measurements.psf"
+  ],
+  "intensity_path": "measurements.psf(field, normalization='raw').intensity -- the project's only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own local implementation was deleted in the same change that pointed it here, which is what benchmarks/observables.py said would happen",
+  "approximation_the_method_rests_on": "O(x) exp(i k_j x) has spectrum O~(k - k_j) exactly, because the object is a thin, angle-independent transmission (operators.complex_transmission's declared approximation). The equivalence between tilting the illumination and shifting the object spectrum would not hold for a thick or angle-dependent sample",
+  "parameters": {
+    "wavelength_m": 5.32e-07,
+    "medium_index": 1.0,
+    "shape": [
+      96,
+      512
+    ],
+    "sample_pitch_m": [
+      6e-07,
+      5e-07
+    ],
+    "focal_length_1_m": 0.02,
+    "focal_length_2_m": 0.02,
+    "numerical_aperture": 0.15,
+    "stop_edge": "hard",
+    "stop_radius_m": 0.003,
+    "fourier_plane_pitch_m": [
+      0.00018472222222222224,
+      4.156250000000001e-05
+    ],
+    "image_plane_pitch_m": [
+      6e-07,
+      5e-07
+    ],
+    "stop_radius_in_fourier_samples_yx": [
+      16.240601503759397,
+      72.18045112781954
+    ],
+    "cutoff_bin": 72.18045112781954,
+    "object_bin": 20,
+    "object_coefficients": {
+      "0": [
+        0.6896551724137931,
+        0.0
+      ],
+      "1": [
+        0.15824321116230797,
+        0.13328641804917746
+      ],
+      "-1": [
+        -0.033443748296224485,
+        -0.0978931125193877
+      ]
+    },
+    "on_grid_illumination_bins": [
+      0.0,
+      20.0,
+      40.0,
+      52.0,
+      53.0,
+      65.0,
+      90.0
+    ],
+    "off_grid_illumination_bins": [
+      40.5,
+      52.5
+    ]
+  },
+  "sweep": {
+    "0.0": {
+      "surviving_orders": [
+        -1,
+        0,
+        1
+      ],
+      "beams": 3,
+      "measured": {
+        "0": [
+          0.5291320838150568,
+          0.0
+        ],
+        "1": [
+          0.08606859232213239,
+          0.15943419109509507
+        ],
+        "2": [
+          -0.018340065728487974,
+          0.01103333164365215
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.5291319857312723,
+          0.0
+        ],
+        "1": [
+          0.08606859508005758,
+          0.15943415901280356
+        ],
+        "2": [
+          -0.018340068443092807,
+          0.011033323059199
+        ]
+      },
+      "residual": 9.808378453879385e-08,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "20.0": {
+      "surviving_orders": [
+        -1,
+        0,
+        1
+      ],
+      "beams": 3,
+      "measured": {
+        "0": [
+          0.5291318983654492,
+          0.0
+        ],
+        "1": [
+          0.08606857218258171,
+          0.15943414116493004
+        ],
+        "2": [
+          -0.018340067045166466,
+          0.011033318474111375
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.5291319857312723,
+          0.0
+        ],
+        "1": [
+          0.08606859508005758,
+          0.15943415901280356
+        ],
+        "2": [
+          -0.018340068443092807,
+          0.011033323059199
+        ]
+      },
+      "residual": 8.736582313151331e-08,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "40.0": {
+      "surviving_orders": [
+        -1,
+        0,
+        1
+      ],
+      "beams": 3,
+      "measured": {
+        "0": [
+          0.5291318779927678,
+          0.0
+        ],
+        "1": [
+          0.08606856987851991,
+          0.15943414233182818
+        ],
+        "2": [
+          -0.0183400672806596,
+          0.011033321269901421
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.5291319857312723,
+          0.0
+        ],
+        "1": [
+          0.08606859508005758,
+          0.15943415901280356
+        ],
+        "2": [
+          -0.018340068443092807,
+          0.011033323059199
+        ]
+      },
+      "residual": 1.077385044512269e-07,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "52.0": {
+      "surviving_orders": [
+        -1,
+        0,
+        1
+      ],
+      "beams": 3,
+      "measured": {
+        "0": [
+          0.5291319185052998,
+          0.0
+        ],
+        "1": [
+          0.08606859423573149,
+          0.1594341507577018
+        ],
+        "2": [
+          -0.018340071130124314,
+          0.011033316767631095
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.5291319857312723,
+          0.0
+        ],
+        "1": [
+          0.08606859508005758,
+          0.15943415901280356
+        ],
+        "2": [
+          -0.018340068443092807,
+          0.011033323059199
+        ]
+      },
+      "residual": 6.722597245545359e-08,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "53.0": {
+      "surviving_orders": [
+        -1,
+        0
+      ],
+      "beams": 2,
+      "measured": {
+        "0": [
+          0.48632574011571705,
+          0.0
+        ],
+        "1": [
+          -0.023064650975017455,
+          0.06751249188218167
+        ],
+        "2": [
+          3.2103561128143057e-09,
+          1.7700046903425887e-09
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.48632580261593344,
+          0.0
+        ],
+        "1": [
+          -0.023064653997396198,
+          0.06751249139268117
+        ],
+        "2": [
+          0.0,
+          0.0
+        ]
+      },
+      "residual": 6.250021639120362e-08,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "65.0": {
+      "surviving_orders": [
+        -1,
+        0
+      ],
+      "beams": 2,
+      "measured": {
+        "0": [
+          0.4863257320248522,
+          0.0
+        ],
+        "1": [
+          -0.023064642455565706,
+          0.06751248514594174
+        ],
+        "2": [
+          -1.065420729528042e-08,
+          1.0332838353067516e-08
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.48632580261593344,
+          0.0
+        ],
+        "1": [
+          -0.023064653997396198,
+          0.06751249139268117
+        ],
+        "2": [
+          0.0,
+          0.0
+        ]
+      },
+      "residual": 7.059108125817559e-08,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    },
+    "90.0": {
+      "surviving_orders": [
+        -1
+      ],
+      "beams": 1,
+      "measured": {
+        "0": [
+          0.010701546429118025,
+          0.0
+        ],
+        "1": [
+          3.8158433213320294e-10,
+          -2.0811239980255926e-10
+        ],
+        "2": [
+          -8.252819130353171e-10,
+          1.6510904765078335e-10
+        ]
+      },
+      "analytic": {
+        "0": [
+          0.010701545778834719,
+          0.0
+        ],
+        "1": [
+          0.0,
+          0.0
+        ],
+        "2": [
+          0.0,
+          0.0
+        ]
+      },
+      "residual": 8.416360458056566e-10,
+      "image_pitch_m": [
+        6e-07,
+        5e-07
+      ]
+    }
+  },
+  "not_covered": [
+    "no reconstruction of any kind: no phase retrieval, no Gerchberg-Saxton, no gradient descent over the object, no pupil recovery, no aberration estimation, no loss function",
+    "LED-array geometry and calibration, shot noise and sensor response, partial coherence, sample thickness and multiple scattering, aberrated pupils",
+    "overlap/redundancy analysis of the angle set (a reconstruction concern)"
+  ],
+  "gates": [
+    {
+      "name": "the_sampling_chain_at_every_plane",
+      "oracle": "dx_F = lambda f1/(n N dx) recomputed from the formula; dx_img = dx f2/f1; the stop radius in Fourier samples is R/dx_F per axis",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "fourier_pitch_m": [
+          0.00018472222222222224,
+          4.156250000000001e-05
+        ],
+        "image_pitch_m": [
+          6e-07,
+          5e-07
+        ],
+        "stop_radius_in_fourier_samples_yx": [
+          16.240601503759397,
+          72.18045112781954
+        ]
+      },
+      "expected": {
+        "fourier_pitch_m": [
+          0.00018472222222222224,
+          4.156250000000001e-05
+        ],
+        "image_pitch_m": [
+          6e-07,
+          5e-07
+        ]
+      },
+      "tolerance": 1e-15,
+      "tolerance_basis": "float64 on both sides. 1e-15 rather than exact equality because the recomputation groups the arithmetic differently from the library function -- (lambda f)/(n N dx) against (lambda f / n)/(N dx) -- and a 1-ulp associativity difference is not a sampling error",
+      "passed": true
+    },
+    {
+      "name": "the_analytic_pass_band_harmonics_at_every_swept_angle",
+      "oracle": "I[k] = (f1/f2)^2 |sum_{o in S} c_o exp(-i o theta_k)|^2, so harmonic m has coefficient sum_{o-o'=m} c_o conj(c_o') over the surviving set S, with S given by the predicate |j + o j_o| <= NA/lambda * N dx. Absolute, complex, and not normalized by anything",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "0.0": {
+          "beams": 3,
+          "surviving_orders": [
+            -1,
+            0,
+            1
+          ],
+          "residual": 9.808378453879385e-08
+        },
+        "20.0": {
+          "beams": 3,
+          "surviving_orders": [
+            -1,
+            0,
+            1
+          ],
+          "residual": 8.736582313151331e-08
+        },
+        "40.0": {
+          "beams": 3,
+          "surviving_orders": [
+            -1,
+            0,
+            1
+          ],
+          "residual": 1.077385044512269e-07
+        },
+        "52.0": {
+          "beams": 3,
+          "surviving_orders": [
+            -1,
+            0,
+            1
+          ],
+          "residual": 6.722597245545359e-08
+        },
+        "53.0": {
+          "beams": 2,
+          "surviving_orders": [
+            -1,
+            0
+          ],
+          "residual": 6.250021639120362e-08
+        },
+        "65.0": {
+          "beams": 2,
+          "surviving_orders": [
+            -1,
+            0
+          ],
+          "residual": 7.059108125817559e-08
+        },
+        "90.0": {
+          "beams": 1,
+          "surviving_orders": [
+            -1
+          ],
+          "residual": 8.416360458056566e-10
+        }
+      },
+      "expected": 0.0,
+      "tolerance": 2e-06,
+      "tolerance_basis": "two complex64 FFT legs and one squaring: eight float32 epsilons is 9.5e-7, and the harmonic coefficients are differences of same-magnitude products so the bound is taken at 2e-6. Worst measured residual across the sweep is reported above; the failures this catches -- a blocked order that survives, a second harmonic that should be exactly zero -- are O(1)",
+      "passed": true
+    },
+    {
+      "name": "the_second_harmonic_steps_to_zero_at_the_analytic_cutoff",
+      "oracle": "three beams give a second harmonic |c_+ conj(c_-)| (f1/f2)^2; two beams give exactly zero. The step is at the largest j with |j + j_o| <= R/dx_F",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "second_harmonic_by_bin": {
+          "0.0": 0.021403093656854257,
+          "20.0": 0.021403087996183363,
+          "40.0": 0.021403089639208166,
+          "52.0": 0.02140309061684571,
+          "53.0": 3.6659654901429367e-09,
+          "65.0": 1.4841822041832652e-08,
+          "90.0": 8.416360458056566e-10
+        },
+        "step_between_bins": [
+          52,
+          53
+        ]
+      },
+      "expected": {
+        "three_beam_second_harmonic": 0.02140309155766944,
+        "two_beam_second_harmonic": 0.0,
+        "cutoff_bin": 72.18045112781954
+      },
+      "tolerance": 2e-06,
+      "tolerance_basis": "the two-beam second harmonic is the arithmetic zero of an elementwise multiply by 0, not a small number, so the step is a floor-to-signal jump of 2.140e-02 rather than a threshold crossing",
+      "passed": true
+    },
+    {
+      "name": "a_single_surviving_order_gives_a_flat_dark_field_intensity",
+      "oracle": "one beam interferes with nothing: both harmonics are zero and the DC level is that order's |c|^2 alone",
+      "oracle_kind": "closed_form",
+      "measured": {
+        "90.0": {
+          "first_harmonic": 4.346462624722808e-10,
+          "second_harmonic": 8.416360458056566e-10,
+          "dc": 0.010701546429118025,
+          "analytic_dc": 0.010701545778834719
+        }
+      },
+      "expected": 0.0,
+      "tolerance": 2e-06,
+      "tolerance_basis": "the same complex64 harmonic floor; the fringes are arithmetically absent rather than small, and the DC level is checked against |c|^2 (f1/f2)^2 absolutely, so a dark field at the wrong brightness fails here too",
+      "passed": true
+    },
+    {
+      "name": "the_stop_radius_realizes_the_declared_numerical_aperture",
+      "oracle": "R / dx_F == (NA/lambda) N dx: the stop radius in Fourier samples equals the cutoff frequency in bins",
+      "oracle_kind": "closed_form",
+      "measured": 72.18045112781954,
+      "expected": 72.18045112781954,
+      "tolerance": 1e-12,
+      "tolerance_basis": "float64 arithmetic on both sides; the wavelength cancels, which is why the same stop realizes the same NA at any wavelength",
+      "passed": true
+    },
+    {
+      "name": "off_grid_illumination_angles_are_exercised_and_reported",
+      "oracle": "none: a line off the DFT grid is spread by the Dirichlet kernel and 'half a transmitted order' has no closed form",
+      "oracle_kind": "diagnostic",
+      "measured": {
+        "40.5": {
+          "second_harmonic": 0.022847935890490147,
+          "three_beam_second_harmonic": 0.02140309155766944,
+          "first_harmonic": 0.17845609789615086,
+          "three_beam_first_harmonic": 0.1811823780591668,
+          "bracketing_on_grid_first_harmonics": {
+            "40.0": 0.1811823780591668,
+            "41.0": 0.1811823780591668
+          },
+          "bracketing_on_grid_surviving_orders": {
+            "40.0": [
+              -1,
+              0,
+              1
+            ],
+            "41.0": [
+              -1,
+              0,
+              1
+            ]
+          },
+          "deviation_from_the_three_beam_prediction": 0.004263070618094862
+        },
+        "52.5": {
+          "second_harmonic": 0.008804660252593731,
+          "three_beam_second_harmonic": 0.02140309155766944,
+          "first_harmonic": 0.11435981457844274,
+          "three_beam_first_harmonic": 0.1811823780591668,
+          "bracketing_on_grid_first_harmonics": {
+            "52.0": 0.1811823780591668,
+            "53.0": 0.0713436385255648
+          },
+          "bracketing_on_grid_surviving_orders": {
+            "52.0": [
+              -1,
+              0,
+              1
+            ],
+            "53.0": [
+              -1,
+              0
+            ]
+          },
+          "deviation_from_the_three_beam_prediction": 0.08041656504009483
+        }
+      },
+      "expected": "reported, not gated",
+      "tolerance": null,
+      "tolerance_basis": "not a gate; recorded so R06.8's sweep does not rest on an unexamined assumption about grid-commensurate angles (R06.5 characterizes the underlying Dirichlet behaviour)",
+      "passed": true
+    },
+    {
+      "name": "float64_numpy_fourier_domain_model_on_a_random_phantom",
+      "oracle": "ifft2(P * fft2(u)) in float64 NumPy, mirrored and scaled by (f1/f2)^2 per the two-forward-leg composition identity",
+      "oracle_kind": "diagnostic",
+      "measured": {
+        "relative_residual": 5.450953839781909e-07,
+        "illumination_bin": 40.0
+      },
+      "expected": 0.0,
+      "tolerance": null,
+      "tolerance_basis": "not a gate: this is repository numerical code checking repository numerical code. Reported as evidence that the two independent paths agree",
+      "passed": true
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "illumination_wavevector_sign_flipped",
+      "changed": "k_j at bin -65.0 instead of 65.0",
+      "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
+      "measured": {
+        "first_harmonic": 0.1426872849373428,
+        "residual_against_the_unflipped_prediction": 0.13443249989283912
+      },
+      "reference": {
+        "unflipped_first_harmonic": 0.0713436385255648,
+        "mirrored_first_harmonic": 0.14268727705112963
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "pupil_at_the_image_plane",
+      "changed": "the same stop applied after leg two instead of between the legs",
+      "breaks_gate": "the_second_harmonic_steps_to_zero_at_the_analytic_cutoff",
+      "measured": {
+        "second_harmonic": 0.02140308975572451,
+        "residual": 0.1426872558275937
+      },
+      "reference": {
+        "two_beam_second_harmonic": 0.0
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "pupil_radius_off_by_the_medium_index",
+      "changed": "radius computed with medium_index=1.33 instead of 1.0",
+      "breaks_gate": "the_second_harmonic_steps_to_zero_at_the_analytic_cutoff",
+      "measured": {
+        "second_harmonic": 2.107549097062698e-09,
+        "residual": 0.14268728179677842,
+        "radius_m": 0.002255639097744361
+      },
+      "reference": {
+        "correct_radius_m": 0.003,
+        "three_beam_second_harmonic": 0.02140309155766944
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "pupil_radius_off_by_two_pi",
+      "changed": "radius multiplied by 2 pi, the cycles/m vs rad/m confusion",
+      "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
+      "measured": {
+        "second_harmonic": 0.02140308975572451,
+        "residual": 0.1426872558275937
+      },
+      "reference": {
+        "two_beam_second_harmonic": 0.0
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "illumination_angle_read_as_spatial_frequency",
+      "changed": "k_j divided by 2 pi, i.e. cycles/m handed over as rad/m",
+      "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
+      "measured": {
+        "second_harmonic": 0.02357776200980642,
+        "residual": 0.1411305774481196,
+        "effective_bin": 10.345071300973197
+      },
+      "reference": {
+        "two_beam_second_harmonic": 0.0
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "transposed_illumination_wavevector",
+      "changed": "the bin-65.0 carrier put on k_y instead of k_x",
+      "breaks_gate": "the_analytic_pass_band_harmonics_at_every_swept_angle",
+      "measured": {
+        "dc": 0.4796699463331606,
+        "residual": 0.15353632449425964,
+        "carrier_position_on_y_m": 0.0027015625,
+        "carrier_position_in_y_samples": 14.624999999999998,
+        "stop_radius_in_y_samples": 16.240601503759397
+      },
+      "reference": {
+        "two_beam_dc_for_a_bin_65_x_tilt": 0.48632580261593344,
+        "three_beam_dc": 0.5291319857312723,
+        "stop_radius_m": 0.003
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "object_frequency_past_nyquist_is_refused",
+      "changed": "the object placed at bin 263, past the Nyquist bin 256",
+      "breaks_gate": "the run itself: it is refused before any field is built",
+      "measured": {
+        "refused": true,
+        "message": "an object at bin 263 puts its second intensity harmonic at bin 526, against this grid's Nyquist bin 256. An object frequency past Nyquist aliases into a completely plausible answer at a different frequency, so it is refused rather than run."
+      },
+      "reference": {
+        "refused": true
+      },
+      "broke_the_gate": true
+    },
+    {
+      "name": "second_leg_as_an_inverse_transform",
+      "changed": "model['direction']='inverse' on leg two",
+      "breaks_gate": "the field-level composition identity; the intensity harmonics are blind to it, which is the point of recording it",
+      "measured": {
+        "field_difference": 1.8368453979492188,
+        "harmonic_residual": 0.13502495283847543
+      },
+      "reference": {
+        "field_difference_if_identical": 0.0
+      },
+      "broke_the_gate": true
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "component": "M_RAY_OPTILAND",
+  "probe": "benchmarks/probes/precision/optiland_capability.py",
+  "probe_tag": "pre-rewrite-2026-08-30",
+  "evidence": "optiland 0.6.0: set_precision is Literal['float32','float64'] and raises ValueError for anything else; set_device raises BackendCapabilityError on the numpy backend, so CUDA is reachable only through the torch backend. With set_backend('torch'); set_device('cuda'), be.array(...) returns a Tensor on cuda:0 in the selected precision, float32 and float64 both confirmed (agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)",
+  "notes": "There is no float16 row and this project will not invent one: Optiland has no float16 mode to execute, and geometry, OPL and direction cosines all accumulate.",
+  "devices": [
+    "cpu",
+    "cuda"
+  ],
+  "precisions": [
+    "fp32",
+    "fp64"
+  ],
+  "minimum_compute_precision": "fp32",
+  "accepted_input_dtypes": [
+    "float32",
+    "float64"
+  ],
+  "native_compute_dtypes": [
+    "float32",
+    "float64"
+  ],
+  "output_dtypes": [
+    "float32",
+    "float64"
+  ],
+  "lossy_input_dtypes": [],
+  "device_namespaces": {
+    "cpu": [
+      "numpy",
+      "torch"
+    ],
+    "cuda": [
+      "torch"
+    ]
+  }
+}

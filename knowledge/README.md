@@ -1,104 +1,92 @@
-# Agent knowledge
+# `knowledge/` — versioned measured evidence
 
-Compact, versioned context disclosed to an agent. **Not** a mirror of upstream
-documentation, and — since CHE-92 — not a test tree, an evidence database or a
-paper archive either. Those three were 96% of this directory by line count and
-they now live where they belong:
+Shared **data**, cited by code that must not own it. One rule:
 
-| Was here | Is now | Why |
-| -- | -- | -- |
-| `solvers/*/tutorials/` | `tests_tutorial/cases/<solver>/` | test code, run by a harness that used to `sys.path.insert` back into here |
-| `solvers/*/probes/`, `couplers/*/probes/` | `benchmarks/probes/<component>/` | executable evidence, not disclosure |
-| `solvers/*/expected/`, `couplers/*/expected/` | `benchmarks/probes/records/<component>/` | recorded outputs of the above |
-| two 11.5 MB PDFs | out of git; `papers/raywave_tracing/README.md` keeps the DOI | a binary is not agent context |
-| `source_manifest.yaml` | `benchmarks/roadmap_source_catalog.yaml` | a catalogue of ~30 packages this project will not integrate |
+> A record here is the single source for the measurement it carries. No package
+> under `src/` keeps a copy.
 
-The evidence did not disappear, and neither did what it established. A claim on
-a card names the record that backs it; the record is in `verification/`.
+Landed by CHE-223 (R03.6) with one kind of record.
 
-## Layout
+## `capabilities/` — measured component capability
 
-```text
-knowledge/
-  solvers/{optiland,chromatix}/
-    card.yaml            the one card for this component
-    conventions.md       units, axes, sign, reference planes
-    usage_notes.md       advisory guidance — how to use it correctly
-    api_minimal_examples.md
-    failure_guide.md     what goes wrong, and what the error means
-  couplers/{ray_to_wave,wave_to_ray}/
-    card.yaml
-    conventions.md
-    theory.md            the mathematics, from the paper
-    failure_guide.md
-    source_manifest.yaml
-  papers/raywave_tracing/README.md
-```
+One JSON file per component, named by its component id, so "which file is
+canonical for this id" needs no index. `numerics.knowledge.load_capabilities`
+reads one into a validated `numerics.ComponentCapabilities`, through the same
+`__post_init__` — all ten widening refusals — that an in-tree declaration went
+through. A record wider than its probe is refused at load with
+`INVALID_CAPABILITY_DECLARATION`.
 
-**One card per component.** There used to be two — a flat routing card in
-`solver_cards/` and a deep card in the pack — and the deep one stated the
-duplication was deliberate while nothing checked it. They had drifted three
-ways, and every drift *understated* what was verified, which wastes effort
-rather than causing errors. The deep card absorbed the flat one and
-`solver_cards/` is gone.
+Present today:
 
-**`usage_notes.md` was `usage_notes.md`.** "Capability" named two different
-layers: `core/capabilities.py`, which is executable and authoritative, and prose
-advice, which is neither. The rename leaves one meaning per word.
+| file | what it measures |
+| -- | -- |
+| `M_RAY_OPTILAND.json` | optiland 0.6.0: CPU + CUDA, FP32/FP64, real dtypes, CUDA only through the torch backend |
+| `M_WAVE_CHROMATIX.json` | chromatix 0.6.0: CPU + CUDA, FP32 only, `complex64`; `complex128` ingestible but lossy |
 
-## What a card may and may not say
+Every field is required and every unknown field is refused, so a typo cannot
+become a silently defaulted value and a stale key cannot linger unread.
+`schema_version` is validated rather than decorative: the loader refuses a version
+it does not read, and a test proves the refusal.
 
-A card does **not** restate a device or dtype table. `core/capabilities.py` owns
-those, `tests/test_registry_matches_capabilities.py` holds the registry to it,
-and a third copy in prose could only ever drift — so a card carries the
-*consequences* the table cannot express (that CUDA is torch-backend-only; that
-the torch backend defaults to float32 while numpy defaults to float64; that
-XLA:GPU silently computes complex64 in TF32) and points at the declaration for
-the rest. `tests/test_solver_knowledge_pack.py` fails a card that restates one.
+`probe` cites a path under `benchmarks/probes/` and `probe_tag` is the git tag it
+resolves against. `benchmarks/probes/precision/` is not in the working tree — the
+greenfield rewrite deleted it — and both records resolve at
+`pre-rewrite-2026-08-30`, which `tests/knowledge/test_capability_pack.py` checks
+with `git cat-file -e`. **Widening a row costs a probe re-run against the pinned
+image, not a re-reading of the packages' documentation.**
 
-## The validation ladder
+### Two records, not seven
 
-Deliberately narrower than scientific validity, and exactly three values:
+The reference implementation declared seven. Five of them described couplers and
+operators whose capability nobody had measured — a coupler's capability is set by
+what its shared implementation is written against, so the ticket that measures one
+declares it with its own evidence. A record for unwritten code is the failure this
+pack exists to prevent.
 
-- **`unvalidated`** — suitable for planning only.
-- **`environment_verified`** — the exact package source and version, import,
-  minimal CPU forward path, and recorded conventions passed in the supported
-  container. This does **not** imply an analytic benchmark or a verified
-  gradient.
-- **`scientifically_validated`** — the issue-specific analytic or independent
-  oracle, and the required convergence checks, also passed.
+### Component-level, and why the id shape allows otherwise
 
-`validation_scope` is a separate field and carries the qualifier — "scalar
-angular-spectrum, complex64, CPU and CUDA" — which is informative and used to be
-fused into the status string, where nothing could check either half.
+Both records are **component-level**, because that is what the probes measured:
+they exercised the packages' device and dtype behaviour, not any one semantic
+operation. An `operations.OperationDescriptor` cites the component id its
+implementation executes within, and several descriptors may cite one record —
+`S_RAY_OPTILAND` and `S_RAY_OPTILAND_BUNDLE` both cite `M_RAY_OPTILAND`.
 
-Before unattended execution: require at least `environment_verified`, read
-`validation_scope` to see whether your task is inside it, and check the card's
-`not_yet_probed` list. That list is a gate, so a stale entry is a defect —
-entries are removed when they are cleared, not annotated as done.
+Operation-level records are permitted **when independently measured**, which is why
+`operations.descriptors._COMPONENT_ID` constrains the shape without demanding an
+`M_` prefix. Do not duplicate a component row per descriptor merely because several
+cite it: that is the second source this pack removes.
 
-## Ticket references
+## The card rule this pack replaces
 
-A ticket ID is legitimate in three places: a structured `verified_by:` or
-`issue:` field, a historical report, and an attribution line where knowing *who
-decided* is itself useful. It is not legitimate as the content of an
-explanation.
+At `pre-rewrite-2026-08-30` this pack was `knowledge/<kind>/<name>/card.yaml` plus
+prose, and its README said:
 
-The test is whether the sentence survives without the link. "The reference
-sphere fit recovers the centre to 1e-12 (CHE-37)" does; "CHE-37 verified the
-oracle" does not, because the reader now has to leave the repository to find out
-what was verified and how well. Where a reference is the only index to a
-measurement, replace it with the measurement: what was measured, on which
-version and device, the observed value, the tolerance, the record path, and the
-test that pins it.
+> A card does **not** restate a device or dtype table. `core/capabilities.py` owns
+> those … a third copy in prose could only ever drift.
 
-This makes explanations longer, and that is the intended trade.
+**That rule is superseded and the reason is worth keeping**, because its *intent*
+is exactly what this directory preserves. The old rule assumed the measured table
+lived in code, so a card restating it would have been a second copy. The direction
+is now reversed: `knowledge/capabilities/` holds the rows, `numerics/` holds only
+the contract and keeps none of the data, and there is still exactly one copy.
 
-## Papers
+What has not changed: **a card carries consequences, not measurements.** These
+files are data read by a loader, not prose. Neither component has a card, and
+adding one that restated a dtype table would recreate the drift the old rule
+named.
 
-Do not store copyrighted full papers here. One recorded exception: a paper this
-project's own authors wrote may be stored in full, in its own subdirectory, with
-a `README.md` naming the DOI and stating why the exception applies.
-`papers/raywave_tracing/` is that case — and even there, CHE-92 moved the PDFs
-out of git, because 11.5 MB of binary in a retrieval-only directory is a cost
-every clone pays for something no agent reads.
+## `capabilities/` is not YAML, deliberately
+
+PyYAML left `pyproject.toml` at R02.1, with the four other dependencies nothing
+under `src/` imported; CHE-223 removed the `types-PyYAML` stub that outlived it.
+`json` is stdlib and is what `benchmarks/systems/records/*.json` already uses.
+
+## Format, and where it is resolved from
+
+`numerics.knowledge.KNOWLEDGE_ROOT` resolves this directory from
+`src/numerics/knowledge.py`, i.e. relative to the repository root. That is a
+decision, not an accident: the project is installed `pip install --no-deps -e .`
+against a mounted checkout, and a real wheel would not ship a repository-root
+directory. Package data under `src/numerics/` was rejected because that would make
+one package the owner of a shared pack again. A missing directory fails naming the
+path it tried.

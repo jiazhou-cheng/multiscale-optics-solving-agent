@@ -1,9 +1,0 @@
-schema_version: 1
-gaussian_beam_radius_relative_max: 0.01
-gaussian_centroid_input_pixels_max: 0.1
-power_conservation_relative_max: 0.001
-smallest_case_compile_inclusive_seconds_max: 10.0
-matching_environment_steady_median_relative_regression_max: 0.25
-matching_environment_required: true
-deterministic_policy: bitwise_identical_complex_field_and_exact_physical_summary
-human_review_required_before_regression_envelope_change: true

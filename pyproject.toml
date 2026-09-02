@@ -6,18 +6,23 @@ build-backend = "setuptools.build_meta"
 name = "multiscale-optics-agent"
 version = "0.1.0"
 description = "Typed model-coupler graphs for verified multi-scale optical simulation and inverse design"
-readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
   { name = "Research scaffold" }
 ]
+# What the new tree actually imports, as of CHE-173 (R02.1). The five entries this
+# replaces (networkx, pydantic, PyYAML, rich, typer) were declared for the tree
+# that was deleted and nothing in `src/` imports any of them.
+#
+# `docker/Dockerfile` installs this project with `pip install --no-deps -e .`, so
+# this list does not shape the image -- `docker/requirements.txt` does. It is a
+# statement about what the source needs, and a stale one reads as a dependency the
+# code has. NumPy is not a backend: it is the array vocabulary JAX and Torch are
+# described in, `numerics/arrays.py` imports it at module scope on purpose, and
+# `numerics/` still pulls no solver. Later packages add theirs as they land.
 dependencies = [
-  "networkx>=3.2",
-  "pydantic>=2.7",
-  "PyYAML>=6.0",
-  "rich>=13.7",
-  "typer>=0.12",
+  "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
@@ -25,8 +30,8 @@ dev = [
   "mypy>=1.10",
   "pytest>=8.2",
   "pytest-cov>=5.0",
+  "pytest-xdist>=3.8",
   "ruff>=0.5",
-  "types-PyYAML>=6.0.12",
 ]
 jax = [
   "jax>=0.6.2",
@@ -42,11 +47,6 @@ wave = [
   "optimistix>=0.0.11",
   "jaxtyping>=0.3.7",
   "chromatix @ git+https://github.com/chromatix-team/chromatix.git@d24bdf0022835bb8ce1cdcc6aeafbc7fcb39daee",
-  # Declared by CHE-37 (M3.8). verification/psf_oracles.py needs scipy.special.j1
-  # for the analytic Airy pattern. It was already present transitively -- jax,
-  # chromatix and optiland each require it, and docker/requirements.txt pins
-  # 1.15.3 -- but a verification oracle should not rest on a dependency this
-  # project never declared.
   "scipy>=1.10",
 ]
 torch = [
@@ -54,78 +54,77 @@ torch = [
   "optiland>=0.6.0",
 ]
 
-[project.scripts]
-multiscale-optics = "cli:app"
-
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true
-# `cli` is a loose module under src/, not a package member, and
-# `packages.find` does not pick up loose modules -- it has to be declared.
-py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-# Explicit rather than discovered. CHE-89 removed the
-# `multiscale_optics_agent/` level, so `where = ["src"]` now discovers whatever
-# directory happens to sit there; an enumeration means a stray scratch directory
-# cannot silently become a shipped package.
-include = ["agent*", "core*", "couplers*", "registry*", "solvers*", "studies*", "verification*"]
-
-[tool.setuptools.package-data]
-"registry" = ["*.yaml"]
+# Explicit rather than discovered, so a stray scratch directory under src/ cannot
+# silently become a shipped package. R01 landed the first two and the deletion of
+# the old tree left them as the whole of it; `solvers*` is R05's, and the trailing
+# glob is what picks up the `solvers.optiland` subpackage. Later tickets add
+# theirs, and `scripts/check_dependencies.py` holds the full declared set.
+include = [
+  "couplers*",
+  # CHE-201 (R14.1) added this one. It was missing from the day `measurements/`
+  # landed (CHE-197 / R11.1), so a built wheel would not have contained it -- the
+  # container installs `-e .` against a mounted checkout, which is why nothing
+  # noticed. `tests/unit/test_cutover.py` now holds this list equal to
+  # `check_dependencies.LANDED`.
+  "measurements*",
+  "numerics*",
+  "operations*",
+  "operators*",
+  "planning*",
+  "problems*",
+  "representations*",
+  "runtime*",
+  "solvers*",
+  "sources*",
+]
 
 [tool.pytest.ini_options]
-# CHE-67: `tests` is the whole default suite. Two active test trees deliberately
-# sit outside it and are reachable only by naming them:
-#   * `tests_tutorial/` -- the on-demand tutorial suite (`make test-tutorial`);
-#     33 min of pinned-dependency regression, so opting *in* is the safe default.
-#   * `archive/tests/<generation>/` -- historical tests, also blocked by
-#     `norecursedirs` below and by a hard abort in each generation's conftest.
-#   * `benchmarks/agents/` -- the CHE-71 V1 agent benchmark (`make test-agent-benchmark`).
 testpaths = ["tests"]
-# The pytest defaults, plus the two opt-in trees. Listing the defaults is
-# required: this key replaces them rather than extending them.
-#
-# This covers `pytest .`, which `testpaths` does not: an explicit path argument
-# overrides `testpaths`, and `pytest .` would otherwise collect the 33-minute
-# tutorial suite (measured: 625 tests instead of 565). `norecursedirs` is NOT
-# applied to a path named on the command line, so `pytest tests_tutorial` still
-# works -- which is exactly the split wanted here: opt in by naming the suite,
-# never by sweeping the repository root.
+# The pytest defaults, restated because this key replaces them rather than
+# extending them. The three opt-in trees that used to be listed here
+# (`archive/`, `tests_tutorial/`, `benchmarks/agents/`) were deleted with the
+# reference implementation, so `pytest .` and `pytest tests` now select the same
+# thing and the exclusions have nothing left to exclude.
 norecursedirs = [
-  "archive",
-  "tests_tutorial",
-  # CHE-71: the V1 agent benchmark. Same reasoning as `tests_tutorial` -- it runs
-  # an agent, so it is nondeterministic, slow and consumes model tokens, and the
-  # default suite is a required gate. Opt in by naming the directory. Its
-  # *harness* is unit-tested in `tests/test_agent_benchmark.py`, which does run by
-  # default and is deterministic.
-  "benchmarks/agents",
   "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
 ]
-addopts = "-ra"
+# `-m "not slow"` is kept: it is the declared default gate, and it costs nothing
+# to leave in place for the first `slow` test R02 writes.
+#
+# The sharding CHE-140 added and CHE-171 re-measured (`-n 8 --dist loadfile`) is
+# gone with the suite that justified it. That measurement -- 196 s serial, 60 s at
+# eight workers -- was taken against 2727 tests whose cost was importing jax,
+# chromatix and optiland in every worker. What is left is the two architecture
+# gates, which parse a handful of files with `ast` and import no solver.
+# Re-measured after the deletion, same host, default selection, 32 tests:
+#
+#     -n 0    0.06 s        -n 8    2.68 s
+#
+# Sharding is now pure overhead: bringing up eight worker processes costs about
+# forty times what the suite itself does. `-n 8` on the command line still works,
+# and the number goes back into addopts when there is again a suite that pays for
+# it -- with a measurement, not by inheriting this one.
+addopts = "-ra -m \"not slow\""
 markers = [
-  "jax: requires the optional JAX solver environment",
-  "torch: requires the optional PyTorch solver environment",
-  "integration: exercises an external physics solver",
-  "optiland: exercises the real Optiland ray-tracing engine (current-milestone ray model)",
-  "chromatix: exercises the real Chromatix wave-propagation engine (current-milestone wave model)",
-  "coupler: exercises C_RAY_TO_WAVE / C_WAVE_TO_RAY coupler physics or protocol",
-  # Registered but selects nothing: every test carrying it was archived by
-  # CHE-67 (archive/tests/gen1/), and it is kept so an unarchived file is valid
-  # pytest the moment it is moved back.
-  #
-  # `fmmax` and `fdtdx` were deleted by CHE-87 together with their adapters,
-  # registry entries, example graphs and knowledge packs -- following the CHE-72
-  # precedent for SAX. A recorded `-m` expression naming a deleted marker still
-  # parses, because an unknown name evaluates false, so the historical tier
-  # commands keep working and simply match less.
-  "benchmark: full-scale Level-1/Level-2 milestone benchmark bundle reproduction; archived by CHE-67 pending a replacement baseline",
   "slow: individually expensive numerical characterization or convergence test",
-  "tutorial: reproduces an upstream third-party tutorial; a regression gate on the PINNED dependency, not a test of this repository's physics (CHE-64). Carried by every test in tests_tutorial/, which testpaths excludes -- selecting it does nothing unless that directory is named (CHE-67)",
   "gpu: requires a CUDA device attached to the container (`./run.sh --gpu`); auto-skips otherwise",
 ]
+# The other ten markers were deleted with the code that carried them. They named
+# solvers, couplers, benchmark tiers and tutorial reproductions that no longer
+# exist, and a registered marker matching nothing reads as a suite someone can
+# select. `slow` stays because addopts names it; `gpu` stays because
+# `make test-gpu` does. `slow` started selecting tests at CHE-185 (R07.1) -- the
+# focal-peak convergence sweep in `tests/physics/test_ray_to_scalar.py`, joined by
+# CHE-186's speedup gate in `test_ray_to_scalar_kspace.py`. Note that the second
+# one is an *acceptance criterion*, and `-m "not slow"` deselects it, so
+# `make test-slow` is not optional before merging a change to coupler numerics.
+# `gpu` still selects nothing outside `tests/numerics/`.
 
 [tool.ruff]
 line-length = 100
@@ -139,16 +138,58 @@ python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 plugins = ["pydantic.mypy"]
-# With no top-level package, mypy has to be told where the roots are: without
-# `mypy_path` it cannot resolve `from core.precision import ...`, and without
-# `explicit_package_bases` it computes a module name for `src/core/specs.py` by
-# walking up to the first directory without `__init__.py`, which is `src/`, and
-# reports every module twice under two names.
+# With no top-level package, mypy has to be told where the root is: without
+# `explicit_package_bases` it computes a module name by walking up to the first
+# directory without `__init__.py`, which is `src/`, and reports every module
+# twice under two names.
 mypy_path = "src"
 explicit_package_bases = true
 
+# optiland 0.6.0 ships no `py.typed` marker and no stubs, so under `strict` every
+# `import optiland...` is an error rather than an `Any`. Narrowed to the one
+# package that has the problem, and declared here rather than with a per-import
+# `# type: ignore`: the fact is a property of the installed distribution, not of
+# any one call site, and `warn_unused_ignores` would then fail the day upstream
+# adds a marker. Added by CHE-179 (R05.1), the first ticket to import a backend.
+# jax and torch are typed and need no entry.
+[[tool.mypy.overrides]]
+module = ["optiland.*"]
+ignore_missing_imports = true
+
+# chromatix 0.6.0 @ d24bdf0 ships no `py.typed` marker either, so the same applies
+# for the same reason. Added by CHE-183 (R06.1), the ticket that first imports it.
+# jax and torch are typed and need no entry.
+[[tool.mypy.overrides]]
+module = ["chromatix.*"]
+ignore_missing_imports = true
+
+# scipy ships no stubs in the pinned image either. It is used only as an
+# *oracle* library -- Bessel functions in `benchmarks/systems/` and in
+# `tests/physics/test_thin_element_spectrum.py` -- and nothing in `src/` imports
+# it. Added by CHE-211/CHE-212, the first tickets to need a special function this
+# project must not implement itself.
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
-# package to name any more.
-source = ["agent", "cli", "core", "couplers", "registry", "solvers", "studies", "verification"]
+# package to name. **All eleven landed packages**, checked against
+# `scripts/check_dependencies.LANDED` by `tests/unit/test_cutover.py` -- this list
+# named two of them until CHE-201 (R14.1), so nine packages' coverage was silently
+# not being measured. A coverage source list that lags the tree reports a number
+# about a fraction of it.
+source = [
+  "couplers",
+  "measurements",
+  "numerics",
+  "operations",
+  "operators",
+  "planning",
+  "problems",
+  "representations",
+  "runtime",
+  "solvers",
+  "sources",
+]
 branch = true

@@ -1,0 +1,112 @@
+"""Every `capabilities` citation in the catalog resolves to a measured record.
+
+CHE-223 (R03.6), acceptance criterion 6. This is the half that `__post_init__` used
+to do eagerly and no longer does: constructing a descriptor now validates the
+**shape** of a component id and nothing else, so a well-formed id with no record
+behind it is a claim nobody has measured and *this* is what catches it.
+
+Separate from `tests/operations/test_descriptors.py` on purpose, and separate from
+descriptor construction. The whole point of moving the check here is that
+`operations/` no longer needs the concrete table to be importable -- see
+`operations/descriptors.py` on why that asymmetry mattered -- so the module that
+resolves the citations has to be a module that is allowed to read the pack.
+
+It is the exact counterpart of `test_catalog_resolution.py`, which does the same
+for `implementation`: both fields are references, both are checked for shape at
+construction and for resolution here.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from numerics import capability_record_ids, load_capabilities
+from operations import CATALOG
+
+#: The records that cite a component, as `(operation_id, component_id)`.
+CITATIONS = [
+    (record.operation_id, record.capabilities)
+    for record in CATALOG
+    if record.capabilities is not None
+]
+
+
+def test_the_catalog_cites_something() -> None:
+    """The meta-check: a parametrization over no citations proves nothing."""
+    assert CITATIONS, "no catalog record cites a capability, so the tests below are vacuous"
+    assert len(CITATIONS) == 5, [operation for operation, _ in CITATIONS]
+
+
+@pytest.mark.parametrize(
+    ("operation_id", "component"), CITATIONS, ids=[case[0] for case in CITATIONS]
+)
+def test_every_capability_citation_resolves_to_a_record(
+    operation_id: str, component: str
+) -> None:
+    """Criterion 6, per citation. A stale or invented id fails here."""
+    assert component in capability_record_ids(), (
+        f"{operation_id} cites {component!r}, which has no record under "
+        f"knowledge/capabilities/. Catalogued components: {list(capability_record_ids())}"
+    )
+    capability = load_capabilities(component)
+    assert capability.component == component
+    assert capability.probe.startswith("benchmarks/probes/")
+
+
+def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
+    """Which citations exist, and the honest `None` for everything else.
+
+    A coupler runs in whatever namespace the field it was handed carries, so it has
+    no measured device/dtype row of its own -- citing the chromatix record would
+    claim a measurement taken about something else. `None` is the citation, not a
+    missing one, and `operations/descriptors.py` says so.
+    """
+    cited = dict(CITATIONS)
+    assert cited == {
+        "S_RAY_OPTILAND": "M_RAY_OPTILAND",
+        "S_RAY_OPTILAND_BUNDLE": "M_RAY_OPTILAND",
+        "S_WAVE_CHROMATIX": "M_WAVE_CHROMATIX",
+        "O_ASM_PROPAGATE": "M_WAVE_CHROMATIX",
+        "O_FOCAL_PLANE_TRANSFORM": "M_WAVE_CHROMATIX",
+    }
+    for record in CATALOG:
+        if record.capabilities is None:
+            assert not record.implementation.startswith("solvers."), record.operation_id
+
+
+def test_several_descriptors_may_cite_one_record() -> None:
+    """The pack rule, from the catalog's side.
+
+    `S_RAY_OPTILAND` and `S_RAY_OPTILAND_BUNDLE` both cite `M_RAY_OPTILAND` because
+    the probe measured the *package's* device and dtype behaviour, not one semantic
+    operation. Duplicating a component row per descriptor is the second source the
+    knowledge pack removes, so this is pinned as intended rather than tolerated.
+    """
+    per_component: dict[str, list[str]] = {}
+    for operation_id, component in CITATIONS:
+        per_component.setdefault(component, []).append(operation_id)
+    assert sorted(per_component["M_RAY_OPTILAND"]) == [
+        "S_RAY_OPTILAND",
+        "S_RAY_OPTILAND_BUNDLE",
+    ]
+    assert len(per_component["M_WAVE_CHROMATIX"]) == 3
+    # And there is exactly one record per component, not one per citation.
+    assert len(capability_record_ids()) == 2
+
+
+def test_an_unresolvable_citation_would_be_caught() -> None:
+    """The falsifier, since the assertions above are all positive.
+
+    Rebuilt on a copy of a real record so the test is known to discriminate: a
+    well-formed id is accepted at construction -- that is the point of CHE-223 --
+    and it is the resolution step here that refuses it.
+    """
+    import dataclasses
+
+    record = next(r for r in CATALOG if r.capabilities == "M_RAY_OPTILAND")
+    invented = dataclasses.replace(record, capabilities="M_RAY_INVENTED")
+    assert invented.capabilities == "M_RAY_INVENTED", "construction must still accept it"
+    assert invented.capabilities not in capability_record_ids()
+    with pytest.raises(ValueError) as caught:
+        load_capabilities(invented.capabilities)
+    assert caught.value.code == "UNKNOWN_COMPONENT"

@@ -35,6 +35,11 @@ typer==0.27.0
 mypy==2.3.0
 pytest==9.1.1
 pytest-cov==7.1.0
+# CHE-140: the default suite is sharded across worker processes
+# (`-n` / `--dist loadfile` in pyproject's addopts). Pinned like every other
+# tool here -- a test-distribution plugin decides which process a module-scoped
+# fixture runs in, so a floating version could change what a green run means.
+pytest-xdist==3.8.0
 ruff==0.16.0
 types-PyYAML==6.0.12.20260724
 
