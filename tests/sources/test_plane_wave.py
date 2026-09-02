@@ -377,9 +377,10 @@ def test_the_source_registers_as_a_solver(isolated_registry: None) -> None:
 
     `input='scalar_field'` follows the precedent R05.3 set for the ray solver,
     whose descriptor also names the representation it works in rather than the
-    `RayTraceProblem` it consumes: `SEMANTIC_TYPES` holds representations, and how
-    a problem type enters the graph is R12's question. Stated here so the choice is
-    visible rather than looking like the input it is not.
+    problem type it consumes -- `OpticalSetup` plus a source since CHE-218:
+    `SEMANTIC_TYPES` holds representations, and how a problem type enters the graph
+    is R12's question. Stated here so the choice is visible rather than looking
+    like the input it is not.
 
     `capabilities=None` is the honest citation. There is no measured device/dtype
     row for this operation because it imports no backend; citing the chromatix row

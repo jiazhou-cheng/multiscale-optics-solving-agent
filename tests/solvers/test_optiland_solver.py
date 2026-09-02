@@ -2,7 +2,7 @@
 
 CHE-181 (R05.3), acceptance criteria:
 
-1. `trace(problem, sampling=..., execution=...)` returns a neutral `RayBundle`,
+1. `trace(setup, source, sampling=..., execution=...)` returns a neutral `RayBundle`,
    and it is the only entry point -- **superseded by CHE-217 (R05.6)**, which
    added `trace_rays` for a supplied bundle. What survives of the criterion is the
    exact list: the public surface is these two functions plus the execution
@@ -39,6 +39,7 @@ as follow-up on CHE-181.
 
 from __future__ import annotations
 
+import math
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -46,7 +47,12 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from fixtures.systems import REVERSE_TELEPHOTO, singlet_ref
+from fixtures.systems import (
+    REVERSE_TELEPHOTO,
+    reverse_telephoto_source,
+    singlet_ref,
+    singlet_source,
+)
 
 from numerics import OPTILAND_CAPABILITIES, ArrayNamespace, DevicePlacement, Precision
 from operations import OperationDescriptor, OperationKind, registry, resolve
@@ -56,7 +62,12 @@ from solvers.optiland import CAPABILITIES, DERIVATIVE, configure_execution, trac
 
 ROOT = Path(__file__).resolve().parents[2]
 CPU64 = {"device": "cpu", "precision": "fp64"}
-ON_AXIS = {"num_rings": 8, "reference_surface": "exit_pupil", "wavelength_um": 0.55}
+ON_AXIS = {"num_rings": 8, "reference_surface": "exit_pupil"}
+
+#: CHE-218 (R05.7): the wavelength and the field angle are the *source's*, not the
+#: sampling's. `singlet_source()` and `reverse_telephoto_source()` both default to
+#: on axis at 550 nm, which is what every assertion in this file was written at.
+LIGHT = singlet_source()
 
 #: Names the reference implementation used for this job, none of which landed.
 AVOIDED_NAMES = (
@@ -107,7 +118,7 @@ def test_no_adapter_facade_anywhere_in_the_package() -> None:
 
 
 def test_trace_returns_a_neutral_bundle() -> None:
-    bundle = trace(singlet_ref(), sampling=ON_AXIS, execution=CPU64)
+    bundle = trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution=CPU64)
     assert isinstance(bundle, RayBundle)
     assert bundle.count == 1 + 3 * 8 * 9
     assert bundle.wavelength_m == pytest.approx(0.55e-6, abs=0.0)
@@ -126,8 +137,8 @@ def test_two_consecutive_calls_are_bit_identical() -> None:
     inheriting them -- is part of the behaviour being reproduced, not an
     incidental detail.
     """
-    first = trace(REVERSE_TELEPHOTO, sampling=ON_AXIS, execution=CPU64)
-    second = trace(REVERSE_TELEPHOTO, sampling=ON_AXIS, execution=CPU64)
+    first = trace(REVERSE_TELEPHOTO, reverse_telephoto_source(), sampling=ON_AXIS, execution=CPU64)
+    second = trace(REVERSE_TELEPHOTO, reverse_telephoto_source(), sampling=ON_AXIS, execution=CPU64)
     for name in ("positions_m", "directions", "amplitude", "optical_path_m", "measure_weight"):
         np.testing.assert_array_equal(getattr(first, name), getattr(second, name))
     assert first.optical_path_reference == second.optical_path_reference
@@ -140,13 +151,13 @@ def test_a_foreign_backend_selection_does_not_leak_in() -> None:
     selects the torch backend, and a trace that every artifact describes as NumPy
     executes in torch, converting every array on entry.
     """
-    baseline = trace(singlet_ref(), sampling=ON_AXIS, execution=CPU64)
+    baseline = trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution=CPU64)
 
     import optiland.backend as be
 
     be.set_backend("torch")
     be.set_precision("float32")
-    after = trace(singlet_ref(), sampling=ON_AXIS, execution=CPU64)
+    after = trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution=CPU64)
     try:
         np.testing.assert_array_equal(baseline.positions_m, after.positions_m)
         assert str(be.get_backend()) == "numpy"
@@ -196,7 +207,7 @@ def test_float32_traces_in_float32_and_says_so() -> None:
     nothing downstream can see it.
     """
     bundle = trace(
-        singlet_ref(), sampling=ON_AXIS, execution={"device": "cpu", "precision": "fp32"}
+        singlet_ref(), LIGHT, sampling=ON_AXIS, execution={"device": "cpu", "precision": "fp32"}
     )
     assert str(bundle.state.dtype) == "float32"
     assert bundle.amplitude.dtype == np.complex64, (
@@ -229,14 +240,19 @@ def test_an_inadmissible_request_is_refused_with_a_code(
     execution: dict[str, str], code: str
 ) -> None:
     with pytest.raises(ValueError) as excinfo:
-        trace(singlet_ref(), sampling=ON_AXIS, execution=execution)
+        trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution=execution)
     assert getattr(excinfo.value, "code", None) == code
 
 
 def test_fp16_refusal_cites_the_measured_table() -> None:
     """A refusal that names the probe is one a reader can check or widen."""
     with pytest.raises(ValueError) as excinfo:
-        trace(singlet_ref(), sampling=ON_AXIS, execution={"device": "cpu", "precision": "fp16"})
+        trace(
+            singlet_ref(),
+            LIGHT,
+            sampling=ON_AXIS,
+            execution={"device": "cpu", "precision": "fp16"},
+        )
     message = str(excinfo.value)
     assert CAPABILITIES in message
     assert "fp32" in message and "fp64" in message
@@ -254,10 +270,10 @@ def test_the_refusal_happens_before_the_solver_is_imported() -> None:
     probe = (
         "import sys, json\n"
         "sys.path.insert(0, 'tests')\n"
-        "from fixtures.systems import singlet_ref\n"
+        "from fixtures.systems import singlet_ref, singlet_source\n"
         "from solvers.optiland import trace\n"
         "try:\n"
-        "    trace(singlet_ref(),\n"
+        "    trace(singlet_ref(), singlet_source(),\n"
         "          sampling={'num_rings': 8, 'reference_surface': 'exit_pupil'},\n"
         "          execution={'device': 'cpu', 'precision': 'fp16'})\n"
         "except ValueError as exc:\n"
@@ -291,38 +307,95 @@ def test_a_misspelled_or_incomplete_argument_is_refused(
     kwargs: dict[str, object] = {"sampling": dict(ON_AXIS), "execution": dict(CPU64)}
     kwargs[argument] = value
     with pytest.raises(ValueError, match=f"{argument}= "):
-        trace(singlet_ref(), **kwargs)  # type: ignore[arg-type]
+        trace(singlet_ref(), LIGHT, **kwargs)  # type: ignore[arg-type]
 
 
-def test_a_field_the_problem_cannot_express_is_refused_not_normalized() -> None:
-    """The singlet declares only the axis, so no other field is expressible on it.
+def test_a_field_no_record_enumerated_is_traceable() -> None:
+    """CHE-218 (R05.7) acceptance criterion 1, and it replaces two refusals.
 
-    Normalizing it to the axis would trace a different field than the caller asked
-    for and report success.
+    Both of these used to raise. `singlet_ref()` declared only the axis, so 6 deg
+    was "not expressible on this problem"; `REVERSE_TELEPHOTO` declared at most
+    30 deg, so 45 deg was "outside the largest field this problem declares". Both
+    refusals were correct given the old schema and both were artifacts of it: the
+    field set existed only to give the backend a `max_field`, so asking for a new
+    field angle meant *editing the optical system*.
+
+    The setups here are the same two objects, unedited, and neither carries a field
+    at all. This is the capability the split bought, so it is asserted as a
+    capability rather than left as the absence of a test.
     """
-    with pytest.raises(ValueError, match="only the on-axis field"):
-        trace(
-            singlet_ref(),
-            sampling={**ON_AXIS, "field_deg": (0.0, 6.0)},
-            execution=CPU64,
-        )
-    with pytest.raises(ValueError, match="outside the largest field"):
-        trace(
-            REVERSE_TELEPHOTO,
-            sampling={**ON_AXIS, "field_deg": (0.0, 45.0)},
-            execution=CPU64,
-        )
+    for setup, source in (
+        (singlet_ref(), singlet_source(field_angle_deg=(0.0, 6.0))),
+        (REVERSE_TELEPHOTO, reverse_telephoto_source(field_angle_deg=(0.0, 45.0))),
+    ):
+        bundle = trace(setup, source, sampling=ON_AXIS, execution=CPU64)
+        assert isinstance(bundle, RayBundle)
+        assert bundle.count == 1 + 3 * 8 * 9
+
+
+def test_the_same_setup_traces_at_two_fields_without_being_reconstructed() -> None:
+    """Acceptance criterion 3: one setup object, two field angles, two traces.
+
+    The setup is constructed **once** and reused, so nothing about it can have
+    been edited between the calls. The two bundles have to differ -- otherwise the
+    field angle reached nothing -- and the axial one has to stay centred on the
+    axis, which is what says the off-axis call did not perturb the on-axis one.
+    """
+    setup = singlet_ref()
+    on_axis = trace(setup, singlet_source(), sampling=ON_AXIS, execution=CPU64)
+    off_axis = trace(
+        setup,
+        singlet_source(field_angle_deg=(0.0, 3.0)),
+        sampling=ON_AXIS,
+        execution=CPU64,
+    )
+    assert on_axis.count == off_axis.count
+    axial_y = np.asarray(on_axis.positions_m)[:, 1]
+    tilted_y = np.asarray(off_axis.positions_m)[:, 1]
+    assert abs(float(axial_y.mean())) < 1.0e-18, "the on-axis fan is centred on the axis"
+    assert float(tilted_y.mean()) != 0.0, "the off-axis field has to have moved the fan"
+    # ...and re-tracing on axis reproduces the first call bitwise, so the setup
+    # carries no state either call could have left behind.
+    again = trace(setup, singlet_source(), sampling=ON_AXIS, execution=CPU64)
+    np.testing.assert_array_equal(
+        np.asarray(again.positions_m), np.asarray(on_axis.positions_m)
+    )
 
 
 def test_field_degrees_convert_to_the_solvers_normalized_coordinate() -> None:
-    """6 deg on a 30 deg system is the `Hy = 0.2` the off-axis evidence was taken at."""
+    """The declared field IS the maximum field, so the coordinate is the unit one.
+
+    Before R05.7 this read `_normalized_field(lens, (0.0, 6.0)) == (0.0, 0.2)`,
+    because `max_field` was 30 -- the largest of a list the caller had to declare.
+    `build_lens` now declares exactly the field being traced, so the same 6 deg
+    normalizes against 6 and the round trip `max_field * H` recovers it exactly.
+    `max_field` is still read off the constructed lens rather than assumed.
+    """
     from solvers.optiland.solver import _normalized_field
     from solvers.optiland.system import build_lens
 
-    lens = build_lens(REVERSE_TELEPHOTO)
-    assert _normalized_field(lens, (0.0, 6.0)) == (0.0, 0.2)
-    assert _normalized_field(lens, (0.0, 30.0)) == (0.0, 1.0)
-    assert _normalized_field(lens, (0.0, 0.0)) == (0.0, 0.0)
+    for field_deg, expected in (
+        ((0.0, 6.0), (0.0, 1.0)),
+        ((0.0, 30.0), (0.0, 1.0)),
+        ((0.0, 0.0), (0.0, 0.0)),
+    ):
+        lens = build_lens(
+            REVERSE_TELEPHOTO, reverse_telephoto_source(field_angle_deg=field_deg)
+        )
+        assert _normalized_field(lens, field_deg) == expected
+        # The round trip the backend performs, exactly: `field = max_field * H`.
+        max_field = float(lens.fields.max_field)
+        normalized = _normalized_field(lens, field_deg)
+        assert (max_field * normalized[0], max_field * normalized[1]) == field_deg
+
+    # A two-component field, where `max_field` is `hypot(x, y)` rather than either
+    # component. The round trip still has to be exact, because
+    # `test_optiland_finite_conjugate.py` asserts the launch position at `abs=0.0`.
+    lens = build_lens(REVERSE_TELEPHOTO, reverse_telephoto_source(field_angle_deg=(2.0, 3.0)))
+    max_field = float(lens.fields.max_field)
+    assert max_field == math.hypot(2.0, 3.0)
+    normalized = _normalized_field(lens, (2.0, 3.0))
+    assert (max_field * normalized[0], max_field * normalized[1]) == (2.0, 3.0)
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +453,7 @@ def test_there_is_no_gradient_knob() -> None:
     import inspect
 
     signature = inspect.signature(trace)
-    assert set(signature.parameters) == {"problem", "sampling", "execution"}
+    assert set(signature.parameters) == {"setup", "source", "sampling", "execution"}
     package = ROOT / "src" / "solvers" / "optiland"
     for module in sorted(package.rglob("*.py")):
         source = module.read_text(encoding="utf-8")
@@ -407,8 +480,8 @@ def test_trace_on_cuda_matches_the_host_within_float32() -> None:
     behind a precision change.
     """
     fp32 = {"precision": "fp32"}
-    host = trace(singlet_ref(), sampling=ON_AXIS, execution={"device": "cpu", **fp32})
-    device = trace(singlet_ref(), sampling=ON_AXIS, execution={"device": "cuda", **fp32})
+    host = trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution={"device": "cpu", **fp32})
+    device = trace(singlet_ref(), LIGHT, sampling=ON_AXIS, execution={"device": "cuda", **fp32})
     assert device.count == host.count
     assert str(device.state.dtype) == "float32"
     np.testing.assert_allclose(
@@ -435,7 +508,12 @@ def test_cuda_is_refused_on_a_container_with_no_device() -> None:
     if torch.version.cuda is not None and torch.cuda.is_available():
         pytest.skip("a CUDA device is attached; the refusal path is not reachable here")
     with pytest.raises(ValueError) as excinfo:
-        trace(singlet_ref(), sampling=ON_AXIS, execution={"device": "cuda", "precision": "fp32"})
+        trace(
+            singlet_ref(),
+            LIGHT,
+            sampling=ON_AXIS,
+            execution={"device": "cuda", "precision": "fp32"},
+        )
     assert getattr(excinfo.value, "code", None) == "DEVICE_NOT_AVAILABLE"
     message = str(excinfo.value)
     assert "CPU-only build" in message or "no CUDA device is attached" in message

@@ -55,9 +55,10 @@ from fixtures.systems import (
     SINGLET_EFFECTIVE_FOCAL_LENGTH_MM,
     SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
     singlet_ref,
+    singlet_source,
 )
 
-from problems.ray_trace import RayTraceProblem
+from problems.ray_trace import OpticalSetup
 from representations import ContractError, direction_norm_tolerance
 from solvers.optiland import trace
 from solvers.optiland.rays import (
@@ -131,16 +132,23 @@ RECORD: dict[str, dict[str, dict[str, float]]] = {
     },
 }
 
-PROBLEMS: dict[str, RayTraceProblem] = {
+SETUPS: dict[str, OpticalSetup] = {
     "M3SingletRef": singlet_ref(),
     "ReverseTelephoto": REVERSE_TELEPHOTO,
 }
 
 
 def _traced(name: str, reference_surface: str) -> tuple[object, dict[str, object]]:
-    """The bundle and its diagnostics, at the record's own settings."""
-    problem = PROBLEMS[name]
-    lens = build_lens(problem)
+    """The bundle and its diagnostics, at the record's own settings.
+
+    CHE-218 (R05.7) split the illumination out of the setup, and this is one of
+    the two places the split had to be shown not to move a number. The lens is
+    built with **no source**, which declares the on-axis field and the setup's own
+    reference wavelength -- exactly what the record was taken under -- and the
+    trace still runs at 550 nm, which for M3-REVERSE-TELEPHOTO is outside the
+    wavelength set the fixture used to carry and always was.
+    """
+    lens = build_lens(SETUPS[name])
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
     return to_ray_bundle(
         lens,
@@ -317,7 +325,7 @@ def test_the_emitted_measure_is_declared_and_scaled_to_the_real_aperture(name: s
     bundle, diagnostics = _traced(name, "exit_pupil")
     assert bundle.measure_kind == "quadrature_area_m2"
     aperture_radius_m = (
-        PROBLEMS[name].entrance_pupil_diameter_mm / 2.0
+        SETUPS[name].entrance_pupil_diameter_mm / 2.0
     ) * NATIVE_LENGTH_M
     assert float(np.sum(bundle.measure_weight)) == pytest.approx(
         math.pi * aperture_radius_m**2 * (1.0 + 1.0 / (4.0 * NUM_RINGS**2)), rel=1e-14
@@ -381,7 +389,7 @@ def test_nothing_is_clipped_on_the_fixture_systems(name: str) -> None:
     """The honest state, recorded rather than assumed.
 
     `Optic.trace` exposes survivors only, and neither fixture clips at any field
-    the problem declares -- which is why the mask logic below is exercised against
+    the setup declares -- which is why the mask logic below is exercised against
     a stub instead. Pinning this means a future prescription change that starts
     clipping is visible rather than silently reducing the ray count.
     """
@@ -495,11 +503,8 @@ def test_the_traced_focal_length_matches_the_thin_lens_formula() -> None:
     """
     bundle = trace(
         singlet_ref(),
-        sampling={
-            "num_rings": NUM_RINGS,
-            "reference_surface": "exit_pupil",
-            "wavelength_um": WAVELENGTH_UM,
-        },
+        singlet_source(wavelength_um=WAVELENGTH_UM),
+        sampling={"num_rings": NUM_RINGS, "reference_surface": "exit_pupil"},
         execution={"device": "cpu", "precision": "fp64"},
     )
     positions = np.asarray(bundle.positions_m)
@@ -543,7 +548,7 @@ def test_the_pupil_semi_extent_matches_the_paraxial_semi_diameter() -> None:
 
 
 def test_the_entrance_pupil_is_the_prescription_it_was_given() -> None:
-    """The aperture is what the problem declared, not what the solver defaulted to."""
+    """The aperture is what the setup declared, not what the solver defaulted to."""
     lens = build_lens(singlet_ref())
     import optiland.backend.utils as be_utils
 

@@ -70,7 +70,9 @@ from fixtures.systems import (
     SINGLET_EFFECTIVE_FOCAL_LENGTH_MM,
     finite_conjugate_image_distance_mm,
     finite_conjugate_singlet,
+    finite_conjugate_source,
     singlet_ref,
+    singlet_source,
 )
 
 from representations import RayBundle
@@ -108,17 +110,23 @@ def _scalar(value: object) -> float:
     return float(np.asarray(_host(value)).ravel()[0])
 
 
-def _launch_state(problem: object, *, field_deg: tuple[float, float]) -> dict[str, np.ndarray]:
+def _launch_state(
+    setup: object, source: object, *, field_deg: tuple[float, float]
+) -> dict[str, np.ndarray]:
     """Regenerate the launch state the way the adapter does, and hand back the columns.
 
     Through the solver's own public generator over the same hexapolar distribution
     `Optic.trace` builds, because `Optic.trace` retains no launch state. Section 1
     checks that the regeneration is faithful before anything is concluded from it.
+
+    CHE-218 (R05.7): the setup and the source are separate arguments, and both
+    reach the lens because both matter here -- the object distance places the
+    object surface and the field angle is what `max_field` normalizes against.
     """
     import optiland.backend as be
     from optiland.distribution import create_distribution
 
-    lens = build_lens(problem)
+    lens = build_lens(setup, source)
     field = _normalized_field(lens, field_deg)
     distribution = create_distribution("hexapolar")
     distribution.generate_points(NUM_RINGS)
@@ -164,7 +172,11 @@ def test_the_finite_object_launch_state_is_a_single_point(
     exactly rather than within a tolerance. A spread that is merely small would
     mean the source is an extended one and the reference is not a single sphere.
     """
-    state = _launch_state(finite_conjugate_singlet(), field_deg=field_deg)
+    state = _launch_state(
+        finite_conjugate_singlet(),
+        finite_conjugate_source(field_angle_deg=field_deg),
+        field_deg=field_deg,
+    )
     for axis in ("x", "y", "z"):
         assert float(np.ptp(state[axis])) == 0.0, f"{axis} origin spread must be exactly zero"
     assert state["x"].size == 1 + 3 * NUM_RINGS * (NUM_RINGS + 1)
@@ -187,7 +199,11 @@ def test_the_finite_object_launch_accumulator_is_seeded_at_zero() -> None:
     reference term would not be zero and the structural argument would have been
     right by luck. Measured: exactly 0.0, with zero spread.
     """
-    state = _launch_state(finite_conjugate_singlet(), field_deg=(0.0, 2.0))
+    state = _launch_state(
+        finite_conjugate_singlet(),
+        finite_conjugate_source(field_angle_deg=(0.0, 2.0)),
+        field_deg=(0.0, 2.0),
+    )
     assert float(np.max(np.abs(state["accumulator"]))) == 0.0
     assert float(np.ptp(state["accumulator"])) == 0.0
 
@@ -200,13 +216,15 @@ def test_the_finite_object_bundle_diverges_rather_than_being_collimated() -> Non
     two fixture systems, because "the two cases are different geometries" is the
     reason they cannot share one arithmetic.
     """
-    point = _launch_state(finite_conjugate_singlet(), field_deg=(0.0, 0.0))
+    point = _launch_state(
+        finite_conjugate_singlet(), finite_conjugate_source(), field_deg=(0.0, 0.0)
+    )
     direction_spread = max(float(np.ptp(point[axis])) for axis in ("L", "M", "N"))
     origin_spread = max(float(np.ptp(point[axis])) for axis in ("x", "y", "z"))
     assert origin_spread == 0.0
     assert direction_spread > 1.0e-3, "a point source radiates; its directions must spread"
 
-    collimated = _launch_state(singlet_ref(), field_deg=(0.0, 0.0))
+    collimated = _launch_state(singlet_ref(), singlet_source(), field_deg=(0.0, 0.0))
     assert float(np.ptp(collimated["z"])) == 0.0, "launched on one plane"
     assert max(float(np.ptp(collimated[axis])) for axis in ("L", "M", "N")) < 1.0e-12
     assert max(float(np.ptp(collimated[axis])) for axis in ("x", "y")) > 1.0e-3
@@ -221,7 +239,11 @@ def test_the_regenerated_launch_state_reproduces_the_trace(
     The same property CHE-41 established for the infinite case, re-established
     here for the finite one rather than assumed to carry over.
     """
-    state = _launch_state(finite_conjugate_singlet(), field_deg=field_deg)
+    state = _launch_state(
+        finite_conjugate_singlet(),
+        finite_conjugate_source(field_angle_deg=field_deg),
+        field_deg=field_deg,
+    )
     lens = state["lens"]
     traced = lens.surfaces.trace(state["launch"], skip=1)
     reference = lens.trace(
@@ -246,8 +268,9 @@ def test_the_object_space_term_is_available_and_exactly_zero(
     field_deg: tuple[float, float],
 ) -> None:
     """The refusal is lifted, and what replaces it is an exact zero per ray."""
-    problem = finite_conjugate_singlet()
-    lens = build_lens(problem)
+    lens = build_lens(
+        finite_conjugate_singlet(), finite_conjugate_source(field_angle_deg=field_deg)
+    )
     field = _normalized_field(lens, field_deg)
     term = _object_space_reference(
         lens,
@@ -269,7 +292,7 @@ def test_the_object_space_term_is_available_and_exactly_zero(
 
 def test_the_infinite_object_term_is_unchanged_and_still_names_its_own_geometry() -> None:
     """The control: adding the finite branch must not touch the collimated one."""
-    lens = build_lens(singlet_ref())
+    lens = build_lens(singlet_ref(), singlet_source())
     term = _object_space_reference(
         lens,
         field=(0.0, 0.0),
@@ -325,12 +348,8 @@ def test_a_point_source_trace_yields_a_coherent_bundle(
     """
     bundle = trace(
         finite_conjugate_singlet(),
-        sampling={
-            "num_rings": NUM_RINGS,
-            "reference_surface": reference_surface,
-            "wavelength_um": WAVELENGTH_UM,
-            "field_deg": field_deg,
-        },
+        finite_conjugate_source(field_angle_deg=field_deg, wavelength_um=WAVELENGTH_UM),
+        sampling={"num_rings": NUM_RINGS, "reference_surface": reference_surface},
         execution=CPU64,
     )
     assert isinstance(bundle, RayBundle)
@@ -364,13 +383,19 @@ def test_the_quadrature_measure_is_the_same_area_element_as_the_collimated_case(
     identical -- if the finite conjugate changed them, the measure would be
     carrying something about the light.
     """
-    common = {
-        "num_rings": NUM_RINGS,
-        "reference_surface": "exit_pupil",
-        "wavelength_um": WAVELENGTH_UM,
-    }
-    finite = trace(finite_conjugate_singlet(), sampling=common, execution=CPU64)
-    collimated = trace(singlet_ref(), sampling=common, execution=CPU64)
+    common = {"num_rings": NUM_RINGS, "reference_surface": "exit_pupil"}
+    finite = trace(
+        finite_conjugate_singlet(),
+        finite_conjugate_source(wavelength_um=WAVELENGTH_UM),
+        sampling=common,
+        execution=CPU64,
+    )
+    collimated = trace(
+        singlet_ref(),
+        singlet_source(wavelength_um=WAVELENGTH_UM),
+        sampling=common,
+        execution=CPU64,
+    )
     np.testing.assert_array_equal(
         np.asarray(finite.measure_weight), np.asarray(collimated.measure_weight)
     )
@@ -387,7 +412,7 @@ def test_the_chief_ray_piston_is_removed_for_a_finite_conjugate_too() -> None:
     system is ~2e4 waves -- so the conditioning is doing the same work here as it
     does for the collimated case rather than being a no-op.
     """
-    lens = build_lens(finite_conjugate_singlet())
+    lens = build_lens(finite_conjugate_singlet(), finite_conjugate_source())
     native = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
     bundle, diagnostics = to_ray_bundle(
         lens,
@@ -417,18 +442,18 @@ def test_the_exit_pupil_transfer_is_a_reparameterization_for_a_finite_conjugate(
     (XPL is negative and small), so the transfer runs with a different sign of
     lever arm than the collimated case.
     """
-    common = {
-        "num_rings": NUM_RINGS,
-        "wavelength_um": WAVELENGTH_UM,
-    }
+    setup = finite_conjugate_singlet()
+    source = finite_conjugate_source(wavelength_um=WAVELENGTH_UM)
     at_image = trace(
-        finite_conjugate_singlet(),
-        sampling={**common, "reference_surface": "image_surface"},
+        setup,
+        source,
+        sampling={"num_rings": NUM_RINGS, "reference_surface": "image_surface"},
         execution=CPU64,
     )
     at_pupil = trace(
-        finite_conjugate_singlet(),
-        sampling={**common, "reference_surface": "exit_pupil"},
+        setup,
+        source,
+        sampling={"num_rings": NUM_RINGS, "reference_surface": "exit_pupil"},
         execution=CPU64,
     )
     np.testing.assert_array_equal(
@@ -461,8 +486,8 @@ def test_the_traced_image_lands_at_the_closed_form_paraxial_conjugate(
     (1.8e-4 at 2f, 5.6e-5 at 10f), which is aberration behaving like aberration.
     """
     distance = multiple * SINGLET_EFFECTIVE_FOCAL_LENGTH_MM
-    problem = finite_conjugate_singlet(distance)
-    lens = build_lens(problem)
+    setup = finite_conjugate_singlet(distance)
+    lens = build_lens(setup, finite_conjugate_source(object_distance_mm=distance))
     traced = lens.trace(Hx=0.0, Hy=0.0, wavelength=WAVELENGTH_UM, num_rays=NUM_RINGS)
 
     position = np.stack([_host(traced.x), _host(traced.y), _host(traced.z)], axis=1)
@@ -474,9 +499,9 @@ def test_the_traced_image_lands_at_the_closed_form_paraxial_conjugate(
         directions[innermost, 2]
     ) / transverse
 
-    expected_mm = problem.surfaces[0].thickness_mm + finite_conjugate_image_distance_mm(distance)
+    expected_mm = setup.surfaces[0].thickness_mm + finite_conjugate_image_distance_mm(distance)
     assert crossing_mm == pytest.approx(expected_mm, rel=CONJUGATE_RELATIVE)
-    assert problem.surfaces[-1].thickness_mm == finite_conjugate_image_distance_mm(distance)
+    assert setup.surfaces[-1].thickness_mm == finite_conjugate_image_distance_mm(distance)
 
 
 def test_the_fixture_sits_at_unit_magnification() -> None:
@@ -485,7 +510,7 @@ def test_the_fixture_sits_at_unit_magnification() -> None:
     The solver's paraxial magnification is a scalar with no aberration in it, so it
     is held to `rel=1e-12` where the ray crossing above is held to 3e-4.
     """
-    lens = build_lens(finite_conjugate_singlet())
+    lens = build_lens(finite_conjugate_singlet(), finite_conjugate_source())
     assert _scalar(lens.paraxial.magnification()) == pytest.approx(
         FINITE_CONJUGATE_MAGNIFICATION, rel=1e-12
     )
@@ -511,12 +536,10 @@ def test_the_off_axis_chief_ray_lands_where_the_magnification_says(
     """
     bundle = trace(
         finite_conjugate_singlet(),
-        sampling={
-            "num_rings": NUM_RINGS,
-            "reference_surface": "image_surface",
-            "wavelength_um": WAVELENGTH_UM,
-            "field_deg": (0.0, field_deg),
-        },
+        finite_conjugate_source(
+            field_angle_deg=(0.0, field_deg), wavelength_um=WAVELENGTH_UM
+        ),
+        sampling={"num_rings": NUM_RINGS, "reference_surface": "image_surface"},
         execution=CPU64,
     )
     positions = np.asarray(bundle.positions_m)
@@ -542,12 +565,10 @@ def test_the_spot_centroid_is_displaced_from_the_chief_ray_by_coma() -> None:
     for field_deg in (0.5, 1.0, 2.0):
         bundle = trace(
             finite_conjugate_singlet(),
-            sampling={
-                "num_rings": NUM_RINGS,
-                "reference_surface": "image_surface",
-                "wavelength_um": WAVELENGTH_UM,
-                "field_deg": (0.0, field_deg),
-            },
+            finite_conjugate_source(
+                field_angle_deg=(0.0, field_deg), wavelength_um=WAVELENGTH_UM
+            ),
+            sampling={"num_rings": NUM_RINGS, "reference_surface": "image_surface"},
             execution=CPU64,
         )
         positions = np.asarray(bundle.positions_m)

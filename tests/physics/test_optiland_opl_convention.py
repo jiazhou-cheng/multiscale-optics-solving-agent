@@ -57,7 +57,7 @@ import numpy as np
 import pytest
 from fixtures.systems import REVERSE_TELEPHOTO, singlet_ref
 
-from problems.ray_trace import Material, RayTraceProblem, SurfaceSpec
+from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
 from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
 from solvers.optiland import rays as rays_module
 from solvers.optiland import trace_rays
@@ -96,7 +96,7 @@ def _host(value: object) -> np.ndarray:
     return np.asarray(be_utils.to_numpy(value))
 
 
-def _plate(*, thickness_mm: float, index: float, epd_mm: float = 2.0) -> RayTraceProblem:
+def _plate(*, thickness_mm: float, index: float, epd_mm: float = 2.0) -> OpticalSetup:
     """A manufactured geometry: one axial gap, then a plane, then an image plane.
 
     Everything about it is chosen so the accumulated optical path has a
@@ -107,16 +107,15 @@ def _plate(*, thickness_mm: float, index: float, epd_mm: float = 2.0) -> RayTrac
     material: Material = (
         {"kind": "air"} if index == 1.0 else {"kind": "ideal", "refractive_index": index}
     )
-    return RayTraceProblem(
+    return OpticalSetup(
         name=f"plate-t{thickness_mm}-n{index}",
         surfaces=(
             SurfaceSpec(thickness_mm=thickness_mm, material=material),
             SurfaceSpec(thickness_mm=0.0),
         ),
         entrance_pupil_diameter_mm=epd_mm,
-        field_angles_deg=((0.0, 0.0),),
-        wavelengths_um=(WAVELENGTH_UM,),
         stop_index=0,
+        reference_wavelength_um=WAVELENGTH_UM,
     )
 
 
@@ -133,16 +132,15 @@ def test_the_accumulator_is_index_weighted_optical_path_not_geometric() -> None:
     products.
     """
     lens = build_lens(
-        RayTraceProblem(
+        OpticalSetup(
             name="two-media",
             surfaces=(
                 SurfaceSpec(thickness_mm=6.0, material={"kind": "ideal", "refractive_index": 1.7}),
                 SurfaceSpec(thickness_mm=0.0),
             ),
             entrance_pupil_diameter_mm=2.0,
-            field_angles_deg=((0.0, 0.0),),
-            wavelengths_um=(WAVELENGTH_UM,),
             stop_index=0,
+            reference_wavelength_um=WAVELENGTH_UM,
         )
     )
     # The launch plane sits an EPD before the first surface, so the air leg is
@@ -223,7 +221,7 @@ def test_a_paraxial_surface_would_not_have_served_as_an_oracle() -> None:
 
 
 def _declared_pupil_opl(
-    problem: RayTraceProblem,
+    setup: OpticalSetup,
     *,
     field_deg: tuple[float, float],
     num_rings: int,
@@ -235,8 +233,19 @@ def _declared_pupil_opl(
     Deliberately exercises the shipping functions with one term altered, rather
     than a hand-written parallel copy that could drift away from what ships. That
     is what makes the negative controls below controls on *this* code.
+
+    CHE-218 (R05.7): the field angle now reaches the lens through a `SourceSpec`,
+    because `build_lens` declares exactly the field being traced. Before the split
+    it reached it through the setup's own field *list*, and the normalization here
+    divided by the largest of them -- so the off-axis case below asked for 6 deg
+    against a declared maximum of 30 and traced at `Hy = 0.2`. It now asks for the
+    same 6 deg against a declared maximum of 6 and traces at `Hy = 1.0`. Same
+    physical field, and `max_field` is still read back off the lens rather than
+    assumed.
     """
-    lens = build_lens(problem)
+    lens = build_lens(
+        setup, SourceSpec(wavelength_um=WAVELENGTH_UM, field_angle_deg=field_deg)
+    )
     max_field = float(lens.fields.max_field)
     field = (
         (0.0, 0.0)

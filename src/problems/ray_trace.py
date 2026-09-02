@@ -1,15 +1,33 @@
-"""A sequential ray-tracing problem, stated as physical intent.
+"""A sequential ray-trace, stated as physical intent: a setup, and a source.
 
-CHE-156 (R04). A solver solves a *problem*: this module says what optical system
-is to be traced, with what light, in units and conventions the project owns. It
-names no ray tracer, imports no backend, and contains no Optiland API concept --
-not `Optic`, not `surface_group`, not `add_surface`, not a normalized field
-coordinate. The translation into any one solver's construction calls belongs to
-that solver's adapter (R05), which is the only place allowed to know how Optiland
-spells a surface.
+CHE-156 (R04), split by CHE-218 (R05.7). A solver solves a *problem*, and this
+module says what a ray-trace problem is in units and conventions the project
+owns. It names no ray tracer, imports no backend, and contains no Optiland API
+concept -- not `Optic`, not `surface_group`, not `add_surface`, not a normalized
+field coordinate. The translation into any one solver's construction calls
+belongs to that solver's adapter (R05), which is the only place allowed to know
+how Optiland spells a surface.
 
-Two classes, not twenty
------------------------
+Two independent inputs, not one record
+--------------------------------------
+`OpticalSetup` is the optical configuration being traced through. `SourceSpec` is
+a declared illumination. They are separate because a ray trace takes two
+independent inputs, and because holding them in one record made the coupling
+*executable*: the pinned solver normalizes an angular field against the largest
+field the system declares, so tracing an existing system at a new field angle
+meant editing the system. R05.6 then made the second input path real -- an
+already-materialized `RayBundle` from `couplers.scalar_to_ray`, which has no field
+angle and no object distance to give -- and a record that required both forced a
+caller to invent them so that a lens could be built.
+
+A source at that argument position is one of two things: this declarative
+specification, or an existing `RayBundle`. They are alternatives at the same
+position, not two functions over two system types. `RayTraceProblem` is gone
+rather than aliased; the tree is pre-cutover and a compatibility wrapper is what
+the clean-slate rule in `AGENTS.md` bans.
+
+Three classes, not twenty
+-------------------------
 The reference implementation spent 20 classes in `core/optical_system.py` on this
 same schema: three geometry classes, two interaction classes, three material
 classes, an aperture class, a field class, a wavelength class, four kind enums, a
@@ -39,7 +57,7 @@ What is deliberately not here
 -----------------------------
 * **No named prescription, and no way to ask for one.** There is no function
   that turns a prescription name into a lens, no list of supported names, and no
-  concrete lens anywhere under `src/`. A caller builds the problem it wants, or
+  concrete lens anywhere under `src/`. A caller builds the setup it wants, or
   reads a fixture from `tests/fixtures/systems.py`. A production catalog of three
   benchmark lenses is a catalog of three things the project happened to measure,
   and it made a solver call whose argument is a name this repository invented the
@@ -53,6 +71,16 @@ What is deliberately not here
 * **No serialization, fingerprint or schema version.** The reference schema had
   all three because prescriptions were data files loaded by name. These are
   values constructed in Python by the caller that needs them.
+* **No field list and no wavelength list.** Both were dropped by CHE-218, and
+  each was a capability decision rather than a cleanup. The field *set* existed
+  only to give the pinned solver a `max_field` to normalize against, which is a
+  construction detail and now lives at the adapter boundary; dropping it is what
+  makes a setup traceable at a field angle no record enumerated in advance. The
+  wavelength set existed only to select a primary, which was never the wavelength
+  a trace evaluated at -- that was always a free value -- and the primary itself
+  is a property of the setup's characterization, kept as
+  `OpticalSetup.reference_wavelength_um`. Neither list ever reached a trace as a
+  list: one solve is one field and one wavelength.
 """
 
 from __future__ import annotations
@@ -65,7 +93,8 @@ __all__ = [
     "MATERIAL_KINDS",
     "UNITS",
     "Material",
-    "RayTraceProblem",
+    "OpticalSetup",
+    "SourceSpec",
     "SurfaceSpec",
 ]
 
@@ -337,61 +366,70 @@ class SurfaceSpec:
 
 
 @dataclass(frozen=True, slots=True)
-class RayTraceProblem:
-    """A sequential optical system and the light to trace through it.
+class OpticalSetup:
+    """The optical configuration a trace passes through. No illumination.
 
-    Minimality rule 1 -- the fields are jointly constrained, and rule 2 -- this
-    is the public model a solver consumes. `stop_index` has to index `surfaces`,
-    `primary_wavelength_index` has to index `wavelengths_um`, and neither means
-    anything alone.
+    CHE-218 (R05.7). This was the system half of `RayTraceProblem`, which held the
+    optical system and the light in one record and named the second group outright
+    in its own docstring. The coupling was executable rather than cosmetic: because
+    the pinned solver normalizes an angular field against the largest field the
+    system declares, "trace this system at 3 degrees" required *editing the optical
+    system*, and an already-materialized `RayBundle` -- which has no field angle and
+    no object distance at all -- forced a caller to invent both so that a lens could
+    be built. `SourceSpec` is the other half, and the two are independent inputs to
+    a trace.
+
+    Minimality rule 1 -- the fields are jointly constrained, and rule 2 -- this is
+    the public model a solver consumes. `stop_index` has to index `surfaces`, and
+    neither means anything alone.
 
     **The aperture stop is an index, not a flag on a surface.** The reference
     schema put `is_stop: bool` on the surface and validated that exactly one was
     set, which made "no stop" and "three stops" representable states that a
     validator then rejected. One index cannot express either.
 
-    Two surfaces are not listed, and both are fixed rather than parameterized:
-    the object plane, in air, `object_distance_mm` before the first surface
-    (`None` is an object at infinity), and the image plane, in air, placed by the
-    last listed surface's `thickness_mm`. A curved object or a tilted image plane
-    is an extension to this schema, not something to smuggle through a field
-    that already means something else.
+    Two surfaces are not listed, and both are fixed rather than parameterized: the
+    object plane, in air, placed by the *source* (`SourceSpec.object_distance_mm`),
+    and the image plane, in air, placed by the last listed surface's
+    `thickness_mm`. A curved object or a tilted image plane is an extension to this
+    schema, not something to smuggle through a field that already means something
+    else.
 
-    Source, in three parts: where the light comes from (`object_distance_mm`),
-    which directions (`field_angles_deg`, as `(x, y)` pairs in degrees), and at
-    which wavelengths (`wavelengths_um`, with one of them primary).
+    `reference_wavelength_um`, and why the one wavelength-shaped field stayed
+    -----------------------------------------------------------------------
+    **This is not illumination.** It is the wavelength at which this setup's own
+    *paraxial characterization* is defined -- specifically the exit pupil, whose
+    location and diameter a solver reads from the system rather than from the
+    light. Every prescription in the literature states one, for the same reason:
+    "the exit pupil is 3.05 mm before the image" is not a fact until a wavelength
+    is named.
 
-    The two source geometries, and why the difference is physical
-    ------------------------------------------------------------
-    `object_distance_mm is None` -- an object at **infinity**. Every ray of one
-    field arrives with the same direction, and the incoming wavefront is a plane.
+    It stayed because it was **measured** to matter, not because it was convenient
+    to keep. On M3-REVERSE-TELEPHOTO the pinned solver evaluates `paraxial.XPL()`
+    and `XPD()` at whichever declared wavelength is primary: at 0.5876 um they are
+    -3.0545788978518327 mm and 0.46053493637581633 mm, and at 0.55 um they are
+    -3.0550180932891653 mm and 0.4607610620693788 mm. So a setup that carried no
+    reference wavelength would have to locate the exit pupil at whatever wavelength
+    the trace happened to use, which is a different reference surface and a
+    different frozen record.
 
-    `object_distance_mm = d` (finite, positive) -- a **point source**, i.e. a
-    spherical wave. The source sits at
-    `(-tan(x_deg) * d, -tan(y_deg) * d, -d)` in the traced frame, so the field
-    angle of a finite-conjugate problem is a *position* rather than a direction,
-    and it is the direction of the chief ray from that point through the stop.
-    Measured to twelve digits for CHE-207 at three fields including one off axis
-    in both x and y; the sign is negative, so a positive field angle places the
-    source below the axis and its image above it.
-
-    Every ray of one field then leaves that **single point**, which is what makes
-    the launch state a common spherical wavefront: the optical path from that
-    wavefront to each launch point is identically zero, because the launch point
-    *is* the wavefront. `solvers/optiland/rays.py` states the consequence for the
-    declared optical path, and the difference from the infinite case is not
-    cosmetic -- there the origins spread over a plane and the directions are
-    common, here the origin is common and the directions spread.
+    Note what that means and what it does not. The traced wavelength is the
+    *source's* and is free -- it need not equal this one, and the frozen ray
+    records deliberately trace M3-REVERSE-TELEPHOTO at 550 nm against a 587.6 nm
+    reference. That the exit pupil is then located at the reference wavelength
+    rather than the traced one is a real convention, and CHE-218 made it visible
+    instead of changing it: it was already the behaviour, implied by
+    `primary_wavelength_index`, and altering it would move a frozen number.
     """
 
     name: str
     surfaces: tuple[SurfaceSpec, ...]
     entrance_pupil_diameter_mm: float
-    field_angles_deg: tuple[tuple[float, float], ...]
-    wavelengths_um: tuple[float, ...]
     stop_index: int
-    primary_wavelength_index: int = 0
-    object_distance_mm: float | None = None
+    #: The wavelength this setup's paraxial characterization is defined at. No
+    #: default: see the class docstring for the measurement that forced it to
+    #: exist, which is also the reason a default would be an invented convention.
+    reference_wavelength_um: float
     description: str = ""
 
     def __post_init__(self) -> None:
@@ -413,27 +451,135 @@ class RayTraceProblem:
                 f"`entrance_pupil_diameter_mm`={self.entrance_pupil_diameter_mm!r} is not a "
                 "finite positive diameter in mm"
             )
-        if not self.field_angles_deg:
-            problems.append("`field_angles_deg` is empty; a trace needs at least one field")
-        for index, angles in enumerate(self.field_angles_deg):
-            if len(angles) != 2 or not all(math.isfinite(value) for value in angles):
-                problems.append(
-                    f"`field_angles_deg[{index}]`={angles!r} is not a finite (x_deg, y_deg) pair"
-                )
-        if not self.wavelengths_um:
-            problems.append("`wavelengths_um` is empty; a trace needs at least one wavelength")
+        if not math.isfinite(self.reference_wavelength_um) or (
+            self.reference_wavelength_um <= 0.0
+        ):
+            problems.append(
+                f"`reference_wavelength_um`={self.reference_wavelength_um!r} is not a finite "
+                "positive wavelength in micrometres. It is not the wavelength to trace at -- "
+                "that belongs to the source -- it is the one this setup's exit pupil is "
+                "located at, and there is no default because a wavelength nobody chose is "
+                "an invented convention"
+            )
+
+        if problems:
+            raise ValueError(
+                f"optical setup {self.name!r} is not usable:\n  " + "\n  ".join(problems)
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSpec:
+    """A declared illumination: which light, from where, in which direction.
+
+    CHE-218 (R05.7). The other half of the split, and a **declaration** rather
+    than a constructor: it says what the illumination is, and something else turns
+    it into physical state. `docs/architecture_principles.md` §2 sanctions exactly
+    this -- "the declaration of a source may live in `problems/`; the constructor
+    that turns it into state is the source" -- which is why this is here and not in
+    `sources/`.
+
+    Minimality rule 1, and the shared invariant is the interesting part: **the
+    meaning of `field_angle_deg` depends on `object_distance_mm`.** At infinity a
+    field angle is a *direction*; at a finite distance it is a *position*. The two
+    fields are not independently interpretable, which is what makes them one
+    record rather than two arguments.
+
+    One solve, one wavelength
+    -------------------------
+    `wavelength_um` is a scalar, not a list, and a sequence is refused rather than
+    looped over. One solver invocation is a single-wavelength solve; a spectrum is
+    several sources, evaluated separately. The record this replaced carried
+    `wavelengths_um` plus a `primary_wavelength_index`, and the other N-1 entries
+    never reached a trace -- they existed only to set the solver's primary
+    wavelength, which is a property of the *setup*'s characterization and now lives
+    there as `OpticalSetup.reference_wavelength_um`.
+
+    The two source geometries, and why the difference is physical
+    ------------------------------------------------------------
+    `object_distance_mm is None` -- an object at **infinity**. Every ray of one
+    field arrives with the same direction, and the incoming wavefront is a plane.
+
+    `object_distance_mm = d` (finite, positive) -- a **point source**, i.e. a
+    spherical wave. The source sits at
+    `(-tan(x_deg) * d, -tan(y_deg) * d, -d)` in the traced frame, so the field
+    angle of a finite-conjugate problem is a *position* rather than a direction,
+    and it is the direction of the chief ray from that point through the stop.
+    Measured to twelve digits for CHE-207 at three fields including one off axis in
+    both x and y; the sign is negative, so a positive field angle places the source
+    below the axis and its image above it.
+
+    Every ray of one field then leaves that **single point**, which is what makes
+    the launch state a common spherical wavefront: the optical path from that
+    wavefront to each launch point is identically zero, because the launch point
+    *is* the wavefront. `solvers/optiland/rays.py` states the consequence for the
+    declared optical path, and the difference from the infinite case is not
+    cosmetic -- there the origins spread over a plane and the directions are
+    common, here the origin is common and the directions spread.
+
+    Note that a finite `object_distance_mm` is generally coupled to the *setup*'s
+    image spacing -- a conjugate pair is a conjugate pair -- but that coupling is
+    the caller's arithmetic, not a field on either record. `tests/fixtures/systems.py`
+    is where a matched pair is written down.
+    """
+
+    #: Vacuum wavelength in micrometres. One value; see the class docstring.
+    wavelength_um: float
+    #: `(x_deg, y_deg)`. A direction at infinity, a position at a finite distance.
+    field_angle_deg: tuple[float, float] = (0.0, 0.0)
+    #: How far the point source sits before the first surface, or `None` for an
+    #: object at infinity.
+    object_distance_mm: float | None = None
+
+    def __post_init__(self) -> None:
+        problems: list[str] = []
+
+        wavelength = self.wavelength_um
+        if isinstance(wavelength, list | tuple | set | frozenset):
+            problems.append(
+                f"`wavelength_um`={wavelength!r} is a sequence of {len(wavelength)}. One "
+                "solver invocation is a SINGLE-WAVELENGTH solve, so this field is one "
+                "value and a spectrum is several sources evaluated separately -- it is "
+                "not a list to be looped over. Passing several here would silently trace "
+                "one of them"
+            )
         else:
-            for index, wavelength in enumerate(self.wavelengths_um):
-                if not math.isfinite(wavelength) or wavelength <= 0.0:
-                    problems.append(
-                        f"`wavelengths_um[{index}]`={wavelength!r} is not a finite positive "
-                        "wavelength in micrometres"
-                    )
-            if not 0 <= self.primary_wavelength_index < len(self.wavelengths_um):
+            try:
+                value = float(wavelength)
+            except (TypeError, ValueError):
                 problems.append(
-                    f"`primary_wavelength_index`={self.primary_wavelength_index} does not "
-                    f"index the {len(self.wavelengths_um)} wavelength(s)"
+                    f"`wavelength_um`={wavelength!r} is not a wavelength in micrometres"
                 )
+            else:
+                if not math.isfinite(value) or value <= 0.0:
+                    problems.append(
+                        f"`wavelength_um`={wavelength!r} is not a finite positive wavelength "
+                        "in micrometres"
+                    )
+                else:
+                    object.__setattr__(self, "wavelength_um", value)
+
+        angles = self.field_angle_deg
+        # Deliberately duck-typed rather than `isinstance(v, int | float)`: a
+        # numpy float32 is not a Python float and a transcribed field angle is
+        # legitimately an int. What is being checked is "two things that are
+        # finite numbers", which is what `math.isfinite` answers -- and a pair of
+        # *pairs*, or a two-character string, raises `TypeError` there and is
+        # refused for it. That is how a list of fields is caught.
+        try:
+            valid = len(angles) == 2 and all(math.isfinite(value) for value in angles)
+        except TypeError:
+            valid = False
+        if not valid:
+            problems.append(
+                f"`field_angle_deg`={angles!r} is not a finite (x_deg, y_deg) pair. One "
+                "field per solve, in degrees: a list of fields is several sources"
+            )
+        else:
+            object.__setattr__(
+                self, "field_angle_deg", (float(angles[0]), float(angles[1]))
+            )
+
         if self.object_distance_mm is not None and (
             not math.isfinite(self.object_distance_mm) or self.object_distance_mm <= 0.0
         ):
@@ -445,13 +591,7 @@ class RayTraceProblem:
             )
 
         if problems:
-            raise ValueError(
-                f"ray-trace problem {self.name!r} is not usable:\n  " + "\n  ".join(problems)
-            )
-
-    @property
-    def primary_wavelength_um(self) -> float:
-        return self.wavelengths_um[self.primary_wavelength_index]
+            raise ValueError("source is not usable:\n  " + "\n  ".join(problems))
 
     @property
     def object_at_infinity(self) -> bool:

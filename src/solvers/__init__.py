@@ -15,11 +15,14 @@ solver's anti-corruption boundary instead of outside it.
 
 Two backends have landed:
 
-* `optiland` -- CHE-179/180/181 (R05.1/R05.2/R05.3). Sequential ray tracing.
-  `solvers.optiland.trace(problem, sampling=..., execution=...)` takes a
-  `RayTraceProblem` and returns a `RayBundle`. Nothing else about Optiland is
-  observable from outside the package: no `RealRays`, no `.i`, no `.opd`, no
-  millimetre.
+* `optiland` -- CHE-179/180/181 (R05.1/R05.2/R05.3), CHE-217/218 (R05.6/R05.7).
+  Sequential ray tracing, with two entry points that differ in what the light is:
+  `solvers.optiland.trace(setup, source, sampling=..., execution=...)` takes an
+  `OpticalSetup` plus a declarative `SourceSpec`, and
+  `solvers.optiland.trace_rays(setup, rays, execution=...)` takes the same setup
+  plus a `RayBundle` the project already holds. Both return a `RayBundle`. Nothing
+  else about Optiland is observable from outside the package: no `RealRays`, no
+  `.i`, no `.opd`, no millimetre.
 * `chromatix` -- CHE-183/184 (R06.1/R06.2). Scalar-wave angular-spectrum
   propagation. `solvers.chromatix.propagate(field, distance_m=..., model=...)`
   takes a `ScalarField` and returns a `ScalarField`, whose typed `validity` says

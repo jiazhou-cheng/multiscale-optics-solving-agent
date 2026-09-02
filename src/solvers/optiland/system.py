@@ -1,8 +1,37 @@
-"""Neutral problem in, native Optiland lens out, through one generic path.
+"""Neutral setup in, native Optiland lens out, through one generic path.
 
-CHE-179 (R05.1). The construction half of the anti-corruption layer:
-`RayTraceProblem` -> `optiland.optic.Optic`. One function, `build_lens`, and
-adding a system means handing it a different problem -- never writing a builder.
+CHE-179 (R05.1), CHE-218 (R05.7). The construction half of the anti-corruption
+layer: `problems.OpticalSetup` -> `optiland.optic.Optic`. One function,
+`build_lens`, and adding a system means handing it a different setup -- never
+writing a builder.
+
+The source is a construction argument, not a system property
+------------------------------------------------------------
+`build_lens(setup, source)`. R05.7 split the illumination out of the system
+record, and this is where the consequence lands: the pinned backend needs an
+object surface and at least one declared field before an `Optic` exists at all,
+so those come from *what the caller asked to trace* rather than from a list the
+caller had to declare in advance. Two facts make that safe rather than merely
+tidier, and both were measured on M3-REVERSE-TELEPHOTO:
+
+* **the declared field set does not affect the system.** Declaring one field at
+  6 deg instead of three at 0/21/30 deg leaves `EPD`, `XPL` and `XPD` bitwise
+  identical and changes only `max_field`, which is the normalization the trace
+  divides by and multiplies back. So the field list was never a system property,
+  and dropping it is what lets a setup be traced at a field angle nothing
+  enumerated in advance;
+* **the declared wavelength set does**, through the primary: `XPL` moves from
+  -3.0545788978518327 mm to -3.0550180932891653 mm between primaries 0.5876 and
+  0.55 um. That is why `OpticalSetup.reference_wavelength_um` exists and why it
+  is what this module declares -- see that class's docstring. The wavelength the
+  trace is *evaluated* at is the source's and is passed to the trace call, not
+  declared here; it never had to be a declared wavelength, and the frozen ray
+  records deliberately trace outside the declared set.
+
+`source=None` is not a defaulted illumination. It means no illumination was
+declared, which is the R05.6 path: the caller supplies its own `RayBundle`, the
+object surface is skipped, and no field is aimed at. The two surfaces the backend
+requires anyway are still built, because an `Optic` cannot exist without them.
 
 What is deliberately absent
 ---------------------------
@@ -11,7 +40,7 @@ resolution. The reference implementation's `_resolve_lens(spec)` read as a looku
 and was a one-line call to the generic builder; the indirection is gone and the
 generic path is called directly. There is no list of supported prescription
 names, because R04 removed the prescription catalog from production: a caller
-constructs the `RayTraceProblem` it wants.
+constructs the `OpticalSetup` it wants.
 
 Why this validates before it constructs
 ---------------------------------------
@@ -51,7 +80,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from problems import UNITS, Material, RayTraceProblem, SurfaceSpec
+from problems import UNITS, Material, OpticalSetup, SourceSpec, SurfaceSpec
 
 __all__ = [
     "FIELD_VIGNETTING_FACTORS",
@@ -280,38 +309,62 @@ def _geometry_arguments(surface: SurfaceSpec, be: Any) -> tuple[str, dict[str, A
     return _SURFACE_TYPE_EVEN_ASPHERE, arguments
 
 
-def build_lens(problem: RayTraceProblem) -> Any:
-    """Construct the Optiland system a `RayTraceProblem` describes.
+def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
+    """Construct the Optiland system an `OpticalSetup` describes.
 
-    The returned object is an ordinary `optiland.optic.Optic`. It is native
-    solver state and is not a project type: it stays inside
-    `solvers/optiland/`, which is why the annotation is `Any` rather than a name
-    this module would have to export.
+    The returned object is an ordinary `optiland.optic.Optic`. It is native solver
+    state and is not a project type: it stays inside `solvers/optiland/`, which is
+    why the annotation is `Any` rather than a name this module would have to
+    export.
 
     The signature carries no Optiland type, unit or API concept -- one neutral
-    problem in.
+    setup in, and one optional neutral source.
+
+    Parameters
+    ----------
+    setup
+        The optical configuration. Everything geometric comes from here, and so
+        does the wavelength the paraxial characterization is evaluated at.
+    source
+        The declared illumination, or `None`. It contributes exactly two things,
+        both of which the pinned backend requires before an `Optic` exists at
+        all: where the object surface goes, and which single field is declared so
+        there is something to normalize against. `None` means **no illumination
+        was declared** -- the R05.6 path, where the caller supplies its own
+        `RayBundle` -- and the object surface is then placed at infinity and the
+        on-axis field declared, neither of which that path reads: it traces with
+        the object surface skipped and never aims at a field. See the module
+        docstring.
 
     Raises:
-        ValueError: the problem is outside the set this builder can construct, or
-            a catalog glass did not resolve as the problem recorded. Raised
-            before any surface is added.
+        TypeError: `setup` or `source` is not the type this builder takes.
+        ValueError: the setup is outside the set this builder can construct, or a
+            catalog glass did not resolve as the setup recorded. Raised before any
+            surface is added.
         ImportError: optiland is not installed.
     """
-    if not isinstance(problem, RayTraceProblem):
+    if not isinstance(setup, OpticalSetup):
         raise TypeError(
-            f"build_lens takes a RayTraceProblem, got {type(problem).__name__}. A "
-            "problem is constructed and validated by the caller; this function does not "
-            "parse one, and it resolves no prescription name into a lens."
+            f"build_lens takes an OpticalSetup, got {type(setup).__name__}. A setup is "
+            "constructed and validated by the caller; this function does not parse one, "
+            "and it resolves no prescription name into a lens."
+        )
+    if source is not None and not isinstance(source, SourceSpec):
+        raise TypeError(
+            f"build_lens's second argument is a SourceSpec or None, got "
+            f"{type(source).__name__}. An already-materialized RayBundle is a source at "
+            "the TRACE's argument position, not at this one: it is physical state and "
+            "there is nothing here to construct from it."
         )
     _require_native_units()
 
     be, optic_cls, ideal_cls, material_cls = _import_optiland_construction()
 
     # 1. Resolve everything that can fail before touching Optiland, so a rejected
-    #    problem never leaves a partially constructed lens behind.
+    #    setup never leaves a partially constructed lens behind.
     plans: list[tuple[SurfaceSpec, str, dict[str, Any], Any]] = []
-    for index, surface in enumerate(problem.surfaces):
-        where = f"{problem.name}: surfaces[{index}]"
+    for index, surface in enumerate(setup.surfaces):
+        where = f"{setup.name}: surfaces[{index}]"
         surface_type, geometry_kwargs = _geometry_arguments(surface, be)
         plans.append(
             (
@@ -322,12 +375,13 @@ def build_lens(problem: RayTraceProblem) -> Any:
             )
         )
 
-    # 2. Construct, in problem order.
-    optic = optic_cls(name=problem.name)
+    # 2. Construct, in setup order.
+    optic = optic_cls(name=setup.name)
 
-    # The object surface, which the problem does not list because it is fixed: a
-    # plane in air, `object_distance_mm` before the first listed surface, at
-    # infinity when the problem says the object is.
+    # The object surface, which the setup does not list because it is not part of
+    # the optical configuration: a plane in air, `object_distance_mm` before the
+    # first listed surface, at infinity when the source says the object is or when
+    # no source was declared.
     #
     # `thickness` is the *whole* of the source geometry, and both cases are one
     # line because the solver derives the rest. At `inf` the field is a direction
@@ -336,10 +390,11 @@ def build_lens(problem: RayTraceProblem) -> Any:
     # the source sits at `(-tan(x_deg) * d, -tan(y_deg) * d, -d)`, measured to
     # twelve digits for CHE-207 -- and every ray of one field leaves that single
     # point. `rays.py` owns what that does to the declared optical path.
+    object_distance = None if source is None else source.object_distance_mm
     optic.surfaces.add(
         index=0,
         radius=be.inf,
-        thickness=be.inf if problem.object_at_infinity else problem.object_distance_mm,
+        thickness=be.inf if object_distance is None else object_distance,
     )
     for offset, (surface, surface_type, geometry_kwargs, material) in enumerate(plans):
         optic.surfaces.add(
@@ -347,9 +402,9 @@ def build_lens(problem: RayTraceProblem) -> Any:
             surface_type=surface_type,
             thickness=surface.thickness_mm,
             material=material,
-            # The stop is one index on the problem, so "no stop" and "three
-            # stops" are not representable states a validator has to reject.
-            is_stop=offset == problem.stop_index,
+            # The stop is one index on the setup, so "no stop" and "three stops"
+            # are not representable states a validator has to reject.
+            is_stop=offset == setup.stop_index,
             comment=surface.comment,
             **geometry_kwargs,
         )
@@ -357,20 +412,28 @@ def build_lens(problem: RayTraceProblem) -> Any:
     # last listed surface's thickness.
     optic.surfaces.add(index=len(plans) + 1, radius=be.inf, thickness=0.0)
 
-    # 3. Aperture, fields, wavelengths -- one fixed order, no inherited default.
-    optic.set_aperture(aperture_type=_APERTURE_TYPE, value=problem.entrance_pupil_diameter_mm)
+    # 3. Aperture, field, wavelength -- one fixed order, no inherited default.
+    optic.set_aperture(aperture_type=_APERTURE_TYPE, value=setup.entrance_pupil_diameter_mm)
 
+    # EXACTLY ONE field: the one being traced, or the axis when none is. That is
+    # what makes `max_field` the field the caller asked for rather than the
+    # largest of a list it had to declare in advance -- and it is measured not to
+    # move any other paraxial quantity. See the module docstring.
     optic.fields.set_type(field_type=_FIELD_TYPE)
+    x_deg, y_deg = (0.0, 0.0) if source is None else source.field_angle_deg
     vignette_x, vignette_y = FIELD_VIGNETTING_FACTORS
-    for x_deg, y_deg in problem.field_angles_deg:
-        optic.fields.add(y=y_deg, x=x_deg, vx=vignette_x, vy=vignette_y, weight=FIELD_WEIGHT)
+    optic.fields.add(y=y_deg, x=x_deg, vx=vignette_x, vy=vignette_y, weight=FIELD_WEIGHT)
 
-    for index, wavelength_um in enumerate(problem.wavelengths_um):
-        optic.wavelengths.add(
-            value=wavelength_um,
-            is_primary=index == problem.primary_wavelength_index,
-            unit=_WAVELENGTH_UNIT,
-            weight=WAVELENGTH_WEIGHT,
-        )
+    # EXACTLY ONE wavelength, and it is the setup's reference rather than the
+    # source's. It is what the backend takes as primary, and the primary is what
+    # `paraxial.XPL()`/`XPD()` are evaluated at -- the exit pupil is a property of
+    # the system's characterization. The wavelength a trace is evaluated at is
+    # passed to the trace call and does not have to be declared here.
+    optic.wavelengths.add(
+        value=setup.reference_wavelength_um,
+        is_primary=True,
+        unit=_WAVELENGTH_UNIT,
+        weight=WAVELENGTH_WEIGHT,
+    )
 
     return optic

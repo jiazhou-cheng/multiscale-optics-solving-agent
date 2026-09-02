@@ -4,8 +4,8 @@ CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3) and CHE-217 (R05.6). The
 public surface is two functions, one per kind of input:
 
 ```python
-solvers.optiland.trace(problem, sampling=..., execution=...) -> RayBundle
-solvers.optiland.trace_rays(problem, rays, execution=...) -> RayBundle
+solvers.optiland.trace(setup, source, sampling=..., execution=...) -> RayBundle
+solvers.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
 ```
 
 `trace` generates its rays inside the solver from a field coordinate and a
@@ -16,7 +16,11 @@ expressible as the other: an importance-weighted ensemble drawn from a scalar
 grid's angular spectrum is not a hexapolar fan at a field angle, and no field
 angle, object distance or ring count reproduces it.
 
-A `problems.RayTraceProblem` goes in and a `representations.RayBundle` comes out.
+A `problems.OpticalSetup` goes in -- with either a `problems.SourceSpec` or a
+`representations.RayBundle` as the light -- and a `representations.RayBundle`
+comes out. CHE-218 (R05.7) is what made the setup and the illumination
+independent, so a setup can be traced at a field angle nothing enumerated in
+advance and a supplied bundle needs no source parameters invented for it.
 Nothing else about Optiland crosses this line: no `RealRays`, no `.i`, no `.opd`,
 no `opd_native`, no millimetre.
 `tests/solvers/test_optiland_boundary.py` asserts that with an AST walk over every
@@ -24,8 +28,11 @@ module outside this package and a `sys.modules` check in a fresh interpreter.
 
 Three modules, and the order is the dependency order:
 
-* `system` -- CHE-179. `build_lens(problem)`, the one generic construction path.
-  Adding a system means handing it a different problem, never writing a builder.
+* `system` -- CHE-179, CHE-218. `build_lens(setup, source)`, the one generic
+  construction path. Adding a system means handing it a different setup, never
+  writing a builder. The source is a *construction* argument -- the pinned backend
+  needs an object surface and one declared field before an `Optic` exists -- and
+  `source=None` is the supplied-bundle path, where neither is read.
 * `rays` -- CHE-180, CHE-217. Both translations. Native trace to neutral bundle:
   the declared optical path with its versioned reference, the exit-pupil and
   image-space geometry, and the hexapolar quadrature measure. And, for a supplied

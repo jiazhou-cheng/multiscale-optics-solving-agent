@@ -56,6 +56,7 @@ from fixtures.systems import (
     SINGLET_EFFECTIVE_FOCAL_LENGTH_MM,
     SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
     singlet_ref,
+    singlet_source,
 )
 from oracles import (
     airy_first_null_radius_m,
@@ -109,12 +110,8 @@ def a_traced_bundle(*, rings: int = 64, reference_surface: str = "image_surface"
     """M3-SINGLET-REF, on axis, at the reference wavelength. The real thing."""
     return trace(
         singlet_ref(),
-        sampling={
-            "num_rings": rings,
-            "reference_surface": reference_surface,
-            "field_deg": (0.0, 0.0),
-            "wavelength_um": 0.55,
-        },
+        singlet_source(field_angle_deg=(0.0, 0.0), wavelength_um=0.55),
+        sampling={"num_rings": rings, "reference_surface": reference_surface},
         execution={"device": "cpu", "precision": "fp64"},
     )
 

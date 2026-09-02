@@ -181,6 +181,40 @@ def test_a_coupler_bundle_traces_and_returns_a_bundle() -> None:
         assert isinstance(getattr(traced, name), np.ndarray)
 
 
+def test_the_bundle_path_needs_no_source_declaration_at_all() -> None:
+    """CHE-218 (R05.7) acceptance criterion 2, stated as two absences.
+
+    Before the split this path had to be handed a record that *required* a field
+    angle and an object distance, so a caller holding only a `RayBundle` had to
+    invent both for a lens to be built. Now: the setup carries no illumination
+    field to fill in, and `trace_rays` has no source parameter to pass one
+    through. Together those are the whole of "without being converted back into
+    source parameters" -- there is nowhere for such a value to go.
+    """
+    import dataclasses as dc
+    import inspect
+
+    from problems import OpticalSetup, SourceSpec
+
+    # Disjoint field sets: no name belongs to both records, so there is no
+    # illumination value a setup could be asked for. Read off the dataclasses
+    # rather than spelled out, which also keeps this file inside the boundary
+    # gate's rule on prescription units.
+    setup_fields = {f.name for f in dc.fields(OpticalSetup)}
+    source_fields = {f.name for f in dc.fields(SourceSpec)}
+    assert setup_fields and source_fields
+    assert not (setup_fields & source_fields), (
+        f"a field belongs to both records: {sorted(setup_fields & source_fields)}"
+    )
+    assert "field_angle_deg" not in setup_fields
+    assert set(inspect.signature(trace_rays).parameters) == {"setup", "rays", "execution"}
+
+    # And it runs on the coupler's own artifact, which has none of those to give.
+    rays = a_coupled_bundle()
+    traced = trace_rays(singlet_ref(), rays, execution=CPU64)
+    assert traced.count == rays.count
+
+
 #: Fragments naming a source specification the supplied-bundle path may not
 #: construct. Matched as substrings of code tokens, the way
 #: `test_optiland_boundary.py` matches its own rule, so a suffixed spelling

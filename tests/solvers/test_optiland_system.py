@@ -3,7 +3,7 @@
 CHE-179 (R05.1), acceptance criteria:
 
 1. one generic construction function -- adding a system means handing it a
-   different `RayTraceProblem`, never writing a builder;
+   different `OpticalSetup`, never writing a builder;
 2. surface tables built from this path match the reference **exactly** on the
    fixture systems, compared as executed output rather than as source;
 3. no Optiland type, unit or API concept in the signature;
@@ -46,7 +46,7 @@ from fixtures.systems import (
     singlet_ref,
 )
 
-from problems.ray_trace import Material, RayTraceProblem, SurfaceSpec
+from problems.ray_trace import Material, OpticalSetup, SourceSpec, SurfaceSpec
 from solvers.optiland import system as system_module
 from solvers.optiland.system import NATIVE_UNITS, build_lens
 
@@ -77,14 +77,14 @@ def _host(value: object) -> np.ndarray:
 
 
 def test_one_generic_construction_function() -> None:
-    """`build_lens` is the whole construction surface, and it takes a problem."""
+    """`build_lens` is the whole construction surface, and it takes a setup."""
     public = [
         name
         for name in dir(system_module)
         if not name.startswith("_")
         and callable(getattr(system_module, name))
-        # Defined here, not imported here: `RayTraceProblem` is callable and is
-        # the argument type, which is the opposite of a second construction path.
+        # Defined here, not imported here: `OpticalSetup` is callable and is the
+        # argument type, which is the opposite of a second construction path.
         and getattr(getattr(system_module, name), "__module__", None) == system_module.__name__
     ]
     assert public == ["build_lens"], (
@@ -110,9 +110,21 @@ def test_two_systems_one_function() -> None:
     assert len(telephoto.surfaces.surfaces) == 13 + 2
 
 
-def test_refuses_something_that_is_not_a_problem() -> None:
-    with pytest.raises(TypeError, match="RayTraceProblem"):
+def test_refuses_something_that_is_not_a_setup() -> None:
+    with pytest.raises(TypeError, match="OpticalSetup"):
         build_lens({"name": "M3SingletRef"})  # type: ignore[arg-type]
+
+
+def test_refuses_a_second_argument_that_is_not_a_source() -> None:
+    """CHE-218: the second argument is a declaration, never physical state.
+
+    A `RayBundle` is a source at the *trace's* argument position, not at this one.
+    Passing one here would mean construction had something to derive from it, and
+    it does not: an already-materialized bundle needs no object surface placed and
+    no field aimed at.
+    """
+    with pytest.raises(TypeError, match="SourceSpec or None"):
+        build_lens(singlet_ref(), {"wavelength_um": 0.55})  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -121,17 +133,32 @@ def test_refuses_something_that_is_not_a_problem() -> None:
 
 
 def _without_comments(state: dict) -> dict:
-    """Drop surface comments before a structural comparison.
+    """The surface table and the aperture, with surface comments dropped.
 
     A comment is prescription annotation and changes no geometry, no material and
     no traced ray. The fixture carries `"plane aperture stop"` where the bundled
     sample carries `""`, which is the only difference between the two tables and
     the only one this helper hides -- everything else is compared verbatim.
+
+    CHE-218 (R05.7) narrowed this from the whole `to_dict()` to the surface group
+    and the aperture, and the narrowing is the point rather than a concession: the
+    field set and the wavelength set are no longer system properties, so a bundled
+    sample that declares three of each and a built lens that declares the one being
+    traced *cannot* agree on those keys and should not be asked to.
+    `test_the_declared_field_and_wavelength_are_the_construction_argument` asserts
+    that difference deliberately, and the geometric oracle below is unweakened:
+    every surface, radius, thickness, conic, material and stop flag is still
+    compared element for element.
     """
-    surfaces = state["surface_group"]["surfaces"]
-    state["surface_group"]["surfaces"] = [{**s, "comment": ""} for s in surfaces]
-    state.pop("name", None)
-    return state
+    return {
+        "surface_group": {
+            **state["surface_group"],
+            "surfaces": [
+                {**surface, "comment": ""} for surface in state["surface_group"]["surfaces"]
+            ],
+        },
+        "aperture": state["aperture"],
+    }
 
 
 def test_surface_table_matches_the_bundled_sample_exactly() -> None:
@@ -141,6 +168,45 @@ def test_surface_table_matches_the_bundled_sample_exactly() -> None:
     oracle = _without_comments(ReverseTelephoto().to_dict())
     built = _without_comments(build_lens(REVERSE_TELEPHOTO).to_dict())
     assert built == oracle
+
+
+def test_the_declared_field_and_wavelength_are_the_construction_argument() -> None:
+    """The difference `_without_comments` excludes, asserted rather than hidden.
+
+    The bundled sample declares three fields and three wavelengths because that is
+    how a prescription file was written. This builder declares exactly one of each
+    -- the field being traced, and the setup's reference wavelength -- and the two
+    therefore differ on those keys by design. Measured for CHE-218: the difference
+    leaves `EPD`, `XPL` and `XPD` bitwise identical, so nothing about the *system*
+    moved.
+    """
+    from optiland.samples.objectives import ReverseTelephoto
+
+    oracle = ReverseTelephoto().to_dict()
+    built = build_lens(
+        REVERSE_TELEPHOTO, SourceSpec(wavelength_um=0.55, field_angle_deg=(0.0, 30.0))
+    ).to_dict()
+    assert len(oracle["fields"]["fields"]) == 3
+    assert len(built["fields"]["fields"]) == 1
+    assert len(oracle["wavelengths"]["wavelengths"]) == 3
+    assert len(built["wavelengths"]["wavelengths"]) == 1
+
+    sample = ReverseTelephoto()
+    for read in ("EPD", "XPL", "XPD"):
+        assert float(_host(getattr(sample.paraxial, read)()).ravel()[0]) == pytest.approx(
+            float(
+                _host(
+                    getattr(
+                        build_lens(
+                            REVERSE_TELEPHOTO,
+                            SourceSpec(wavelength_um=0.55, field_angle_deg=(0.0, 30.0)),
+                        ).paraxial,
+                        read,
+                    )()
+                ).ravel()[0]
+            ),
+            abs=0.0,
+        ), f"{read} moved, so the declared sets were a system property after all"
 
 
 def test_surface_table_is_deterministic_across_independent_builds() -> None:
@@ -166,25 +232,51 @@ def test_singlet_surface_table_is_the_prescription() -> None:
     assert float(_host(front.material_post.n(0.55)).ravel()[0]) == SINGLET_REFRACTIVE_INDEX
 
 
-def test_aperture_fields_and_wavelengths_are_set_not_inherited() -> None:
-    lens = build_lens(REVERSE_TELEPHOTO)
+def test_aperture_field_and_wavelength_are_set_not_inherited() -> None:
+    """CHE-218: exactly one field and one wavelength, and each from its own source.
+
+    The field comes from the `SourceSpec` -- what the caller asked to trace -- and
+    the wavelength from the setup's reference, which is what the backend takes as
+    primary and evaluates the exit pupil at. Before R05.7 both were lists on the
+    system record, and `max_field` was the largest of a set the caller had to
+    declare in advance.
+    """
+    lens = build_lens(
+        REVERSE_TELEPHOTO, SourceSpec(wavelength_um=0.55, field_angle_deg=(0.0, 21.0))
+    )
     state = lens.to_dict()
     assert state["aperture"] == {
         "type": "EPD",
         "value": REVERSE_TELEPHOTO.entrance_pupil_diameter_mm,
     }
-    assert lens.fields.max_field == 30.0
-    assert tuple(
-        (f["x"], f["y"]) for f in state["fields"]["fields"]
-    ) == REVERSE_TELEPHOTO.field_angles_deg
+    assert tuple((f["x"], f["y"]) for f in state["fields"]["fields"]) == ((0.0, 21.0),)
+    assert lens.fields.max_field == 21.0, "the declared field IS the maximum field"
     assert all(
         f["vx"] == 0.0 and f["vy"] == 0.0 and f["weight"] == 1.0
         for f in state["fields"]["fields"]
     )
-    primary = [w for w in state["wavelengths"]["wavelengths"] if w["is_primary"]]
-    assert len(primary) == 1
-    assert primary[0]["value"] == REVERSE_TELEPHOTO.primary_wavelength_um
-    assert {w["unit"] for w in state["wavelengths"]["wavelengths"]} == {"um"}
+    wavelengths = state["wavelengths"]["wavelengths"]
+    assert len(wavelengths) == 1
+    assert wavelengths[0]["is_primary"] is True
+    # The SETUP's reference, not the source's 0.55: the primary is what
+    # `paraxial.XPL()`/`XPD()` are evaluated at, and that is a property of the
+    # system's characterization rather than of the light being traced.
+    assert wavelengths[0]["value"] == REVERSE_TELEPHOTO.reference_wavelength_um
+    assert {w["unit"] for w in wavelengths} == {"um"}
+
+
+def test_with_no_source_the_axis_is_declared_and_the_object_is_at_infinity() -> None:
+    """`source=None` is an absence, not a defaulted illumination.
+
+    It is the R05.6 supplied-bundle path: the object surface is skipped and no
+    field is aimed at, so what is built here is only what the backend requires
+    before an `Optic` exists at all.
+    """
+    lens = build_lens(REVERSE_TELEPHOTO)
+    state = lens.to_dict()
+    assert tuple((f["x"], f["y"]) for f in state["fields"]["fields"]) == ((0.0, 0.0),)
+    assert lens.fields.max_field == 0.0
+    assert math.isinf(float(_host(lens.surfaces.positions).ravel()[0]))
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +344,7 @@ def test_catalog_glasses_resolve_to_the_recorded_row(
     (`system_construction_probe.json`, case
     `catalog_names_resolve_to_one_exact_match`).
     """
-    problem = _one_glass_problem(glass, catalog, expected_file)
+    problem = _one_glass_setup(glass, catalog, expected_file)
     lens = build_lens(problem)
     row = lens.surfaces.surfaces[1].material_post.material_data
     assert str(row["filename"]) == expected_file
@@ -261,7 +353,7 @@ def test_catalog_glasses_resolve_to_the_recorded_row(
 
 def test_a_glass_that_resolves_to_a_different_file_is_refused() -> None:
     """A material-database change becomes an error, not a different trace."""
-    problem = _one_glass_problem("N-SK10", None, "glass/hikari/N-SK10.yml")
+    problem = _one_glass_setup("N-SK10", None, "glass/hikari/N-SK10.yml")
     with pytest.raises(ValueError, match="not the recorded"):
         build_lens(problem)
 
@@ -275,7 +367,7 @@ def test_an_inexact_glass_name_is_refused() -> None:
     stdout -- so without this guard the trace would run on a real but *different*
     glass and report success.
     """
-    problem = _one_glass_problem("N-SK1", None, None)
+    problem = _one_glass_setup("N-SK1", None, None)
     with pytest.raises(ValueError, match="by similarity"):
         build_lens(problem)
 
@@ -283,30 +375,29 @@ def test_an_inexact_glass_name_is_refused() -> None:
 def test_an_unknown_glass_is_refused_as_a_problem_not_a_crash() -> None:
     """No substring survives, so the solver raises a bare ValueError. It reaches
     the caller as a statement about the problem rather than as a solver crash."""
-    problem = _one_glass_problem("NOT-A-GLASS-AT-ALL", None, None)
+    problem = _one_glass_setup("NOT-A-GLASS-AT-ALL", None, None)
     with pytest.raises(ValueError, match="could not be resolved"):
         build_lens(problem)
 
 
-def _one_glass_problem(
+def _one_glass_setup(
     glass: str, catalog: str | None, expected_file: str | None
-) -> RayTraceProblem:
+) -> OpticalSetup:
     material: Material = {
         "kind": "catalog",
         "name": glass,
         "catalog": catalog,
         "expected_catalog_file": expected_file,
     }
-    return RayTraceProblem(
+    return OpticalSetup(
         name=f"one-glass-{glass}",
         surfaces=(
             SurfaceSpec(radius_mm=50.0, thickness_mm=5.0, material=material),
             SurfaceSpec(thickness_mm=45.0),
         ),
         entrance_pupil_diameter_mm=10.0,
-        field_angles_deg=((0.0, 0.0),),
-        wavelengths_um=(0.5876,),
         stop_index=0,
+        reference_wavelength_um=0.5876,
     )
 
 
@@ -350,11 +441,11 @@ def _analytic_sag_mm(
     return conic_sag + polynomial
 
 
-def _asphere_problem(
+def _asphere_setup(
     coefficients: tuple[float, ...], *, radius_mm: float | None = ASPHERE_RADIUS_MM
-) -> RayTraceProblem:
+) -> OpticalSetup:
     """A one-surface aspheric problem. Radius `None` is an aspheric plate."""
-    return RayTraceProblem(
+    return OpticalSetup(
         name=f"asphere-{len(coefficients)}",
         surfaces=(
             SurfaceSpec(
@@ -367,15 +458,14 @@ def _asphere_problem(
             SurfaceSpec(thickness_mm=40.0),
         ),
         entrance_pupil_diameter_mm=4.0,
-        field_angles_deg=((0.0, 0.0),),
-        wavelengths_um=(0.55,),
+        reference_wavelength_um=0.55,
         stop_index=0,
     )
 
 
 def test_an_aspheric_surface_builds_the_aspheric_geometry() -> None:
     """Criterion: the right Optiland type, selected from the schema alone."""
-    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    lens = build_lens(_asphere_setup(ASPHERE_COEFFICIENTS))
     geometry = lens.surfaces.surfaces[1].geometry
     assert type(geometry).__name__ == "EvenAsphere"
     assert list(_host(geometry.coefficients).ravel()) == list(ASPHERE_COEFFICIENTS)
@@ -389,7 +479,7 @@ def test_the_aspheric_sag_matches_the_closed_form_and_the_recorded_values() -> N
     orders of magnitude above the 5.6e-17 agreement, so the case discriminates the
     convention rather than merely the arithmetic.
     """
-    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    lens = build_lens(_asphere_setup(ASPHERE_COEFFICIENTS))
     radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
     observed = _host(lens.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial)))
 
@@ -416,7 +506,7 @@ def test_the_aspheric_sag_matches_the_closed_form_and_the_recorded_values() -> N
 def test_an_aspheric_plate_is_the_polynomial_alone() -> None:
     """A planar base plus aspheric terms, which `is_plane` would have got wrong."""
     coefficients = (1e-3, -2.5e-5)
-    lens = build_lens(_asphere_problem(coefficients, radius_mm=None))
+    lens = build_lens(_asphere_setup(coefficients, radius_mm=None))
     geometry = lens.surfaces.surfaces[1].geometry
     assert type(geometry).__name__ == "EvenAsphere"
     radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
@@ -434,8 +524,8 @@ def test_a_zero_coefficient_polynomial_builds_the_standard_surface() -> None:
     geometry with zeroed coefficients agrees with the standard surface **bitwise**
     in sag, so selecting `standard` is a guarantee rather than a compromise.
     """
-    plain = build_lens(_asphere_problem(()))
-    padded = build_lens(_asphere_problem((0.0, 0.0, 0.0)))
+    plain = build_lens(_asphere_setup(()))
+    padded = build_lens(_asphere_setup((0.0, 0.0, 0.0)))
     assert type(plain.surfaces.surfaces[1].geometry).__name__ == "StandardGeometry"
     assert type(padded.surfaces.surfaces[1].geometry).__name__ == "StandardGeometry"
     # `_without_comments` drops the problem name, which is the only thing the two
@@ -443,7 +533,7 @@ def test_a_zero_coefficient_polynomial_builds_the_standard_surface() -> None:
     assert _without_comments(plain.to_dict()) == _without_comments(padded.to_dict())
 
     radial = np.array(ASPHERE_RADIAL_POSITIONS_MM)
-    forced = build_lens(_asphere_problem((0.0, 0.0, 1e-300)))
+    forced = build_lens(_asphere_setup((0.0, 0.0, 1e-300)))
     np.testing.assert_array_equal(
         _host(forced.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial))),
         _host(plain.surfaces.surfaces[1].geometry.sag(radial, np.zeros_like(radial))),
@@ -490,7 +580,7 @@ def test_the_surface_type_and_its_keywords_are_decided_together() -> None:
 
 def test_an_aspheric_system_traces() -> None:
     """It is not enough that it builds: the surface has to be reachable by rays."""
-    lens = build_lens(_asphere_problem(ASPHERE_COEFFICIENTS))
+    lens = build_lens(_asphere_setup(ASPHERE_COEFFICIENTS))
     traced = lens.trace(Hx=0.0, Hy=0.0, wavelength=0.55, num_rays=6)
     x = _host(traced.x)
     assert x.size == 1 + 3 * 6 * 7
@@ -498,7 +588,7 @@ def test_an_aspheric_system_traces() -> None:
     assert bool(np.all(np.isfinite(_host(traced.opd))))
 
     # And the asphere changes the trace: a strong r**4 term must move the rays.
-    strong = build_lens(_asphere_problem((0.0, -5e-3)))
+    strong = build_lens(_asphere_setup((0.0, -5e-3)))
     moved = _host(strong.trace(Hx=0.0, Hy=0.0, wavelength=0.55, num_rays=6).x)
     assert float(np.max(np.abs(moved - x))) > 1e-6, (
         "if the polynomial were being filtered out, the two traces would agree"
@@ -517,9 +607,13 @@ def test_the_object_surface_carries_the_declared_object_distance() -> None:
     built system's own surface positions rather than on the call that set it: the
     object surface lands at `-d`, and the first optical surface stays at 0.
     """
-    from fixtures.systems import FINITE_CONJUGATE_OBJECT_DISTANCE_MM, finite_conjugate_singlet
+    from fixtures.systems import (
+        FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+        finite_conjugate_singlet,
+        finite_conjugate_source,
+    )
 
-    finite = build_lens(finite_conjugate_singlet())
+    finite = build_lens(finite_conjugate_singlet(), finite_conjugate_source())
     positions = _host(finite.surfaces.positions).ravel()
     assert positions[0] == pytest.approx(-FINITE_CONJUGATE_OBJECT_DISTANCE_MM, abs=0.0)
     assert positions[1] == pytest.approx(0.0, abs=0.0)
@@ -527,7 +621,9 @@ def test_the_object_surface_carries_the_declared_object_distance() -> None:
     # the Python singleton -- `rays.py` coerces it for the same reason.
     assert bool(finite.object_surface.is_infinite) is False
 
-    collimated = build_lens(singlet_ref())
+    from fixtures.systems import singlet_source
+
+    collimated = build_lens(singlet_ref(), singlet_source())
     collimated_positions = _host(collimated.surfaces.positions).ravel()
     assert math.isinf(collimated_positions[0]) and collimated_positions[0] < 0.0
     assert bool(collimated.object_surface.is_infinite) is True
@@ -536,23 +632,33 @@ def test_the_object_surface_carries_the_declared_object_distance() -> None:
 def test_the_field_of_a_finite_conjugate_is_a_position() -> None:
     """The schema's declared point-source convention, verified against the solver.
 
-    `problems.RayTraceProblem` documents the source at
+    `problems.SourceSpec` documents the source at
     `(-tan(x_deg) * d, -tan(y_deg) * d, -d)`. That is a claim about the *solver's*
     field convention, so it is checked here rather than only in the schema tests --
     a schema that documented a convention the adapter did not produce would be
     worse than one that documented nothing.
     """
     import optiland.backend as be
-    from fixtures.systems import FINITE_CONJUGATE_OBJECT_DISTANCE_MM, finite_conjugate_singlet
+    from fixtures.systems import (
+        FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+        finite_conjugate_singlet,
+        finite_conjugate_source,
+    )
     from optiland.distribution import create_distribution
 
     from solvers.optiland.solver import _normalized_field
 
-    lens = build_lens(finite_conjugate_singlet())
     distribution = create_distribution("hexapolar")
     distribution.generate_points(2)
     points = int(_host(distribution.x).size)
     for field_deg in ((0.0, 0.0), (0.0, 2.0)):
+        # A lens per field, because CHE-218 made the declared field the one being
+        # traced. That is the capability the split bought: the second field is not
+        # in any record, and nothing had to be edited to reach it.
+        lens = build_lens(
+            finite_conjugate_singlet(),
+            finite_conjugate_source(field_angle_deg=field_deg),
+        )
         normalized = _normalized_field(lens, field_deg)
         launch = lens.ray_tracer.ray_generator.generate_rays(
             be.repeat(be.atleast_1d(be.array(normalized[0])), points),

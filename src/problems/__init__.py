@@ -4,6 +4,14 @@ A problem is physical intent: this optical system, this light, these units. It
 is not a construction procedure, and it is not a name that some registry knows
 how to turn into a lens.
 
+**Two independent inputs, not one record** (CHE-218 / R05.7): `OpticalSetup` is
+the optical configuration, `SourceSpec` is a declared illumination, and a trace
+takes one of each. A source at that argument position may instead be an
+already-materialized `representations.RayBundle` -- the two are alternatives at
+the same position. A source *declaration* belongs here and its *constructor* does
+not: `docs/architecture_principles.md` §2 draws that line, and `sources/` is
+where the constructors live.
+
 `problems/` may import `representations/` and `numerics/`; today it imports
 neither, because a ray-trace problem is a prescription rather than physical state
 at a boundary. It must never import a solver or a backend --
@@ -12,9 +20,9 @@ statable by a caller that has no ray tracer installed.
 
 One module, landed by CHE-156 (R04):
 
-* `ray_trace` -- `RayTraceProblem` and `SurfaceSpec`, the sequential
-  ray-tracing problem. Material is a `TypedDict`; aperture, source, field and
-  wavelength are plain fields and frozen tuples.
+* `ray_trace` -- `OpticalSetup`, `SourceSpec` and `SurfaceSpec`, the sequential
+  ray-trace problem. Material is a `TypedDict`; the aperture, the stop, the field
+  angle and the wavelength are plain fields and frozen tuples.
 
 Concrete lens prescriptions are **not** here and are not anywhere under `src/`,
 and nothing resolves a prescription name into a lens. The benchmark systems live
@@ -26,7 +34,8 @@ from problems.ray_trace import (
     MATERIAL_KINDS,
     UNITS,
     Material,
-    RayTraceProblem,
+    OpticalSetup,
+    SourceSpec,
     SurfaceSpec,
 )
 
@@ -34,6 +43,7 @@ __all__ = [
     "MATERIAL_KINDS",
     "UNITS",
     "Material",
-    "RayTraceProblem",
+    "OpticalSetup",
+    "SourceSpec",
     "SurfaceSpec",
 ]

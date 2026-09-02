@@ -168,11 +168,11 @@ SRC = ROOT / "src"
 #: or frozen tuples"; three is what an AST count sees, and the third is the
 #: TypedDict:
 #:
-#:   `RayTraceProblem`  rules 1 + 2 -- `stop_index` has to index `surfaces` and
-#:                      `primary_wavelength_index` has to index `wavelengths_um`,
-#:                      so the fields are jointly constrained and none of them
-#:                      means anything alone; and it is the public model a solver
-#:                      adapter consumes.
+#:   `OpticalSetup`     rules 1 + 2 -- `stop_index` has to index `surfaces`, so
+#:                      the fields are jointly constrained and none of them means
+#:                      anything alone; and it is the public model a solver adapter
+#:                      consumes. Was `RayTraceProblem` until CHE-218 (R05.7),
+#:                      which split the illumination out of it; see the +1 below.
 #:   `SurfaceSpec`      rule 1 -- curvature, conic, following medium and spacing
 #:                      describe one interface. A radius given twice in two forms
 #:                      makes the surface silently a *different* one rather than
@@ -185,11 +185,39 @@ SRC = ROOT / "src"
 #:                      (`_check_material`), because a TypedDict is an annotation
 #:                      that disappears at run time.
 #:
+#: **Raised to 4 by CHE-218 (R05.7)**, which splits `RayTraceProblem` into
+#: `OpticalSetup` and `SourceSpec`. Not a new capability given a class: one record
+#: became two because it held two unrelated things, and the coupling was
+#: *executable* -- the pinned solver normalizes an angular field against the largest
+#: field the system declares, so tracing an existing system at a new field angle
+#: meant editing the optical system, and an already-materialized `RayBundle`
+#: (R05.6) forced a caller to invent a field angle and an object distance so that a
+#: lens could be built.
+#:
+#:   `SourceSpec`       rules 1 + 2. Rule 1, and the shared invariant is the point:
+#:                      **the meaning of `field_angle_deg` depends on
+#:                      `object_distance_mm`** -- at infinity a field angle is a
+#:                      direction, at a finite distance it is a position
+#:                      (`-tan(theta) * d`), measured to twelve digits by CHE-207.
+#:                      The two fields are not independently interpretable. Rule 2,
+#:                      because it is the second half of what a solver adapter
+#:                      consumes and its field names are the interface.
+#:
+#: What the +1 bought, so the raise is reviewable against something: two *fields*
+#: were removed with their validators -- `field_angles_deg` and `wavelengths_um`,
+#: each with its index bound -- and `primary_wavelength_index` with them. A plural
+#: was replaced by a singular in both cases, because one solve is one field and one
+#: wavelength and neither list ever reached a trace as a list. The alternative to
+#: the class was a `TypedDict`, which this gate counts identically, or three loose
+#: arguments, which would have put the field-angle-means-two-things invariant
+#: nowhere.
+#:
 #: Twenty class names did not land against that +3 -- the whole of
 #: `core/optical_system.py`'s geometry, interaction, material, aperture, field and
 #: wavelength hierarchies, its four kind enums and its error type, plus
 #: `core/optical_assembly.py`'s three and every builder.
-#: `tests/problems/test_ray_trace.py` asserts their absence.
+#: `tests/problems/test_ray_trace.py` asserts their absence, and now also asserts
+#: that `RayTraceProblem` is gone rather than aliased.
 #: `solvers` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
 #: neither is a public class**: R05 budgets "0 public classes, at most 1 private",
 #: and the private one (`_OptilandTraceBatch`, for grouped native ray state) did
@@ -305,7 +333,7 @@ BUDGETS: dict[str, int] = {
     "numerics": 7,
     "operations": 2,
     "operators": 1,
-    "problems": 3,
+    "problems": 4,
     "representations": 5,
     "solvers": 2,
     "sources": 0,
@@ -382,7 +410,29 @@ BUDGETS: dict[str, int] = {
 #: the commit that adds `executor.py`; until then this line is a pre-authorization
 #: and nothing here can consume it, because per-package equality still forbids any
 #: package from growing.
-PROJECT_CEILING = 26
+#:
+#: **26 -> 27 by CHE-218 (R05.7)**, for `problems.SourceSpec` -- the split of
+#: `RayTraceProblem` into a setup and an illumination, justified against rules 1
+#: and 2 in the `problems` note above. Same handling as every raise before it: one
+#: class, named, in the commit that adds it.
+#:
+#: The raise is +1 rather than +0 **on purpose, and this is the part that needed
+#: deciding.** The declared total before this commit was 25 against a ceiling of
+#: 26, so there was one unit of slack and `problems: 3 -> 4` would have fitted
+#: inside it without touching this constant. That unit is not slack: the note
+#: directly above reserves it for R13.2's `runtime.Executor`, pre-authorized by the
+#: owner ahead of the code. Consuming it here would silently spend another
+#: ticket's authorization and leave R13.2 unable to land without a raise nobody
+#: had agreed to -- which is exactly the "every individual raise looks local"
+#: failure the ceiling exists to prevent. So the ceiling moves by one and the
+#: declared total goes to 26 against 27, leaving R13.2's unit where it was.
+#:
+#: Flagged for the owner on CHE-218, because the standing question above is now
+#: two units old: this constant has ratcheted five times without ever being
+#: re-derived from the new tree, and `AGENTS.md` says a class budget introduced
+#: later should be derived from that tree and made a visibility gate. The
+#: per-package equality gates are the half doing real work.
+PROJECT_CEILING = 27
 
 
 @dataclass(frozen=True)

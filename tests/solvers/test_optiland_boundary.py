@@ -48,7 +48,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from fixtures.systems import singlet_ref
+from fixtures.systems import singlet_ref, singlet_source
 
 from representations import RayBundle, ReferenceSurface
 from solvers.optiland import trace, trace_rays
@@ -321,7 +321,8 @@ def test_trace_emits_a_neutral_bundle_and_nothing_native() -> None:
     """Criterion 3, as an absence claim on the artifact rather than on its type."""
     bundle = trace(
         singlet_ref(),
-        sampling={"num_rings": 8, "reference_surface": "exit_pupil", "wavelength_um": 0.55},
+        singlet_source(wavelength_um=0.55),
+        sampling={"num_rings": 8, "reference_surface": "exit_pupil"},
         execution={"device": "cpu", "precision": "fp64"},
     )
     assert isinstance(bundle, RayBundle)

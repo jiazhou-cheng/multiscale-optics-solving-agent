@@ -30,7 +30,7 @@ from fixtures.systems import (
     singlet_ref,
 )
 
-from problems.ray_trace import RayTraceProblem
+from problems.ray_trace import OpticalSetup, SourceSpec
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
@@ -63,9 +63,45 @@ def test_building_both_fixtures_imports_no_solver() -> None:
     )
 
 
-def test_the_fixtures_are_neutral_problems() -> None:
-    for problem in (singlet_ref(), REVERSE_TELEPHOTO):
-        assert isinstance(problem, RayTraceProblem)
+def test_the_fixtures_are_neutral_setups_and_neutral_sources() -> None:
+    """CHE-218 (R05.7): each fixture is a setup, and each has a companion source."""
+    from fixtures.systems import (
+        finite_conjugate_singlet,
+        finite_conjugate_source,
+        reverse_telephoto_source,
+        singlet_source,
+    )
+
+    for setup in (singlet_ref(), REVERSE_TELEPHOTO, finite_conjugate_singlet()):
+        assert isinstance(setup, OpticalSetup)
+    for source in (singlet_source(), reverse_telephoto_source(), finite_conjugate_source()):
+        assert isinstance(source, SourceSpec)
+
+
+def test_the_conjugate_pair_is_matched_by_the_fixture_not_by_a_field() -> None:
+    """The one place a setup and a source are coupled, and it is arithmetic.
+
+    `finite_conjugate_singlet`'s last spacing is derived from the object distance,
+    so a pair is conjugate only when both factories were given the same distance.
+    That coupling lives in the fixture rather than as a field on either record --
+    which is what keeps the two records independently constructible.
+    """
+    from fixtures.systems import (
+        FINITE_CONJUGATE_OBJECT_DISTANCE_MM,
+        finite_conjugate_image_distance_mm,
+        finite_conjugate_singlet,
+        finite_conjugate_source,
+    )
+
+    distance = 3.0 * FINITE_CONJUGATE_OBJECT_DISTANCE_MM
+    setup = finite_conjugate_singlet(distance)
+    source = finite_conjugate_source(object_distance_mm=distance)
+    assert source.object_distance_mm == distance
+    assert setup.surfaces[-1].thickness_mm == finite_conjugate_image_distance_mm(distance)
+    # The defaults agree, so the common case needs no argument at all.
+    assert (
+        finite_conjugate_source().object_distance_mm == FINITE_CONJUGATE_OBJECT_DISTANCE_MM
+    )
 
 
 def test_the_singlet_derived_quantities_stay_derived() -> None:
@@ -90,15 +126,19 @@ def test_the_transcribed_systems_are_the_measured_ones() -> None:
     assert singlet.surfaces[0].resolved_radius_mm == 2.5
     assert singlet.surfaces[0].material == {"kind": "ideal", "refractive_index": 1.5168}
     assert singlet.stop_index == 0
-    assert singlet.wavelengths_um == (0.55,)
-    assert singlet.object_at_infinity
+    assert singlet.reference_wavelength_um == 0.55
+    from fixtures.systems import singlet_source
+
+    assert singlet_source().object_at_infinity
 
     assert REVERSE_TELEPHOTO.surfaces[0].resolved_radius_mm == 1.69111096
     assert REVERSE_TELEPHOTO.surfaces[8].is_plane
     assert REVERSE_TELEPHOTO.stop_index == 8
     assert REVERSE_TELEPHOTO.entrance_pupil_diameter_mm == 0.3
-    assert REVERSE_TELEPHOTO.primary_wavelength_um == 0.5876
-    assert REVERSE_TELEPHOTO.field_angles_deg == ((0.0, 0.0), (0.0, 21.0), (0.0, 30.0))
+    # The sample's own primary wavelength, which is what the exit pupil is located
+    # at. Its other two wavelengths and its three field angles were dropped by
+    # CHE-218: neither list ever reached a trace as a list.
+    assert REVERSE_TELEPHOTO.reference_wavelength_um == 0.5876
     assert REVERSE_TELEPHOTO.surfaces[2].material["expected_catalog_file"] == (
         "glass/hikari/SK15.yml"
     )
@@ -137,7 +177,9 @@ def test_the_problems_package_exposes_no_lens_by_name() -> None:
     import problems
 
     exported = {name: getattr(problems, name) for name in problems.__all__}
-    assert not any(isinstance(value, RayTraceProblem) for value in exported.values())
+    assert not any(
+        isinstance(value, OpticalSetup | SourceSpec) for value in exported.values()
+    )
     # Nor a callable that returns one from a name.
     assert not {"resolve", "get", "load", "by_name"} & set(exported)
 
