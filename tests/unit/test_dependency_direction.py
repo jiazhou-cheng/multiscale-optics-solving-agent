@@ -231,13 +231,22 @@ def test_a_package_under_a_reference_tree_name_is_not_pre_approved(
     With that tree deleted the skip has no benefit, so it was removed. This drives
     `verify()` against a synthetic tree to show the hole is actually closed, rather
     than inferring it from the set arithmetic.
+
+    **All three `SHARED_NAMES` are landed now** -- `couplers` at CHE-185 (R07.1),
+    `solvers` at R05, `runtime` at CHE-199 (R13.1) -- so none of them can play the
+    unlanded package any more. `runtime` is un-landed for the length of this test,
+    which is the same technique
+    `test_an_allowed_direction_to_an_unlanded_package_is_still_refused` uses and for
+    the same reason: what is pinned is the rule, not which packages happen to exist.
     """
+    landed = LANDED - {"runtime"}
     src = tmp_path / "src"
-    for package in [*sorted(LANDED), "runtime"]:
+    for package in [*sorted(landed), "runtime"]:
         (src / package).mkdir(parents=True)
         (src / package / "__init__.py").write_text("")
     monkeypatch.setattr(check_dependencies, "ROOT", tmp_path)
     monkeypatch.setattr(check_dependencies, "SRC", src)
+    monkeypatch.setattr(check_dependencies, "LANDED", landed)
 
     _, structural, _ = check_dependencies.verify()
     assert any("src/runtime/" in problem and "LANDED" in problem for problem in structural), (

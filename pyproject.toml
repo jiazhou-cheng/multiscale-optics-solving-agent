@@ -73,6 +73,7 @@ include = [
   "planning*",
   "problems*",
   "representations*",
+  "runtime*",
   "solvers*",
   "sources*",
 ]

@@ -347,6 +347,10 @@ BUDGETS: dict[str, int] = {
     "planning": 0,
     "problems": 4,
     "representations": 5,
+    #: `runtime` is 2, landed by CHE-199 (R13.1): `ExecutionRecord` and
+    #: `NodeRecord`, both rule 2. R13.2 raises it to 3 for `Executor` on rule 3,
+    #: which is the ceiling unit reserved at 25 -> 26 in the note below.
+    "runtime": 2,
     "solvers": 2,
     "sources": 0,
 }
@@ -439,12 +443,38 @@ BUDGETS: dict[str, int] = {
 #: failure the ceiling exists to prevent. So the ceiling moves by one and the
 #: declared total goes to 26 against 27, leaving R13.2's unit where it was.
 #:
+#: **27 -> 29 by CHE-199 (R13.1)**, and this is a raise of *two*, which no previous
+#: one has been. **Flagged for the owner** rather than treated as routine, because
+#: the ratchet's whole value is that a raise is one visible line per class.
+#:
+#: The two are `runtime.ExecutionRecord` and `runtime.NodeRecord`, both on **rule
+#: 2** -- public serialized provenance models. CHE-199 names both and budgets +2, so
+#: the justification is not invented here, and `records.py`'s docstring records
+#: which of the reference tree's classes each one replaces: the seven of
+#: `core/execution_record.py` collapse into these two plus a `Literal` and two
+#: string mappings, `RunProvenance` and `RecordVerdict` do not come back, and none
+#: of the eleven of `core/performance.py` does either.
+#:
+#: Why two and not one. They are the two halves the deletion test is *about*: a
+#: `NodeRecord` is one operation's outcome and an `ExecutionRecord` is the run,
+#: and collapsing them would put a node's status, diagnostics and observed
+#: placement into parallel lists indexed by position -- which is the arrangement
+#: `nodes[i].operation_id == route[i]` currently checks and would then be unable
+#: to. Rule 2 is satisfied separately by each: both are serialized, both are read
+#: back by `from_json`, and a consumer reads a node without reading the run.
+#:
+#: **R13.2's unit is still untouched.** The declared total after this commit is 28
+#: against 29: 26 as before, plus these two. `BUDGETS["runtime"] = 2` here, and
+#: R13.2 raises it to 3 for `Executor` in the commit that adds `executor.py` --
+#: spending the unit reserved at 25 -> 26 above, which is what it was reserved
+#: for. Note that this raise lands *with* its classes, unlike that one.
+#:
 #: Flagged for the owner on CHE-218, because the standing question above is now
 #: two units old: this constant has ratcheted five times without ever being
 #: re-derived from the new tree, and `AGENTS.md` says a class budget introduced
 #: later should be derived from that tree and made a visibility gate. The
 #: per-package equality gates are the half doing real work.
-PROJECT_CEILING = 27
+PROJECT_CEILING = 29
 
 
 @dataclass(frozen=True)
