@@ -67,6 +67,12 @@ where = ["src"]
 # theirs, and `scripts/check_dependencies.py` holds the full declared set.
 include = [
   "couplers*",
+  # CHE-201 (R14.1) added this one. It was missing from the day `measurements/`
+  # landed (CHE-197 / R11.1), so a built wheel would not have contained it -- the
+  # container installs `-e .` against a mounted checkout, which is why nothing
+  # noticed. `tests/unit/test_cutover.py` now holds this list equal to
+  # `check_dependencies.LANDED`.
+  "measurements*",
   "numerics*",
   "operations*",
   "operators*",
@@ -168,9 +174,22 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 # Enumerated for the same reason as packages.find: there is no single top-level
-# package to name.
+# package to name. **All eleven landed packages**, checked against
+# `scripts/check_dependencies.LANDED` by `tests/unit/test_cutover.py` -- this list
+# named two of them until CHE-201 (R14.1), so nine packages' coverage was silently
+# not being measured. A coverage source list that lags the tree reports a number
+# about a fraction of it.
 source = [
+  "couplers",
+  "measurements",
   "numerics",
+  "operations",
+  "operators",
+  "planning",
+  "problems",
   "representations",
+  "runtime",
+  "solvers",
+  "sources",
 ]
 branch = true
