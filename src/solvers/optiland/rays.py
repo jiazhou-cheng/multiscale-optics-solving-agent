@@ -89,16 +89,43 @@ The hexapolar area weight has exactly one producer -- this solver -- so it stays
 inside the package rather than becoming a generic quadrature framework nothing
 else uses yet. The *contract* is elsewhere and unchanged: `measure_kind` on
 `RayBundle` must be declared or the consumer refuses.
+
+Two translations, and the reason they are not one
+-------------------------------------------------
+CHE-217 (R05.6) added a second, narrow path: a `RayBundle` the project already
+holds, traced *through* a system. `to_ray_bundle` translates rays the solver
+generated; `to_traced_ray_bundle` carries a supplied bundle's own amplitude and
+quadrature across the trace. Reusing the first for the second is not a shortcut,
+it is the defect the second exists to avoid, and both halves of it are silent:
+
+* `amplitude = sqrt(intensity)` is correct on the generated path and *only*
+  there, because the solver seeds `intensity = ones_like` without apodization and
+  clips by zeroing rather than removing, so `i in {0, 1}` is a survival flag and
+  `sqrt(1) = 1`. Applied to a caller's `a_i` it returns `|a_i|` and drops every
+  radian of phase. See `AMPLITUDE_SIDECAR_RULE`.
+* `_declare_measure` *regenerates* the hexapolar fan, re-reads the entrance pupil
+  and assigns a pupil area element. Pointed at a supplied bundle it would either
+  refuse on the row count or substitute a pupil quadrature for the caller's
+  importance weights -- and R05 deliberately moved the quadrature weight off the
+  amplitude so that R07's kernel applies `measure_weight` itself, which makes a
+  substituted measure a rescaling of every reconstruction downstream that nothing
+  can observe.
+
+So on the supplied-bundle path the amplitude and the measure are the caller's,
+the trace may filter the ensemble but may not restate either, and the optical
+path is a *composition* rather than a fresh absolute declaration
+(`COMPOSED_OPL_REFERENCE_VERSION`).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from typing import Any
 
 import numpy as np
 
-from numerics import dtype_of
+from numerics import ArrayNamespace, DevicePlacement, Precision, dtype_of, to_namespace
 from representations import (
     UNVERIFIED,
     ContractError,
@@ -110,20 +137,34 @@ from representations import (
 )
 
 __all__ = [
+    "ADMISSIBLE_OPL_REFERENCES",
     "AMPLITUDE_MAPPING",
+    "AMPLITUDE_SIDECAR_RULE",
+    "COMPOSED_OPL_REFERENCE_VERSION",
     "LAUNCH_PLANE_WAVEFRONT",
     "LAUNCH_POINT_SOURCE",
+    "LAUNCH_SURFACE_TOLERANCE_M",
+    "MONOCHROMATIC_WAVELENGTH_RULE",
     "NATIVE_LENGTH_M",
     "NATIVE_WAVELENGTH_M",
     "OPL_REFERENCE_VERSION",
+    "OPTILAND_INTENSITY_RULE",
     "REFERENCE_SURFACES",
+    "SKIP_OBJECT_SURFACE",
+    "SUPPLIED_MEASURE_RULE",
+    "SUPPLIED_RAY_SURVIVAL_RULE",
+    "compose_optical_path_m",
     "declare_optical_path_m",
     "exit_pupil",
     "hexapolar_area_weight_m2",
     "hexapolar_ray_count",
     "hexapolar_ring_index",
     "require_declared_optical_path",
+    "require_launch_surface",
+    "surface_positions_m",
+    "to_native_rays",
     "to_ray_bundle",
+    "to_traced_ray_bundle",
 ]
 
 #: The lens geometry unit, in metres. CHE-30 part 4: `RealRays.opd` and every
@@ -163,8 +204,39 @@ REFERENCE_SURFACES: tuple[str, ...] = ("image_surface", "exit_pupil")
 #: convergence tilt off it.
 OPL_REFERENCE_VERSION = "optiland-declared-opl/v2"
 
+#: The version of the OPL reference the *supplied-bundle* path declares, and the
+#: second prefix `require_declared_optical_path` admits.
+#:
+#: A separate version rather than a reuse of the one above, because it names a
+#: different quantity. `OPL_REFERENCE_VERSION` is an *absolute* declaration this
+#: solver constructed from end to end: it fixed the zero at the traced chief ray
+#: and named the object-space wavefront the path is measured from. This one is a
+#: **composition**: the zero and the reference surface are the incoming bundle's,
+#: whatever they were, and all this trace contributed is the increment through the
+#: system. Labelling the two the same would tell a consumer that a chief-ray-zeroed
+#: absolute path had been handed over when what it holds is somebody else's
+#: reference plus an increment, and `require_coherent()` cannot tell them apart.
+#:
+#: CHE-217 (R05.6) extends the admissible vocabulary here deliberately. It does
+#: **not** loosen the check: this prefix is written by exactly one function,
+#: `compose_optical_path_m`, and the native accumulator still carries no prefix at
+#: all.
+COMPOSED_OPL_REFERENCE_VERSION = "optiland-composed-opl/v1"
+
+#: Every OPL reference prefix this package will carry on a bundle, and the whole
+#: of what `require_declared_optical_path` admits. Enumerated rather than matched
+#: by pattern: a `startswith("optiland-")` test would admit the next label anybody
+#: invents, which is exactly the "plausible label" the versioning exists to stop.
+ADMISSIBLE_OPL_REFERENCES: tuple[str, ...] = (
+    OPL_REFERENCE_VERSION,
+    COMPOSED_OPL_REFERENCE_VERSION,
+)
+
 #: How `RealRays.i` becomes an amplitude. Stated because it is a modelling
 #: decision, and this is the producer that makes it.
+#:
+#: **This mapping is the solver-generated path's and only its.** See
+#: `AMPLITUDE_SIDECAR_RULE` for why it must not be reused for a supplied bundle.
 AMPLITUDE_MAPPING = (
     "amplitude = sqrt(intensity); intensity is Optiland RealRays.i, a real "
     "non-negative power-like per-ray weight. It carries no phase, so every radian "
@@ -173,6 +245,127 @@ AMPLITUDE_MAPPING = (
     "measure_weight, and a traced ray set is a physical ensemble rather than a "
     "Monte-Carlo sample of one."
 )
+
+#: What happens to a **supplied** bundle's complex amplitude, and the rule that
+#: makes reusing `AMPLITUDE_MAPPING` on this path a defect rather than a shortcut.
+#:
+#: Reused verbatim in substance from
+#: `pre-rewrite-2026-08-30:src/core/coherent_batch.py:89` (`AMPLITUDE_SIDECAR_RULE`).
+#: `sqrt(i)` is right on the solver-generated path and *only* there, because
+#: `RayGenerator.generate_rays` seeds `intensity = ones_like` when there is no
+#: apodization and Optiland clips by zeroing the row rather than removing it, so
+#: `i in {0, 1}` is a pure survival flag and `sqrt(1) = 1`. Hand the same output
+#: path a caller's `a_i` and it is silently replaced -- by `|a_i|` if the modulus
+#: was bridged in as an intensity, dropping every radian of phase, or by `1` if it
+#: was not. No error, no diagnostic, and no downstream intensity check can see it.
+AMPLITUDE_SIDECAR_RULE = (
+    "the complex amplitude is a SIDECAR on this path: it is never passed to the "
+    "solver, never reconstructed from the native intensity, and is re-associated "
+    "after the trace row for row. sqrt(intensity) is the solver-generated path's "
+    "mapping and is wrong here -- it would return |a| and drop the phase, which no "
+    "intensity check downstream can detect."
+)
+
+#: Why a real intensity crosses into the solver at all, and the one thing that is
+#: read back off it. `pre-rewrite-2026-08-30:src/core/coherent_batch.py:94`.
+OPTILAND_INTENSITY_RULE = (
+    "the native intensity is seeded from |a|^2, formed on this side of the "
+    "boundary so the only amplitude-derived quantity that reaches the solver is "
+    "unambiguously an intensity, and is read back for exactly one purpose: "
+    "deciding which rays the trace clipped. It is never read as an amplitude."
+)
+
+#: Why the solver is handed one wavelength rather than one per ray.
+#:
+#: `RayBundle.wavelength_m` is a scalar by contract, so a per-ray array was always
+#: a broadcast of a single number. optiland 0.6.0 memoizes `BaseMaterial.n`/`.k` on
+#: the *contents* of whatever it is handed -- `_create_cache_key` evaluates
+#: `tuple(ravel(to_numpy(wavelength)))` -- so a per-ray broadcast copies the array
+#: to the host, builds an N-element Python tuple and hashes it, four times per
+#: surface. CHE-118 measured that at 97% of the trace stage. A size-1 array takes
+#: the solver's own documented scalar path and broadcasts against the N-ray
+#: geometry, and the equivalence is exact *because* the bundle is monochromatic:
+#: with one wavelength there is nothing a per-ray array can say that a scalar
+#: cannot.
+MONOCHROMATIC_WAVELENGTH_RULE = (
+    "one solver invocation is a single-wavelength solve, so the solver is handed a "
+    "size-1 wavelength array rather than one entry per ray. The pinned release keys "
+    "its refractive-index cache on the array's contents, which made the redundant "
+    "broadcast cost O(rays) of host-side tuple construction per surface (CHE-118)."
+)
+
+#: What a trace does and does not do to a supplied bundle's membership, and the
+#: convention this package settled on. CHE-217 (R05.6) chose it explicitly.
+#:
+#: `to_ray_bundle` **drops** clipped rows, which is right when the solver also
+#: generated the rays: nothing outside holds a per-ray array to stay aligned with.
+#: A supplied bundle is the opposite case -- the caller still holds the ensemble it
+#: handed over, and dropping rows silently breaks that correspondence. So the row
+#: is kept and the amplitude is zeroed, which is the reference implementation's
+#: convention (`coherent_trace.py`, `zeroed_amplitude = where(valid, amplitude, 0)`)
+#: and keeps the output count equal to the input count.
+#:
+#: Survival is `i > 0` and finite geometry, and nothing else. A clipped ray's
+#: state is frozen at the clip and can be non-finite, which `RayBundle` forbids
+#: outright, so its geometry is replaced by the same harmless placeholder
+#: `to_ray_bundle` uses. That substitution is safe *because* the amplitude is zero:
+#: the row contributes nothing to any reconstruction.
+SUPPLIED_RAY_SURVIVAL_RULE = (
+    "a trace may filter a supplied bundle but never redefines it: the row count is "
+    "preserved so the output aligns with the caller's own arrays row for row, and a "
+    "ray the trace did not survive is MARKED by a zeroed amplitude rather than "
+    "removed. Survival is intensity > 0 and finite geometry, and nothing else. A "
+    "non-surviving row's geometry is a placeholder (position 0, direction +z, path "
+    "increment 0) because the frozen native state can be non-finite; it is "
+    "unreadable by construction, the zeroed amplitude being what makes it so. One "
+    "consequence, stated rather than hidden: a supplied amplitude whose |a|^2 "
+    "underflows the compute precision reads as a clipped ray, because a zero "
+    "intensity is how the solver reports one. A ray carrying no representable power "
+    "is marked, not traced."
+)
+
+#: What a trace does to a supplied bundle's sampling measure, which is nothing.
+#:
+#: The reason is `operators.propagate_rays`'s, verbatim in substance: the
+#: quadrature that fixed each plane wavelet's coefficient was taken at the surface
+#: where the rays were declared, and a plane wavelet is an infinite plane wave
+#: whose coefficient is fixed once. Passing through a surface changes where the
+#: wavelet is stated to cross a plane; it does not change what the wavelet is.
+#:
+#: Declared as a constant rather than written inline because it is the *absence*
+#: of a computation, and an absence has nowhere else to be stated. It is also
+#: what `_declare_measure` must not be reached from on this path: substituting
+#: this solver's own entrance-pupil area element for a caller's importance
+#: weights rescales every reconstruction downstream by a factor nothing can
+#: observe, R05 having deliberately moved the quadrature weight off the amplitude
+#: so that R07's kernel applies `measure_weight` itself.
+SUPPLIED_MEASURE_RULE = (
+    "passed through unchanged, weights and kind both. The quadrature that fixed "
+    "each plane wavelet's coefficient was taken at the surface where the rays were "
+    "declared, and passing through a surface does not restate it. No pupil area "
+    "element was assigned and no ring index was recovered."
+)
+
+#: How far the first traced surface may sit from the surface a supplied bundle
+#: declares itself on, in metres, before the pairing is refused.
+#:
+#: A nanometre, reused from the reference implementation's
+#: `coherent_trace._PLANE_TOLERANCE_M`. The two are the *same* surface by
+#: construction, so any real difference is a setup error rather than round-off --
+#: and a float32 representation of a 60 um coordinate is good to about 4e-12 m, so
+#: the tolerance is loose enough not to refuse an honest float32 bundle.
+LAUNCH_SURFACE_TOLERANCE_M = 1.0e-9
+
+#: How many surfaces a supplied bundle's trace skips: the object surface, and
+#: only it.
+#:
+#: A built `Optic` always carries one, and for an infinite conjugate it sits at
+#: `z = -inf`, so rays supplied at a real surface must not be traced through it.
+#: One rather than a caller-chosen count on purpose: a skip is not a physical
+#: choice, and exposing it would let a caller quietly trace a *sub-system* while
+#: every artifact still named the whole prescription. `require_launch_surface`
+#: checks the surface this lands on rather than trusting the number.
+SKIP_OBJECT_SURFACE = 1
 
 #: Absolute tolerance, in units of ring spacing, for a normalized pupil radius to
 #: count as landing on a hexapolar ring. `optiland.distribution` places ring `j`
@@ -1052,6 +1245,409 @@ def _declare_measure(
     )
 
 
+# ---------------------------------------------------------------------------
+# The supplied-bundle path. CHE-217 (R05.6).
+#
+# Everything above translates rays the solver generated. Everything below carries
+# a `RayBundle` the project already holds *through* a system, and the difference
+# that matters is one sentence: on this path the amplitude and the quadrature are
+# the caller's, and the trace may filter the ensemble but may not restate either.
+# ---------------------------------------------------------------------------
+
+
+def surface_positions_m(lens: Any) -> list[float]:
+    """Every surface's axial position, in metres, read from the built system.
+
+    The object surface is included and is `-inf` for an infinite conjugate, which
+    is the whole reason `require_launch_surface` exists: the position is read
+    rather than assumed, so "the first surface a supplied bundle is traced
+    through" is a fact about the constructed lens and not about the skip count.
+    """
+    positions = _host(lens.surfaces.positions).ravel()
+    return [float(value) * NATIVE_LENGTH_M for value in positions]
+
+
+def require_launch_surface(
+    lens: Any, surface: ReferenceSurface, *, skip: int, wavelength_um: float
+) -> float:
+    """Check that `surface` is where the trace actually starts, and in what medium.
+
+    Returns the object-space refractive index the trace will weight its first
+    transfer by, read from the prescription.
+
+    A built `Optic` always carries an object surface, at `z = -inf` for an
+    infinite conjugate, so rays supplied at a real surface must not be traced
+    through it and `skip` exists. But a skip count that is merely *asserted*
+    substitutes one silent failure for another: getting it wrong is not a crash,
+    it is a trace through a different optical system that returns plausible
+    numbers. So the first non-skipped surface is located and compared.
+
+    The **medium** is checked alongside the coordinate, and for the same reason
+    the coordinate is. The composed optical path this path declares is
+    `opl_in + n-weighted accumulator`, and the two halves have to be measured in
+    one medium: a caller declaring `n = 1` at a surface the prescription puts in
+    glass gets a composed path that is wrong by the index ratio over the first
+    transfer, with no error and nothing downstream that can attribute it. "It is
+    air" is a property of two particular systems, not of lenses.
+
+    Raises:
+        ContractError: `SHAPE_MISMATCH` if `skip` leaves no surface to trace;
+            `FRAME_MISMATCH` if the first traced surface is not where the bundle
+            says it is; `MISSING_DECLARATION` if the object-space index cannot be
+            read, or disagrees with the medium the bundle declares.
+    """
+    positions_m = surface_positions_m(lens)
+    if skip >= len(positions_m):
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"skip={skip} leaves no surface to trace in a {len(positions_m)}-surface "
+            "system, so there is nothing for the supplied rays to pass through",
+            declaration="skip",
+        )
+    first_z_m = positions_m[skip]
+    if not math.isfinite(first_z_m) or abs(first_z_m - surface.z_m) > LAUNCH_SURFACE_TOLERANCE_M:
+        raise ContractError(
+            "FRAME_MISMATCH",
+            (
+                f"the first traced surface sits at z = {first_z_m!r} m but the bundle "
+                f"declares itself on {surface.name!r} at z = {surface.z_m!r} m, a "
+                f"difference of more than {LAUNCH_SURFACE_TOLERANCE_M!r} m. Tracing would "
+                "propagate the rays through a different optical system than the one they "
+                "were declared against, and would succeed while doing it."
+            ),
+            declaration="reference_surface",
+            remedy=(
+                "Build the problem so that the surface following the object surface is the "
+                "one the rays are declared on, or declare the rays on the surface the "
+                "trace starts at."
+            ),
+        )
+
+    index = _scalar(lambda: lens.surfaces.surfaces[skip - 1].material_post.n(wavelength_um))
+    if index is None or index <= 0.0:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            "the object-space refractive index could not be read from the prescription, "
+            "and the optical path this trace accumulates from the launch surface is "
+            "index-weighted, so it cannot be composed with the path the bundle already "
+            "carries.",
+            declaration="reference_surface",
+        )
+    # Relative, because an index is dimensionless: the length tolerance above has
+    # nothing to say about it, and a catalog index is a computed float rather than
+    # a transcribed one.
+    if not math.isclose(index, surface.medium_index, rel_tol=1.0e-9, abs_tol=0.0):
+        raise ContractError(
+            "MISSING_DECLARATION",
+            (
+                f"the bundle declares its surface in a medium of index "
+                f"{surface.medium_index!r}, but the prescription puts the space before the "
+                f"first traced surface in one of {index!r}. The incoming optical path was "
+                "measured in the first medium and the accumulator will be weighted by the "
+                "second, so the composed path would be wrong by that ratio over the first "
+                "transfer -- and nothing downstream can attribute it back here."
+            ),
+            declaration="reference_surface",
+            remedy=(
+                "Declare the medium the rays actually travel in, or trace them through a "
+                "prescription whose object space is that medium."
+            ),
+        )
+    return index
+
+
+def to_native_rays(
+    rays: RayBundle,
+    *,
+    namespace: ArrayNamespace,
+    device: DevicePlacement,
+    precision: Precision,
+) -> Any:
+    """Build the native ray object a supplied `RayBundle` describes.
+
+    The inbound half of the anti-corruption layer for this path, and the *only*
+    place a project representation becomes native ray state. Three conversions
+    happen here and each is stated rather than implied:
+
+    * positions metres -> the geometry unit (`NATIVE_LENGTH_M`);
+    * the vacuum wavelength metres -> micrometres, as **one** scalar in a size-1
+      array -- see `MONOCHROMATIC_WAVELENGTH_RULE`;
+    * the complex amplitude -> `|a|^2`, formed on *this* side of the boundary so
+      that the only amplitude-derived quantity the solver ever sees is
+      unambiguously an intensity. See `OPTILAND_INTENSITY_RULE` and
+      `AMPLITUDE_SIDECAR_RULE`: the complex amplitude itself does not cross, and
+      the pinned solver has no complex ray field to put it in.
+
+    Directions are dimensionless and cross unconverted. Nothing else crosses:
+    `measure_weight` is a property of how the caller sampled its pupil and the
+    solver has no concept of it, so passing it in would be meaningless and
+    reading one back would be an invention.
+    """
+    from optiland.rays import RealRays
+
+    amplitude, _ = rays.require_coherent()
+    xp = rays.xp
+    # |a|^2 in the bundle's own namespace, so no complex buffer is handed across.
+    intensity = xp.abs(amplitude) ** 2
+
+    def native(value: Any) -> Any:
+        return to_namespace(
+            value,
+            namespace=namespace,
+            device=None if namespace is ArrayNamespace.NUMPY else device,
+            dtype=precision.real_dtype,
+        )
+
+    positions = native(rays.positions_m / NATIVE_LENGTH_M)
+    directions = native(rays.directions)
+    return RealRays(
+        positions[:, 0],
+        positions[:, 1],
+        positions[:, 2],
+        directions[:, 0],
+        directions[:, 1],
+        directions[:, 2],
+        native(intensity),
+        # ONE wavelength, not N copies of it.
+        native(xp.asarray([rays.wavelength_m / NATIVE_WAVELENGTH_M])),
+    )
+
+
+def compose_optical_path_m(
+    rays: RayBundle,
+    accumulated_m: Any,
+    *,
+    launch_surface_z_m: float,
+    image_surface_z_m: float,
+    object_space_index: float,
+) -> tuple[Any, str]:
+    """Add this trace's accumulated path to the one the bundle already carries.
+
+    The decision this path had to make explicitly, and the three things it is
+    **not**:
+
+    * it is not the native accumulator promoted to an optical path. A freshly
+      constructed native ray seeds its accumulator to zero at the launch state, so
+      the accumulator alone is the path *through the system only* and says nothing
+      about where the light was before it -- which for a coupler's output is the
+      whole optical path so far;
+    * it is not a re-declaration. No chief-ray piston is removed and no reference
+      surface is renamed. The incoming bundle already fixed both, and re-zeroing
+      would silently discard a reference a consumer may be matching against;
+    * it is not `declare_optical_path_m`'s quantity, so it does not carry that
+      function's version prefix. See `COMPOSED_OPL_REFERENCE_VERSION`.
+
+    The sum is therefore measured from exactly the surface the incoming reference
+    names, with exactly the incoming sign convention, extended through the traced
+    surfaces. `accumulated_m` is the native accumulator already scaled to metres
+    and already in the bundle's own array state, so the addition neither converts
+    a unit nor moves a buffer.
+
+    Precision note, stated because it is inherited rather than chosen: the sum is
+    formed in the bundle's dtype. Unlike `declare_optical_path_m` this path cannot
+    remove the absolute piston -- the incoming reference is what fixes the zero --
+    so a float32 bundle carries the *absolute* composed path at float32 relative
+    accuracy. That is the caller's declared precision and it is reported rather
+    than silently upgraded.
+    """
+    reference = rays.optical_path_reference or ""
+    declaration = (
+        f"{COMPOSED_OPL_REFERENCE_VERSION}: the optical path the SUPPLIED bundle already "
+        f"carried, whose own reference is {reference!r}, PLUS the index-weighted optical "
+        f"path this trace accumulated from the launch surface "
+        f"{rays.reference_surface.name!r} at z = {launch_surface_z_m!r} m through to the "
+        f"traced image surface at z = {image_surface_z_m!r} m. The zero, the reference "
+        f"surface and the sign convention are the incoming bundle's and are unchanged: no "
+        f"chief-ray piston was removed and no reference was renamed, so a consumer "
+        f"matching against the incoming declaration still matches. Object-space index "
+        f"{object_space_index!r}, read from the prescription and checked against the "
+        f"medium the bundle declares. {SUPPLIED_RAY_SURVIVAL_RULE}"
+    )
+    return rays.optical_path_m + accumulated_m, declaration
+
+
+def to_traced_ray_bundle(
+    lens: Any,
+    traced: Any,
+    rays: RayBundle,
+    *,
+    launch_surface_z_m: float,
+    object_space_index: float,
+    wavelength_um: float,
+) -> tuple[RayBundle, dict[str, Any]]:
+    """Translate a trace of a *supplied* bundle back into that bundle, evolved.
+
+    The sibling of `to_ray_bundle`, and the difference is the whole ticket: this
+    one takes the amplitude and the measure from `rays` rather than deriving them
+    from the trace. There is no `sqrt(intensity)` here, no regenerated hexapolar
+    fan, no entrance-pupil area element and no ring index -- the caller's
+    quadrature is what the caller declared, and substituting a pupil quadrature
+    for it would rescale every reconstruction downstream by a factor nothing can
+    observe.
+
+    Built with `dataclasses.replace`, which is not a stylistic choice: the fields
+    this operation does not touch -- `wavelength_m`, `frame`, `measure_weight`,
+    `measure_kind`, `phasor` -- are then not merely re-assigned to the same value,
+    they are never named at all, and a future edit cannot restate one by accident.
+
+    Returns the bundle and a diagnostics mapping, on `to_ray_bundle`'s convention.
+    Nothing in either is native.
+
+    Raises:
+        ContractError: the image-space index could not be read, or every supplied
+            ray was clipped.
+    """
+    native = {
+        name: _host(value)
+        for name, value in (
+            ("x", traced.x),
+            ("y", traced.y),
+            ("z", traced.z),
+            ("L", traced.L),
+            ("M", traced.M),
+            ("N", traced.N),
+            ("intensity", traced.i),
+            ("accumulator", traced.opd),
+        )
+    }
+    shapes = {name: array.shape for name, array in native.items()}
+    if native["x"].ndim != 1 or len(set(shapes.values())) != 1:
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"the solver returned ray columns that are not equal-length 1-D arrays: {shapes!r}",
+            declaration="positions_m",
+        )
+    if int(native["x"].size) != rays.count:
+        raise ContractError(
+            "SHAPE_MISMATCH",
+            f"the trace returned {int(native['x'].size)} rays for the {rays.count} that "
+            "were supplied, so the two cannot be matched row for row and the caller's "
+            "amplitude cannot be re-associated",
+            declaration="positions_m",
+        )
+
+    # `_ALIVE_RULE`, applied to a supplied ensemble. Intensity and finite geometry,
+    # and nothing else -- no aperture model of this package's own, which is R05.9's.
+    alive = (
+        (native["intensity"] > 0)
+        & np.isfinite(native["x"])
+        & np.isfinite(native["y"])
+        & np.isfinite(native["z"])
+        & np.isfinite(native["L"])
+        & np.isfinite(native["M"])
+        & np.isfinite(native["N"])
+        & np.isfinite(native["accumulator"])
+    )
+    alive_count = int(np.count_nonzero(alive))
+    if alive_count == 0:
+        raise ContractError(
+            "EMPTY_ENSEMBLE",
+            f"none of the {rays.count} supplied rays survived the trace, so every "
+            "amplitude would be zero and the bundle would carry no light. " + _ALIVE_RULE,
+            declaration="positions_m",
+        )
+    if alive_count != rays.count:
+        # See `SUPPLIED_RAY_SURVIVAL_RULE`: the row stays, the geometry becomes a
+        # placeholder because the frozen native state can be non-finite and
+        # `RayBundle` forbids that outright, and the amplitude is zeroed below,
+        # which is what makes the placeholder unreadable rather than merely wrong.
+        native = {name: array.copy() for name, array in native.items()}
+        for name, placeholder in (
+            ("x", 0.0),
+            ("y", 0.0),
+            ("z", 0.0),
+            ("L", 0.0),
+            ("M", 0.0),
+            ("N", 1.0),
+            ("accumulator", 0.0),
+        ):
+            native[name][~alive] = placeholder
+
+    image_z_m = _scalar(lambda: lens.surfaces.surfaces[-1].geometry.cs.z)
+    if image_z_m is None:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            "the final surface's axial position could not be read from the system, so the "
+            "surface the traced bundle is declared on cannot be located",
+            declaration="reference_surface",
+        )
+    image_z_m *= NATIVE_LENGTH_M
+    image_space_index = _scalar(
+        lambda: lens.surfaces.surfaces[-1].material_pre.n(wavelength_um)
+    )
+    if image_space_index is None or image_space_index <= 0.0:
+        raise ContractError(
+            "MISSING_DECLARATION",
+            "the image-space refractive index could not be read from the prescription, and "
+            "the traced bundle's surface declares the medium it sits in. 'It is air' is a "
+            "property of two particular systems, not of lenses.",
+            declaration="reference_surface",
+        )
+
+    # Back into the state the caller handed over, so the untouched amplitude and
+    # measure and the evolved geometry are one artifact rather than two halves in
+    # two ecosystems -- which `RayBundle` refuses anyway.
+    def home(value: Any) -> Any:
+        return to_namespace(
+            value,
+            namespace=rays.state.namespace,
+            device=None if rays.state.namespace is ArrayNamespace.NUMPY else rays.state.device,
+            dtype=rays.state.dtype,
+        )
+
+    xp = rays.xp
+    survived = home(alive.astype(np.float64)) > 0.0
+    optical_path_m, optical_path_reference = compose_optical_path_m(
+        rays,
+        home(native["accumulator"] * NATIVE_LENGTH_M),
+        launch_surface_z_m=launch_surface_z_m,
+        image_surface_z_m=image_z_m,
+        object_space_index=object_space_index,
+    )
+    bundle = dataclasses.replace(
+        rays,
+        positions_m=home(
+            np.stack([native[name] for name in ("x", "y", "z")], axis=1) * NATIVE_LENGTH_M
+        ),
+        directions=home(np.stack([native[name] for name in ("L", "M", "N")], axis=1)),
+        reference_surface=ReferenceSurface(
+            name="image_surface",
+            z_m=image_z_m,
+            medium_index=image_space_index,
+        ),
+        # The caller's own coefficients, re-associated row for row and zeroed
+        # exactly where the trace did not survive. Never `sqrt(intensity)`.
+        amplitude=xp.where(survived, rays.amplitude, xp.zeros_like(rays.amplitude)),
+        optical_path_m=optical_path_m,
+        optical_path_reference=optical_path_reference,
+    )
+    require_declared_optical_path(bundle)
+
+    diagnostics: dict[str, Any] = {
+        "supplied_ray_count": rays.count,
+        "surviving_ray_count": alive_count,
+        "marked_ray_count": rays.count - alive_count,
+        "alive_rule": _ALIVE_RULE,
+        "survival_rule": SUPPLIED_RAY_SURVIVAL_RULE,
+        "amplitude_handling": AMPLITUDE_SIDECAR_RULE,
+        "intensity_handling": OPTILAND_INTENSITY_RULE,
+        "wavelength_handling": MONOCHROMATIC_WAVELENGTH_RULE,
+        "launch_surface_z_m": launch_surface_z_m,
+        "launch_surface_tolerance_m": LAUNCH_SURFACE_TOLERANCE_M,
+        "object_space_refractive_index": object_space_index,
+        "reference_surface": "image_surface",
+        "reference_surface_z_m": image_z_m,
+        "image_space_refractive_index": image_space_index,
+        "optical_path_reference": optical_path_reference,
+        "measure_kind": rays.measure_kind,
+        "measure": SUPPLIED_MEASURE_RULE,
+        "observed_dtype": str(dtype_of(bundle.positions_m)),
+        "direction_norm_tolerance": direction_norm_tolerance(dtype_of(bundle.directions)),
+        "polarization": "missing; the native ray carries none on this path, and none is fabricated",
+    }
+    return bundle, diagnostics
+
+
 def require_declared_optical_path(bundle: RayBundle) -> None:
     """Refuse a bundle whose optical path is the native accumulator in disguise.
 
@@ -1069,15 +1665,21 @@ def require_declared_optical_path(bundle: RayBundle) -> None:
       wavefront, so a converging beam reconstructs as a diverging one and no
       intensity check can tell the difference.
 
-    So the only admissible optical path is one whose reference carries
-    `OPL_REFERENCE_VERSION`, which only `declare_optical_path_m` writes. A bundle
-    with no optical path at all passes: carrying no phase is honest, and
+    So the only admissible optical path is one whose reference carries a prefix
+    from `ADMISSIBLE_OPL_REFERENCES`, and each of those two prefixes is written by
+    exactly one function: `declare_optical_path_m` for a path this solver
+    constructed absolutely, and `compose_optical_path_m` for one extended through
+    a system from a path a caller already held. CHE-217 (R05.6) added the second
+    **by enumerating it**, which is not the same as loosening the check: the
+    native accumulator carries no prefix at all and is refused exactly as before.
+
+    A bundle with no optical path at all passes: carrying no phase is honest, and
     `RayBundle.require_coherent()` is what refuses to read one that is not there.
     """
     if bundle.optical_path_m is None:
         return
     reference = bundle.optical_path_reference or ""
-    if not reference.startswith(OPL_REFERENCE_VERSION):
+    if not reference.startswith(ADMISSIBLE_OPL_REFERENCES):
         raise ContractError(
             "OPL_REFERENCE_UNVERIFIED",
             (
@@ -1089,8 +1691,9 @@ def require_declared_optical_path(bundle: RayBundle) -> None:
             ),
             declaration="optical_path_reference",
             remedy=(
-                f"Obtain the path from declare_optical_path_m, whose reference starts with "
-                f"{OPL_REFERENCE_VERSION!r}, or carry it with the reference declared "
-                f"{UNVERIFIED!r} so require_coherent() refuses to read it as a phase."
+                f"Obtain the path from declare_optical_path_m or compose_optical_path_m, "
+                f"whose references start with one of {list(ADMISSIBLE_OPL_REFERENCES)}, or "
+                f"carry it with the reference declared {UNVERIFIED!r} so require_coherent() "
+                f"refuses to read it as a phase."
             ),
         )

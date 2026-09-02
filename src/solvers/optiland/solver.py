@@ -1,7 +1,20 @@
-"""The public trace entry point, and the one genuinely stateful thing in this package.
+"""The public trace entry points, and the one genuinely stateful thing in this package.
 
 CHE-181 (R05.3). `trace(problem, sampling=..., execution=...) -> RayBundle`: one
 neutral problem in, one neutral bundle out, and no facade class in between.
+
+Two entry points, and why the second is not a parameter on the first
+--------------------------------------------------------------------
+CHE-217 (R05.6) added `trace_rays(problem, rays, *, execution=...) -> RayBundle`,
+which traces a `RayBundle` the project already holds. The two differ in what the
+rays *are*, not in how the trace runs: `trace` builds them inside the solver from
+a normalized field coordinate and a hexapolar ring count, and `trace_rays`
+consumes a representation declared at a boundary. Folding them into one function
+behind an optional `rays=` would make `sampling=` mean nothing on half its calls
+and would put a `sqrt(intensity)` and a regenerated pupil quadrature on the same
+code path as a caller's own coefficients -- which is exactly the corruption
+`rays.AMPLITUDE_SIDECAR_RULE` and `rays.SUPPLIED_RAY_SURVIVAL_RULE` exist to name.
+`trace` is numerically untouched by the addition; its frozen ray parity holds.
 
 What is not here
 ----------------
@@ -63,7 +76,16 @@ from numerics import (
 )
 from problems import RayTraceProblem
 from representations import RayBundle
-from solvers.optiland.rays import REFERENCE_SURFACES, hexapolar_ray_count, to_ray_bundle
+from solvers.optiland.rays import (
+    NATIVE_WAVELENGTH_M,
+    REFERENCE_SURFACES,
+    SKIP_OBJECT_SURFACE,
+    hexapolar_ray_count,
+    require_launch_surface,
+    to_native_rays,
+    to_ray_bundle,
+    to_traced_ray_bundle,
+)
 from solvers.optiland.system import build_lens
 
 __all__ = [
@@ -73,6 +95,7 @@ __all__ = [
     "Sampling",
     "configure_execution",
     "trace",
+    "trace_rays",
 ]
 
 #: The row of `numerics.COMPONENT_CAPABILITIES` this solver executes within.
@@ -496,5 +519,128 @@ def trace(
         wavelength_um=wavelength_um,
         num_rings=num_rings,
         reference_surface=reference_surface,
+    )
+    return bundle
+
+
+def trace_rays(
+    problem: RayTraceProblem, rays: RayBundle, *, execution: Execution
+) -> RayBundle:
+    """Trace an **externally supplied** `RayBundle` through `problem`'s system.
+
+    The second entry point, and the one that makes a composed workflow expressible:
+    `couplers.scalar_to_ray` produces a fully declared bundle, and this is what
+    carries it through an optical system so `couplers.ray_to_scalar` can
+    reconstruct on the other side. `trace` is unchanged and unaffected -- it
+    *generates* its rays inside the solver from a field coordinate and a ring
+    count, which is the right shape for a pupil benchmark and cannot express an
+    importance-weighted ensemble drawn from a scalar grid's angular spectrum.
+
+    There is deliberately no `sampling=` argument. Every quantity it carries is
+    already a property of the bundle: the rays *are* the sampling, the wavelength
+    is `rays.wavelength_m`, and no field angle, object distance or pupil-sampling
+    parameter is constructed anywhere in this call path. A trace **consumes** a
+    representation; it does not regenerate one from a higher-level source
+    specification.
+
+    What this operation may and may not do to the bundle
+    ---------------------------------------------------
+    It evolves the geometry and it extends the optical path. It does **not**
+    restate the amplitude or the quadrature:
+
+    * the complex amplitude is a sidecar. `|a|^2` crosses into the solver so the
+      clipping bookkeeping is meaningful, and what comes back is read for exactly
+      one purpose -- deciding which rays survived. `rays.AMPLITUDE_SIDECAR_RULE`;
+    * `measure_weight` and `measure_kind` pass through untouched, for the reason
+      `operators.propagate_rays` already states for propagation: the quadrature
+      that fixed each plane wavelet's coefficient was taken at the surface where
+      the rays were declared, and passing through a surface does not restate it;
+    * the optical path is `incoming + accumulator`, carrying a reference that says
+      so. `rays.compose_optical_path_m`;
+    * survival keeps the row and zeroes the amplitude, so the output aligns with
+      the caller's own arrays row for row. `rays.SUPPLIED_RAY_SURVIVAL_RULE`.
+
+    The bundle must be **coherent** -- `RayBundle.require_coherent()` is the gate,
+    and it settles the three cases that would otherwise need new vocabulary here:
+    a bundle with no amplitude and a bundle with no optical path are both refused
+    with `COHERENT_STATE_INCOMPLETE`, and one whose reference is `"unverified"` is
+    refused with `OPL_REFERENCE_UNVERIFIED`. The last of those is the one worth
+    naming: composing onto an unverified zero and then labelling the sum with this
+    package's own version prefix would *launder* an unverified path into an
+    admissible one, which is worse than either half.
+
+    Parameters
+    ----------
+    problem
+        The system to trace through. Its `field_angles_deg`, `object_distance_mm`
+        and `entrance_pupil_diameter_mm` still describe the prescription -- the
+        first two place the object surface this trace skips, and the third is the
+        solver's pupil for ray *generation*, which this path does not use. No
+        aperture is clipped by anything but the surface geometry: a physical clear
+        aperture is R05.9's.
+    rays
+        The bundle to trace. It must declare itself on the first surface after the
+        object surface, in that surface's medium; both are checked
+        (`rays.require_launch_surface`).
+    execution
+        Device and precision, on `trace`'s contract and with the same capability
+        gate, applied before the solver enters the process.
+
+    Returns
+    -------
+    A `RayBundle` on the traced image surface, with the same row count, the same
+    `wavelength_m`, `frame`, `measure_weight` and `measure_kind`, the caller's
+    amplitude re-associated row for row, and a composed optical path.
+
+    Raises
+    ------
+    TypeError, ValueError
+        `execution=` is misspelled or incomplete, `rays` is not a `RayBundle`, or
+        the requested precision or device is outside the measured capability
+        table. Raised before the solver is imported.
+    ContractError
+        The bundle is not coherent, is not declared where the trace starts or in
+        the medium it starts in, or no supplied ray survived.
+    ImportError
+        optiland is not installed.
+    """
+    if not isinstance(rays, RayBundle):
+        raise TypeError(
+            f"trace_rays takes a RayBundle as its second argument, got "
+            f"{type(rays).__name__}. This entry point consumes a representation the "
+            "project already holds; `trace` is the one that generates its own rays."
+        )
+    _require_keys(execution, name="execution")
+    # Before anything else, and before the solver is imported: a bundle that
+    # cannot be read as coherent has no amplitude to carry across and no path to
+    # compose onto, and the refusal names every missing declaration at once.
+    rays.require_coherent()
+
+    # The whole capability gate, before the solver enters the process.
+    device, precision, namespace = _resolve_execution(execution)
+
+    configure_execution(device=device, precision=precision, namespace=namespace)
+    lens = build_lens(problem)
+
+    wavelength_um = rays.wavelength_m / NATIVE_WAVELENGTH_M
+    # The launch surface and its medium, checked against the constructed system
+    # rather than assumed from the skip count: getting this wrong is not a crash,
+    # it is a silently different optical system.
+    object_space_index = require_launch_surface(
+        lens,
+        rays.reference_surface,
+        skip=SKIP_OBJECT_SURFACE,
+        wavelength_um=wavelength_um,
+    )
+
+    native = to_native_rays(rays, namespace=namespace, device=device, precision=precision)
+    traced = lens.surfaces.trace(native, skip=SKIP_OBJECT_SURFACE)
+    bundle, _ = to_traced_ray_bundle(
+        lens,
+        traced,
+        rays,
+        launch_surface_z_m=rays.reference_surface.z_m,
+        object_space_index=object_space_index,
+        wavelength_um=wavelength_um,
     )
     return bundle

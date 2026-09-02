@@ -38,6 +38,14 @@ Nothing here uses this repository's own numerics as the oracle. The manufactured
 geometries have closed-form answers, and the analytic sphere condition and the
 geometric slope requirement are both statements about optics rather than about
 this code.
+
+CHE-217 (R05.6) adds section 3c: the *composed* path a supplied bundle leaves
+with, which is a second declared quantity rather than a variation on the first.
+It is here rather than beside the rest of R05.6's tests because this is the file
+that owns the accumulator convention and the manufactured plate that gives it a
+closed-form answer -- and because the composition is the place R05.6 could be
+wrong without any intensity check noticing. Same discipline: an exact closed form,
+`n * L` rather than `L`, and the geometric distance kept as the falsifiable twin.
 """
 
 from __future__ import annotations
@@ -52,7 +60,9 @@ from fixtures.systems import REVERSE_TELEPHOTO, singlet_ref
 from problems.ray_trace import Material, RayTraceProblem, SurfaceSpec
 from representations import UNVERIFIED, ContractError, Frame, RayBundle, ReferenceSurface
 from solvers.optiland import rays as rays_module
+from solvers.optiland import trace_rays
 from solvers.optiland.rays import (
+    COMPOSED_OPL_REFERENCE_VERSION,
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
     NATIVE_LENGTH_M,
@@ -438,6 +448,122 @@ def test_the_native_accumulator_scaled_to_metres_is_refused_as_an_optical_path()
     assert excinfo.value.code == "OPL_REFERENCE_UNVERIFIED"
     assert "native accumulator" in str(excinfo.value)
     assert "moves with the aperture" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# 3c. The composed path of a SUPPLIED bundle. CHE-217 (R05.6).
+#
+# The convention above is for a path this solver declared from end to end.
+# `trace_rays` declares a different quantity -- the incoming bundle's own path
+# plus this trace's increment -- and it is checked here, in the file that owns the
+# accumulator convention, against the same manufactured plate that gave the
+# original convention a closed-form answer. The composition is where a
+# plausible-looking implementation of R05.6 is wrong in a way no intensity check
+# can see, so it is measured rather than reasoned about.
+# ---------------------------------------------------------------------------
+
+EXECUTION = {"device": "cpu", "precision": "fp64"}
+
+
+def _supplied_bundle(
+    *, axial_cosines: tuple[float, ...], offsets_m: tuple[float, ...]
+) -> RayBundle:
+    """Rays on the plate's front surface, each with its own tilt and its own path.
+
+    The tilt is in `x` only, so `d = (sqrt(1 - dz^2), 0, dz)` and the arc to a
+    plane at axial offset `L` is exactly `L / dz`. `offsets_m` is each ray's
+    incoming optical path, distinct per ray so an implementation that replaced it
+    with a constant -- or dropped it -- cannot pass.
+    """
+    count = len(axial_cosines)
+    assert len(offsets_m) == count
+    axial = np.asarray(axial_cosines, dtype=np.float64)
+    return RayBundle(
+        positions_m=np.zeros((count, 3)),
+        directions=np.column_stack([np.sqrt(1.0 - axial**2), np.zeros(count), axial]),
+        wavelength_m=WAVELENGTH_M,
+        reference_surface=ReferenceSurface(
+            name="plate front", z_m=0.0, medium_index=1.0
+        ),
+        frame=Frame(),
+        amplitude=np.linspace(0.3, 1.7, count) * np.exp(1j * np.linspace(0.1, 1.1, count)),
+        optical_path_m=np.asarray(offsets_m, dtype=np.float64),
+        optical_path_reference="zero at the plate front",
+        measure_weight=np.linspace(1.0, 3.0, count),
+        measure_kind="importance_weight",
+    )
+
+
+def test_the_composed_path_is_the_incoming_path_plus_the_closed_form_arc() -> None:
+    """An all-air plate: no refraction anywhere, so the arc is `L / dz` exactly.
+
+    Every ingredient of the composition is exercised at once and each has a
+    closed form: the incoming path is distinct per ray, the increment is a
+    per-ray arc length rather than a constant, and the unit conversion is the one
+    that scales `k * OPL` by a thousand when it is wrong.
+    """
+    thickness = 3.0
+    axial = (1.0, 0.99, 0.95, 0.8)
+    offsets = (0.0, 1.0e-3, -2.0e-4, 5.0e-3)
+    bundle = _supplied_bundle(axial_cosines=axial, offsets_m=offsets)
+
+    traced = trace_rays(_plate(thickness_mm=thickness, index=1.0), bundle, execution=EXECUTION)
+
+    length_m = thickness * NATIVE_LENGTH_M
+    expected = np.asarray(offsets) + length_m / np.asarray(axial)
+    assert traced.optical_path_m == pytest.approx(expected, rel=0.0, abs=1.0e-18)
+    # And the increment alone is the arc, so the addition is an addition.
+    assert traced.optical_path_m - bundle.optical_path_m == pytest.approx(
+        length_m / np.asarray(axial), rel=0.0, abs=1.0e-18
+    )
+
+
+def test_the_composed_increment_is_index_weighted_not_geometric() -> None:
+    """The plate in glass, axial rays: the increment is `n * L`, and `n != 1` matters.
+
+    The falsifiable twin of the test above. An implementation that added the
+    geometric distance instead of the optical one is right in air and wrong
+    everywhere else -- including inside a lens, which is where a sequential trace
+    actually uses this. On this plate the two differ by 52%, so the assertion
+    discriminates rather than merely passes.
+    """
+    thickness = 3.0
+    index = 1.5168
+    offsets = (0.0, 4.0e-4, -1.0e-3)
+    bundle = _supplied_bundle(axial_cosines=(1.0, 1.0, 1.0), offsets_m=offsets)
+
+    traced = trace_rays(
+        _plate(thickness_mm=thickness, index=index), bundle, execution=EXECUTION
+    )
+
+    length_m = thickness * NATIVE_LENGTH_M
+    increment = traced.optical_path_m - bundle.optical_path_m
+    assert increment == pytest.approx(index * length_m, rel=0.0, abs=1.0e-18)
+    # The negative control: the geometric distance is not the answer.
+    assert not np.allclose(increment, length_m, atol=1.0e-6)
+
+
+def test_the_composed_reference_is_its_own_version_and_names_the_incoming_one() -> None:
+    """A composition is not the absolute declaration, and must not be labelled as one.
+
+    `declare_optical_path_m`'s reference promises a chief-ray-zeroed absolute path
+    measured from a named object-space wavefront. A composed path promises the
+    incoming bundle's zero plus an increment. Carrying the first label on the
+    second would tell a consumer something false about where the zero is, and
+    `require_coherent()` cannot tell them apart -- so the two prefixes are
+    distinct, and the composed one quotes what it was composed onto.
+    """
+    bundle = _supplied_bundle(axial_cosines=(1.0, 0.98), offsets_m=(0.0, 1.0e-4))
+    traced = trace_rays(_plate(thickness_mm=2.0, index=1.0), bundle, execution=EXECUTION)
+
+    reference = traced.optical_path_reference
+    assert reference is not None
+    assert reference.startswith(COMPOSED_OPL_REFERENCE_VERSION)
+    assert not reference.startswith(OPL_REFERENCE_VERSION)
+    assert bundle.optical_path_reference in reference
+    # Admissible, because the vocabulary was extended by enumeration.
+    require_declared_optical_path(traced)
+    traced.require_coherent()
 
 
 @pytest.mark.parametrize(

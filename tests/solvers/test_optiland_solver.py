@@ -3,7 +3,11 @@
 CHE-181 (R05.3), acceptance criteria:
 
 1. `trace(problem, sampling=..., execution=...)` returns a neutral `RayBundle`,
-   and it is the only entry point;
+   and it is the only entry point -- **superseded by CHE-217 (R05.6)**, which
+   added `trace_rays` for a supplied bundle. What survives of the criterion is the
+   exact list: the public surface is these two functions plus the execution
+   configuration, and a third name has to be justified. `trace` itself is
+   numerically untouched by that addition;
 2. backend / device / precision configuration is explicit and idempotent, and two
    consecutive calls with the same request produce bit-identical results;
 3. a requested precision or device the measured capability table does not support
@@ -74,14 +78,23 @@ AVOIDED_NAMES = (
 # ---------------------------------------------------------------------------
 
 
-def test_one_public_entry_point() -> None:
-    """`trace` is the API; `configure_execution` is the state it owns."""
+def test_the_public_entry_points_are_the_two_kinds_of_input() -> None:
+    """`trace` and `trace_rays` are the API; `configure_execution` is the state they own.
+
+    Was `test_one_public_entry_point` through CHE-181. CHE-217 (R05.6) added
+    `trace_rays`, and the two are not a facade over one implementation: they differ
+    in what the rays *are*. `trace` generates them inside the solver from a field
+    coordinate and a ring count; `trace_rays` consumes a `RayBundle` the project
+    already holds, with its own amplitude and its own quadrature. This assertion
+    stays an exact list for the reason it always was -- a third name has to be
+    justified rather than accumulated.
+    """
     callables = sorted(
         name
         for name in optiland.__all__
         if callable(getattr(optiland, name)) and not isinstance(getattr(optiland, name), type)
     )
-    assert callables == ["configure_execution", "trace"]
+    assert callables == ["configure_execution", "trace", "trace_rays"]
 
 
 def test_no_adapter_facade_anywhere_in_the_package() -> None:

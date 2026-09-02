@@ -31,6 +31,12 @@ And criterion 3: the public boundary receives neutral project types and emits a
 neutral `RayBundle`. That is checked as an absence claim on the emitted artifact,
 because a bundle whose arrays were torch tensors would satisfy the type
 annotation and not the boundary.
+
+CHE-217 (R05.6) extends the last section to the second entry point and changes
+nothing else: the AST walk and the `sys.modules` check are unaltered, and the
+supplied-bundle path and its own test file are held to them as written -- which
+is why `tests/solvers/test_optiland_bundle_trace.py` is in neither exemption set
+and states its lengths in SI.
 """
 
 from __future__ import annotations
@@ -44,8 +50,8 @@ import numpy as np
 import pytest
 from fixtures.systems import singlet_ref
 
-from representations import RayBundle
-from solvers.optiland import trace
+from representations import RayBundle, ReferenceSurface
+from solvers.optiland import trace, trace_rays
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
@@ -272,6 +278,7 @@ def test_the_walk_would_actually_catch_a_violation() -> None:
         "import operations",
         "import solvers.optiland",
         "from solvers.optiland import trace",
+        "from solvers.optiland import trace_rays",
         "import solvers.optiland.rays",
         "import solvers.optiland.system",
     ],
@@ -334,6 +341,57 @@ def test_trace_emits_a_neutral_bundle_and_nothing_native() -> None:
     # path reference is the one to watch: it is a long declaration written inside
     # the package, and it quotes the plane coordinate and the removed piston --
     # both of which have to be in metres by the time they are written down.
+    for value in (
+        bundle.optical_path_reference,
+        bundle.reference_surface.name,
+        bundle.frame.axis_order,
+    ):
+        text = str(value)
+        for name in NATIVE_NAMES:
+            assert name not in text
+        for fragment in MILLIMETRE_FRAGMENTS:
+            assert fragment not in text
+
+
+def test_trace_rays_emits_a_neutral_bundle_and_nothing_native() -> None:
+    """Criterion 3 on CHE-217's second entry point, on the same absence claim.
+
+    The extension matters because this path is the one that *receives* a project
+    representation as well as emitting one, so there are two directions for
+    native state to escape in. The AST walk above already covers every module
+    outside the package, including the tests for this path; what is checked here
+    is the artifact.
+
+    The composed optical-path reference is the field to watch: it is written
+    inside the package, and it quotes the incoming bundle's own declaration, both
+    surface coordinates and the object-space index. Every one of those has to be
+    in metres and free of the solver's type names by the time it is written down.
+    """
+    count = 5
+    radii = np.linspace(0.0, 2.0e-4, count)
+    supplied = RayBundle(
+        positions_m=np.column_stack([radii, np.zeros(count), np.zeros(count)]),
+        directions=np.tile(np.array([0.0, 0.0, 1.0]), (count, 1)),
+        wavelength_m=0.55e-6,
+        reference_surface=ReferenceSurface(
+            name="emitting surface", z_m=0.0, medium_index=1.0
+        ),
+        amplitude=np.linspace(0.3, 2.1, count) * np.exp(1j * np.linspace(0.2, 2.2, count)),
+        optical_path_m=np.zeros(count),
+        optical_path_reference="zero at the emitting surface",
+        measure_weight=np.linspace(1.0, 5.0, count),
+        measure_kind="importance_weight",
+    )
+    bundle = trace_rays(
+        singlet_ref(), supplied, execution={"device": "cpu", "precision": "fp64"}
+    )
+
+    assert isinstance(bundle, RayBundle)
+    for name in ("positions_m", "directions", "amplitude", "optical_path_m", "measure_weight"):
+        array = getattr(bundle, name)
+        assert isinstance(array, np.ndarray), f"{name} is {type(array).__name__}"
+    assert bundle.measure_kind == "importance_weight"
+    assert bundle.reference_surface.name == "image_surface"
     for value in (
         bundle.optical_path_reference,
         bundle.reference_surface.name,
