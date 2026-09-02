@@ -431,18 +431,24 @@ def test_the_descriptor_says_forward_only() -> None:
     this package's own `CAPABILITIES`, which is the half a catalog in another
     package cannot check for itself.
     """
-    descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND")
-    # `SOURCE` since CHE-224 (R15.1), `SOLVER` before it. It consumes no upstream
-    # representation -- an `OpticalSetup` is a constructor argument, not a port --
-    # which is this project's definition of a source, and the fact that it drives
-    # a backend is `backend` rather than a kind.
-    assert descriptor.kind is OperationKind.SOURCE
+    descriptor = next(d for d in CATALOG if d.operation_id == "SO_RAY_LAUNCH_TRACE")
+    # A COMPOSITE since CHE-225 (R15.2), and the history is worth carrying: this
+    # record was `SOLVER`-kind, then CHE-224 made it `SOURCE`, which was a false
+    # claim -- `trace` materializes its rays and then refracts them through every
+    # surface. `kind` is the terminal stage and `composes` carries the fusion.
+    assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
+    assert descriptor.composes == (
+        OperationKind.SOURCE,
+        OperationKind.PHYSICAL_OPERATOR,
+    )
+    assert descriptor.entry_stage is OperationKind.SOURCE
+    assert descriptor.is_graph_entry, "it still consumes no upstream representation"
     assert descriptor.backend == "optiland"
     assert descriptor.implementation == "backends.optiland.solver:trace"
     assert descriptor.derivative == DERIVATIVE == "forward_only"
     assert descriptor.derivative_evidence is None
     assert descriptor.capabilities == CAPABILITIES
-    assert resolve("S_RAY_OPTILAND") is trace
+    assert resolve("SO_RAY_LAUNCH_TRACE") is trace
 
 
 def test_the_supplied_bundle_entry_point_has_its_own_record() -> None:

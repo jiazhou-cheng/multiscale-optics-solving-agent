@@ -71,12 +71,22 @@ state, and it is a separate descriptor field (`backend`). CHE-224 (R15.1)
 separated the two, replacing a `solver` kind with `source`; see
 `docs/architecture_principles.md` §2.
 
+The four are **primitive**. One callable may fuse several of them and declares the
+ordered stages in `OperationDescriptor.composes`, with `kind` naming the
+**terminal** stage — where it leaves the state. `SO_` is a composite id prefix, not
+a fifth kind. There is exactly one composite today: `SO_RAY_LAUNCH_TRACE`
+initializes rays and then refracts them through every surface, so neither `source`
+nor `physical_operator` alone is a true claim about it. CHE-225 (R15.2) landed
+this; a composition is **not** a pipeline description and nothing can execute a
+stage of one.
+
 - **representation** — physical state with explicit conventions. The initial public target is one ray representation and one scalar-field representation. PSF is a measurement, not a representation. Coherence is a stronger contract by default, not a subtype.
 - **backend** — an adapter package that **provides** operations of the other kinds and is not itself an operation kind. It owns external-library API, compatibility, and version-specific behavior, and `backends/<backend>/` is the only place permitted to import that library. A backend answers *who executes*; a kind answers *what happens to physical state*, and an operation has exactly one of each. Package location follows the provider; kind is declared in the catalog — so a backend-provided measurement lives in `backends/<backend>/` and needs no `measurements/ -> backends/` edge.
 - **source** — owns the physically meaningful **initialization** of a representation. A representation defines the structure and conventions of physical state at a declared boundary; a source defines how that state is initialized from physical source parameters — a plane-wave source initializes a `ScalarField`'s complex amplitude and phase from its wavelength, propagation direction, amplitude, sampling grid and reference surface. **A source does not consume an existing physical representation; it creates the initial state of one.** But **a source may be described without an optical system and a ray launch may not**: the launch positions and directions of a source into a system depend on the stop, the entrance pupil, the surfaces before the stop, the object distance, the field, the backend's pupil map and the ray aimer, so ray launch is a `backends/<backend>/` operation taking the constructed system as a required argument, and `sources/` produces no system-launch `RayBundle`. CHE-219 (R05.8) decided this; see `docs/architecture_principles.md` §2. It registers as `source`-kind, and what separates `sources/` from `backends/<backend>/` is not the kind — both provide `source`-kind operations — but the provider: a source in `sources/` has no external backend, so its descriptor carries `backend=None`.
 - **coupler** — changes *representation* while preserving the same physical state at the same boundary. Heavy numerics do not make it an operator.
 - **physical operator** — changes physical state. Propagation and surface interactions are operators, not couplers.
 - **measurement** — derives an observable from state.
+- **composite operation** — one callable that fuses more than one primitive stage, declaring them in order. `kind` is the terminal stage; `composes` is `()` for everything that fuses nothing. A composite exists only where a single kind would be a *false* claim, not merely a simplification — and it is not a route, a plan or a pipeline description. `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler and deliberately declares no composition, because its representation types do not change at its ports; whether it should is an open question, not a defect.
 - **operation descriptor** — lightweight discovery/execution metadata; the target design resolves implementation paths lazily.
 
 The target dependency allowlist, **for packages that exist**, is:

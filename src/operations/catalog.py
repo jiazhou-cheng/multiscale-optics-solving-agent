@@ -61,9 +61,9 @@ a default, removing one or adding a required argument fails that gate.
 
 That matters because a second source of truth beside a signature is precisely what
 drifts, and two records here were already wrong before the check existed --
-`S_SOURCE_PLANE_WAVE` and `S_RAY_OPTILAND` each declared a representation input
-their callables do not accept. `approximation`, `validity` and `evidence` remain
-unguarded prose; nothing can derive those.
+`S_SOURCE_PLANE_WAVE` and `S_RAY_OPTILAND` (now `SO_RAY_LAUNCH_TRACE`) each
+declared a representation input their callables do not accept. `approximation`,
+`validity` and `evidence` remain unguarded prose; nothing can derive those.
 
 Two records may name one callable -- and none does any more
 -----------------------------------------------------------
@@ -135,9 +135,18 @@ __all__ = ["CATALOG"]
 #: sequence.
 CATALOG: tuple[OperationDescriptor, ...] = (
     # --- backends/optiland ---------------------------------------------------
+    # The one composite record -- CHE-225 (R15.2). `trace` is `build_lens` ->
+    # `launch` (materialize and declare the rays) -> `lens.trace` (refract through
+    # every surface) -> `to_ray_bundle`, so it initializes state AND evolves it.
+    # CHE-224 declared it `SOURCE` and that was a false claim, contradicted by this
+    # record's own `approximation` below: "a surface interaction is refraction at a
+    # real interface". `kind` is the TERMINAL stage and `composes` carries the
+    # fusion; `operations/descriptors.py` holds the retraction and the reason the
+    # honest decomposition is blocked on numbers rather than on taxonomy.
     OperationDescriptor(
-        operation_id="S_RAY_OPTILAND",
-        kind=OperationKind.SOURCE,
+        operation_id="SO_RAY_LAUNCH_TRACE",
+        kind=OperationKind.PHYSICAL_OPERATOR,
+        composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
         inputs=(),
         returns=("ray_bundle",),
         implementation="backends.optiland.solver:trace",
@@ -162,7 +171,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         backend="optiland",
         requires=("setup", "execution"),
         approximation=(
-            "the same sequential geometric ray trace as S_RAY_OPTILAND, over an "
+            "the same sequential geometric ray trace as SO_RAY_LAUNCH_TRACE, over an "
             "externally supplied ensemble rather than a generated pupil fan: the "
             "geometry evolves and the optical path is composed onto the incoming one, "
             "while the complex amplitude and the sampling measure are the caller's and "
@@ -257,6 +266,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # `kind=OperationKind.SOURCE` since CHE-224 (R15.1). All three were `SOLVER`
     # before it, because the enum had no `SOURCE` member -- so the `S_` on these
     # three ids meant "source" while the `S_` on `S_RAY_OPTILAND` meant "solver",
+    # a record CHE-225 (R15.2) then renamed to `SO_RAY_LAUNCH_TRACE`,
     # and `kind` could not tell a reader which.
     #
     # What a source consumes instead is in `requires`: a grid `shape`, a pitch, a

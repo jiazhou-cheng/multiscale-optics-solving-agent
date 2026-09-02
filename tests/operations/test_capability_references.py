@@ -63,7 +63,7 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
     """
     cited = dict(CITATIONS)
     assert cited == {
-        "S_RAY_OPTILAND": "M_RAY_OPTILAND",
+        "SO_RAY_LAUNCH_TRACE": "M_RAY_OPTILAND",
         "O_RAY_TRACE": "M_RAY_OPTILAND",
         "O_ASM_PROPAGATE": "M_WAVE_CHROMATIX",
         "O_FOCAL_PLANE_TRANSFORM": "M_WAVE_CHROMATIX",
@@ -76,7 +76,7 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
 def test_several_descriptors_may_cite_one_record() -> None:
     """The pack rule, from the catalog's side.
 
-    `S_RAY_OPTILAND` and `O_RAY_TRACE` both cite `M_RAY_OPTILAND` because the probe
+    `SO_RAY_LAUNCH_TRACE` and `O_RAY_TRACE` both cite `M_RAY_OPTILAND` because the probe
     measured the *package's* device and dtype behaviour, not one semantic operation.
     Duplicating a component row per descriptor is the second source the knowledge
     pack removes, so this is pinned as intended rather than tolerated.
@@ -91,7 +91,7 @@ def test_several_descriptors_may_cite_one_record() -> None:
         per_component.setdefault(component, []).append(operation_id)
     assert sorted(per_component["M_RAY_OPTILAND"]) == [
         "O_RAY_TRACE",
-        "S_RAY_OPTILAND",
+        "SO_RAY_LAUNCH_TRACE",
     ]
     assert len(per_component["M_WAVE_CHROMATIX"]) == 2
     # And there is exactly one record per component, not one per citation.

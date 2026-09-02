@@ -125,11 +125,16 @@ def test_the_check_would_notice_a_backend() -> None:
         """
 import operations
 
-descriptor = operations.find(output="ray_bundle", kind="source")[0]
+# The one graph entry that produces a ray bundle. Selected by `entry=True` and not
+# by `kind="source"`: CHE-225 (R15.2) made this record a composite whose `kind` is
+# its TERMINAL stage, `physical_operator`, so a kind query no longer finds it while
+# the entry query -- the one a planner actually asks -- still does.
+descriptor = operations.find(entry=True, output="ray_bundle")[0]
 implementation = operations.resolve(descriptor.operation_id)
 assert callable(implementation)
 assert descriptor.implementation.startswith("backends.optiland")
 assert descriptor.backend == "optiland"
+assert descriptor.entry_stage == "source" and descriptor.kind == "physical_operator"
 
 # What executing it would do. Imported explicitly so the probe below is testing
 # the probe, not the adapter's laziness.

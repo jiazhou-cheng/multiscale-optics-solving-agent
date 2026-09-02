@@ -547,10 +547,10 @@ def test_the_walk_would_catch_a_violation() -> None:
 # same four tuples from `inspect.signature` and compares, so what is asserted here
 # as metadata is separately known to match the code.
 
-#: The four graph entries: the three analytic sources, and the problem-driven ray
-#: solve. Written out because "four" would pass with the wrong four.
+#: The four graph entries: the three analytic sources, and the fused
+#: launch-and-trace. Written out because "four" would pass with the wrong four.
 GRAPH_ENTRIES = {
-    "S_RAY_OPTILAND",
+    "SO_RAY_LAUNCH_TRACE",
     "S_SOURCE_GAUSSIAN_BEAM",
     "S_SOURCE_PLANE_WAVE",
     "S_SOURCE_SPHERICAL_WAVE",
@@ -573,11 +573,13 @@ def test_question_1_is_an_upstream_representation_edge_required() -> None:
     entries = {record.operation_id for record in CATALOG if record.is_graph_entry}
     assert entries == GRAPH_ENTRIES
     assert len(CATALOG) - len(entries) == 9
-    # Every entry is `source`-kind, which is what `ENTRY_KINDS` enforces. It was
-    # `solver`-kind until CHE-224 (R15.1), for want of a `SOURCE` member.
+    # Every entry BEGINS with a source, which is what `ENTRY_KINDS` enforces. Read
+    # off `entry_stage` and not `kind` since CHE-225 (R15.2): `SO_RAY_LAUNCH_TRACE`
+    # is `physical_operator`-kind because that is where it leaves the state, and it
+    # is still an entry because its first stage is a source.
     for record in CATALOG:
         if record.is_graph_entry:
-            assert record.kind is OperationKind.SOURCE, record.operation_id
+            assert record.entry_stage is OperationKind.SOURCE, record.operation_id
     assert operations.find(entry=True) == tuple(
         sorted((r for r in CATALOG if r.is_graph_entry), key=lambda r: r.operation_id)
     )
@@ -625,7 +627,7 @@ def test_question_3_every_required_value_is_named() -> None:
         "O_FOCAL_PLANE_TRANSFORM",
         "O_PROPAGATE_RAYS",
         "O_RAY_TRACE",
-        "S_RAY_OPTILAND",
+        "SO_RAY_LAUNCH_TRACE",
         "S_SOURCE_GAUSSIAN_BEAM",
         "S_SOURCE_PLANE_WAVE",
         "S_SOURCE_SPHERICAL_WAVE",
@@ -652,7 +654,7 @@ def test_question_4_the_optional_set_is_names_and_not_values() -> None:
     index = {record.operation_id: record for record in CATALOG}
     assert len(index["O_DIFFRACTIVE_SURFACE"].optional) == 16
     assert index["O_RAY_TRACE"].optional == ()
-    assert index["S_RAY_OPTILAND"].optional == ("aiming",)
+    assert index["SO_RAY_LAUNCH_TRACE"].optional == ("aiming",)
     for record in CATALOG:
         for name in record.optional:
             assert name.isidentifier(), (record.operation_id, name)
@@ -754,46 +756,73 @@ def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
     port, so not a source under any reading -- was renamed to `O_RAY_TRACE` in the
     same change rather than left as the defect from the other side.
     """
-    prefixes = {
+    primitive = {
         "S_": OperationKind.SOURCE,
         "O_": OperationKind.PHYSICAL_OPERATOR,
         "C_": OperationKind.COUPLER,
         "M_": OperationKind.MEASUREMENT,
     }
+    #: Composite prefixes, spelled as the stages they fuse. CHE-225 (R15.2) adds
+    #: exactly one: `SO_` is source-then-operator. A composite prefix is NOT a
+    #: fifth kind -- the stages are all primitives from the enum.
+    composite = {"SO_": (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR)}
+
     for record in CATALOG:
+        three = record.operation_id[:3]
+        if three in composite:
+            assert record.composes == composite[three], (
+                f"{record.operation_id} has the composite prefix {three!r}, which means "
+                f"{[k.value for k in composite[three]]}, but declares "
+                f"{[k.value for k in record.composes]}"
+            )
+            continue
         prefix = record.operation_id[:2]
-        assert prefix in prefixes, (
+        assert prefix in primitive, (
             f"{record.operation_id} starts with {prefix!r}, which is not one of "
-            f"{sorted(prefixes)}"
+            f"{sorted(primitive)} and not a declared composite prefix "
+            f"{sorted(composite)}"
         )
-        assert record.kind is prefixes[prefix], (
+        assert record.kind is primitive[prefix], (
             f"{record.operation_id} is {record.kind.value} but its {prefix!r} prefix "
-            f"says {prefixes[prefix].value}"
+            f"says {primitive[prefix].value}"
+        )
+        assert record.composes == (), (
+            f"{record.operation_id} declares a composition "
+            f"{[k.value for k in record.composes]} under the single-primitive prefix "
+            f"{prefix!r}. A record that fuses stages says so in its prefix."
         )
     # Every kind is actually exercised, so the loop is not passing on three of four.
     assert {r.kind for r in CATALOG} == set(OperationKind)
 
 
-def test_g3_every_source_is_an_entry_and_every_entry_is_a_source() -> None:
-    """Redundant with `ENTRY_KINDS` in one direction, and it is the cheap half.
+def test_g3_every_entry_begins_with_a_source_and_every_source_start_is_an_entry() -> None:
+    """The `entry_stage` version, CHE-225 (R15.2). Both directions, over the catalog.
 
-    `ENTRY_KINDS` refuses `inputs=()` on a non-source at construction, so the
-    entry-implies-source direction cannot fail. The other direction is what this
-    adds: a `SOURCE` that declared a port would satisfy every construction check,
-    and `S_RAY_OPTILAND_BUNDLE` was exactly that shape under the old taxonomy -- a
-    `solver` with a `ray_bundle` port, in a set where `solver` was also the entry
-    kind. That is the state defect 4 came from, and this is the assertion that stops
-    it coming back.
+    `ENTRY_KINDS` refuses `inputs=()` on a record whose entry stage is not a source
+    at construction, so that direction cannot fail. The other direction is what this
+    adds: a record that *begins* with a source and also declares a port would
+    satisfy every construction check, and it is incoherent -- a source stage
+    consumes nothing.
+
+    The `kind`-keyed version of this test could not survive CHE-225, and that is the
+    point rather than a weakening: `SO_RAY_LAUNCH_TRACE` is an entry whose `kind` is
+    `physical_operator`, so "every entry is a `SOURCE`" is now false while "every
+    entry BEGINS with a source" is exactly true. The old wording is what let
+    CHE-224 put a false `kind` on a record and still pass.
     """
-    sources = {r.operation_id for r in CATALOG if r.kind is OperationKind.SOURCE}
+    source_started = {r.operation_id for r in CATALOG if r.entry_stage is OperationKind.SOURCE}
     entries = {r.operation_id for r in CATALOG if r.is_graph_entry}
-    assert sources == entries == GRAPH_ENTRIES
+    assert source_started == entries == GRAPH_ENTRIES
     for record in CATALOG:
-        assert (record.kind is OperationKind.SOURCE) == (record.inputs == ()), (
+        assert (record.entry_stage is OperationKind.SOURCE) == (record.inputs == ()), (
             record.operation_id,
-            record.kind.value,
+            record.entry_stage.value,
             record.inputs,
         )
+    # And the composite is genuinely one of them, so this is not four plain sources.
+    index = {r.operation_id: r for r in CATALOG}
+    fused = index["SO_RAY_LAUNCH_TRACE"]
+    assert fused.is_graph_entry and fused.kind is OperationKind.PHYSICAL_OPERATOR
 
 
 def test_the_backend_field_and_the_capability_citation_are_different_questions() -> None:
@@ -831,3 +860,112 @@ def test_no_record_and_no_id_says_solver_any_more() -> None:
     for record in CATALOG:
         assert "SOLVER" not in record.operation_id, record.operation_id
         assert record.kind.value != "solver"
+
+
+# ---------------------------------------------------------------------------
+# 8. Composition. CHE-225 (R15.2).
+# ---------------------------------------------------------------------------
+#
+# Question 10, and the two gates that keep the composite honest. `composes` exists
+# because one landed record's `kind` was otherwise a false claim -- `trace`
+# initializes its rays and then refracts them through every surface -- and not
+# because composition is an interesting shape to model.
+
+
+def test_g5_a_composition_is_well_formed_and_kind_is_its_terminal_stage() -> None:
+    """The invariant that makes the scalar `kind` mean something on a composite.
+
+    Without it, `kind` on a fused record would be a free choice between its stages,
+    and CHE-224's mistake -- picking the first stage and calling the record a source
+    -- would be expressible again. `kind` is the TERMINAL stage: where the operation
+    leaves the state, and therefore which boundary the output sits at.
+
+    Enforced at construction as well, so this is the catalog-wide half.
+    """
+    for record in CATALOG:
+        if not record.composes:
+            continue
+        assert len(record.composes) >= 2, (
+            f"{record.operation_id} declares a one-stage composition; `()` already "
+            "means 'exactly its kind'"
+        )
+        assert record.composes[-1] is record.kind, (
+            f"{record.operation_id} fuses {[k.value for k in record.composes]} but its "
+            f"kind is {record.kind.value}; kind is the terminal stage"
+        )
+        assert all(stage in set(OperationKind) for stage in record.composes), (
+            f"{record.operation_id} fuses something that is not a primitive kind"
+        )
+
+
+def test_g5_the_construction_checks_actually_refuse_a_malformed_composition() -> None:
+    """The detection half, since every assertion above is over a catalog that passes.
+
+    Three ways a composition can be a false claim, each refused at construction.
+    Built as data rather than by editing a real record.
+    """
+    from tests.operations.test_descriptors import a_descriptor
+
+    # `kind` disagreeing with the last stage -- CHE-224's mistake, made expressible.
+    with pytest.raises(ValueError, match="TERMINAL stage"):
+        a_descriptor(
+            kind=OperationKind.SOURCE,
+            inputs=(),
+            composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
+        )
+    # A one-stage "composition", which states one fact twice.
+    with pytest.raises(ValueError, match="single stage"):
+        a_descriptor(kind=OperationKind.COUPLER, composes=(OperationKind.COUPLER,))
+    # A stage that is not a primitive kind.
+    with pytest.raises(ValueError, match="primitive kinds"):
+        a_descriptor(kind=OperationKind.COUPLER, composes=("source", "solver"))
+
+
+def test_g6_exactly_one_record_declares_a_composition() -> None:
+    """A second composite is a modelling claim, not something to acquire quietly.
+
+    The same discipline CHE-221 applied to "this is the only callable with two
+    records". `composes` is cheap to add to a record and expensive to be wrong
+    about, so the set is pinned and a new member has to come past this test.
+
+    `O_DIFFRACTIVE_SURFACE` is the interesting exclusion and it is deliberate: it
+    is internally coupler -> operator -> coupler (it imports `couplers` and
+    `operators.transmission`, and its `approximation` describes accumulate ->
+    transmit -> decompose), but its input and output representation types do not
+    change and it presents a single operator-like transformation at its boundary, so
+    its net primitive kind is the whole truth about it at the ports. Whether it
+    should nonetheless expose that structure is a recorded follow-up design
+    question -- see the `composes` field docstring -- and not a defect this gate is
+    tolerating.
+    """
+    composites = {r.operation_id for r in CATALOG if r.composes}
+    assert composites == {"SO_RAY_LAUNCH_TRACE"}, composites
+    index = {r.operation_id: r for r in CATALOG}
+    assert index["O_DIFFRACTIVE_SURFACE"].composes == ()
+    # And the other twelve are untouched by this ticket.
+    assert len([r for r in CATALOG if not r.composes]) == 12
+
+
+def test_the_fused_record_says_what_it_fuses_and_why_that_is_not_a_source() -> None:
+    """The record CHE-225 exists for, pinned against being quietly re-collapsed.
+
+    `S_RAY_OPTILAND` claimed `kind=SOURCE` for a callable that refracts through
+    every surface. What makes the claim checkably false is the record's own
+    `approximation`, which describes a state change -- so this asserts the two
+    agree now rather than contradict.
+    """
+    index = {r.operation_id: r for r in CATALOG}
+    assert "S_RAY_OPTILAND" not in index, (
+        "the collapsed record is back. `trace` initializes rays AND evolves them; "
+        "declaring either half alone is a false claim."
+    )
+    fused = index["SO_RAY_LAUNCH_TRACE"]
+    assert fused.composes == (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR)
+    assert fused.kind is OperationKind.PHYSICAL_OPERATOR
+    assert fused.entry_stage is OperationKind.SOURCE
+    assert fused.implementation == "backends.optiland.solver:trace"
+    assert fused.backend == "optiland"
+    assert fused.capabilities == "M_RAY_OPTILAND"
+    # The prose that made the old `kind` falsifiable, still present and still
+    # describing a state change.
+    assert "refraction at a real interface" in fused.approximation

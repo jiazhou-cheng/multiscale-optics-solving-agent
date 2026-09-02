@@ -258,10 +258,17 @@ def test_a_source_reaches_a_psf_from_no_upstream_state() -> None:
     """
     found = routes(frm=ENTRY, to="psf")
     assert ("S_SOURCE_PLANE_WAVE", "M_PSF") in found
+    # Every route from ENTRY starts at an operation that consumes no upstream
+    # representation. Checked against the catalog rather than against the id
+    # spelling: `route[0].startswith("S_")` was the old form and it broke on
+    # CHE-225's `SO_RAY_LAUNCH_TRACE`, which is a graph entry whose prefix is a
+    # composition rather than a primitive kind. The id was never the property under
+    # test.
+    entries = {r.operation_id for r in CATALOG if r.is_graph_entry}
     for route in found:
-        assert route[0].startswith("S_"), route
-    # The ray solver is the other entry, and it enters at `ray_bundle`.
-    assert routes(frm=ENTRY, to="ray_bundle", max_steps=1) == (("S_RAY_OPTILAND",),)
+        assert route[0] in entries, route
+    # The fused launch-and-trace is the other entry, and it enters at `ray_bundle`.
+    assert routes(frm=ENTRY, to="ray_bundle", max_steps=1) == (("SO_RAY_LAUNCH_TRACE",),)
 
 
 def test_a_state_with_nothing_composing_to_it_returns_no_route() -> None:
@@ -323,14 +330,14 @@ def test_the_unbounded_default_keeps_the_canonical_multi_scale_route() -> None:
     """Why there is no default bound, stated as the route a bound would have lost.
 
     `max_steps=4` was the first default here, and it silently omitted
-    `S_RAY_OPTILAND -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE ->
+    `SO_RAY_LAUNCH_TRACE -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE ->
     M_PSF`: trace the system, advance the rays, cross to the wave model, propagate
     the field, measure. That is the project's whole reason for existing, and a
     default that dropped it while its own comment claimed headroom was worse than
     verbose output.
     """
     canonical = (
-        "S_RAY_OPTILAND",
+        "SO_RAY_LAUNCH_TRACE",
         "O_PROPAGATE_RAYS",
         "C_RAY_TO_SCALAR",
         "O_ASM_PROPAGATE",

@@ -626,7 +626,7 @@ def test_a_failed_run_still_releases_the_resource() -> None:
 def test_a_ray_trace_crossing_to_the_wave_model_runs_end_to_end() -> None:
     """The route R12's graph discovers, executed: rays, coupled, measured.
 
-    `S_RAY_OPTILAND -> C_RAY_TO_SCALAR -> M_PSF`. Every step is a landed
+    `SO_RAY_LAUNCH_TRACE -> C_RAY_TO_SCALAR -> M_PSF`. Every step is a landed
     implementation with its own physics tests, and the point here is only that the
     executor binds and carries them: it resolves three operations across two
     packages, hands each the arguments the request names, passes the coupler's
@@ -638,7 +638,7 @@ def test_a_ray_trace_crossing_to_the_wave_model_runs_end_to_end() -> None:
     default gate does not depend on this one.
     """
     record = execute(
-        ("S_RAY_OPTILAND", "C_RAY_TO_SCALAR", "M_PSF"),
+        ("SO_RAY_LAUNCH_TRACE", "C_RAY_TO_SCALAR", "M_PSF"),
         request={
             "setup": singlet_ref(),
             "source": singlet_source(),

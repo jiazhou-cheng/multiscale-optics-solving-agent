@@ -168,7 +168,7 @@ def routes(
         25 ms; every ordered pair of states together is 48648 routes in 106 ms. So
         the complete answer is affordable, and a default that truncated it would be
         the worse failure: at `max_steps=4` this function silently omits
-        `S_RAY_OPTILAND -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE
+        `SO_RAY_LAUNCH_TRACE -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE
         -> M_PSF`, which is the project's canonical multi-scale composition. Routes
         come back shortest-first, so a caller who wants the short ones slices.
     catalog

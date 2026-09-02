@@ -433,7 +433,7 @@ def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
+def test_a_graph_entry_is_declared_and_only_a_source_stage_may_begin_one() -> None:
     """Acceptance criterion 9. `inputs=()` became expressible, so it needs a rule.
 
     Only `source`-kind, since CHE-224 (R15.1) -- `solver`-kind before it, which
@@ -453,8 +453,27 @@ def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
         OperationKind.PHYSICAL_OPERATOR,
         OperationKind.MEASUREMENT,
     ):
-        with pytest.raises(ValueError, match="may be a graph entry"):
+        with pytest.raises(ValueError, match="may begin a graph entry"):
             a_descriptor(kind=kind, inputs=())
+
+    # A composite is admitted on its FIRST stage, not on `kind` -- CHE-225 (R15.2).
+    # This is the shape `SO_RAY_LAUNCH_TRACE` needs: it consumes no upstream
+    # representation, and it leaves the state somewhere a source could not.
+    fused = a_descriptor(
+        kind=OperationKind.PHYSICAL_OPERATOR,
+        inputs=(),
+        composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
+    )
+    assert fused.is_graph_entry is True
+    assert fused.entry_stage is OperationKind.SOURCE
+    # And a composition that does NOT begin with a source is still refused, so the
+    # entry rule is keyed on the stage rather than merely bypassed by `composes`.
+    with pytest.raises(ValueError, match="may begin a graph entry"):
+        a_descriptor(
+            kind=OperationKind.MEASUREMENT,
+            inputs=(),
+            composes=(OperationKind.COUPLER, OperationKind.MEASUREMENT),
+        )
 
 
 def test_inputs_is_required_so_no_upstream_edge_has_to_be_written() -> None:

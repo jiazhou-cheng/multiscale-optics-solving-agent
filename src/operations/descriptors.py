@@ -1,5 +1,8 @@
 """One record per executable operation, with the four kinds as metadata.
 
+Four *primitive* kinds. A record that fuses more than one declares the fusion in
+`composes`; `SO_` is a composite id prefix and not a fifth kind.
+
 CHE-177 (R03.1). The reference implementation described the same information
 with 23 pydantic classes in `core/specs.py` plus 45 KB of YAML mirroring a
 358-line Python table. This is one frozen dataclass and one `StrEnum`, and the
@@ -50,13 +53,13 @@ What a planner has to be able to ask, and CHE-222 (R03.5)
 R03.1 described every operation as `one representation in -> one representation
 out`. Four shapes in the landed tree are not that, and for two of them the record
 was **false**: `S_SOURCE_PLANE_WAVE` declared `input="scalar_field"` for a function
-that consumes no field, and `S_RAY_OPTILAND` declared `input="ray_bundle"` for one
-that consumes no bundle. Both contradicted the code, `sources/__init__.py` and
-`docs/architecture_principles.md` §2, which all say a source is the one operation
-with no input.
+that consumes no field, and `S_RAY_OPTILAND` (`SO_RAY_LAUNCH_TRACE` since CHE-225)
+declared `input="ray_bundle"` for one that consumes no bundle. Both contradicted
+the code, `sources/__init__.py` and `docs/architecture_principles.md` §2, which
+all say a source is the one operation with no input.
 
-The fields below are the minimum that answers nine questions and nothing else.
-The specification *is* those nine questions -- a field that answers none of them
+The fields below are the minimum that answers ten questions and nothing else.
+The specification *is* those ten questions -- a field that answers none of them
 does not belong here, which is the discipline this record's own docstring already
 demanded and had no list to check against:
 
@@ -74,12 +77,24 @@ demanded and had no list to check against:
    resolved signature and compares, so the answer is checked against the code
    rather than against a table.
 9. which backend executes this, without resolving the implementation? -> `backend`
+10. does one callable fuse more than one primitive operation, and in what order?
+    -> `composes`, `entry_stage`
 
 Question 9 is CHE-224 (R15.1)'s, and adding it removed a field rather than
 adding one on balance: the catalog lost a record. It is a *separate* question from
 1-8, all of which are about physical state and arguments, and that separateness is
 the point -- see `OperationKind` on why `solver` was never an answer to any of
 them.
+
+Question 10 is CHE-225 (R15.2)'s, and it exists because **one landed record's
+`kind` was otherwise a false claim.** `backends.optiland.solver:trace` materializes
+and declares its rays and then refracts them through every surface: it initializes
+state *and* evolves it, so neither `source` nor `physical_operator` alone describes
+it. CHE-224 declared it `source` and was wrong; `composes` lets the record say
+`(SOURCE, PHYSICAL_OPERATOR)` and lets `kind` mean the terminal stage. See
+`ENTRY_KINDS` for the retraction of the argument that produced the false claim, and
+for the schema gap -- no notion of *which reference surface* a result sits at --
+that made it possible.
 
 `input` and `output` are **gone**, not aliased. Shipping `input` beside `inputs`
 as a convenience would put two spellings of one fact in one dataclass, which is
@@ -231,20 +246,37 @@ OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
 #: input would observe nothing. `__post_init__` refuses all three, which is the
 #: check that makes `inputs=()` an honest declaration rather than a hole.
 #:
-#: **`S_RAY_OPTILAND` is a `SOURCE`, and this is the re-kinding a reviewer will
-#: challenge.** §2 defines a solver as mapping a *problem* into a representation,
-#: and mapping an `OpticalSetup` plus a `SourceSpec` into a `RayBundle` is exactly
-#: that. The argument for collapsing it into `SOURCE` anyway is structural: an
-#: `OpticalSetup` is a constructor *argument*, not a port, so `S_RAY_OPTILAND` and
-#: `S_SOURCE_PLANE_WAVE` are **indistinguishable in this schema** -- both are
-#: `inputs=()`, both turn declared arguments into physical state, and the
-#: difference §2 draws between them is a difference in what the arguments *mean*
-#: that no field here records. Collapsing them loses no information the catalog
-#: held; it stops the catalog claiming a distinction it never carried. What made
-#: `S_RAY_OPTILAND` feel different was that it drives a backend, and that fact now
-#: has its own field. The §2 distinction returns properly when a source that
-#: consumes an `optical_setup` port is visibly different from one consuming only
-#: scalars, which is a port-vocabulary change and a separate ticket.
+#: **The membership test is the ENTRY STAGE, not `kind`** -- CHE-225 (R15.2). For
+#: a record that fuses nothing, the two are the same thing. For a composite the
+#: entry stage is `composes[0]`, so `SO_RAY_LAUNCH_TRACE` is admitted as an entry
+#: because its *first* stage is a source, while its `kind` stays
+#: `PHYSICAL_OPERATOR` because that is where it leaves the state.
+#:
+#: **CHE-224 declared `S_RAY_OPTILAND` a `SOURCE` here, and that was wrong.**
+#: The argument it gave is retracted rather than reworded, because the reasoning
+#: is the interesting part. It said: an `OpticalSetup` is a constructor *argument*
+#: and not a port, so `S_RAY_OPTILAND` and `S_SOURCE_PLANE_WAVE` are
+#: "indistinguishable in this schema" -- both `inputs=()`, both turning declared
+#: arguments into physical state -- so collapsing them "loses no information the
+#: catalog held".
+#:
+#: **That proves too much.** It reasons from *ports* to *kind*, and `kind` exists
+#: precisely to state what the ports cannot. On the state axis the two records are
+#: not remotely alike: `plane_wave` initializes a field at its declared reference
+#: surface and stops, while `trace` initializes rays *and then refracts them
+#: through every surface* to arrive at the image surface. The collapsed record's
+#: own `approximation` said so -- "a surface interaction is refraction at a real
+#: interface" -- so the catalog contained a `kind` contradicted by the record's own
+#: prose.
+#:
+#: **What the schema actually cannot say, and this is the root cause.** There is no
+#: notion here of *which reference surface* a returned representation sits at.
+#: `inputs=()` plus `returns=("ray_bundle",)` is true of both a source and a fused
+#: launch-and-trace, and nothing distinguishes "state at the surface I initialized
+#: on" from "state at a surface N interfaces downstream". `composes` labels that
+#: gap honestly; it does not close it. Closing it is a port-vocabulary change, and
+#: the decomposition ticket needs it before `launch` + `O_RAY_TRACE` can replace
+#: the fused record.
 ENTRY_KINDS: frozenset[str] = frozenset({"source"})
 
 #: The shape of a component id, which is what `capabilities` cites.
@@ -289,7 +321,45 @@ class OperationDescriptor:
         Stable identity. What `resolve` takes and what a plan records, and the
         **planning** identity: two records may share an `implementation`.
     `kind`
-        One of the four. Accepts the string form for convenience and normalizes.
+        One of the four, as a **scalar**. Accepts the string form for convenience
+        and normalizes.
+
+        **The terminal stage** -- CHE-225 (R15.2) narrowed this from "what this
+        operation is" to "where this operation leaves the state". For a record that
+        fuses nothing the two readings coincide, which is twelve of thirteen. For a
+        composite it is `composes[-1]`, and `__post_init__` enforces the agreement,
+        so the scalar is well defined rather than a free choice between stages.
+    `composes`
+        The ordered primitive stages this one callable fuses, when it fuses more
+        than one. `()` means "this record is exactly its `kind`" and is the default
+        and the common case.
+
+        Question 10, and it exists because one landed record needs it rather than
+        because composition is an interesting shape. `SO_RAY_LAUNCH_TRACE` is
+        `(SOURCE, PHYSICAL_OPERATOR)`: `backends.optiland.solver:trace`
+        materializes and declares the rays and *then* refracts them through every
+        surface, so it initializes state and evolves it in one call. Declaring only
+        one of those is a false claim either way round, and CHE-224 made the
+        `SOURCE` half of that mistake.
+
+        **Ordered, and the order is physical.** Initialize-then-evolve is the
+        operation; the reverse is meaningless. `composes[0]` is what decides
+        whether the record may be a graph entry (see `ENTRY_KINDS`) and
+        `composes[-1]` is what `kind` must equal.
+
+        This is **not** the schema becoming a pipeline language. It records that a
+        fusion happened and which primitives it fused -- not the arguments each
+        stage took, not their intermediate representations, not a way to execute
+        them separately. Nothing here can run a stage. When the launch/trace
+        boundary is aligned numerically the fused record is replaced by two real
+        records and this field goes back to being empty everywhere.
+
+        `O_DIFFRACTIVE_SURFACE` is internally coupler -> operator -> coupler and
+        deliberately keeps `composes=()`. Its input and output representation types
+        do not change and it presents a single operator-like transformation at its
+        boundary, so its net primitive kind is the whole truth about it at the
+        ports. Whether it should nonetheless expose that structure is a recorded
+        follow-up design question, not a defect.
     `inputs`
         The **representation** ports the callable consumes, as semantic types from
         `SEMANTIC_TYPES`, **in call order**. `()` means this operation consumes no
@@ -358,7 +428,7 @@ class OperationDescriptor:
 
         Orthogonal to `capabilities`, which is unaffected and keeps its meaning: it
         cites a *measured* device/dtype row by component id, which is a different
-        question from which library runs. `S_RAY_OPTILAND` and `O_RAY_TRACE` both
+        question from which library runs. `SO_RAY_LAUNCH_TRACE` and `O_RAY_TRACE` both
         have `backend="optiland"` and both cite `M_RAY_OPTILAND`, and neither
         implies the other -- a backend-driving operation with no measured row of its
         own would carry a `backend` and `capabilities=None`.
@@ -402,6 +472,9 @@ class OperationDescriptor:
     #: be made by omission: a record that drives a backend and forgets to say so
     #: fails G1 against its own `implementation` path.
     backend: str | None = None
+    #: The ordered primitive stages one callable fuses, or `()` for "exactly its
+    #: `kind`" -- twelve of the thirteen records. See the class docstring.
+    composes: tuple[OperationKind, ...] = ()
     capabilities: str | None = None
     cost: str | None = None
     derivative: str = "forward_only"
@@ -421,7 +494,15 @@ class OperationDescriptor:
         boundary; this is where that becomes a construction error rather than a
         convention.
         """
-        for name in ("inputs", "returns", "evidence", "requires", "optional", "validity"):
+        for name in (
+            "inputs",
+            "returns",
+            "evidence",
+            "requires",
+            "optional",
+            "validity",
+            "composes",
+        ):
             object.__setattr__(self, name, tuple(getattr(self, name)))
 
         problems: list[str] = []
@@ -451,18 +532,61 @@ class OperationDescriptor:
                     "physical state and the state it was derived from is still upstream."
                 )
 
+        # G5 -- `composes` is well formed and `kind` is its terminal stage. Checked
+        # before the entry rule below, which reads `composes[0]`. A one-stage
+        # composition is refused because it is not a composition: `()` already says
+        # "exactly its kind", so `(SOURCE,)` on a source is a second spelling of one
+        # fact, which is the two-source arrangement this record exists to avoid.
+        stages: list[OperationKind] = []
+        for index, stage in enumerate(self.composes):
+            try:
+                stages.append(OperationKind(stage))
+            except ValueError:
+                problems.append(
+                    f"`composes[{index}]` is {stage!r}; the stages of a composition are "
+                    f"primitive kinds from {[k.value for k in OperationKind]}. A "
+                    "composition fuses declared primitives; it cannot introduce one."
+                )
+        if len(stages) == len(self.composes):
+            object.__setattr__(self, "composes", tuple(stages))
+        if self.composes:
+            if len(self.composes) < 2:
+                problems.append(
+                    f"`composes` is {[k.value for k in self.composes]}, a single stage. "
+                    "`()` already means 'this record is exactly its kind'; a one-stage "
+                    "composition states the same fact twice."
+                )
+            elif not problems and self.composes[-1] != self.kind:
+                problems.append(
+                    f"`composes` ends in {self.composes[-1].value!r} but `kind` is "
+                    f"{getattr(self.kind, 'value', self.kind)!r}. `kind` is the TERMINAL "
+                    "stage -- where the operation leaves the state -- so it must equal "
+                    "the last stage it fuses."
+                )
+
         # A graph entry, and the three kinds that cannot be one. `inputs=()` became
         # expressible in CHE-222, which is what makes this refusal necessary: a
         # coupler with no input would change the representation of nothing, an
         # operator the state of nothing, a measurement would observe nothing.
-        if not self.inputs and str(self.kind) not in ENTRY_KINDS:
+        #
+        # Keyed on the ENTRY STAGE since CHE-225 (R15.2): `composes[0]` for a
+        # composite, `kind` otherwise. A fused launch-and-trace consumes no upstream
+        # representation because its *first* stage is a source, and refusing it here
+        # for the `kind` of its *last* stage would be the mirror of CHE-224's error.
+        entry_stage = self.composes[0] if self.composes else self.kind
+        if not self.inputs and str(entry_stage) not in ENTRY_KINDS:
+            described = (
+                f"`kind` is {getattr(self.kind, 'value', self.kind)!r}"
+                if not self.composes
+                else f"the first stage of `composes` is {entry_stage.value!r}"
+            )
             problems.append(
-                f"`inputs` is empty but `kind` is {getattr(self.kind, 'value', self.kind)!r}. "
-                f"Only {sorted(ENTRY_KINDS)} may be a graph entry: a source initializes a "
-                "representation from source parameters alone, whether those parameters "
-                "describe the light or a system to launch into. A coupler changes the "
-                "representation of something, an operator changes the state of something, "
-                "and a measurement observes something."
+                f"`inputs` is empty but {described}. Only {sorted(ENTRY_KINDS)} may begin "
+                "a graph entry: a source initializes a representation from source "
+                "parameters alone, whether those parameters describe the light or a "
+                "system to launch into. A coupler changes the representation of "
+                "something, an operator changes the state of something, and a "
+                "measurement observes something."
             )
 
         if not self.returns:
@@ -564,10 +688,28 @@ class OperationDescriptor:
     def is_graph_entry(self) -> bool:
         """Whether this operation consumes no upstream representation.
 
-        Question 1. `inputs == ()`, which `ENTRY_KINDS` restricts to `source`-kind,
-        so since CHE-224 (R15.1) this is exactly "is this a source".
+        Question 1. `inputs == ()`, which `ENTRY_KINDS` restricts to a `source`
+        entry *stage*, so this is exactly "does this operation begin with a source".
+
+        Unchanged by CHE-225 (R15.2), and deliberately: a planner asks this to
+        decide whether a node needs an upstream edge, and the answer for
+        `SO_RAY_LAUNCH_TRACE` is no -- it consumes no representation, whatever it
+        does internally afterwards. `find(entry=True)` therefore still returns it.
         """
         return not self.inputs
+
+    @property
+    def entry_stage(self) -> OperationKind:
+        """The primitive kind this operation *begins* with. Question 10.
+
+        `composes[0]` for a composite, `kind` otherwise -- and for the twelve
+        records that fuse nothing those are the same value, which is why this is a
+        property rather than a second field. `ENTRY_KINDS` is checked against this
+        and not against `kind`, so a fused launch-and-trace is admitted as a graph
+        entry on its source stage while `kind` keeps naming where it leaves the
+        state.
+        """
+        return self.composes[0] if self.composes else self.kind
 
     @property
     def primary_output(self) -> str:

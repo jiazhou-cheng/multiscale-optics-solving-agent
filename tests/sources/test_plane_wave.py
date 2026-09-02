@@ -386,7 +386,7 @@ def test_the_source_registers_as_a_source() -> None:
     descriptor = next(d for d in CATALOG if d.operation_id == "S_SOURCE_PLANE_WAVE")
     # `SOURCE` since CHE-224 (R15.1). It was `SOLVER` only because the enum had no
     # `SOURCE` member -- which is what made the `S_` prefix ambiguous, since
-    # `S_RAY_OPTILAND`'s `S_` stood for solver and this one's for source.
+    # `SO_RAY_LAUNCH_TRACE`'s `S_` stood for solver and this one's for source.
     assert descriptor.kind is OperationKind.SOURCE
     assert descriptor.backend is None, "the project's own arithmetic drives no library"
     assert descriptor.implementation == "sources.plane_wave:plane_wave"

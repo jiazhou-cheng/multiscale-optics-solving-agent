@@ -43,6 +43,12 @@ is a separate axis from what the operation does to physical state, and it is a
 separate field: `OperationDescriptor.backend`. CHE-224 (R15.1) separated the two;
 see the `backend` term in §2.
 
+The four are **primitive**. One callable may fuse several of them, and it says so
+in `OperationDescriptor.composes` with `kind` naming the terminal stage — see
+*composite operation* in §2. A composition is not a fifth kind and not a pipeline
+language: it exists because one landed operation initializes state *and* evolves
+it, so any single word for it is a false claim.
+
 The previous implementation expressed these kinds as families of base classes,
 request/result envelopes, and per-family diagnostics. The clean rewrite must not
 recreate that shape by default.
@@ -56,7 +62,7 @@ that satisfies the class-minimality rules below.
 
 ---
 
-## 2. The seven terms
+## 2. The eight terms
 
 Each term is defined by the boundary that separates it from its nearest
 neighbour. These definitions are target semantics even before their corresponding
@@ -91,8 +97,9 @@ imports belong in `backends/<backend>/`.
 **Boundary against *operation kind*:** a backend answers **who executes**; a kind
 answers **what happens to physical state**. Every operation has exactly one of
 each, and they are two fields — `backend` and `kind` — not one. A backend does not
-appear in `OperationKind` at all: `backends/optiland/` provides one `source`
-(`S_RAY_OPTILAND`) and one `physical_operator` (`O_RAY_TRACE`), and a
+appear in `OperationKind` at all: `backends/optiland/` provides one
+`physical_operator` (`O_RAY_TRACE`) and one **composite** whose terminal stage is a
+physical operator (`SO_RAY_LAUNCH_TRACE`, §2 *composite operation*), and a
 backend-provided `measurement` would live there too. The package a callable lives
 in follows its **provider**; its kind is declared in the catalog.
 
@@ -117,13 +124,19 @@ because one field was answering two questions; `operations/catalog.py` said so i
 its own docstring.
 
 What replaces it: `backend` is a provider, defined above; `source` is the kind, and
-its definition below did not change a word. A solver adapter's *problem-driven
-solve* is a `source` — it consumes no upstream **representation**, which is what
-that definition has always required — and the fact that it drives a library is
-carried by `backend`. See `ENTRY_KINDS` in `operations/descriptors.py` for the
-structural argument, which is that an `OpticalSetup` is a constructor argument and
-not a port, so the schema cannot distinguish `S_RAY_OPTILAND` from
-`S_SOURCE_PLANE_WAVE` and used to claim it could.
+its definition below did not change a word. The fact that an operation drives a
+library is carried by `backend`.
+
+*[JUDGEMENT]* **CHE-224 also concluded that a backend adapter's *problem-driven
+solve* is therefore a plain `source`, and CHE-225 (R15.2) retracts that.** The
+argument was structural: an `OpticalSetup` is a constructor argument and not a
+port, so the schema "cannot distinguish `S_RAY_OPTILAND` from
+`S_SOURCE_PLANE_WAVE`". It proves too much. It reasons from *ports* to *kind*, and
+`kind` exists precisely to state what the ports cannot — on the state axis the two
+are not alike at all, because `trace` initializes rays **and then refracts them
+through every surface**. The record's own `approximation` said so, so the catalog
+carried a `kind` its own prose contradicted. That operation is now the composite
+`SO_RAY_LAUNCH_TRACE`; see *composite operation* below.
 
 ### source
 
@@ -258,6 +271,60 @@ Derives an **observable** from physical state.
 **Boundary against *representation*:** its output is a number, profile, or image
 *about* the state, not the state itself. PSF, Strehl ratio, and first-null radius
 are measurements.
+
+### composite operation
+
+One callable that **fuses more than one primitive stage**, declaring the ordered
+stages it fuses. `OperationDescriptor.composes` carries them; `kind` names the
+**terminal** stage — where the operation leaves the state, and therefore which
+boundary its output sits at. `()` is the default and means "this record is exactly
+its `kind`", which is twelve of the thirteen landed records.
+
+**A composite is not a fifth kind.** Every stage is a primitive from the four, and
+the id prefix spells the composition rather than naming a new category: `SO_` is
+source-then-operator. There is exactly one today, `SO_RAY_LAUNCH_TRACE`
+(`backends.optiland.solver:trace`), which materializes and declares its rays and
+then refracts them through every surface.
+
+**Boundary against *the primitive kinds*:** a primitive record answers "what
+happens to physical state" with one word. A composite exists only when one word is
+a *false* claim — not when it would merely be a simplification. `trace` initializes
+state and evolves it; calling it a source denies the refraction and calling it an
+operator denies that it consumes nothing.
+
+**Boundary against a route or a plan:** a composite is **not** a pipeline
+description. It records that a fusion happened and which primitives it fused —
+not the arguments each stage took, not their intermediate representations, and not
+a way to execute them separately. Nothing can run a stage. A route is
+`planning.routes`' business and lives outside the descriptor entirely.
+
+*[JUDGEMENT]* **Why this exists rather than a `solve` kind, and what it is
+labelling.** The honest decomposition is `launch` + `O_RAY_TRACE`, and it is
+blocked by measured numerical facts rather than by taxonomy: an object at infinity
+launches at `z = -EPD`, which is not the surface the trace starts from, and
+`to_traced_ray_bundle` composes the optical path under a different declared
+reference. Unifying moves frozen ray numbers, so it needs its own evidence and its
+own ticket. A fifth primitive kind was rejected because the operation is two known
+primitives fused, not a new category.
+
+**The deeper reason a single `kind` could not express it** is that this schema has
+no notion of *which reference surface* a returned representation sits at. A source
+produces state where it initialized; `trace` returns state N interfaces
+downstream. `inputs=()` plus `returns=("ray_bundle",)` is true of both. So
+`composes` **labels that gap honestly; it does not close it.** Closing it is a
+port-vocabulary change and is what the decomposition ticket needs first.
+
+*[JUDGEMENT]* `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler
+and deliberately declares **no** composition. Its input and output representation
+types do not change and it presents a single operator-like transformation at its
+boundary, so its net primitive kind is the whole truth about it *at the ports*.
+Whether it should nonetheless expose that structure is an open design question to
+revisit once the composition model settles — recorded, not decided.
+
+*[LANDING GATE]* A composition is well-formed: at least two stages, every stage a
+primitive kind, and `composes[-1] == kind`. A record whose `kind` disagrees with
+its own last stage is refused at construction, which is what stops `kind` being a
+free choice between stages — the shape that produced CHE-224's false claim.
 
 ### operation descriptor
 
