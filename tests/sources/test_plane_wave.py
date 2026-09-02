@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import ast
 import math
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from representations import PHASOR, ContractError, Frame, ReferenceSurface, ScalarField
 from sources import plane_wave, transverse_wavevector_from_angle
 
@@ -357,17 +356,7 @@ def test_the_scalar_field_contract_refuses_the_rest() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_source_registers_as_a_solver(isolated_registry: None) -> None:
+def test_the_source_registers_as_a_solver() -> None:
     """Criterion 7. `solver`-kind, because that is what the definition says.
 
     A source maps a problem statement into a representation, which is
@@ -379,56 +368,52 @@ def test_the_source_registers_as_a_solver(isolated_registry: None) -> None:
     whose descriptor also names the representation it works in rather than the
     problem type it consumes -- `OpticalSetup` plus a source since CHE-218:
     `SEMANTIC_TYPES` holds representations, and how a problem type enters the graph
-    is R12's question. Stated here so the choice is visible rather than looking
-    like the input it is not.
+    is CHE-222 (R03.5)'s question. It is the reason `operations/catalog.py` calls
+    itself production-complete but not planner-ready.
 
     `capabilities=None` is the honest citation. There is no measured device/dtype
     row for this operation because it imports no backend; citing the chromatix row
     would claim a measurement that was taken about something else.
 
-    The descriptor lives test-side for the reason R05.3, R06.2, R06.4 and R06.6 all
-    recorded: `sources/` may not import `operations/` and `operations/` may not
-    import `sources/`, so there is no production registration site. Note that
-    R06.5 *did* make an allowlist change -- the `sources` row itself -- so this is
-    not a constraint nobody was willing to touch; it is one whose fix is R03/R12's
-    and not this ticket's.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `sources/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="S_SOURCE_PLANE_WAVE",
-            kind=OperationKind.SOLVER,
-            input="scalar_field",
-            output="scalar_field",
-            implementation="sources.plane_wave:plane_wave",
-            approximation=(
-                "an ideal monochromatic, fully coherent, scalar plane wave sampled at a "
-                "declared surface: A exp(i(k_y y + k_x x)) with k_t in rad/m. No spectral "
-                "width, no partial coherence, no polarization, and no physical model of an "
-                "illumination unit. The amplitude is a relative peak, not a radiometric "
-                "power: chromatix's power= renormalization is deliberately not inherited"
-            ),
-            validity=(
-                "|k_t| <= n k0, checked against the surface's own medium index: a larger "
-                "value is an evanescent wave, not an illumination angle",
-                "|k_t| <= pi/d per axis: past the grid's Nyquist limit the sampled ramp "
-                "aliases and reads back as a different, entirely plausible angle",
-                "the field is complex64, which is the one storage dtype of this project's "
-                "wave path; the phase ramp is accumulated in float64 before the cast",
-            ),
-            evidence=(
-                "tests/sources/test_plane_wave.py",
-                "tests/physics/test_coherent_sources.py",
-            ),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
-
+    descriptor = next(d for d in CATALOG if d.operation_id == "S_SOURCE_PLANE_WAVE")
     assert descriptor.kind is OperationKind.SOLVER
+    assert descriptor.implementation == "sources.plane_wave:plane_wave"
     assert descriptor.derivative == "forward_only"
     assert descriptor.derivative_evidence is None
     assert descriptor.capabilities is None
     assert resolve("S_SOURCE_PLANE_WAVE") is plane_wave
+
+
+def test_the_other_two_sources_have_records_too() -> None:
+    """CHE-221: `gaussian_beam` and `spherical_wave` had no descriptor at all.
+
+    Three sources, three records, three ids -- not one `S_SOURCE` with a mode
+    argument. They differ in what they approximate and in what they refuse: the
+    Gaussian is exact only at its waist, the spherical wave is refused when its
+    local phase gradient outruns the grid, and the plane wave has neither
+    condition. That is metadata a caller reads before choosing, so it belongs on
+    separate records.
+    """
+    catalogued = {d.operation_id: d for d in CATALOG}
+    for operation_id, implementation in (
+        ("S_SOURCE_GAUSSIAN_BEAM", "sources.gaussian_beam:gaussian_beam"),
+        ("S_SOURCE_SPHERICAL_WAVE", "sources.spherical_wave:spherical_wave"),
+    ):
+        descriptor = catalogued[operation_id]
+        assert descriptor.kind is OperationKind.SOLVER
+        assert descriptor.implementation == implementation
+        assert descriptor.capabilities is None, "no source imports a backend"
+        assert descriptor.derivative == "forward_only"
+        assert descriptor.validity, "each states its own applicability"
+    assert len({d.operation_id for d in CATALOG if d.implementation.startswith("sources.")}) == 3
 
 
 def test_the_module_defines_no_class() -> None:

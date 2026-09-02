@@ -598,8 +598,11 @@ def trace_rays(
         all, which is exactly what this path needs. Its
         `entrance_pupil_diameter_mm` is the solver's pupil for ray *generation* and
         is not used here, and its `reference_wavelength_um` locates the exit pupil
-        rather than deciding what is traced. No aperture is clipped by anything but
-        the surface geometry: a physical clear aperture is R05.9's.
+        rather than deciding what is traced. A surface's declared
+        `clear_semi_diameter_mm` **does** clip on this path -- CHE-220 (R05.9)
+        landed it, and the backend applies a declared rim to a supplied bundle
+        exactly as to a generated fan -- so a supplied ray outside one comes back
+        marked rather than traced.
     rays
         The bundle to trace. It must declare itself on the first surface after the
         object surface, in that surface's medium; both are checked

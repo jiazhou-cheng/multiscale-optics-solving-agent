@@ -187,20 +187,51 @@ Still not here:
 
 A source here is an analytic field at a declared surface, nothing more.
 
-No source registers an `OperationDescriptor` today, and CHE-215 deliberately did
-not invent registration for four functions: per `AGENTS.md` each descriptor's
-`output` representation must be unambiguous, so when sources enter the registry
-they go in together. Owed to
-R03/R12, which also owns the fact that `sources/` may not import `operations/` and
-`operations/` may not import `sources/`, so there is no production registration
-site yet.
+All three sources are in the production operation catalog, as of CHE-221 (R03.4):
+`S_SOURCE_PLANE_WAVE`, `S_SOURCE_GAUSSIAN_BEAM` and `S_SOURCE_SPHERICAL_WAVE`. They
+went in together, which is what CHE-215 said the condition was -- per `AGENTS.md`
+each descriptor's `output` representation must be unambiguous, and all three
+declare `ScalarField`.
+
+**This package still does not import `operations/`, and does not need to.** The
+catalog lives inside `operations/` and names each implementation as a
+`"module.path:attribute"` string, so the dependency runs in neither direction and
+the allowlist is unchanged. What this package declares is `OPERATIONS`, a tuple of
+strings naming the three; `tests/operations/test_catalog.py` walks that against the
+catalog in both directions, so a fourth source added to `OPERATIONS` cannot land
+without a record, and a record naming a fourth cannot land without the tuple.
+`OPERATIONS` is itself hand-maintained, which is the honest limit stated beside the
+tuple below: a source added to neither is invisible to a gate that compares the two
+against each other.
 """
 
 from sources.gaussian_beam import gaussian_beam
 from sources.plane_wave import plane_wave, transverse_wavevector_from_angle
 from sources.spherical_wave import spherical_wave
 
+#: The public callables in this package that are **semantic operations**, as
+#: strings, one per `operations.catalog` record. CHE-221 (R03.4).
+#:
+#: Strings, and *this package does not import* `operations`: the dependency
+#: allowlist gives no implementation package an edge to `operations/`, and an edge
+#: would end the one property that package exists to provide -- listing what the
+#: project can do would have loaded what it does it with.
+#: `tests/operations/test_catalog.py` walks this tuple against the catalog in both
+#: directions.
+#:
+#: Hand-maintained, and deliberately not derived from `__all__`:
+#: `transverse_wavevector_from_angle` is a pure unit converter, degrees to rad/m, with no
+#: representation on either side.
+#:
+#: The residual failure this cannot catch is someone landing a public operation and
+#: not adding it here. That is the honest limit of a mechanical gate -- the two
+#: directions checked are catalog-against-this-tuple, not this-tuple-against
+#: reality -- and it is the reason the tuple is one line of strings rather than
+#: something cleverer.
+OPERATIONS: tuple[str, ...] = ("gaussian_beam", "plane_wave", "spherical_wave")
+
 __all__ = [
+    "OPERATIONS",
     "gaussian_beam",
     "plane_wave",
     "spherical_wave",

@@ -46,6 +46,16 @@ EXPECTED_EXPORTS = {
     "transverse_wavevector_from_angle",
 }
 
+#: Exports that are declarations rather than callables, so the callability and
+#: return-annotation checks below have to skip them by name rather than by type.
+#:
+#: `OPERATIONS` is CHE-221 (R03.4)'s tuple of strings naming this package's
+#: semantic operations, read by `tests/operations/test_catalog.py`. Skipping it by
+#: name rather than with `if callable(...)` is deliberate: a future export that
+#: stopped being callable would then be skipped silently, and the whole point of
+#: the exact-set assertion is that a change to this surface is a deliberate act.
+DECLARATION_EXPORTS = {"OPERATIONS"}
+
 #: Names that must not come back. `collimated_bundle` built a launch `RayBundle`
 #: from explicit points; `direction_from_angle` turned a source field into a
 #: launched ray direction. Both are now test helpers in
@@ -72,11 +82,15 @@ LAUNCH_VOCABULARY = (
 
 def test_every_export_is_public_and_importable() -> None:
     """`__all__` is the surface, and every name on it resolves."""
-    assert set(sources.__all__) == EXPECTED_EXPORTS
+    assert set(sources.__all__) == EXPECTED_EXPORTS | DECLARATION_EXPORTS
     assert len(sources.__all__) == len(set(sources.__all__))
     assert sources.__all__ == sorted(sources.__all__)
     for name in EXPECTED_EXPORTS:
         assert callable(getattr(sources, name))
+    # And the declaration is what it claims to be: strings naming real callables
+    # here, which is the property the catalog gate depends on from the other side.
+    assert sources.OPERATIONS == ("gaussian_beam", "plane_wave", "spherical_wave")
+    assert all(callable(getattr(sources, name)) for name in sources.OPERATIONS)
 
 
 def test_the_return_representation_is_unambiguous_per_operation() -> None:
@@ -120,8 +134,16 @@ def test_no_public_operation_returns_a_ray_bundle() -> None:
     anything.
     """
     for name in sources.__all__:
+        if name in DECLARATION_EXPORTS:
+            continue
         annotation = getattr(sources, name).__annotations__.get("return", "")
         assert "RayBundle" not in str(annotation), f"{name} returns a RayBundle"
+
+    # The same claim through the declaration, which is the surface a planner reads:
+    # nothing this package advertises as an operation produces a ray bundle.
+    for name in sources.OPERATIONS:
+        annotation = getattr(sources, name).__annotations__.get("return", "")
+        assert "RayBundle" not in str(annotation), f"OPERATIONS names {name}"
 
     for path in sorted(PACKAGE.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))

@@ -51,12 +51,37 @@ from solvers.chromatix.solver import (
     propagate,
 )
 
+#: The public callables in this package that are **semantic operations**, as
+#: strings, one per `operations.catalog` record. CHE-221 (R03.4).
+#:
+#: Strings, and *this package does not import* `operations`: the dependency
+#: allowlist gives no implementation package an edge to `operations/`, and an edge
+#: would end the one property that package exists to provide -- listing what the
+#: project can do would have loaded what it does it with.
+#: `tests/operations/test_catalog.py` walks this tuple against the catalog in both
+#: directions.
+#:
+#: Hand-maintained, and deliberately not derived from `__all__`:
+#: `carrier_phase_rad`, `edge_energy_fraction`, `fourier_plane_pitch_m`, `padded_shape` and
+#: `padded_field_bytes` are sizing and diagnostic helpers over declarations, not operations over
+#: a representation. Note that `propagate` carries TWO catalog records -- `S_WAVE_CHROMATIX` the
+#: backend and `O_ASM_PROPAGATE` the physical operation -- which the gate allows by keying
+#: uniqueness on (implementation, kind) rather than on implementation alone.
+#:
+#: The residual failure this cannot catch is someone landing a public operation and
+#: not adding it here. That is the honest limit of a mechanical gate -- the two
+#: directions checked are catalog-against-this-tuple, not this-tuple-against
+#: reality -- and it is the reason the tuple is one line of strings rather than
+#: something cleverer.
+OPERATIONS: tuple[str, ...] = ("focal_plane_transform", "propagate")
+
 __all__ = [
     "CAPABILITIES",
     "DERIVATIVE",
     "DIRECTIONS",
     "EDGE_ENERGY_REPORTING_THRESHOLD",
     "MODELS",
+    "OPERATIONS",
     "carrier_phase_rad",
     "edge_energy_fraction",
     "focal_plane_transform",

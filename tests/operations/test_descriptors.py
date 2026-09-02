@@ -291,3 +291,68 @@ def test_lists_are_accepted_and_stored_as_tuples() -> None:
     assert descriptor.evidence == ("a",)
     assert descriptor.validity == ("paraxial",)
     assert hash(descriptor) is not None
+
+
+# ---------------------------------------------------------------------------
+# The observable rules. Moved here from `tests/physics/test_psf.py` by CHE-221
+# (R03.4): the subject is this schema's port validation rather than the PSF, and
+# the ticket confines `OperationDescriptor(...)` construction to this directory.
+# R11 criterion 3's catalog-wide half stayed in the PSF tests, where it now runs
+# against the shipped catalog instead of an emptied registry.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [OperationKind.COUPLER, OperationKind.SOLVER, OperationKind.PHYSICAL_OPERATOR],
+)
+def test_only_a_measurement_may_produce_an_observable(kind: OperationKind) -> None:
+    """Criterion 3 of the parent, as a **construction error** rather than a loop.
+
+    The first version of this test iterated the registered couplers and asserted
+    none named `psf`. At the time the registry was empty at import -- no
+    registration site had landed anywhere in the tree -- so the loop body had never
+    run and could not run. It asserted nothing, while a shared docstring in
+    `operations/descriptors.py` cited it as the enforcement. (The catalog is
+    populated now, as of CHE-221, and `tests/physics/test_psf.py` does run that
+    loop over it; this test is the construction-time half, which is the one that
+    binds a record nobody catalogued.)
+
+    Adding `psf` to `SEMANTIC_TYPES` is what made `C_FIELD_TO_PSF` reconstructible,
+    so the rule has to live where ports are validated. It does now, and it is the
+    general statement rather than one banned id: an observable is derived from
+    physical state, so only a measurement produces one.
+    """
+    with pytest.raises(ValueError) as raised:
+        OperationDescriptor(
+            operation_id="C_FIELD_TO_PSF",
+            kind=kind,
+            input="scalar_field",
+            output="psf",
+            implementation="couplers.field_to_psf:convert",
+            approximation="none",
+            evidence=(),
+        )
+    assert "Only a measurement produces an observable" in str(raised.value)
+    assert "CHE-36" in str(raised.value)
+
+
+@pytest.mark.parametrize("kind", list(OperationKind))
+def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
+    """The other half. An observable is terminal.
+
+    An operation reading a PSF as its input is either a measurement of a
+    measurement, or a physical operation that has mistaken an intensity for a
+    state -- and in the second case the representation it should have consumed is
+    still sitting upstream, unconsumed. This one binds a `measurement` too.
+    """
+    with pytest.raises(ValueError, match="observable and not a representation"):
+        OperationDescriptor(
+            operation_id="X_FROM_PSF",
+            kind=kind,
+            input="psf",
+            output="scalar_field",
+            implementation="nowhere:run",
+            approximation="none",
+            evidence=(),
+        )

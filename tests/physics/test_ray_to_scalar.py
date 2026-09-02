@@ -28,7 +28,6 @@ import dataclasses
 import math
 import subprocess
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -51,7 +50,7 @@ from couplers import (
     grid_nyquist_direction_limit,
 )
 from couplers.ray_to_scalar import ray_to_scalar
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from representations import UNVERIFIED, ContractError, ReferenceSurface
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -508,58 +507,25 @@ def test_importing_the_coupler_loads_no_backend() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
+def test_the_wavelet_sum_registers_as_a_coupler() -> None:
+    """It changes representation, not state: `ray_bundle -> scalar_field` on one
+    surface.
 
-
-def test_the_wavelet_sum_registers_as_a_coupler(isolated_registry: None) -> None:
-    """It changes representation, not state: `ray_bundle -> scalar_field` on one surface.
-
-    The descriptor lives here rather than in production for the reason R05.3,
-    R06.2 and R06.4 all recorded: `couplers/` may not import `operations/` and
-    `operations/` may not import `couplers/`, so no production registration site
-    exists yet. Widening the allowlist to make one fit is not this ticket's
-    change.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `couplers/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="C_RAY_TO_SCALAR",
-            kind=OperationKind.COUPLER,
-            input="ray_bundle",
-            output="scalar_field",
-            implementation="couplers.ray_to_scalar:ray_to_scalar",
-            approximation=(
-                "each ray is a plane wavelet contributing a linear phase ramp across the "
-                "whole surface, summed as a quadrature over the declared sampling "
-                "measure. The sum is linear in the transverse coordinate, so the field "
-                "carries no exp(i k r^2 / 2R) wavefront-curvature term (CHE-50) and is "
-                "valid at the declared surface with zero further propagation. The scale "
-                "omits the 1/(i lambda z) Kirchhoff prefactor, so U is i lambda z times "
-                "the SI field and every reported power is relative"
-            ),
-            validity=(
-                "the output grid must represent the steepest ramp, |d_t| <= lambda_0 / "
-                "(2 n pitch) per axis; beyond it the reconstruction is refused",
-                "the transverse ramp and the launch-ramp subtraction carry the surface's "
-                "medium index; the optical path is already an optical one",
-                "the bundle must declare its integration measure; 'undeclared' is refused",
-                "fully coherent, scalar, monochromatic",
-            ),
-            evidence=("tests/physics/test_ray_to_scalar.py",),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
-
+    descriptor = next(d for d in CATALOG if d.operation_id == "C_RAY_TO_SCALAR")
     assert descriptor.kind is OperationKind.COUPLER
     assert descriptor.kind is not OperationKind.PHYSICAL_OPERATOR
+    assert descriptor.input == "ray_bundle"
+    assert descriptor.output == "scalar_field"
     assert descriptor.derivative == "forward_only"
+    assert descriptor.capabilities is None
     assert resolve("C_RAY_TO_SCALAR") is ray_to_scalar
 
 

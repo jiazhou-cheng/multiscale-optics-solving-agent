@@ -95,14 +95,27 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   `ReferenceSurface`. CHE-175/CHE-176 (R02.3/R02.4) added `contracts.py`,
 #:   `rays.py` and `scalar.py`, and those do import `numerics`, so the
 #:   `representations -> numerics` edge is exercised.
-#: * `operations` -- landed by CHE-177/CHE-178 (R03.1/R03.2): `descriptors.py` and
-#:   `registry.py`. It imports `numerics` (one name, `COMPONENT_CAPABILITIES`, which
-#:   a descriptor cites rather than copies) and nothing else in the project. The
-#:   forbidden edges matter more here than anywhere else so far: `operations ->
-#:   solvers` or `-> couplers` would be the end of "listing the registry imports no
-#:   backend", which is the single property the package exists to provide. This
-#:   allowlist entry and `tests/operations/test_registry_imports_no_backend.py` are the two
-#:   halves of that -- the structural rule and the executed check.
+#: * `operations` -- landed by CHE-177/CHE-178 (R03.1/R03.2) as `descriptors.py` and
+#:   `registry.py`, joined by CHE-221 (R03.4)'s `catalog.py`. It imports `numerics`
+#:   (`COMPONENT_CAPABILITIES` and the two measured rows a descriptor cites rather
+#:   than copies) and nothing else in the project. The forbidden edges matter more
+#:   here than anywhere else so far: `operations -> solvers` or `-> couplers` would
+#:   be the end of "listing the registry imports no backend", which is the single
+#:   property the package exists to provide. This allowlist entry and
+#:   `tests/operations/test_registry_imports_no_backend.py` are the two halves of
+#:   that -- the structural rule and the executed check.
+#:
+#:   **CHE-221 is the ticket that had to resolve this without widening anything.**
+#:   Eleven real descriptors had accumulated in test fixtures, and three landed
+#:   operations had none at all, because no
+#:   production home existed: `solvers -> operations` and `operations -> solvers`
+#:   are both barred, so a registration site inside an implementation package was
+#:   impossible and one inside `operations/` looked impossible too. It was not. The
+#:   `implementation` field is already a `"module.path:attribute"` **string**, so
+#:   the catalog names `solvers.optiland.solver:trace` without importing it, and
+#:   `ALLOWED` gained no row. Each implementation package declares `OPERATIONS`, a
+#:   tuple of strings, which is the other half of the completeness gate and is
+#:   likewise not an import.
 #:
 #: * `solvers` -- landed by CHE-179/CHE-180/CHE-181 (R05.1/R05.2/R05.3) as
 #:   `solvers/optiland/`: `system.py`, `rays.py`, `solver.py`, joined by
@@ -117,7 +130,12 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   `solvers -> operations`: a solver holding its own descriptor would make
 #:   listing the registry import a backend, which is the one property
 #:   `operations/` exists to provide. It is also why the trace's descriptor is not
-#:   in this package -- see the R05 report.
+#:   in this package -- it is in `operations/catalog.py`, which names
+#:   `solvers.optiland.solver:trace` as a string (CHE-221 / R03.4). What this
+#:   package declares instead is `solvers.optiland.OPERATIONS` and
+#:   `solvers.chromatix.OPERATIONS`, two tuples of strings the catalog's
+#:   completeness gate reads. `solvers/` has no package-level operation surface,
+#:   so the declaration is per backend subpackage.
 #:
 #: * `problems` -- landed by CHE-156 (R04): `ray_trace.py`, the neutral sequential
 #:   ray-tracing problem. Its allowlist permits `representations` and `numerics`

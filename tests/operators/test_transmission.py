@@ -16,14 +16,13 @@ from __future__ import annotations
 
 import ast
 import math
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from numerics import CHROMATIX_CAPABILITIES
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from operators import (
     EDGES,
     circular_aperture_amplitude,
@@ -144,6 +143,11 @@ def test_there_is_no_operator_per_element_type() -> None:
     assert set(operators.__all__) == {
         "DIFFRACTIVE_MODELS",
         "EDGES",
+        # Not an operator: the tuple of strings CHE-221 (R03.4) added so the
+        # catalog's completeness gate can walk this package without deriving
+        # coverage from `__all__` -- which would have demanded a descriptor for
+        # `DiffractiveModel` and the two mask builders.
+        "OPERATIONS",
         "DiffractiveModel",
         "DiffractiveSurface",
         "circular_aperture_amplitude",
@@ -419,17 +423,7 @@ def test_a_surface_only_field_is_not_refused_here() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_element_registers_as_a_physical_operator(isolated_registry: None) -> None:
+def test_the_element_registers_as_a_physical_operator() -> None:
     """Criterion 7. A physical operator, never a coupler.
 
     The representation on both sides is a `ScalarField` at the same surface and
@@ -437,51 +431,23 @@ def test_the_element_registers_as_a_physical_operator(isolated_registry: None) -
     opposite, which is the call `docs/architecture_principles.md` section 2 makes
     and the one the retired `C_FIELD_TO_PSF` got wrong in the other direction.
 
-    The descriptor lives here rather than in production for the reason R05.3,
-    R06.2 and R06.4 all recorded: `operators/` may not import `operations/` and
-    `operations/` may not import `operators/`, so no production registration site
-    exists yet. Widening the allowlist to make one fit is not this ticket's
-    change -- and note that R06.5's `sources` row *is* an allowlist change, made
-    deliberately with the owner, which is what the difference looks like.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `operators/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
 
     `capabilities=None` is the honest citation: this operator has no measured
     device/dtype row of its own because it runs in whatever namespace the field
     carries. `CHROMATIX_CAPABILITIES` is imported here only to assert that it is
     *not* cited.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="O_COMPLEX_TRANSMISSION",
-            kind=OperationKind.PHYSICAL_OPERATOR,
-            input="scalar_field",
-            output="scalar_field",
-            implementation="operators.transmission:complex_transmission",
-            approximation=(
-                "an infinitely thin element acting at the field's own reference surface: "
-                "U_out = U_in * A * exp(i phi), elementwise. z_m does not advance, no "
-                "propagation happens inside it, and there is no thickness, no multiple "
-                "scattering, no polarization and no angular dependence of the "
-                "transmission -- which is also what makes tilt-as-spectral-shift exact "
-                "rather than approximate for this element"
-            ),
-            validity=(
-                "the transmission is sampled on the field's own grid, so a mask with "
-                "structure finer than the pitch is aliased rather than resolved",
-                "A is a real non-negative modulus bounded by 1 unless gain is claimed",
-                "surface_only fields are permitted: the element acts exactly at the "
-                "surface where such a field is valid",
-            ),
-            evidence=(
-                "tests/operators/test_transmission.py",
-                "tests/physics/test_thin_element_spectrum.py",
-            ),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
-
+    descriptor = next(d for d in CATALOG if d.operation_id == "O_COMPLEX_TRANSMISSION")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
+    assert descriptor.implementation == "operators.transmission:complex_transmission"
     assert descriptor.derivative == "forward_only"
     assert descriptor.capabilities is None
     assert descriptor.capabilities != CHROMATIX_CAPABILITIES.component

@@ -25,7 +25,6 @@ import dataclasses
 import math
 import subprocess
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -40,7 +39,7 @@ from couplers import (
     ray_to_scalar,
     scalar_to_ray,
 )
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from representations import ContractError, ReferenceSurface
 from sources import plane_wave
 
@@ -685,56 +684,23 @@ def test_the_avoided_sampling_classes_did_not_land() -> None:
     }
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_decomposition_registers_as_a_coupler(isolated_registry: None) -> None:
+def test_the_decomposition_registers_as_a_coupler() -> None:
     """`scalar_field -> ray_bundle`, the reverse port pair of `C_RAY_TO_SCALAR`.
 
-    Test-side for the reason every solver, operator and coupler ticket since R05.3
-    has recorded: `couplers/` may not import `operations/` and vice versa, so no
-    production registration site exists.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `couplers/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="C_SCALAR_TO_RAY",
-            kind=OperationKind.COUPLER,
-            input="scalar_field",
-            output="ray_bundle",
-            implementation="couplers.scalar_to_ray:scalar_to_ray",
-            approximation=(
-                "the field is decomposed into plane-wave modes on its own grid and each "
-                "selected mode becomes a ray. Evanescent modes are discarded -- they have "
-                "no propagation direction to give a ray -- and the discarded power is "
-                "reported. A stochastic selection is a Monte-Carlo estimator of the modal "
-                "sum, so the emitted measure is an importance weight and the "
-                "reconstruction owes a 1/N; an exhaustive enumeration is the same "
-                "estimator with zero variance"
-            ),
-            validity=(
-                "scalar, monochromatic, fully coherent",
-                "the direction cosines are lambda_0 f / n and the evanescent cut is "
-                "|k_t| < n k0, both on the surface's declared medium index",
-                "the field's grid fixes the mode set; a mode finer than the pitch is not "
-                "represented",
-                "exhaustive enumeration is exact only under the uniform density",
-            ),
-            evidence=(
-                "tests/physics/test_scalar_to_ray.py",
-                "tests/physics/test_scalar_to_ray_estimator.py",
-            ),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
+    descriptor = next(d for d in CATALOG if d.operation_id == "C_SCALAR_TO_RAY")
     assert descriptor.kind is OperationKind.COUPLER
+    assert descriptor.input == "scalar_field"
+    assert descriptor.output == "ray_bundle"
     assert descriptor.derivative == "forward_only"
+    assert descriptor.capabilities is None
     assert resolve("C_SCALAR_TO_RAY") is scalar_to_ray
 
 

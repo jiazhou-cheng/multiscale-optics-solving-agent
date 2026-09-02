@@ -1,9 +1,10 @@
-"""Explicit registration, capability queries, and the one call that imports code.
+"""The by-id index over the catalog, capability queries, and the one call that imports code.
 
-CHE-178 (R03.2). Module-level state and four functions, no `Registry` class: a
-class would be justified if two consumers needed independent registries, and
-naming those two consumers is the bar for introducing one. There is one process
-and one set of operations, so the module *is* the registry.
+CHE-178 (R03.2), rewired by CHE-221 (R03.4). Module-level state and three
+functions, no `Registry` class: a class would be justified if two consumers needed
+independent registries, and naming those two consumers is the bar for introducing
+one. There is one process and one set of operations, so the module *is* the
+registry.
 
 The whole layer exists for one property
 ---------------------------------------
@@ -17,21 +18,26 @@ backend-free can pull one three levels down.
 
 Registration is *pulled*, never *pushed*
 ----------------------------------------
-The tempting arrangement is for `solvers/optiland/adapter.py` to call
+The tempting arrangement is for `solvers/optiland/solver.py` to call a
 `register(...)` at import time. That inverts the dependency -- an implementation
 would import `operations/` -- and it defeats the property above the moment
 anything imports the implementation package for any other reason, because then
 listing the registry means the implementations were already loaded. So there is
-no import-time scan, no filename convention and no entry-point discovery: a
-descriptor is in the registry because a registration site constructed it and
-called `register`.
+no import-time scan, no filename convention and no entry-point discovery.
 
-**Today there is no registration site, and the registry is empty at import.** No
-operation has landed: `solvers/`, `couplers/`, `operators/` and `measurements/`
-do not exist in the new tree. When the first one lands it brings its descriptor
-and the call that registers it. An empty registry is the honest state, and
-`tests/operations/test_registry.py` pins it rather than leaving it to be
-discovered.
+**The registration site is `operations.catalog`, inside this package.** CHE-221
+put the fourteen landed operations there, and this module builds its by-id index
+from `catalog.CATALOG` at import. That needs no dependency edge in either
+direction, because `implementation` is a string: the catalog *names*
+`solvers.optiland.solver:trace` without importing it.
+
+So there is no public `register()` any more. `_build_index` below is what replaced
+it, and it kept the one behaviour that mattered -- a duplicate id is refused
+rather than overwritten -- as an error at first import rather than at a call
+nobody makes. The function was public only because a registration site had to live
+outside this package; once the site moved in, its last caller was a test
+subprocess that existed to make the no-backend check non-vacuous, and the real
+catalog does that better (it names `optiland` and `chromatix` outright).
 """
 
 from __future__ import annotations
@@ -40,43 +46,53 @@ import importlib
 from collections.abc import Callable
 from typing import Any
 
+from operations.catalog import CATALOG
 from operations.descriptors import SEMANTIC_TYPES, OperationDescriptor, OperationKind
 
-__all__ = ["find", "register", "registered_ids", "resolve"]
-
-#: The registry. A dict keyed by operation id, mutated only by `register`.
-#:
-#: Module-level mutable state is a real cost and it is taken deliberately: the
-#: alternative is threading a registry object through planning and the runtime
-#: for a mapping there is exactly one of. It is private so that the only way to
-#: add to it is the function that validates the addition.
-_REGISTERED: dict[str, OperationDescriptor] = {}
+__all__ = ["find", "registered_ids", "resolve"]
 
 
-def register(descriptor: OperationDescriptor) -> OperationDescriptor:
-    """Add one operation to the registry, and return it.
+def _build_index(
+    catalog: tuple[OperationDescriptor, ...],
+) -> dict[str, OperationDescriptor]:
+    """The by-id mapping over a catalog, refusing a duplicate id.
 
-    Returns the descriptor so a registration site can read as a declaration:
-    `RAY_TO_WAVE = register(OperationDescriptor(...))`.
+    `CATALOG` is a tuple and not a dict literal keyed by `operation_id`
+    specifically so that this check exists. A dict literal would silently keep the
+    last of two entries sharing an id; two descriptors under one id means two
+    answers to "what does this operation do", and last-write-wins would make which
+    one you get depend on nothing a reader can see.
 
-    A duplicate id is refused rather than overwritten. Two descriptors under one
-    id means two answers to "what does this operation do", and last-write-wins
-    would make which one you get depend on import order -- the property this
-    module is otherwise built to avoid depending on.
+    Raised at first import of `operations`, so a duplicate cannot reach a caller
+    at all. This is what `register()` used to do at a call site, kept after the
+    call site moved into this package.
     """
-    if not isinstance(descriptor, OperationDescriptor):
-        raise TypeError(
-            f"register() takes an OperationDescriptor, got {type(descriptor).__name__}"
-        )
-    existing = _REGISTERED.get(descriptor.operation_id)
-    if existing is not None:
-        raise ValueError(
-            f"{descriptor.operation_id!r} is already registered, as "
-            f"{existing.implementation!r}. Registration is explicit and ids are unique; "
-            "overwriting one would make the answer depend on import order."
-        )
-    _REGISTERED[descriptor.operation_id] = descriptor
-    return descriptor
+    index: dict[str, OperationDescriptor] = {}
+    for descriptor in catalog:
+        if not isinstance(descriptor, OperationDescriptor):
+            raise TypeError(
+                f"the catalog holds {type(descriptor).__name__}, not an "
+                "OperationDescriptor"
+            )
+        existing = index.get(descriptor.operation_id)
+        if existing is not None:
+            raise ValueError(
+                f"{descriptor.operation_id!r} appears twice in the catalog, as "
+                f"{existing.implementation!r} and {descriptor.implementation!r}. Ids are "
+                "unique; keeping one of the two would make the answer depend on "
+                "declaration order. Two records MAY name one callable -- "
+                "S_WAVE_CHROMATIX and O_ASM_PROPAGATE do -- but they need two ids."
+            )
+        index[descriptor.operation_id] = descriptor
+    return index
+
+
+#: The index, derived from the one canonical declaration at import.
+#:
+#: Not a second source of truth: `catalog.CATALOG` is the declaration and this is a
+#: lookup over it. Private, and no longer mutable by anything -- `register()` is
+#: gone, so there is no call that can add to it.
+_BY_ID: dict[str, OperationDescriptor] = _build_index(CATALOG)
 
 
 def find(
@@ -87,8 +103,10 @@ def find(
 ) -> tuple[OperationDescriptor, ...]:
     """Every registered operation matching the filters, ordered by id.
 
-    No argument enumerates the whole registry, which is what makes "listing
-    everything imports no backend" a statement about a real call.
+    No argument enumerates the whole catalog, which is what makes "listing
+    everything imports no backend" a statement about a real call -- and since
+    CHE-221 it is a statement about fourteen real records naming `optiland` and
+    `chromatix`, rather than about an empty dict.
 
     An unknown semantic type or kind is an error, not an empty result. A query
     that silently returns nothing is indistinguishable from a correct answer,
@@ -108,15 +126,15 @@ def find(
                 f"kind={kind!r} is not one of {[k.value for k in OperationKind]}"
             ) from exc
     return tuple(
-        _REGISTERED[key]
-        for key in sorted(_REGISTERED)
-        if _REGISTERED[key].matches(input=input, output=output, kind=kind)
+        _BY_ID[key]
+        for key in sorted(_BY_ID)
+        if _BY_ID[key].matches(input=input, output=output, kind=kind)
     )
 
 
 def registered_ids() -> tuple[str, ...]:
-    """The ids currently registered, sorted. For error messages and tests."""
-    return tuple(sorted(_REGISTERED))
+    """The ids in the catalog, sorted. For error messages and tests."""
+    return tuple(sorted(_BY_ID))
 
 
 def resolve(operation_id: str) -> Callable[..., Any]:
@@ -131,11 +149,12 @@ def resolve(operation_id: str) -> Callable[..., Any]:
     second place the loaded state lives.
     """
     try:
-        descriptor = _REGISTERED[operation_id]
+        descriptor = _BY_ID[operation_id]
     except KeyError as exc:
         raise KeyError(
-            f"{operation_id!r} is not registered. Registered: "
-            f"{list(registered_ids()) or '(nothing -- no operation has landed yet)'}"
+            f"{operation_id!r} is not in the catalog. Catalogued: "
+            f"{list(registered_ids())}. An operation is discoverable because "
+            "`operations.catalog` declares it, not because something registered it."
         ) from exc
 
     module_path, _, attribute = descriptor.implementation.partition(":")

@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 from chromatix_support import WAVELENGTH_M, a_scalar_field
 
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, registry, resolve
 from representations import ContractError, ScalarField
 from solvers import chromatix
 from solvers.chromatix import CAPABILITIES, DERIVATIVE, MODELS, carrier_phase_rad, propagate
@@ -249,18 +249,9 @@ def test_the_carrier_is_not_folded_back_into_the_field() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def isolated_registry():
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_solver_and_the_propagation_register_as_themselves(isolated_registry: None) -> None:
-    """Criterion 4, executed end to end: both records resolve to this function.
+def test_the_solver_and_the_propagation_register_as_themselves() -> None:
+    """Criterion 4, executed end to end: both PRODUCTION records resolve to this
+    function.
 
     Two descriptors over one implementation, because they answer different
     questions. `S_WAVE_CHROMATIX` is the *backend* -- what this project can drive,
@@ -273,57 +264,30 @@ def test_the_solver_and_the_propagation_register_as_themselves(isolated_registry
     physical state and preserves the representation, which is the exact opposite,
     and heavy numerics is not what decides the question.
 
-    The descriptors live here rather than in `solvers/chromatix/` because the
-    dependency allowlist bars a solver from importing `operations/` and bars
-    `operations/` from importing a solver; `planning/` and `runtime/`, which
-    `operations/registry.py` names as the consumers, have not landed. Widening the
-    allowlist to make a record fit is an architecture change, not something to do
-    inside an implementation ticket.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `solvers/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
     """
-    solver = registry.register(
-        OperationDescriptor(
-            operation_id="S_WAVE_CHROMATIX",
-            kind=OperationKind.SOLVER,
-            input="scalar_field",
-            output="scalar_field",
-            implementation="solvers.chromatix.solver:propagate",
-            approximation=(
-                "scalar diffraction: one complex amplitude per sample, no polarization "
-                "and no vectorial coupling, evaluated in complex64 because the backend "
-                "has no other field storage"
-            ),
-            evidence=("tests/physics/test_scalar_wave_propagation.py",),
-            capabilities=CAPABILITIES,
-            derivative=DERIVATIVE,
-        )
-    )
-    operator = registry.register(
-        OperationDescriptor(
-            operation_id="O_ASM_PROPAGATE",
-            kind=OperationKind.PHYSICAL_OPERATOR,
-            input="scalar_field",
-            output="scalar_field",
-            implementation="solvers.chromatix.solver:propagate",
-            approximation=(
-                "the exact (non-paraxial) angular spectrum in a homogeneous isotropic "
-                "medium: no Fresnel approximation and no term dropped, but the sampled "
-                "window is periodic, so power that leaves it wraps back in unless the "
-                "grid is padded"
-            ),
-            validity=(
-                "z <= N pitch^2 / lambda, the transfer function's own sampling bound",
-                "pitch <= lambda / (2 sin theta_max) for the field's own largest angle",
-            ),
-            evidence=("tests/physics/test_scalar_wave_propagation.py",),
-            capabilities=CAPABILITIES,
-            derivative=DERIVATIVE,
-        )
-    )
+    catalogued = {d.operation_id: d for d in CATALOG}
+    solver = catalogued["S_WAVE_CHROMATIX"]
+    operator = catalogued["O_ASM_PROPAGATE"]
 
     assert solver.kind is OperationKind.SOLVER
     assert operator.kind is OperationKind.PHYSICAL_OPERATOR
     assert OperationKind.COUPLER not in {solver.kind, operator.kind}
-    assert registry.find(kind=OperationKind.COUPLER) == ()
+    assert solver.implementation == operator.implementation
+    assert solver.capabilities == operator.capabilities == CAPABILITIES
+    assert solver.derivative == operator.derivative == DERIVATIVE
+    # The catalog now HAS couplers -- two of them -- so the old assertion that
+    # `find(kind=COUPLER)` is empty is no longer a statement about these records.
+    # What still holds, and is what the criterion meant, is that neither of these
+    # two is among them.
+    assert solver not in registry.find(kind=OperationKind.COUPLER)
+    assert operator not in registry.find(kind=OperationKind.COUPLER)
     assert resolve("S_WAVE_CHROMATIX") is propagate
     assert resolve("O_ASM_PROPAGATE") is propagate
 

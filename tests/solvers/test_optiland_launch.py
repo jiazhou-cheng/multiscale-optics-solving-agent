@@ -122,7 +122,10 @@ def test_the_source_package_cannot_produce_a_launch_bundle() -> None:
     """
     import sources
 
-    for name in sources.__all__:
+    # `OPERATIONS` (CHE-221) is a tuple of strings, not a callable, so the loop
+    # reads it as the declaration it is: every name it advertises, and no name
+    # that produces a ray bundle.
+    for name in sources.OPERATIONS:
         annotation = str(getattr(sources, name).__annotations__.get("return", ""))
         assert "RayBundle" not in annotation
 

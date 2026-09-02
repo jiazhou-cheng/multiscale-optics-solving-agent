@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import ast
 import math
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -38,7 +37,7 @@ from measurements import (
     border_energy_fraction,
     psf,
 )
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, registry, resolve
 from representations import ContractError, Frame, ReferenceSurface, ScalarField
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -459,110 +458,63 @@ def test_the_class_delta_is_one() -> None:
         assert avoided not in defined
 
 
-@pytest.fixture
-def isolated_registry() -> Iterator[None]:
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_psf_registers_as_a_measurement_and_never_as_a_coupler(
-    isolated_registry: None,
-) -> None:
+def test_psf_registers_as_a_measurement_and_never_as_a_coupler() -> None:
     """Criterion 4. `scalar_field -> psf`: an observable derived from state.
 
-    `psf` joins `SEMANTIC_TYPES` in this ticket, which is the discipline that
+    `psf` joins `SEMANTIC_TYPES` in R11.1's ticket, which is the discipline that
     vocabulary declares -- a type is added by the change that lands the boundary
-    it names. It is added as the **output port of a measurement**, and the second
-    half of this test is what keeps that from becoming the thing CHE-36 removed:
-    no `coupler`-kind descriptor may name it on either port, because a coupler to
-    an observable changes no representation and consults no convention it does not
+    it names. It is added as the **output port of a measurement**, and the two
+    tests below are what keep that from becoming the thing CHE-36 removed: no
+    `coupler`-kind descriptor may name it on either port, because a coupler to an
+    observable changes no representation and consults no convention it does not
     already hold.
+
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `measurements/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
+
+    The uniqueness claim is now stronger than it was, and for a real reason: it
+    used to read `find(kind=MEASUREMENT) == (descriptor,)` against a registry the
+    fixture had just emptied, so it said "the one record this test registered".
+    Against the shipped catalog it says the project has exactly one measurement,
+    which is R11's criterion 1 and was previously unassertable.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="M_PSF",
-            kind=OperationKind.MEASUREMENT,
-            input="scalar_field",
-            output="psf",
-            implementation="measurements.psf:psf",
-            approximation=(
-                "none in the reduction itself: intensity is |u|^2 exactly, and the "
-                "declared normalization is an exact scaling of it. What the caller must "
-                "know is that peak and energy normalization are both blind to a constant "
-                "multiplicative error in the field, so the unscaled peak and window "
-                "energy are recorded on every result"
-            ),
-            evidence=("tests/physics/test_psf.py",),
-            validity=(
-                "monochromatic, fully coherent, scalar",
-                "the sampled window only: energy that left the grid is not measured, and "
-                "border_energy_fraction is the indicator for it",
-            ),
-            derivative="forward_only",
-        )
-    )
+    descriptor = next(d for d in CATALOG if d.operation_id == "M_PSF")
     assert descriptor.kind is OperationKind.MEASUREMENT
-    assert registry.find(kind=OperationKind.MEASUREMENT) == (descriptor,)
+    assert descriptor.input == "scalar_field"
+    assert descriptor.output == "psf"
+    assert registry.find(kind=OperationKind.MEASUREMENT) == (descriptor,), (
+        "one measurement in the whole catalog, which is R11 criterion 1"
+    )
     assert resolve("M_PSF") is psf
 
-    with pytest.raises(ValueError, match="already registered"):
-        registry.register(descriptor)
 
+def test_no_catalogued_operation_consumes_or_mis_produces_the_observable() -> None:
+    """R11 criterion 3, against the whole shipped catalog rather than a fixture.
 
-@pytest.mark.parametrize(
-    "kind",
-    [OperationKind.COUPLER, OperationKind.SOLVER, OperationKind.PHYSICAL_OPERATOR],
-)
-def test_only_a_measurement_may_produce_an_observable(kind: OperationKind) -> None:
-    """Criterion 3 of the parent, as a **construction error** rather than a loop.
-
-    The first version of this test iterated the registered couplers and asserted
-    none named `psf`. The registry is empty at import -- no registration site has
-    landed anywhere in the tree -- and the fixture above clears it besides, so the
-    loop body had never run and could not run. It asserted nothing, and a shared
-    docstring in `operations/descriptors.py` cited it as the enforcement.
-
-    Adding `psf` to `SEMANTIC_TYPES` is what made `C_FIELD_TO_PSF` reconstructible,
-    so the rule has to live where ports are validated. It does now, and it is the
-    general statement rather than one banned id: an observable is derived from
-    physical state, so only a measurement produces one.
+    The construction-time rules in `operations/descriptors.py` make `C_FIELD_TO_PSF`
+    unbuildable, and the two tests below assert that. This asserts the *catalog*
+    obeys them, which is a different statement: it is the one that would fail if a
+    future record slipped an observable onto a port some other way.
     """
-    with pytest.raises(ValueError) as raised:
-        OperationDescriptor(
-            operation_id="C_FIELD_TO_PSF",
-            kind=kind,
-            input="scalar_field",
-            output="psf",
-            implementation="couplers.field_to_psf:convert",
-            approximation="none",
-            evidence=(),
-        )
-    assert "Only a measurement produces an observable" in str(raised.value)
-    assert "CHE-36" in str(raised.value)
+    for record in CATALOG:
+        assert record.input != "psf", record.operation_id
+        if record.output == "psf":
+            assert record.kind is OperationKind.MEASUREMENT, record.operation_id
 
 
-@pytest.mark.parametrize("kind", list(OperationKind))
-def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
-    """The other half. An observable is terminal.
-
-    An operation reading a PSF as its input is either a measurement of a
-    measurement, or a physical operation that has mistaken an intensity for a
-    state -- and in the second case the representation it should have consumed is
-    still sitting upstream, unconsumed. This one binds a `measurement` too.
-    """
-    with pytest.raises(ValueError, match="observable and not a representation"):
-        OperationDescriptor(
-            operation_id="X_FROM_PSF",
-            kind=kind,
-            input="psf",
-            output="scalar_field",
-            implementation="nowhere:run",
-            approximation="none",
-            evidence=(),
-        )
+# The two construction-error tests that used to sit here -- "only a measurement may
+# produce an observable" and "nothing consumes an observable" -- moved to
+# `tests/operations/test_descriptors.py` with CHE-221 (R03.4). Their subject is the
+# schema's port validation, not the PSF, and the ticket's criterion 8 confines
+# `OperationDescriptor(...)` construction to `tests/operations/`. R11 criterion 3 is
+# still asserted here, by `test_no_catalogued_operation_consumes_or_mis_produces_the_
+# observable` above, which is the stronger of the two statements: it holds against
+# the whole shipped catalog rather than against a record a test built.
 
 
 @pytest.mark.filterwarnings("ignore:overflow encountered:RuntimeWarning")

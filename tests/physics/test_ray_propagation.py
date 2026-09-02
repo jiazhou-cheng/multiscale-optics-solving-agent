@@ -28,7 +28,6 @@ from __future__ import annotations
 import ast
 import dataclasses
 import math
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +35,7 @@ import pytest
 from ray_support import WAVELENGTH_M, a_surface, collimated_bundle
 
 from couplers import DEFAULT_PHASE_BUDGET_RAD, ray_to_scalar
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from operators import propagate_rays
 from representations import ContractError, RayBundle, ReferenceSurface
 
@@ -762,57 +761,35 @@ def test_exactly_one_advance_to_a_plane_exists_in_the_tree() -> None:
     assert advancing == ["operators/ray_propagation.py::propagate_rays"], advancing
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
+def test_ray_propagation_registers_as_a_physical_operator() -> None:
+    """Criterion 4. `ray_bundle -> ray_bundle`: the state changes, the representation
+    does not.
 
+    Not a coupler, and the `kind` is where that is said.
 
-def test_ray_propagation_registers_as_a_physical_operator(isolated_registry: None) -> None:
-    """Criterion 4. `ray_bundle -> ray_bundle`: the state changes, the representation does not.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `operators/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
 
-    Not a coupler, and the `kind` is where that is said. Test-side for the reason
-    every operation ticket since R05.3 has recorded: `operators/` may not import
-    `operations/` and vice versa.
+    One line of the migrated `validity` was **corrected rather than copied**, and
+    the correction is flagged on CHE-221: the fixture said the reconstruction
+    kernel "implements the n = 1 ramp and refuses n != 1, so a bundle advanced
+    through a medium cannot yet be reconstructed (recorded on CHE-192)". CHE-192's
+    follow-up put the `n` in and lifted the refusal, so migrating that line
+    verbatim would have put a false validity claim into the canonical catalog.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="O_PROPAGATE_RAYS",
-            kind=OperationKind.PHYSICAL_OPERATOR,
-            input="ray_bundle",
-            output="ray_bundle",
-            implementation="operators.ray_propagation:propagate_rays",
-            approximation=(
-                "exact rather than approximate: each ray advances along its own direction "
-                "by the arc length s = dz / d_z and its optical path grows by n s, which "
-                "changes each wavelet's constant phase by n k d_z dz -- precisely what a "
-                "plane wave accumulates over the axial offset. Directions are unchanged, "
-                "so nothing refracts, and the sampling measure is unchanged, because a "
-                "plane wavelet's coefficient was fixed by the quadrature at the surface "
-                "the rays were originally declared on"
-            ),
-            validity=(
-                "one medium: the source and target surfaces must declare the same index, "
-                "because two indices do not bound one medium",
-                "the target must be perpendicular to the propagation axis",
-                "every ray must reach the target; one that does not is refused, not dropped",
-                "|d_z| must clear a floor derived from the phase the arc length would "
-                "carry at the optical path's own precision",
-                "correct for any medium index, but the reconstruction kernel implements "
-                "the n = 1 ramp and refuses n != 1, so a bundle advanced through a medium "
-                "cannot yet be reconstructed (recorded on CHE-192)",
-            ),
-            evidence=("tests/physics/test_ray_propagation.py",),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
+    descriptor = next(d for d in CATALOG if d.operation_id == "O_PROPAGATE_RAYS")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
     assert descriptor.input == descriptor.output == "ray_bundle"
+    assert descriptor.capabilities is None
+    assert not any("cannot yet be reconstructed" in c for c in descriptor.validity), (
+        "the n != 1 reconstruction refusal was lifted by CHE-192"
+    )
     assert resolve("O_PROPAGATE_RAYS") is propagate_rays
 
 

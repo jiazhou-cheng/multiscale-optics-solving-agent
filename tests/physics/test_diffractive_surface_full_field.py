@@ -29,7 +29,6 @@ import ast
 import dataclasses
 import math
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -37,7 +36,7 @@ import pytest
 from ray_support import WAVELENGTH_M, a_surface, collimated_bundle, propagating_only
 
 from couplers import ray_to_scalar, scalar_to_ray
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from operators import DiffractiveSurface, complex_transmission, diffractive_surface
 from representations import ContractError, ReferenceSurface
 
@@ -516,60 +515,38 @@ def test_the_medium_index_is_inherited_from_the_parts_rather_than_restated() -> 
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_diffractive_surface_registers_as_a_physical_operator(
-    isolated_registry: None,
-) -> None:
+def test_the_diffractive_surface_registers_as_a_physical_operator() -> None:
     """Criterion 4. `ray_bundle -> ray_bundle`, and **never** as a coupler.
 
     The interior converts representation twice and the identity is still a physical
     state change, because an optical surface changes the state. That is the call
     `docs/architecture_principles.md` section 2 makes, and the `kind` field is
     where it is said.
+
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `operators/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
+
+    One line of the migrated `validity` was **corrected rather than copied**, and
+    the correction is flagged on CHE-221: the fixture said "air only until the
+    ray<->wave ramp convention carries the refractive index (R09)". CHE-192 put the
+    `n` in, and this composition inherited the fix from its parts -- which
+    `src/operators/diffractive_surface.py`'s own docstring records. Migrating that
+    line verbatim would have put a false validity claim into the canonical catalog.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="O_DIFFRACTIVE_SURFACE",
-            kind=OperationKind.PHYSICAL_OPERATOR,
-            input="ray_bundle",
-            output="ray_bundle",
-            implementation="operators.diffractive_surface:diffractive_surface",
-            approximation=(
-                "the full-field model: every incident ray is accumulated coherently onto "
-                "the surface's own grid, the complex transmission is applied once as a "
-                "thin element, and the transmitted field is decomposed into the modes "
-                "that leave. Exact for a thin, angle-independent transmission on one "
-                "common plane; the interior field carries no exp(i k r^2 / 2R) "
-                "wavefront-curvature term (CHE-50) and is valid at the surface with zero "
-                "further propagation, both of which the emitted bundle declares"
-            ),
-            validity=(
-                "the incident bundle must already be expressed on the surface; this "
-                "operation does not propagate",
-                "one common plane, i.e. a planar substrate; a conformal one has no such "
-                "plane and needs the local-patch model",
-                "air only until the ray<->wave ramp convention carries the refractive "
-                "index (R09)",
-                "the surface's grid is the reconstruction grid, so its pitch must "
-                "represent the steepest wavelet ramp of both the incident and the "
-                "transmitted spectrum",
-            ),
-            evidence=("tests/physics/test_diffractive_surface_full_field.py",),
-            capabilities=None,
-            derivative="forward_only",
-        )
-    )
+    descriptor = next(d for d in CATALOG if d.operation_id == "O_DIFFRACTIVE_SURFACE")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
     assert descriptor.input == descriptor.output == "ray_bundle"
+    assert descriptor.capabilities is None
+    assert not any("air only" in condition for condition in descriptor.validity), (
+        "the air-only restriction was lifted by CHE-192; a catalog that still "
+        "declared it would be refusing on paper what the code accepts"
+    )
     assert resolve("O_DIFFRACTIVE_SURFACE") is diffractive_surface
 
 

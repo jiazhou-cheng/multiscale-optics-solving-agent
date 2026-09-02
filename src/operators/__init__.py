@@ -70,9 +70,35 @@ from operators.transmission import (
     numerical_aperture_radius_m,
 )
 
+#: The public callables in this package that are **semantic operations**, as
+#: strings, one per `operations.catalog` record. CHE-221 (R03.4).
+#:
+#: Strings, and *this package does not import* `operations`: the dependency
+#: allowlist gives no implementation package an edge to `operations/`, and an edge
+#: would end the one property that package exists to provide -- listing what the
+#: project can do would have loaded what it does it with.
+#: `tests/operations/test_catalog.py` walks this tuple against the catalog in both
+#: directions.
+#:
+#: Hand-maintained, and deliberately not derived from `__all__`:
+#: `circular_aperture_amplitude` and `numerical_aperture_radius_m` are mask builders -- they
+#: produce an array to hand to `complex_transmission`, and consume and produce no representation.
+#:
+#: The residual failure this cannot catch is someone landing a public operation and
+#: not adding it here. That is the honest limit of a mechanical gate -- the two
+#: directions checked are catalog-against-this-tuple, not this-tuple-against
+#: reality -- and it is the reason the tuple is one line of strings rather than
+#: something cleverer.
+OPERATIONS: tuple[str, ...] = (
+    "complex_transmission",
+    "diffractive_surface",
+    "propagate_rays",
+)
+
 __all__ = [
     "DIFFRACTIVE_MODELS",
     "EDGES",
+    "OPERATIONS",
     "DiffractiveModel",
     "DiffractiveSurface",
     "circular_aperture_amplitude",

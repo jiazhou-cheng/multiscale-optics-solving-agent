@@ -26,9 +26,32 @@ from measurements.psf import (
     psf,
 )
 
+#: The public callables in this package that are **semantic operations**, as
+#: strings, one per `operations.catalog` record. CHE-221 (R03.4).
+#:
+#: Strings, and *this package does not import* `operations`: the dependency
+#: allowlist gives no implementation package an edge to `operations/`, and an edge
+#: would end the one property that package exists to provide -- listing what the
+#: project can do would have loaded what it does it with.
+#: `tests/operations/test_catalog.py` walks this tuple against the catalog in both
+#: directions.
+#:
+#: Hand-maintained, and deliberately not derived from `__all__`:
+#: `border_energy_fraction` is a reduction over an array that `PsfResult` already reports rather
+#: than an operation over a representation, and the rest of `__all__` is the normalization
+#: vocabulary.
+#:
+#: The residual failure this cannot catch is someone landing a public operation and
+#: not adding it here. That is the honest limit of a mechanical gate -- the two
+#: directions checked are catalog-against-this-tuple, not this-tuple-against
+#: reality -- and it is the reason the tuple is one line of strings rather than
+#: something cleverer.
+OPERATIONS: tuple[str, ...] = ("psf",)
+
 __all__ = [
     "COHERENCE_MODEL",
     "NORMALIZATION_DECLARATIONS",
+    "OPERATIONS",
     "PSF_INVARIANTS",
     "PSF_NORMALIZATIONS",
     "PsfNormalization",

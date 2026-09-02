@@ -42,7 +42,6 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -55,10 +54,16 @@ from fixtures.systems import (
 )
 
 from numerics import OPTILAND_CAPABILITIES, ArrayNamespace, DevicePlacement, Precision
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from representations import RayBundle
 from solvers import optiland
-from solvers.optiland import CAPABILITIES, DERIVATIVE, configure_execution, trace
+from solvers.optiland import (
+    CAPABILITIES,
+    DERIVATIVE,
+    configure_execution,
+    trace,
+    trace_rays,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 CPU64 = {"device": "cpu", "precision": "fp64"}
@@ -407,43 +412,48 @@ def test_field_degrees_convert_to_the_solvers_normalized_coordinate() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def isolated_registry() -> Iterator[None]:
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
+def test_the_descriptor_says_forward_only() -> None:
+    """Criterion 4, executed end to end against the PRODUCTION record.
 
-
-def test_the_descriptor_says_forward_only(isolated_registry: None) -> None:
-    """Criterion 4, executed end to end: the record resolves to this function.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `solvers/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
 
     A descriptor with `derivative='differentiable'` and no evidence is refused at
     construction (R03.1), so `forward_only` here is the project's rule holding
-    rather than a string someone typed.
+    rather than a string someone typed. The capability citation is checked against
+    this package's own `CAPABILITIES`, which is the half a catalog in another
+    package cannot check for itself.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="S_RAY_OPTILAND",
-            kind=OperationKind.SOLVER,
-            input="ray_bundle",
-            output="ray_bundle",
-            implementation="solvers.optiland.solver:trace",
-            approximation=(
-                "sequential geometric ray tracing: rays are plane wavelets, diffraction "
-                "is not modelled, and a surface interaction is refraction at a real "
-                "interface"
-            ),
-            evidence=("tests/physics/test_optiland_rays.py",),
-            capabilities=CAPABILITIES,
-            derivative=DERIVATIVE,
-        )
-    )
-    assert descriptor.derivative == "forward_only"
+    descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND")
+    assert descriptor.kind is OperationKind.SOLVER
+    assert descriptor.implementation == "solvers.optiland.solver:trace"
+    assert descriptor.derivative == DERIVATIVE == "forward_only"
     assert descriptor.derivative_evidence is None
+    assert descriptor.capabilities == CAPABILITIES
     assert resolve("S_RAY_OPTILAND") is trace
+
+
+def test_the_supplied_bundle_entry_point_has_its_own_record() -> None:
+    """CHE-221: `trace_rays` had no descriptor at all until the catalog landed.
+
+    Two records over two callables, not one record with two readings. `trace`
+    generates its rays inside the solver from a field coordinate and a ring count;
+    `trace_rays` consumes an ensemble the caller already holds. A planner choosing
+    between them is choosing between different inputs, which is why they are two
+    ids rather than one with a mode argument.
+    """
+    descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND_BUNDLE")
+    assert descriptor.kind is OperationKind.SOLVER
+    assert descriptor.implementation == "solvers.optiland.solver:trace_rays"
+    assert descriptor.capabilities == CAPABILITIES
+    assert descriptor.derivative == DERIVATIVE
+    assert descriptor.validity, "the supplied-bundle path has real preconditions"
+    assert resolve("S_RAY_OPTILAND_BUNDLE") is trace_rays
 
 
 def test_there_is_no_gradient_knob() -> None:

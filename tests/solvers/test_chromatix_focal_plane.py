@@ -12,15 +12,13 @@ picking one silently.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-
 import numpy as np
 import pytest
 from chromatix_support import PITCH_M, SHAPE, a_scalar_field
 
-from operations import OperationDescriptor, OperationKind, registry, resolve
+from operations import CATALOG, OperationKind, resolve
 from representations import ContractError, ScalarField
-from solvers.chromatix import CAPABILITIES, DERIVATIVE, DIRECTIONS, focal_plane_transform
+from solvers.chromatix import CAPABILITIES, DIRECTIONS, focal_plane_transform
 
 FOCAL_LENGTH_M = 20e-3
 
@@ -171,17 +169,7 @@ def test_the_namespace_and_shape_the_caller_handed_in_come_back() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def isolated_registry() -> Iterator[None]:
-    """The registry is module-level state, so the isolation belongs in the test."""
-    saved = dict(registry._REGISTERED)
-    registry._REGISTERED.clear()
-    yield
-    registry._REGISTERED.clear()
-    registry._REGISTERED.update(saved)
-
-
-def test_the_transform_registers_as_a_physical_operator(isolated_registry: None) -> None:
+def test_the_transform_registers_as_a_physical_operator() -> None:
     """Criterion 7. A physical operator, never a coupler.
 
     The state at the back focal plane is a different physical state from the one
@@ -190,41 +178,19 @@ def test_the_transform_registers_as_a_physical_operator(isolated_registry: None)
     a different *grid* is not what decides it; a regrid is bookkeeping, and this
     operation would still be an operator without one.
 
-    The descriptor lives here rather than in production for the reason R05.3 and
-    R06.2 both recorded: `solvers/` may not import `operations/` and `operations/`
-    may not import `solvers/`, so no production registration site exists yet.
-    Widening the allowlist to make one fit is an architecture change and is not
-    this ticket's to make.
+    The descriptor used to be constructed here, inside a fixture that emptied the
+    registry, because `solvers/` may not import `operations/` and there was no
+    production registration site anywhere. CHE-221 (R03.4) put one *inside*
+    `operations/`: the catalog names the implementation as a
+    `"module.path:attribute"` string, so it needs no dependency edge in either
+    direction, and the allowlist is unchanged. What is read below is the shipped
+    record rather than a copy this file kept in step by hand.
     """
-    descriptor = registry.register(
-        OperationDescriptor(
-            operation_id="O_FOCAL_PLANE_TRANSFORM",
-            kind=OperationKind.PHYSICAL_OPERATOR,
-            input="scalar_field",
-            output="scalar_field",
-            implementation="solvers.chromatix.focal_plane:focal_plane_transform",
-            approximation=(
-                "the ideal thin lens between its two focal planes: one optical Fourier "
-                "transform, so spatial frequency maps linearly onto position and a plane "
-                "wave at theta focuses at f sin(theta) rather than f tan(theta). No "
-                "aberration, no thickness, no pupil, and the exp(i k n 2f) piston of the "
-                "textbook relation is not carried"
-            ),
-            validity=(
-                "the output grid is lambda f / (n N dx) per axis, so content beyond that "
-                "window is not represented; padding is refused because it would change N",
-                "carrier_removed_phase: the phase is relative to a removed piston, and two "
-                "fields with different removed pistons may not be interfered directly",
-            ),
-            evidence=("tests/physics/test_focal_plane_transform.py",),
-            capabilities=CAPABILITIES,
-            derivative=DERIVATIVE,
-        )
-    )
-
+    descriptor = next(d for d in CATALOG if d.operation_id == "O_FOCAL_PLANE_TRANSFORM")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.kind is not OperationKind.COUPLER
     assert descriptor.derivative == "forward_only"
+    assert descriptor.capabilities == CAPABILITIES
     assert resolve("O_FOCAL_PLANE_TRANSFORM") is focal_plane_transform
 
 
