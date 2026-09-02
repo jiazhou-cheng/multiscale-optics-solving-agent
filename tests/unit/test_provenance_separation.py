@@ -252,6 +252,74 @@ def test_deleting_a_request_field_does_break_the_rerun() -> None:
     )
 
 
+def test_the_real_executor_produces_identical_physics_with_no_provenance_at_all() -> None:
+    """The deletion loop's reach, widened to the production consumer.
+
+    The loop above re-derives the physics through this module's own `_physics`,
+    which reads `request` by construction -- so it is a statement about that
+    helper, and a leak in the *executor's* binding path would be invisible to it.
+    The review found that, and this is the case that closes it: `runtime.execute`
+    is driven with `record_provenance` patched to return nothing, and the physical
+    result has to be bit-identical to the reference.
+
+    That is the strongest available executable form of the rule, because the code
+    under test is the one a caller actually runs. The structural check below is
+    still the stronger *statement* -- a leak is not expressible -- but this is the
+    one that would catch a leak someone had written.
+    """
+    import runtime
+    import runtime.executor as executor_module
+    from measurements import PsfResult
+
+    reference = _physics(REQUEST)
+    surface = ReferenceSurface(name="emitting surface", z_m=0.0, medium_index=1.0)
+    executable = {
+        key: value
+        for key, value in REQUEST.items()
+        if key not in ("shape", "sample_pitch_m", "transverse_wavevector_rad_per_m")
+    }
+    executable.update(
+        shape=tuple(REQUEST["shape"]),
+        sample_pitch_m=tuple(REQUEST["sample_pitch_m"]),
+        transverse_wavevector_rad_per_m=tuple(REQUEST["transverse_wavevector_rad_per_m"]),
+        reference_surface=surface,
+    )
+
+    original = executor_module.record_provenance
+    executor_module.record_provenance = lambda **_: {}  # type: ignore[assignment]
+    try:
+        stripped = runtime.execute(ROUTE, request=executable)
+    finally:
+        executor_module.record_provenance = original  # type: ignore[assignment]
+
+    assert stripped.status == "completed", [
+        (node.operation_id, node.status, node.diagnostics) for node in stripped.nodes
+    ]
+    # `runtime_seconds` and `resources` are added after `record_provenance`, so a
+    # record with no provenance block still carries those two -- which is why this
+    # asserts on what the *fingerprints* are gone rather than on an empty dict.
+    assert "code_fingerprint" not in stripped.provenance
+    assert "environment_fingerprint" not in stripped.provenance
+
+    with_provenance = runtime.execute(ROUTE, request=executable)
+    assert "code_fingerprint" in with_provenance.provenance
+    assert stripped.fingerprinted == with_provenance.fingerprinted
+
+    # And the physics the executor ran is the reference physics, to the bit.
+    field = gaussian_beam(
+        tuple(REQUEST["shape"]),
+        sample_pitch_m=tuple(REQUEST["sample_pitch_m"]),
+        wavelength_m=REQUEST["wavelength_m"],
+        reference_surface=surface,
+        waist_radius_m=REQUEST["waist_radius_m"],
+        transverse_wavevector_rad_per_m=tuple(REQUEST["transverse_wavevector_rad_per_m"]),
+        amplitude=REQUEST["amplitude"],
+    )
+    result = psf(field, normalization=REQUEST["normalization"])
+    assert isinstance(result, PsfResult)
+    assert np.array_equal(np.asarray(result.intensity), reference[0])
+
+
 def test_nothing_physical_may_import_the_runtime() -> None:
     """The structural half, and the stronger one: a leak is not expressible.
 
@@ -615,6 +683,18 @@ def test_there_is_no_cache_no_cache_key_and_no_graph_fingerprint() -> None:
         code = ast.unparse(tree)
         for forbidden in ("cache", "Cache", "graph_fingerprint", "lru_cache"):
             assert forbidden not in code, f"{path.name} contains {forbidden!r}"
+
+    # The one thing the executor remembers, and it is not a result: the environment
+    # fingerprint, read once per lifetime because `importlib.metadata.version` is
+    # 7.5 ms and installed versions cannot change in-process. CHE-200 measured that
+    # (391% overhead on a two-node plan) and
+    # `tests/integration/test_executor.py::test_two_runs_of_one_plan_both_execute_the_physics`
+    # is the evidence that no *physics* is skipped -- which is the property this
+    # substring scan cannot see, since it constrains identifiers rather than
+    # semantics.
+    assert "_environment" in (
+        (ROOT / "src" / "runtime" / "executor.py").read_text(encoding="utf-8")
+    )
 
 
 def test_no_src_io_package_exists() -> None:

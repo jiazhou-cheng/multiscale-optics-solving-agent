@@ -6,11 +6,19 @@ nothing imports it. That direction is what makes the rule this package is built
 around structurally true rather than a discipline someone maintains, because a
 physical layer *cannot* read a provenance field.
 
-One module, landed by CHE-199 (R13.1):
+Two modules:
 
-* `records` -- `ExecutionRecord` and `NodeRecord`, the serialized provenance
-  models; `strip_volatile`, the source and environment fingerprints, and the JSON
-  round trip.
+* `records` -- CHE-199 (R13.1). `ExecutionRecord` and `NodeRecord`, the serialized
+  provenance models; `strip_volatile`, the source and environment fingerprints, and
+  the JSON round trip.
+* `executor` -- CHE-200 (R13.2). `execute(plan, *, request)`, and `Executor`, the
+  one class in the new architecture justified by rule 3 -- a mutable resource
+  lifecycle. The resource is **a memory sampling thread**, started on `__enter__`
+  and joined on `__exit__`, and the shared-server policy's swap-growth stop
+  condition is what it exists for. It does *not* own backend configuration: this
+  package cannot import `solvers/`, and `configure_execution` sets device and
+  precision on every call rather than inheriting -- `executor.py` records that
+  correction, because an earlier version of this note claimed otherwise.
 
 **Deleting any provenance field changes no physical result.** That is §13's rule
 and `tests/unit/test_provenance_separation.py` executes it on every field: a
@@ -28,6 +36,7 @@ namespace root a top-level `io` package shadows the standard library's.
 Serialization is `records.to_json` / `records.from_json`.
 """
 
+from runtime.executor import SAMPLE_INTERVAL_S, Executor, execute, memory_snapshot
 from runtime.records import (
     FINGERPRINTED_PACKAGES,
     NODE_STATUSES,
@@ -48,11 +57,15 @@ __all__ = [
     "FINGERPRINTED_PACKAGES",
     "NODE_STATUSES",
     "PROVENANCE_SCHEMA_VERSION",
+    "SAMPLE_INTERVAL_S",
     "VOLATILE_KEYS",
     "ExecutionRecord",
+    "Executor",
     "NodeRecord",
     "environment_fingerprint",
+    "execute",
     "from_json",
+    "memory_snapshot",
     "record_provenance",
     "require_stable_payload",
     "source_fingerprint",

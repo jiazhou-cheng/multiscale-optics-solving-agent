@@ -347,10 +347,26 @@ BUDGETS: dict[str, int] = {
     "planning": 0,
     "problems": 4,
     "representations": 5,
-    #: `runtime` is 2, landed by CHE-199 (R13.1): `ExecutionRecord` and
-    #: `NodeRecord`, both rule 2. R13.2 raises it to 3 for `Executor` on rule 3,
-    #: which is the ceiling unit reserved at 25 -> 26 in the note below.
-    "runtime": 2,
+    #: `runtime` is 3. `ExecutionRecord` and `NodeRecord` landed with CHE-199
+    #: (R13.1), both rule 2 -- public serialized provenance models. `Executor`
+    #: landed with CHE-200 (R13.2) on **rule 3**, and it is the only class in the
+    #: new architecture on that rule: it owns a mutable resource lifecycle, which
+    #: `runtime/executor.py` names as **a memory sampling thread** -- started on
+    #: `__enter__`, joined on `__exit__`, and the thing the shared-server
+    #: swap-growth stop condition needs in order to exist. This is the unit reserved
+    #: at the 25 -> 26 raise in the note below, spent on what it was reserved for.
+    #:
+    #: **Correction, recorded rather than edited away.** That reservation, and the
+    #: first version of `executor.py`, named the resource as "process-global solver
+    #: backend, device and precision state plus a memory sampling thread". The first
+    #: half was false and could not have been true: `check_dependencies` gives
+    #: `runtime` only `{planning, operations, representations}`, so this package
+    #: cannot reach `configure_execution` at all -- and it does not need to, because
+    #: that function sets all three on every call and never inherits what a previous
+    #: call left. Rule 3 holds on the thread alone, which is a real resource with a
+    #: real lifetime; the raise is unchanged and the justification is now the one
+    #: the code supports.
+    "runtime": 3,
     "solvers": 2,
     "sources": 0,
 }

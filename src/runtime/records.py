@@ -1,7 +1,7 @@
 """What happened, written down. Never whether it was right.
 
-CHE-199 (R13.1). Two records and five functions, and one rule that the whole
-module exists to make executable:
+CHE-199 (R13.1), with `stabilize_diagnostics` added by CHE-200 (R13.2). Two records
+and eight functions, and one rule that the whole module exists to make executable:
 
 > **Deleting any provenance field changes no physical result.**
 
@@ -95,6 +95,7 @@ __all__ = [
     "record_provenance",
     "require_stable_payload",
     "source_fingerprint",
+    "stabilize_diagnostics",
     "strip_volatile",
     "to_json",
 ]
@@ -119,6 +120,22 @@ NODE_STATUSES: tuple[str, ...] = ("completed", "refused", "failed")
 #: **not** in this list on purpose -- they change what was computed, so a
 #: fingerprint that ignored them would claim reproducibility across a real change.
 VOLATILE_KEYS: tuple[str, ...] = (
+    # CHE-200 (R13.2) added this one; the rest are the reference implementation's,
+    # spellings included. `resources` holds the memory guard's observations -- peak
+    # RSS, peak container swap, the baseline -- and they are a measurement of *this
+    # run* rather than of the computation, which is the same category every other
+    # key here is in. Two runs of the same plan legitimately differ in peak RSS, so
+    # a fingerprint that included it would report a change nobody made; and the
+    # whole subtree goes, because a nested baseline reading is no less volatile than
+    # the peak it is compared against.
+    #
+    # One latent edge, since this filters by key name at **every** depth including
+    # inside `request`: a future request key spelled `resources`, `run_id` or
+    # `output_directory` would vanish from `fingerprinted`, so an *input* would
+    # become invisible to the fingerprint. None of these is a plausible physical
+    # parameter name, which is why the filter is by name at all -- but it is the
+    # thing to check before adding a key here.
+    "resources",
     "runtime_seconds",
     "process_wall_seconds",
     "worker_process_seconds",
@@ -432,7 +449,11 @@ def environment_fingerprint() -> dict[str, Any]:
 
 
 def record_provenance(
-    *, sources: Iterable[Path], root: Path, timestamp_utc: str | None = None
+    *,
+    sources: Iterable[Path],
+    root: Path,
+    timestamp_utc: str | None = None,
+    environment: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The provenance block a record carries. Observations only.
 
@@ -447,11 +468,22 @@ def record_provenance(
     that stamped `datetime.now()` would make this module's own output unhashable
     by `require_stable_payload`, and the name is the one `VOLATILE_KEYS` already
     projects out.
+
+    `environment` may be supplied by a caller that already has one. Measured for
+    CHE-200: `environment_fingerprint()` is **7.5 ms**, because
+    `importlib.metadata.version` scans the filesystem once per package and there
+    are seven, and computing it per record made a two-node run 391% slower than
+    the physics it ran. Installed versions cannot change inside a process, so
+    `runtime.Executor` reads it once when it opens and passes it here. That is the
+    one memoization in this package and it is of an immutable process fact, not of
+    a result -- see `executor.py` on why there is no result cache.
     """
     payload: dict[str, Any] = {
         "schema_version": PROVENANCE_SCHEMA_VERSION,
         "code_fingerprint": source_fingerprint(sources, root=root),
-        "environment_fingerprint": environment_fingerprint(),
+        "environment_fingerprint": (
+            environment_fingerprint() if environment is None else dict(environment)
+        ),
     }
     if timestamp_utc is not None:
         payload["timestamp_utc"] = timestamp_utc
@@ -484,6 +516,26 @@ def require_stable_payload(payload: Any, *, where: str) -> None:
                 "hashed payload -- and a uuid inside a diagnostic message is the case that "
                 "actually happened."
             )
+
+
+def stabilize_diagnostics(text: str) -> str:
+    """One diagnostic message with any uuid or timestamp replaced by a placeholder.
+
+    The B0-META-01 defect, closed at the point where it can now recur. `runtime`'s
+    executor writes arbitrary backend and boundary exception text into
+    `NodeRecord.diagnostics`, and `ExecutionRecord.fingerprinted` **includes**
+    diagnostics -- so a refusal message carrying a `uuid4` would make the record's
+    fingerprint change on every run, and nothing would be able to tell that from a
+    real change. That is exactly what happened to B0-META-01, and
+    `require_stable_payload` refuses it; the executor calls this first so a
+    legitimate run is not refused for a message it did not write.
+
+    The message keeps its meaning: what is lost is the specific identifier, which
+    identified the run rather than the problem. Replaced rather than stripped, so a
+    reader can see that something was there.
+    """
+    stabilized = _UUID.sub("<uuid>", text)
+    return _TIMESTAMP.sub("<timestamp>", stabilized)
 
 
 def to_json(record: ExecutionRecord) -> str:
