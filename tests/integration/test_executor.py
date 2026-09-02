@@ -818,3 +818,239 @@ def test_the_record_carries_no_verdict_about_the_physics() -> None:
     )
     for verdict in ("verdict", "reproduces", "passed", "correct", "converged", "verified"):
         assert verdict not in text, f"the serialized record contains {verdict!r}"
+
+
+# ---------------------------------------------------------------------------
+# 7. A plan of node instances: a repeated operation, and what came out
+# ---------------------------------------------------------------------------
+#
+# The capability the flat request could not express. A plan is an ordered sequence
+# of node instances, so one operation may appear twice with different arguments --
+# and the measured failure before it could is the one these tests are written
+# against: the six-node 4f plan bound f1 to *both* focal-plane transforms and an
+# open pupil to *both* masks, and reported every node `completed`.
+
+#: A four-node plan that repeats `O_COMPLEX_TRANSMISSION` at two amplitudes.
+#:
+#: The repeated operation is a **backend-free** one on purpose. The plan that
+#: motivated per-node requests repeats `O_FOCAL_PLANE_TRANSFORM` at f1 and f2, and
+#: writing that here imports Chromatix into this worker --
+#: `tests/operations/test_descriptors.py` asserts `"chromatix" not in sys.modules`
+#: and fails when pytest puts the two files on one worker. This module's docstring
+#: already declares the backend-free plan as its limit, so the repetition is
+#: expressed with an operation that keeps it. The f1/f2 case is covered where it
+#: belongs, in `benchmarks/systems/b4f_ideal.py`, whose record carries both focal
+#: lengths read off `node_requests` and whose magnification gate is what would fail
+#: if they were shared.
+#:
+#: Two attenuations compose exactly: `A = 0.5 * second`, and the raw intensity is
+#: `A^2` times the source's. A shared flat request would apply *one* of them twice,
+#: giving `0.25` or `second^2` -- both far from the product, so this is arithmetic
+#: rather than a tolerance.
+def _attenuator_plan(second: float) -> tuple[Any, ...]:
+    return (
+        (
+            "S_SOURCE_GAUSSIAN_BEAM",
+            {
+                "shape": (32, 32),
+                "sample_pitch_m": (1.0e-6, 1.0e-6),
+                "wavelength_m": 5.5e-7,
+                "reference_surface": SURFACE,
+                "waist_radius_m": 6.0e-6,
+            },
+        ),
+        ("O_COMPLEX_TRANSMISSION", {"amplitude": 0.5}),
+        ("O_COMPLEX_TRANSMISSION", {"amplitude": second}),
+        ("M_PSF", {"normalization": "raw"}),
+    )
+
+
+def test_a_repeated_operation_binds_each_occurrence_independently() -> None:
+    """The failure the per-node request form exists to end, as a physical check.
+
+    Two elements at 0.5 and 0.25. The peak intensity is `(0.5 * 0.25)^2` of the
+    source's, and an executor that bound one `amplitude` to both nodes would return
+    `0.25^2` or `0.0625^2` instead -- which is what happened, silently, with every
+    node reading `completed`.
+    """
+    with Executor() as executor:
+        record = executor.execute(_attenuator_plan(0.25))
+        measured = executor.result
+    assert record.status == "completed", [
+        (node.operation_id, node.status, node.diagnostics) for node in record.nodes
+    ]
+    assert [entry["amplitude"] for entry in record.node_requests[1:3]] == [0.5, 0.25]
+    assert float(np.max(np.asarray(measured.intensity))) == pytest.approx(
+        (0.5 * 0.25) ** 2, rel=1e-5
+    )
+
+
+def test_the_two_occurrences_are_not_the_same_system_and_the_record_says_so() -> None:
+    """A fingerprint that ignored `node_requests` would call these one run.
+
+    Both plans are the same route, the same shared request (empty) and the same
+    node statuses. The *only* thing that distinguishes them is the per-node
+    arguments, so leaving those out of `fingerprinted` would answer "nothing
+    changed" about a physically different system.
+    """
+    with Executor() as executor:
+        weak = executor.execute(_attenuator_plan(0.25))
+        weak_peak = float(np.max(np.asarray(executor.result.intensity)))
+        strong = executor.execute(_attenuator_plan(0.5))
+        strong_peak = float(np.max(np.asarray(executor.result.intensity)))
+    assert weak.route == strong.route
+    assert weak_peak != strong_peak
+    assert weak.fingerprinted != strong.fingerprinted
+
+
+def test_a_nodes_own_request_does_not_fall_back_to_the_shared_one() -> None:
+    """The rule that makes a forgotten argument loud rather than silently shared.
+
+    `M_PSF` requires `normalization` and this node's request does not name it, while
+    the shared request does. A merge would run it with the shared value; the refusal
+    is the point -- an argument meant for one node reaching another is the failure
+    mode, not a convenience.
+    """
+    record = execute((("M_PSF", {"field": _overflowing_field()}),), request=WAVE_REQUEST)
+    assert record.status == "refused"
+    assert record.nodes[0].diagnostics.startswith("INCOMPLETE_REQUEST")
+    assert "normalization" in record.nodes[0].diagnostics
+
+
+def test_a_bare_id_still_reads_the_shared_request() -> None:
+    """The original form, unchanged, and mixed with the new one in one plan.
+
+    A bare id is bound from `request` exactly as before, which is what keeps every
+    caller that predates per-node requests running. Mixed with a pair, each node
+    reads its own source -- and `node_requests` then records the effective request
+    of every step, so nothing is left to be inferred about the bare one.
+    """
+    plan = ("S_SOURCE_GAUSSIAN_BEAM", ("M_PSF", {"normalization": "peak"}))
+    record = execute(plan, request=WAVE_REQUEST)
+    assert record.status == "completed"
+    assert len(record.node_requests) == 2
+    assert record.node_requests[0]["waist_radius_m"] == WAVE_REQUEST["waist_radius_m"]
+    assert record.node_requests[1] == {"normalization": "peak"}
+
+
+def test_the_result_is_what_the_last_node_produced_and_is_not_in_the_record() -> None:
+    """Criterion: the physical result comes back on the public API, beside the record.
+
+    `ExecutionRecord` is the serialized provenance model and a `PsfResult` cannot
+    go in it, so the result is read off the executor. What this pins is that the
+    two are consistent: a completed run has a result of the last node's type, and
+    the record still carries no field holding it.
+    """
+    from measurements import PsfResult
+
+    with Executor() as executor:
+        record = executor.execute(WAVE_PLAN, request=WAVE_REQUEST)
+        assert isinstance(executor.result, PsfResult)
+        assert np.array_equal(
+            np.asarray(executor.result.intensity), _physical(record)
+        )
+    assert not any("result" in name for name in record.__dataclass_fields__)
+
+
+def test_a_run_that_did_not_complete_has_no_result() -> None:
+    """A refusal must not leave a previous node's state readable as the answer.
+
+    The plan's first node completes and the second refuses. `result` is `None`, not
+    the field the source produced -- which would be a plausible-looking wrong
+    answer for the plan that was asked for.
+    """
+    with Executor() as executor:
+        record = executor.execute(("S_SOURCE_GAUSSIAN_BEAM", "M_PSF"), request={
+            key: value for key, value in WAVE_REQUEST.items() if key != "normalization"
+        })
+        assert record.status == "refused"
+        assert executor.result is None
+
+
+def test_the_result_is_cleared_by_the_next_run_and_by_reopening() -> None:
+    """It is a run's output, not something the executor keeps.
+
+    A second `execute` that refuses must not hand back the first run's result, and
+    neither may a reopened executor or a closed one. Every one of those is the
+    "fabricated result" failure with an extra step in front of it.
+    """
+    executor = Executor()
+    with executor:
+        executor.execute(WAVE_PLAN, request=WAVE_REQUEST)
+        assert executor.result is not None
+        executor.execute(("M_PSF",), request={})
+        assert executor.result is None
+    with executor:
+        assert executor.result is None
+        executor.execute(WAVE_PLAN, request=WAVE_REQUEST)
+        assert executor.result is not None
+    assert executor.result is None, "a closed executor still held the run's output"
+
+
+@pytest.mark.parametrize(
+    "rejected",
+    [(), (("M_PSF",),), ("X_INVENTED",)],
+    ids=["empty", "malformed", "uncatalogued"],
+)
+def test_a_plan_that_execute_rejects_clears_the_previous_result(rejected: Any) -> None:
+    """The raise paths clear it too, and that is not incidental.
+
+    `execute` refuses an empty plan, a malformed step and an uncatalogued id by
+    raising. A caller that catches one and then reads `result` would otherwise be
+    handed the *previous* run's object as the answer for a plan that never ran --
+    the same hazard as a pre-refusal node's state, one level up, and the reason the
+    clear happens before validation rather than after it.
+    """
+    with Executor() as executor:
+        executor.execute(WAVE_PLAN, request=WAVE_REQUEST)
+        assert executor.result is not None
+        with pytest.raises(ValueError):
+            executor.execute(rejected, request=WAVE_REQUEST)
+        assert executor.result is None
+
+
+@pytest.mark.parametrize(
+    ("plan", "expected"),
+    [
+        ((), "at least one operation"),
+        ((("M_PSF",),), "plan step 0"),
+        ((("M_PSF", 5),), "not a mapping"),
+        (((1, {}),), "not an operation id"),
+    ],
+)
+def test_a_malformed_plan_is_refused_by_step(plan: Any, expected: str) -> None:
+    """`normalize_plan` names the step, because a plan is long enough that it must.
+
+    Public for this reason: a caller -- or, later, whatever generates a plan -- can
+    be told which step is wrong without running anything.
+    """
+    with pytest.raises(ValueError, match=expected):
+        runtime.normalize_plan(plan)
+
+
+def test_per_node_requests_survive_the_serialization_round_trip() -> None:
+    """They are inputs, so a record that lost them would not describe its own run."""
+    record = execute(
+        ("S_SOURCE_GAUSSIAN_BEAM", ("M_PSF", {"normalization": "peak"})),
+        request=WAVE_REQUEST,
+    )
+    serializable = ExecutionRecord(
+        route=record.route,
+        request={"normalization": "peak"},
+        node_requests=({"waist_radius_m": 6.0e-6}, {"normalization": "peak"}),
+        nodes=record.nodes,
+        provenance={"code_fingerprint": {"files": {}}},
+    )
+    assert runtime.from_json(runtime.to_json(serializable)) == serializable
+    assert json.loads(runtime.to_json(serializable))["node_requests"][1] == {
+        "normalization": "peak"
+    }
+
+
+def test_a_per_node_request_that_does_not_align_with_the_route_is_refused() -> None:
+    """Aligned by index, so a short list would attribute a request to the wrong node."""
+    with pytest.raises(ValueError, match="aligned with `route` by index"):
+        ExecutionRecord(
+            route=("S_SOURCE_GAUSSIAN_BEAM", "M_PSF"),
+            node_requests=({"normalization": "peak"},),
+        )

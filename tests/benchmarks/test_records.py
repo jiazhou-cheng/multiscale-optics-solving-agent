@@ -72,8 +72,16 @@ def test_a_benchmark_imports_no_backend(script: Path) -> None:
         f"{script.relative_to(ROOT)} imports {sorted(BACKEND_IMPORTS & imported)}; a "
         "benchmark composes sources / operators / solvers.chromatix and nothing past them"
     )
-    # ...and it really does reach the project through the public packages.
-    assert {"sources", "operators"} <= imported
+    # ...and it really does reach the project through the public packages. Two
+    # shapes are accepted, and a benchmark matches one of them: importing the
+    # operation packages and calling them in order, which is how CHE-212 and
+    # CHE-213 were first written, or naming catalog ids and handing the plan to
+    # `runtime.Executor`, which imports no operation here at all. What neither
+    # shape may do is reach a backend, which is the assertion above.
+    assert any(
+        shape <= imported
+        for shape in ({"sources", "operators"}, {"operations", "planning", "runtime"})
+    ), f"{script.relative_to(ROOT)} composes neither directly nor through a plan: {imported}"
 
 
 def test_the_detector_would_catch_a_violation() -> None:

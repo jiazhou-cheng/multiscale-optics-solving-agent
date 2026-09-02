@@ -36,7 +36,14 @@ namespace root a top-level `io` package shadows the standard library's.
 Serialization is `records.to_json` / `records.from_json`.
 """
 
-from runtime.executor import SAMPLE_INTERVAL_S, Executor, execute, memory_snapshot
+from runtime.executor import (
+    SAMPLE_INTERVAL_S,
+    Executor,
+    PlanNode,
+    execute,
+    memory_snapshot,
+    normalize_plan,
+)
 from runtime.records import (
     FINGERPRINTED_PACKAGES,
     NODE_STATUSES,
@@ -62,10 +69,12 @@ __all__ = [
     "ExecutionRecord",
     "Executor",
     "NodeRecord",
+    "PlanNode",
     "environment_fingerprint",
     "execute",
     "from_json",
     "memory_snapshot",
+    "normalize_plan",
     "record_provenance",
     "require_stable_payload",
     "source_fingerprint",
