@@ -199,27 +199,30 @@ def test_every_catalog_record_names_a_declared_operation() -> None:
     )
 
 
-def test_one_record_per_implementation_and_kind_not_per_implementation() -> None:
-    """Acceptance criteria 4 and 9, which conflict literally and are reconciled here.
+def test_one_record_per_implementation() -> None:
+    """Acceptance criterion 4, no longer needing a reconciliation with criterion 9.
 
     Criterion 4 asks for "exactly one record" per declared operation; criterion 9
-    requires `S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` to be two records over one
-    callable. Both hold once uniqueness is keyed on `(implementation, kind)`
-    instead of on `implementation`: a callable may carry one record per kind -- the
-    backend it is, and the physical operation it performs -- and a second record of
-    the *same* kind over the same callable is the accidental duplicate the
-    criterion is protecting against.
+    required `S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` to be two records over one
+    callable, so uniqueness was keyed on `(implementation, kind)` to let both hold.
+    CHE-224 (R15.1) removed the conflict at its source rather than keeping the
+    compound key: the two records existed because `kind` was answering both "which
+    library runs" and "what happens to the state", and `backend` answers the first
+    now. The pair is merged, so the key is `implementation` alone.
+
+    The compound key was a real loophole while it lasted -- any callable could
+    acquire a second record under a different kind silently, which is exactly what
+    the "exactly one record" wording was guarding against.
     """
-    seen: dict[tuple[str, OperationKind], str] = {}
+    seen: dict[str, str] = {}
     for record in CATALOG:
-        key = (record.implementation, record.kind)
-        previous = seen.get(key)
+        previous = seen.get(record.implementation)
         assert previous is None, (
-            f"{record.operation_id} and {previous} are both {record.kind.value} records "
-            f"over {record.implementation}. One callable may carry one record per KIND; "
-            "two of one kind is a duplicate."
+            f"{record.operation_id} and {previous} are both records over "
+            f"{record.implementation}. One callable, one record: the pair that needed "
+            "two was two answers to two questions, and the second question is a field."
         )
-        seen[key] = record.operation_id
+        seen[record.implementation] = record.operation_id
 
 
 def test_the_counts_this_justification_rests_on() -> None:
@@ -310,46 +313,48 @@ def test_configure_execution_is_not_an_operation() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_two_records_may_share_one_callable_and_stay_distinct() -> None:
-    """Acceptance criterion 9, pinned as intended rather than tolerated.
+def test_the_pair_of_records_over_one_callable_is_gone() -> None:
+    """CHE-224 (R15.1) merged them, and this is the assertion that they stay merged.
 
-    One answers "what backend does this project drive, and in which measured
-    capability row"; the other answers "what happens to the physical state".
-    Neither is a coupler, and that is the substantive half: a coupler changes
-    representation while preserving physical state, and this changes physical state
-    while preserving the representation.
+    `S_WAVE_CHROMATIX` (`solver`) and `O_ASM_PROPAGATE` (`physical_operator`) both
+    resolved to `backends.chromatix.solver:propagate`. The old version of this test
+    pinned that as intended -- "one answers what backend does this project drive,
+    the other what happens to the physical state" -- and naming two questions was
+    the diagnosis rather than the justification. `backend` answers the first one now.
+
+    So what is pinned is the merge: the surviving record is the physical operator,
+    it declares the backend as a field, and it carries the scalar-model sentence the
+    deleted record contributed. `S_WAVE_CHROMATIX` must not come back, and the
+    uniqueness gate above -- one record per `implementation` -- is what stops any
+    callable acquiring a second record silently.
     """
     index = {record.operation_id: record for record in CATALOG}
-    solver = index["S_WAVE_CHROMATIX"]
+    assert "S_WAVE_CHROMATIX" not in index
+
     operator = index["O_ASM_PROPAGATE"]
-
-    assert solver.implementation == operator.implementation
-    assert solver.kind is OperationKind.SOLVER
+    assert operator.implementation == "backends.chromatix.solver:propagate"
     assert operator.kind is OperationKind.PHYSICAL_OPERATOR
-    assert OperationKind.COUPLER not in {solver.kind, operator.kind}
-    assert solver.approximation != operator.approximation
-    assert solver.validity != operator.validity
+    assert operator.backend == "chromatix"
+    assert operator.capabilities == "M_WAVE_CHROMATIX"
+    # The one claim the deleted record made that this one did not: what the SCALAR
+    # model omits, as distinct from what the angular-spectrum kernel approximates.
+    # Migrated rather than dropped, which is the half of a merge that gets lost.
+    for carried in ("no polarization", "no vectorial coupling", "complex64"):
+        assert carried in operator.approximation, carried
 
-    # And this is the ONLY callable with two records. Without this, the
-    # `(implementation, kind)` key above would let any callable acquire a second
-    # record under a different kind silently, which is the loophole the
-    # "exactly one record" wording was guarding. Sharing a callable is a real
-    # modelling claim -- that one function is both a backend and a physical
-    # operation -- and it should have to be argued into this set.
+    # And no callable has two records any more.
     counts: dict[str, int] = {}
     for record in CATALOG:
         counts[record.implementation] = counts.get(record.implementation, 0) + 1
-    assert {name for name, n in counts.items() if n > 1} == {
-        "backends.chromatix.solver:propagate"
-    }
+    assert {name for name, n in counts.items() if n > 1} == set()
 
 
 def test_the_three_operations_that_had_no_descriptor_now_have_one() -> None:
     """The gap CHE-221 measured: `trace_rays`, `gaussian_beam`, `spherical_wave`.
 
     Eleven descriptors existed in test fixtures and three landed operations had
-    none at all. Named individually here because "14 records" would pass with the
-    wrong fourteen.
+    none at all. Named individually here because "13 records" would pass with the
+    wrong thirteen.
     """
     by_implementation = {record.implementation: record for record in CATALOG}
     for implementation in (
@@ -379,10 +384,18 @@ def test_no_record_claims_a_gradient() -> None:
 def test_the_capability_citations_are_the_two_measured_rows_or_none() -> None:
     """A citation is validated at construction; this pins *which* rows are cited.
 
-    Only the two operations that drive an external backend cite a row. Everything
-    else is `None`, which is the honest citation rather than a missing one: a
-    coupler runs in whatever namespace the field it was handed carries, so citing
-    the chromatix row would claim a measurement taken about something else.
+    Only the operations that drive an external backend cite a row. Everything else
+    is `None`, which is the honest citation rather than a missing one: a coupler
+    runs in whatever namespace the field it was handed carries, so citing the
+    chromatix row would claim a measurement taken about something else.
+
+    Note that this is **not** the same question as `backend`, which CHE-224 (R15.1)
+    added: `capabilities` cites a *measured* device/dtype row, and a
+    backend-driving operation with no measured row of its own would carry a
+    `backend` and `capabilities=None`. The two happen to coincide across all
+    thirteen records today, and
+    `test_the_backend_field_and_the_capability_citation_are_different_questions` is
+    where that coincidence is stated as a coincidence.
     """
     cited = {r.implementation.rsplit(".", 1)[0]: r.capabilities for r in CATALOG}
     assert cited["backends.optiland"] == "M_RAY_OPTILAND"
@@ -518,13 +531,17 @@ def test_the_walk_would_catch_a_violation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 6. The eight planner questions, answered from metadata alone. CHE-222 (R03.5).
+# 6. The nine planner questions, answered from metadata alone. CHE-222 (R03.5).
 # ---------------------------------------------------------------------------
 #
-# Each of these is one of the eight questions `operations/descriptors.py` names as
-# the specification for the schema's field list. They are asserted against the
-# **shipped catalog**, from metadata only -- no signature inspection, no import of
-# an implementation -- because that is the situation a planner is in.
+# Each of these is one of the nine questions `operations/descriptors.py` names as
+# the specification for the schema's field list. Question 9 -- which backend
+# executes this -- is CHE-224 (R15.1)'s, and it is section 7 below, because its
+# gate is an agreement between two fields rather than a property of one.
+#
+# They are asserted against the **shipped catalog**, from metadata only -- no
+# signature inspection, no import of an implementation -- because that is the
+# situation a planner is in.
 #
 # `tests/operations/test_catalog_signatures.py` is the other half: it derives the
 # same four tuples from `inspect.signature` and compares, so what is asserted here
@@ -555,11 +572,12 @@ def test_question_1_is_an_upstream_representation_edge_required() -> None:
     """
     entries = {record.operation_id for record in CATALOG if record.is_graph_entry}
     assert entries == GRAPH_ENTRIES
-    assert len(CATALOG) - len(entries) == 10
-    # Every entry is `solver`-kind, which is what `ENTRY_KINDS` enforces.
+    assert len(CATALOG) - len(entries) == 9
+    # Every entry is `source`-kind, which is what `ENTRY_KINDS` enforces. It was
+    # `solver`-kind until CHE-224 (R15.1), for want of a `SOURCE` member.
     for record in CATALOG:
         if record.is_graph_entry:
-            assert record.kind is OperationKind.SOLVER, record.operation_id
+            assert record.kind is OperationKind.SOURCE, record.operation_id
     assert operations.find(entry=True) == tuple(
         sorted((r for r in CATALOG if r.is_graph_entry), key=lambda r: r.operation_id)
     )
@@ -574,7 +592,7 @@ def test_question_2_the_two_one_port_operations_are_distinguishable() -> None:
     planner would use to tell them apart.
     """
     index = {record.operation_id: record for record in CATALOG}
-    supplied = index["S_RAY_OPTILAND_BUNDLE"]
+    supplied = index["O_RAY_TRACE"]
     advanced = index["O_PROPAGATE_RAYS"]
 
     assert supplied.inputs == advanced.inputs == ("ray_bundle",)
@@ -589,11 +607,12 @@ def test_question_2_the_two_one_port_operations_are_distinguishable() -> None:
 
 
 def test_question_3_every_required_value_is_named() -> None:
-    """Twelve of the fourteen need a value the old schema never mentioned.
+    """Eleven of the thirteen need a value the old schema never mentioned.
 
     The ticket says nine, from a table written before three of these records
-    existed; the measured figure is twelve, and the two exceptions are named at the
-    bottom of this test. Asserted as the exact set rather than a count, because "n
+    existed; the measured figure was twelve of fourteen and is eleven of thirteen
+    since CHE-224 (R15.1) merged `S_WAVE_CHROMATIX` away. The two exceptions are
+    named at the bottom of this test. Asserted as the exact set rather than a count, because "n
     records have a requirement" would pass with the wrong n. `psf` is the sharpest small case:
     `normalization` is keyword-only with no default and which one was used is the
     subject of three of R11's acceptance criteria, so a runtime must not pick.
@@ -605,12 +624,11 @@ def test_question_3_every_required_value_is_named() -> None:
         "O_DIFFRACTIVE_SURFACE",
         "O_FOCAL_PLANE_TRANSFORM",
         "O_PROPAGATE_RAYS",
+        "O_RAY_TRACE",
         "S_RAY_OPTILAND",
-        "S_RAY_OPTILAND_BUNDLE",
         "S_SOURCE_GAUSSIAN_BEAM",
         "S_SOURCE_PLANE_WAVE",
         "S_SOURCE_SPHERICAL_WAVE",
-        "S_WAVE_CHROMATIX",
         "C_RAY_TO_SCALAR",
     }
     index = {record.operation_id: record for record in CATALOG}
@@ -625,7 +643,7 @@ def test_question_3_every_required_value_is_named() -> None:
 
 
 def test_question_4_the_optional_set_is_names_and_not_values() -> None:
-    """`diffractive_surface` reports 16; `trace_rays` reports none.
+    """`diffractive_surface` reports 16; `trace_rays` (`O_RAY_TRACE`) reports none.
 
     Names only, checked by absence: no `optional` member carries an `=`, a repr or
     anything else that would be a mirrored default. Seventeen mirrored defaults
@@ -633,7 +651,7 @@ def test_question_4_the_optional_set_is_names_and_not_values() -> None:
     """
     index = {record.operation_id: record for record in CATALOG}
     assert len(index["O_DIFFRACTIVE_SURFACE"].optional) == 16
-    assert index["S_RAY_OPTILAND_BUNDLE"].optional == ()
+    assert index["O_RAY_TRACE"].optional == ()
     assert index["S_RAY_OPTILAND"].optional == ("aiming",)
     for record in CATALOG:
         for name in record.optional:
@@ -641,14 +659,14 @@ def test_question_4_the_optional_set_is_names_and_not_values() -> None:
 
 
 def test_question_5_the_primary_result_is_one_field_access() -> None:
-    """No `operation_id` switch anywhere, for any of the fourteen."""
+    """No `operation_id` switch anywhere, for any of the thirteen."""
     for record in CATALOG:
         assert record.primary_output == record.returns[0]
         assert record.primary_output in ("ray_bundle", "scalar_field", "psf")
 
 
 def test_question_6_auxiliary_returns_are_exactly_the_three_that_have_them() -> None:
-    """True for the two couplers and the diffractive surface; false for the other 11.
+    """True for the two couplers and the diffractive surface; false for the other 10.
 
     `output="ray_bundle"` used to read identically for `propagate_rays`, which
     returns a bundle, and `diffractive_surface`, which returns a 2-tuple. A runtime
@@ -680,3 +698,136 @@ def test_question_8_no_record_declares_a_port_by_a_name_alone() -> None:
             assert port in ("ray_bundle", "scalar_field"), record.operation_id
         if record.is_graph_entry:
             assert record.inputs == (), record.operation_id
+
+
+# ---------------------------------------------------------------------------
+# 7. The backend axis. CHE-224 (R15.1).
+# ---------------------------------------------------------------------------
+#
+# Question 9 of the schema's specification, and the three gates that keep it from
+# collapsing back into `kind`. Before this ticket a backend was an operation kind,
+# which put "who executes" and "what happens to physical state" in one field; the
+# three checks below are the ones that make the separation checkable rather than
+# a convention.
+
+
+def test_g1_the_backend_field_agrees_with_the_module_path() -> None:
+    """A record's declared backend matches where its implementation lives.
+
+    Declared rather than derived -- `operations/descriptors.py` gives the reason,
+    which is `check_dependencies.LANDED`'s -- so this is the agreement check that
+    makes the declaration safe to trust.
+
+    **The string is parsed, never imported.** `operations/` has no edge to
+    `backends/`, and resolving these paths would load torch and JAX, which is the
+    one property the package exists to provide. That is also why this test lives
+    here rather than in `test_catalog_resolution.py`.
+    """
+    for record in CATALOG:
+        module = record.implementation.split(":", 1)[0]
+        if module.startswith("backends."):
+            expected = module.split(".")[1]
+            assert record.backend == expected, (
+                f"{record.operation_id} implements {module} but declares "
+                f"backend={record.backend!r}; the package it lives in says {expected!r}"
+            )
+        else:
+            assert record.backend is None, (
+                f"{record.operation_id} declares backend={record.backend!r} but "
+                f"implements {module}, which is project-owned code driving no external "
+                "library. `None` is what a record with no backend says."
+            )
+
+    # Not vacuous in either direction: some records declare a backend and some
+    # declare none, so neither branch above is the only one that ever runs.
+    declared = {r.backend for r in CATALOG}
+    assert declared == {None, "optiland", "chromatix"}
+
+
+def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
+    """`S_` source, `O_` physical operator, `C_` coupler, `M_` measurement.
+
+    The defect this closes is that `S_` used to mean two things: `S_RAY_OPTILAND`
+    was `S_` for solver and `S_SOURCE_PLANE_WAVE` was `S_` for source, and `kind`
+    read `solver` for both, so nothing could tell them apart. Once `SOURCE` exists
+    the prefix can carry one meaning, and `S_RAY_OPTILAND_BUNDLE` -- a `ray_bundle`
+    port, so not a source under any reading -- was renamed to `O_RAY_TRACE` in the
+    same change rather than left as the defect from the other side.
+    """
+    prefixes = {
+        "S_": OperationKind.SOURCE,
+        "O_": OperationKind.PHYSICAL_OPERATOR,
+        "C_": OperationKind.COUPLER,
+        "M_": OperationKind.MEASUREMENT,
+    }
+    for record in CATALOG:
+        prefix = record.operation_id[:2]
+        assert prefix in prefixes, (
+            f"{record.operation_id} starts with {prefix!r}, which is not one of "
+            f"{sorted(prefixes)}"
+        )
+        assert record.kind is prefixes[prefix], (
+            f"{record.operation_id} is {record.kind.value} but its {prefix!r} prefix "
+            f"says {prefixes[prefix].value}"
+        )
+    # Every kind is actually exercised, so the loop is not passing on three of four.
+    assert {r.kind for r in CATALOG} == set(OperationKind)
+
+
+def test_g3_every_source_is_an_entry_and_every_entry_is_a_source() -> None:
+    """Redundant with `ENTRY_KINDS` in one direction, and it is the cheap half.
+
+    `ENTRY_KINDS` refuses `inputs=()` on a non-source at construction, so the
+    entry-implies-source direction cannot fail. The other direction is what this
+    adds: a `SOURCE` that declared a port would satisfy every construction check,
+    and `S_RAY_OPTILAND_BUNDLE` was exactly that shape under the old taxonomy -- a
+    `solver` with a `ray_bundle` port, in a set where `solver` was also the entry
+    kind. That is the state defect 4 came from, and this is the assertion that stops
+    it coming back.
+    """
+    sources = {r.operation_id for r in CATALOG if r.kind is OperationKind.SOURCE}
+    entries = {r.operation_id for r in CATALOG if r.is_graph_entry}
+    assert sources == entries == GRAPH_ENTRIES
+    for record in CATALOG:
+        assert (record.kind is OperationKind.SOURCE) == (record.inputs == ()), (
+            record.operation_id,
+            record.kind.value,
+            record.inputs,
+        )
+
+
+def test_the_backend_field_and_the_capability_citation_are_different_questions() -> None:
+    """They coincide across all thirteen records, and that is a fact not a rule.
+
+    `backend` names the library that runs; `capabilities` cites a *measured*
+    device/dtype row. A backend-driving operation whose device behaviour nobody has
+    probed would carry a `backend` and `capabilities=None`, and nothing should
+    prevent it -- so the coincidence is asserted as the current state rather than
+    enforced as an invariant, and the schema is checked for not conflating them.
+    """
+    import dataclasses
+
+    fields = {f.name for f in dataclasses.fields(OperationDescriptor)}
+    assert {"backend", "capabilities"} <= fields, "two fields, two questions"
+
+    for record in CATALOG:
+        if record.capabilities is not None:
+            assert record.backend is not None, (
+                f"{record.operation_id} cites a measured row but drives no backend, "
+                "which is possible in principle and is not the current state"
+            )
+    assert {r.operation_id for r in CATALOG if r.backend and not r.capabilities} == set()
+
+
+def test_no_record_and_no_id_says_solver_any_more() -> None:
+    """The acceptance criterion, stated over the shipped catalog.
+
+    `solver` is not a kind, not an id prefix and not a package name. The word may
+    still appear in prose -- an external ray-tracing library is a solver, and
+    `backends.optiland.solver` is a module -- and what must not appear is a *kind*
+    or an *identity* claiming it.
+    """
+    assert "solver" not in {kind.value for kind in OperationKind}
+    for record in CATALOG:
+        assert "SOLVER" not in record.operation_id, record.operation_id
+        assert record.kind.value != "solver"

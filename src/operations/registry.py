@@ -80,8 +80,10 @@ def _build_index(
                 f"{descriptor.operation_id!r} appears twice in the catalog, as "
                 f"{existing.implementation!r} and {descriptor.implementation!r}. Ids are "
                 "unique; keeping one of the two would make the answer depend on "
-                "declaration order. Two records MAY name one callable -- "
-                "S_WAVE_CHROMATIX and O_ASM_PROPAGATE do -- but they need two ids."
+                "declaration order. A callable may carry more than one record only "
+                "with more than one id, and since CHE-224 (R15.1) none does: the one "
+                "pair that did was two answers to two different questions, and the "
+                "second question now has its own field."
             )
         index[descriptor.operation_id] = descriptor
     return index
@@ -106,7 +108,7 @@ def find(
 
     No argument enumerates the whole catalog, which is what makes "listing
     everything imports no backend" a statement about a real call -- and since
-    CHE-221 it is a statement about fourteen real records naming `optiland` and
+    CHE-221 it is a statement about thirteen real records naming `optiland` and
     `chromatix`, rather than about an empty dict.
 
     An unknown semantic type or kind is an error, not an empty result. A query

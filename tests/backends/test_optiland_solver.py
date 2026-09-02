@@ -432,7 +432,12 @@ def test_the_descriptor_says_forward_only() -> None:
     package cannot check for itself.
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND")
-    assert descriptor.kind is OperationKind.SOLVER
+    # `SOURCE` since CHE-224 (R15.1), `SOLVER` before it. It consumes no upstream
+    # representation -- an `OpticalSetup` is a constructor argument, not a port --
+    # which is this project's definition of a source, and the fact that it drives
+    # a backend is `backend` rather than a kind.
+    assert descriptor.kind is OperationKind.SOURCE
+    assert descriptor.backend == "optiland"
     assert descriptor.implementation == "backends.optiland.solver:trace"
     assert descriptor.derivative == DERIVATIVE == "forward_only"
     assert descriptor.derivative_evidence is None
@@ -448,14 +453,26 @@ def test_the_supplied_bundle_entry_point_has_its_own_record() -> None:
     `trace_rays` consumes an ensemble the caller already holds. A planner choosing
     between them is choosing between different inputs, which is why they are two
     ids rather than one with a mode argument.
+
+    **The id is `O_RAY_TRACE` since CHE-224 (R15.1), and the kind is
+    `PHYSICAL_OPERATOR`.** It was `S_RAY_OPTILAND_BUNDLE` and `SOLVER`, and both
+    halves were wrong once `SOURCE` existed: this record declares a `ray_bundle`
+    port, so it is not a source under any reading, and an `S_` prefix on a
+    non-source is the same defect as `S_` meaning two things -- from the other
+    side. What it does to the state is what it is: the geometry evolves and the
+    optical path composes, which is a physical operator. That it happens to be
+    Optiland doing the evolving is `backend`.
     """
-    descriptor = next(d for d in CATALOG if d.operation_id == "S_RAY_OPTILAND_BUNDLE")
-    assert descriptor.kind is OperationKind.SOLVER
+    descriptor = next(d for d in CATALOG if d.operation_id == "O_RAY_TRACE")
+    assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
+    assert descriptor.backend == "optiland"
+    assert descriptor.inputs == ("ray_bundle",), "a port, which is why it is not a source"
     assert descriptor.implementation == "backends.optiland.solver:trace_rays"
     assert descriptor.capabilities == CAPABILITIES
     assert descriptor.derivative == DERIVATIVE
     assert descriptor.validity, "the supplied-bundle path has real preconditions"
-    assert resolve("S_RAY_OPTILAND_BUNDLE") is trace_rays
+    assert resolve("O_RAY_TRACE") is trace_rays
+    assert "S_RAY_OPTILAND_BUNDLE" not in {d.operation_id for d in CATALOG}
 
 
 def test_there_is_no_gradient_knob() -> None:

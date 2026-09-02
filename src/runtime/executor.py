@@ -896,7 +896,7 @@ def _requested_placement(request: Mapping[str, Any]) -> dict[str, str]:
     Read out of `request["execution"]` and not from top-level `request["device"]`,
     which is where the first version looked and where nothing puts them: every
     landed operation that takes a placement takes it as an `execution` mapping
-    (`S_RAY_OPTILAND`, `S_RAY_OPTILAND_BUNDLE`), so top-level keys were both never
+    (`S_RAY_OPTILAND`, `O_RAY_TRACE`), so top-level keys were both never
     populated *and* silently dropped from the call -- neither port, required nor
     optional -- while still being recorded as "requested". A record claiming a
     request that reached nothing is worse than one claiming nothing.

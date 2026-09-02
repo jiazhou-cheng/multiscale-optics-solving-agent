@@ -243,7 +243,7 @@ def test_the_surviving_pack_uses_the_four_operation_kinds() -> None:
 
     text = (ROOT / "knowledge" / "README.md").read_text(encoding="utf-8")
     kinds = {kind.value for kind in OperationKind}
-    assert kinds == {"solver", "coupler", "physical_operator", "measurement"}
+    assert kinds == {"source", "coupler", "physical_operator", "measurement"}
     # No pack card in the surviving tree, so no card can miscategorize one.
     cards = list((ROOT / "knowledge").rglob("card.yaml"))
     assert cards == [], f"a pack card is back without a taxonomy review: {cards}"

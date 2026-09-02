@@ -183,10 +183,11 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   covered it -- but it did change what this package *is*, and R05.8 changed it
 #:   back to one representation. **A new row in `ALLOWED`, and therefore a
 #:   deliberate architecture change**, decided by the
-#:   owner on that ticket rather than assumed here. A source maps a problem
-#:   statement into a representation -- the definition of a `solver`, which is what
-#:   its operations register as -- but it has no external backend, and
-#:   `backends/<backend>/` is organized per backend. The three alternatives were each
+#:   owner on that ticket rather than assumed here. A source initializes a
+#:   representation from source parameters alone -- `source` is its own operation
+#:   kind since CHE-224 (R15.1), and was `solver` before it -- but it has no
+#:   external backend, and `backends/<backend>/` is organized per backend. The
+#:   three alternatives were each
 #:   worse: `representations/` would own physics it exists only to declare,
 #:   `operators/` is wrong by definition because an operator *consumes* a
 #:   representation, and widening an existing package's remit to make a source fit

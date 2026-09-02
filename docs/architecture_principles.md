@@ -34,9 +34,14 @@ consume and produce representations, problems, or measurements — with one
 asymmetric case: a **source** produces a representation without consuming one,
 because it *initializes* physical state rather than transforming it (§2).
 
-There are four operation kinds — `solver`, `coupler`, `physical_operator`, and
+There are four operation kinds — `source`, `coupler`, `physical_operator`, and
 `measurement` — and they are **descriptor metadata, not four class hierarchies**.
 The kind is a field on one operation descriptor.
+
+A **backend** is not among them. Which third-party library executes an operation
+is a separate axis from what the operation does to physical state, and it is a
+separate field: `OperationDescriptor.backend`. CHE-224 (R15.1) separated the two;
+see the `backend` term in §2.
 
 The previous implementation expressed these kinds as families of base classes,
 request/result envelopes, and per-family diagnostics. The clean rewrite must not
@@ -75,15 +80,50 @@ representation. Coherence is a *stronger contract* on the ray representation
 (e.g. `require_coherent()`), not a subtype, unless a concrete implementation
 issue shows that distinct runtime identity is required.
 
-### solver
+### backend
 
-Maps a **problem** into a physical representation. A solver adapter is the
-boundary at which an external backend's API, conventions, compatibility logic, or
-version requirements may appear.
+An **adapter package that provides operations of the other kinds, and is not
+itself an operation kind.** A backend adapter is the boundary at which an external
+library's API, conventions, compatibility logic, or version requirements may
+appear, and the only place in the tree permitted to import that library. Backend
+imports belong in `backends/<backend>/`.
 
-**Boundary against *coupler*:** a solver is where an external solver enters the
-system; a coupler is repository-owned physics between representations. Backend
-imports belong in `backends/<backend>/` once that adapter exists.
+**Boundary against *operation kind*:** a backend answers **who executes**; a kind
+answers **what happens to physical state**. Every operation has exactly one of
+each, and they are two fields — `backend` and `kind` — not one. A backend does not
+appear in `OperationKind` at all: `backends/optiland/` provides one `source`
+(`S_RAY_OPTILAND`) and one `physical_operator` (`O_RAY_TRACE`), and a
+backend-provided `measurement` would live there too. The package a callable lives
+in follows its **provider**; its kind is declared in the catalog.
+
+**Boundary against *coupler*:** a backend adapter is where an external solver
+enters the system; a coupler is repository-owned physics between representations.
+
+*[JUDGEMENT]* **This term replaced a `solver` term on CHE-224 (R15.1), and the
+change is recorded rather than substituted.** The old term read "Maps a
+**problem** into a physical representation", with `solver` as one of the four
+operation kinds. What went wrong is that this definition and the boundary beneath
+it were about two different things: mapping a problem into a representation is a
+statement about state, and owning an external library's API is a statement about
+who executes. `coupler`, `physical_operator` and `measurement` are all the first
+kind of statement, so `solver` sat on a different axis from the other three.
+
+Three consequences were live in the tree, not hypothetical. `source` — a term this
+section has always defined — had no member in `OperationKind`, so all three source
+records declared `kind=solver`. The `S_` id prefix therefore meant "solver" on
+`S_RAY_OPTILAND` and "source" on `S_SOURCE_PLANE_WAVE`, and `kind` read `solver`
+for both. And `backends.chromatix.solver:propagate` needed **two** catalog records,
+because one field was answering two questions; `operations/catalog.py` said so in
+its own docstring.
+
+What replaces it: `backend` is a provider, defined above; `source` is the kind, and
+its definition below did not change a word. A solver adapter's *problem-driven
+solve* is a `source` — it consumes no upstream **representation**, which is what
+that definition has always required — and the fact that it drives a library is
+carried by `backend`. See `ENTRY_KINDS` in `operations/descriptors.py` for the
+structural argument, which is that an `OpticalSetup` is a constructor argument and
+not a port, so the schema cannot distinguish `S_RAY_OPTILAND` from
+`S_SOURCE_PLANE_WAVE` and used to claim it could.
 
 ### source
 
@@ -112,9 +152,13 @@ aimer, so the launch state is a property of **source + system + backend**.
 A `RayBundle` built from caller-supplied points and a shared direction, with no
 system in scope, cannot say whether those points are the entrance pupil, the
 stop, the first traced surface, a valid finite-conjugate aim, or anything in the
-constructed system at all. That is why ray launch is a **solver** operation —
+constructed system at all. That is why ray launch belongs to the **backend** —
 backend ownership beats taxonomy — and why it takes the constructed system as a
-required argument. It is `backends/optiland/launch.py` today.
+required argument. It is `backends/optiland/launch.py` today, and it is not in the
+catalog: it takes native solver state, and a public launch operation needs a
+neutral signature first. (This sentence read "is a **solver** operation" until
+CHE-224 (R15.1); `solver` was the operation kind then, and the claim it was making
+was about which package owns the code.)
 
 Note precisely what this does and does not narrow. `sources/` may still
 initialize any representation whose state is genuinely determined by source
@@ -139,11 +183,12 @@ is why it has its own package and its own row in §3.
 a source may live in `problems/`; the constructor that turns it into state is the
 source. A source may read a problem; it is not one.
 
-**Kind:** `solver`. A source maps a problem statement into a representation, which
-is this document's definition of a solver, and there is no fifth operation kind.
-What separates `sources/` from `backends/<backend>/` is that a source has **no
-external backend**: it is the project's own arithmetic on the project's own grid,
-so per-backend organization has nothing to organize.
+**Kind:** `source`, which is its own member of `OperationKind` since CHE-224
+(R15.1) and was `solver` before it. What separates `sources/` from
+`backends/<backend>/` is not the kind — both provide `source`-kind operations —
+but the **provider**: a source in `sources/` has **no external backend**, so its
+descriptor carries `backend=None`, and it is the project's own arithmetic on the
+project's own grid, which per-backend organization has nothing to organize.
 
 `sources/` is **representation-independent at the package level and
 representation-explicit at each public operation.** A source operation may
@@ -169,8 +214,11 @@ function that returns a launch `RayBundle` while importing nothing at all.
 made it able to.** `OperationDescriptor.inputs` is a tuple of representation ports,
 and `()` means this operation consumes no upstream representation. The three
 sources and the problem-driven ray solve declare it, and `ENTRY_KINDS` restricts
-`()` to `solver`-kind — a coupler with no input would change the representation of
+`()` to `source`-kind — a coupler with no input would change the representation of
 nothing, an operator the state of nothing, a measurement would observe nothing.
+(It restricted `()` to `solver`-kind until CHE-224 (R15.1), which **contradicted
+the sentence above it**: that set had to name `solver` because there was no
+`SOURCE` member to name.)
 
 This paragraph used to be a `[LANDING GATE]` recording the opposite: that
 `OperationDescriptor.input` had no vocabulary for "no input representation", so a
@@ -224,7 +272,7 @@ reading discovery metadata does not import solver backends.
 *[JUDGEMENT]* Every classification in this section.
 
 *[LANDING GATE]* When the relevant package lands, backend imports must stay
-inside solver adapters and discovery metadata must not require importing
+inside backend adapters and discovery metadata must not require importing
 implementation packages. Add executable dependency/import tests with that
 surface.
 

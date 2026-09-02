@@ -9,11 +9,13 @@ the only operation in the graph with no input representation.
 
 `sources/` is a **new package**, landed by CHE-210 (R06.5) as a deliberate
 architecture change with the owner's decision. Its operations register as
-`solver`-kind, because mapping a problem statement into a representation is what
-that document calls a solver and there is no fifth operation kind; what separates
-this package from `backends/<backend>/` is that a source has no external backend,
-so per-backend organization has nothing to organize. Section 3 records why each
-alternative home was worse.
+`source`-kind, which is its own member of `OperationKind` since CHE-224 (R15.1)
+and was `solver` before it -- not because a source changed, but because the enum
+had no `source` member to put them in. What separates this package from
+`backends/<backend>/` is therefore **not the kind**: both provide `source`-kind
+operations, and what differs is the provider, since a source here has no external
+backend and its descriptors carry `backend=None`. Per-backend organization has
+nothing to organize. Section 3 records why each alternative home was worse.
 
 The allowlist row is `sources/ -> problems, representations, numerics`. Only the
 last two are exercised today: a source *declaration* belongs in `problems/` when
@@ -198,8 +200,10 @@ upstream representation, and until that ticket the descriptor had no way to say 
 `S_SOURCE_PLANE_WAVE` carried `input="scalar_field"` -- the representation it
 *produces*, named on both sides -- which contradicted this package's own docstring,
 `docs/architecture_principles.md` §2 and the signature. The schema now refuses a
-non-`solver` kind with no input, so "produces without consuming" is a checked
-declaration rather than a convention.
+non-`source` kind with no input, so "produces without consuming" is a checked
+declaration rather than a convention. (`ENTRY_KINDS` read `{"solver"}` until
+CHE-224 (R15.1), which contradicted the sentence this paragraph is about; the
+refusal was the same one, admitting the wrong kind's name.)
 
 **This package still does not import `operations/`, and does not need to.** The
 catalog lives inside `operations/` and names each implementation as a

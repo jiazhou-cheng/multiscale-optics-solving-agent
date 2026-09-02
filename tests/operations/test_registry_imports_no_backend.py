@@ -44,7 +44,7 @@ def _modules_after(statement: str) -> set[str]:
 def test_importing_operations_pulls_no_backend() -> None:
     """And it is no longer importing an empty package: the catalog is built here.
 
-    `operations/__init__.py` imports `catalog`, which constructs fourteen
+    `operations/__init__.py` imports `catalog`, which constructs thirteen
     descriptors naming two backends. That construction is what used to be the
     fixture's job, and it happens at import with nothing loaded.
     """
@@ -63,7 +63,7 @@ def test_enumerating_the_whole_catalog_pulls_no_backend() -> None:
 import operations
 
 found = operations.find()
-assert len(found) == 14, found
+assert len(found) == 13, found
 for descriptor in found:
     # Read every field of every descriptor.
     assert descriptor.implementation and descriptor.approximation
@@ -73,9 +73,9 @@ for descriptor in found:
     assert descriptor.inputs is not None and descriptor.requires is not None
     assert descriptor.is_graph_entry in (True, False)
     _ = descriptor.capabilities, descriptor.cost, descriptor.derivative_evidence
-assert operations.find(input="ray_bundle", kind="solver")
+assert operations.find(input="ray_bundle", kind="physical_operator")
 assert operations.find(kind="coupler")
-assert len(operations.registered_ids()) == 14
+assert len(operations.registered_ids()) == 13
 """
     )
     assert not loaded & set(BACKENDS), (
@@ -88,7 +88,7 @@ def test_resolving_every_operation_still_loads_no_backend() -> None:
     """Measured, and stronger than the criterion asks for -- so it is recorded here.
 
     `resolve` is the only call in `operations/` *permitted* to import a backend.
-    It turns out that resolving all fourteen imports none, because every adapter
+    It turns out that resolving all thirteen imports none, because every adapter
     defers its own backend import into a function body: `backends/optiland/system.py`
     has `_import_optiland_construction`, and importing the module gives a caller
     the neutral signature without paying for torch.
@@ -125,10 +125,11 @@ def test_the_check_would_notice_a_backend() -> None:
         """
 import operations
 
-descriptor = operations.find(input="ray_bundle", kind="solver")[0]
+descriptor = operations.find(output="ray_bundle", kind="source")[0]
 implementation = operations.resolve(descriptor.operation_id)
 assert callable(implementation)
 assert descriptor.implementation.startswith("backends.optiland")
+assert descriptor.backend == "optiland"
 
 # What executing it would do. Imported explicitly so the probe below is testing
 # the probe, not the adapter's laziness.

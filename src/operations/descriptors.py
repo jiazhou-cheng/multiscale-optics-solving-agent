@@ -9,7 +9,7 @@ cheap.
 
 Why the kind is a field and not a hierarchy
 -------------------------------------------
-`solver`, `coupler`, `physical_operator` and `measurement` differ in what they
+`source`, `coupler`, `physical_operator` and `measurement` differ in what they
 *mean physically*, not in what a caller does with the record. Discovery,
 capability queries and lazy resolution are identical for all four, so four
 subclasses would share every field and override nothing. The distinction that
@@ -55,8 +55,8 @@ that consumes no bundle. Both contradicted the code, `sources/__init__.py` and
 `docs/architecture_principles.md` §2, which all say a source is the one operation
 with no input.
 
-The fields below are the minimum that answers eight questions and nothing else.
-The specification *is* those eight questions -- a field that answers none of them
+The fields below are the minimum that answers nine questions and nothing else.
+The specification *is* those nine questions -- a field that answers none of them
 does not belong here, which is the discipline this record's own docstring already
 demanded and had no list to check against:
 
@@ -66,11 +66,20 @@ demanded and had no list to check against:
 4. which parameters are optional?                -> `optional`
 5. what is the primary returned value?           -> `primary_output`
 6. is auxiliary data also returned?              -> `returns_auxiliary`
-7. do two records over one callable stay distinct? -> `operation_id`, below
+7. what identifies an operation for planning and for a run record? ->
+   `operation_id`. This question used to read "do two records over one callable
+   stay distinct?", which no record needs any more; see below.
 8. does any record claim an input its callable does not take? -> nothing here;
    `tests/operations/test_catalog_signatures.py` derives all four tuples from the
    resolved signature and compares, so the answer is checked against the code
    rather than against a table.
+9. which backend executes this, without resolving the implementation? -> `backend`
+
+Question 9 is CHE-224 (R15.1)'s, and adding it removed a field rather than
+adding one on balance: the catalog lost a record. It is a *separate* question from
+1-8, all of which are about physical state and arguments, and that separateness is
+the point -- see `OperationKind` on why `solver` was never an answer to any of
+them.
 
 `input` and `output` are **gone**, not aliased. Shipping `input` beside `inputs`
 as a convenience would put two spellings of one fact in one dataclass, which is
@@ -87,14 +96,29 @@ arguments. `requires` and
 of the public contract rather than decoration, which is why the names are carried
 verbatim from the signature.
 
-Semantic identity is not implementation identity
-------------------------------------------------
-Two descriptors may name one callable and remain two distinct planning choices.
-`S_WAVE_CHROMATIX` (`solver`) and `O_ASM_PROPAGATE` (`physical_operator`) both
-resolve to `backends.chromatix.solver:propagate` with different `approximation` and
-`validity`: one answers "what backend does this project drive", the other "what
-happens to the physical state". **Nothing may deduplicate the catalog by
-implementation string.** The id is the planning identity.
+One record per callable, once the two questions were separated
+--------------------------------------------------------------
+This section used to read "Semantic identity is not implementation identity" and
+argued that two descriptors may name one callable and remain two distinct planning
+choices: `S_WAVE_CHROMATIX` (`solver`) and `O_ASM_PROPAGATE` (`physical_operator`)
+both resolved to `backends.chromatix.solver:propagate` with different
+`approximation` and `validity`, because "one answers 'what backend does this
+project drive', the other 'what happens to the physical state'".
+
+**Both halves of that sentence were true, and together they were the diagnosis
+rather than the justification.** Two questions were being asked of one field, so
+the only way to answer both was two records over one function -- and a planner
+reading the catalog saw two routes where the tree has one callable. CHE-224
+(R15.1) gave the first question its own field, `backend`, and `S_WAVE_CHROMATIX`
+was deleted: `O_ASM_PROPAGATE` carries `backend="chromatix"` and says everything
+the pair said between them.
+
+So the rule is now the plain one. **One record per `implementation`**, checked by
+`tests/operations/test_catalog.py`. The id remains the planning identity and
+nothing deduplicates the catalog by implementation string -- but nothing needs to,
+because no two records share one. A future callable that genuinely needs two
+records would be a modelling claim to argue on its own ticket, not a shape this
+schema is holding open.
 
 Nothing here imports a backend, and since CHE-223 (R03.6) this module imports
 nothing from this project at all: `implementation` is a string, `capabilities` is a
@@ -124,9 +148,21 @@ class OperationKind(StrEnum):
     Exactly four members, and the set is closed: these are the four operation
     kinds `docs/architecture_principles.md` defines. A fifth kind is an
     architecture change, not a registry entry.
+
+    **`SOLVER` became `SOURCE` on CHE-224 (R15.1)**, and the count did not change.
+    `solver` was never answering the question this field asks. It described *who
+    executes* -- an adapter over an external library -- while `coupler`,
+    `physical_operator` and `measurement` all describe *what happens to physical
+    state*, so one member of a four-member set was on a different axis from the
+    other three. The consequence was mechanical rather than aesthetic: `source` is
+    one of the seven terms §2 defines and had no member at all, so all three source
+    records carried `SOLVER`, `S_` meant "solver" on one record and "source" on the
+    next, and `propagate` needed two records because one field was being asked two
+    questions. `backend` on `OperationDescriptor` now answers the execution
+    question, and this enum answers only the state question.
     """
 
-    SOLVER = "solver"
+    SOURCE = "source"
     COUPLER = "coupler"
     PHYSICAL_OPERATOR = "physical_operator"
     MEASUREMENT = "measurement"
@@ -182,15 +218,34 @@ OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
 #: The operation kinds that may be a **graph entry** -- `inputs=()`, no upstream
 #: representation edge.
 #:
-#: Only `solver`. Two cases are real and both are `solver`-kind per
-#: `docs/architecture_principles.md` §2: a **source**, which initializes a
-#: representation from source parameters alone, and a **problem-driven solve**
-#: (`S_RAY_OPTILAND`), which turns an `OpticalSetup` plus a `SourceSpec` into a
-#: bundle. A coupler with no input would change the representation of nothing; a
-#: physical operator with no input would change the state of nothing; a measurement
-#: with no input would observe nothing. `__post_init__` refuses all three, which is
-#: the check that makes `inputs=()` an honest declaration rather than a hole.
-ENTRY_KINDS: frozenset[str] = frozenset({"solver"})
+#: Only `source`, which is what the module docstring above has always said §2 says:
+#: a source is the one operation with no input. Until CHE-224 (R15.1) this set read
+#: `frozenset({"solver"})` and **contradicted that sentence eight lines above it**.
+#: The code was right about the records as they stood and wrong about the intent,
+#: and it was wrong for one reason: there was no `SOURCE` member to put here, so the
+#: three sources were declared `SOLVER` and the set had to name `solver` to admit
+#: them.
+#:
+#: A coupler with no input would change the representation of nothing; a physical
+#: operator with no input would change the state of nothing; a measurement with no
+#: input would observe nothing. `__post_init__` refuses all three, which is the
+#: check that makes `inputs=()` an honest declaration rather than a hole.
+#:
+#: **`S_RAY_OPTILAND` is a `SOURCE`, and this is the re-kinding a reviewer will
+#: challenge.** §2 defines a solver as mapping a *problem* into a representation,
+#: and mapping an `OpticalSetup` plus a `SourceSpec` into a `RayBundle` is exactly
+#: that. The argument for collapsing it into `SOURCE` anyway is structural: an
+#: `OpticalSetup` is a constructor *argument*, not a port, so `S_RAY_OPTILAND` and
+#: `S_SOURCE_PLANE_WAVE` are **indistinguishable in this schema** -- both are
+#: `inputs=()`, both turn declared arguments into physical state, and the
+#: difference §2 draws between them is a difference in what the arguments *mean*
+#: that no field here records. Collapsing them loses no information the catalog
+#: held; it stops the catalog claiming a distinction it never carried. What made
+#: `S_RAY_OPTILAND` feel different was that it drives a backend, and that fact now
+#: has its own field. The §2 distinction returns properly when a source that
+#: consumes an `optical_setup` port is visibly different from one consuming only
+#: scalars, which is a port-vocabulary change and a separate ticket.
+ENTRY_KINDS: frozenset[str] = frozenset({"source"})
 
 #: The shape of a component id, which is what `capabilities` cites.
 #:
@@ -284,6 +339,29 @@ class OperationDescriptor:
         guarantee drift against the signature.
     `implementation`
         `"module.path:attribute"`. A **string**, resolved only on request.
+    `backend`
+        The third-party library the implementation drives -- `"optiland"`,
+        `"chromatix"` -- or `None` for project-owned code that drives none.
+        Question 9, and the field CHE-224 (R15.1) added to stop `kind` being asked
+        two questions at once.
+
+        **Declared, not derived.** It is checkable against `implementation`'s module
+        path, and `tests/operations/test_catalog.py` checks it (gate G1), but it is
+        not *read off* that path -- for the same reason
+        `scripts/check_dependencies.py::LANDED` is declared rather than probed from
+        the filesystem. That comment already makes the argument: a stray checkout or
+        a package created ahead of the code that justifies it would read as
+        "landed" to a probe, so declaring it means joining the graph is an edit
+        someone reviews. Joining the set of driven backends is the same kind of
+        edit. A path prefix is a parse; the library a module drives is a fact about
+        the module.
+
+        Orthogonal to `capabilities`, which is unaffected and keeps its meaning: it
+        cites a *measured* device/dtype row by component id, which is a different
+        question from which library runs. `S_RAY_OPTILAND` and `O_RAY_TRACE` both
+        have `backend="optiland"` and both cite `M_RAY_OPTILAND`, and neither
+        implies the other -- a backend-driving operation with no measured row of its
+        own would carry a `backend` and `capabilities=None`.
     `approximation`
         What the operation approximates and what error that introduces. Required
         and free text: a physical claim in a sentence a reviewer can check beats
@@ -318,6 +396,12 @@ class OperationDescriptor:
     requires: tuple[str, ...] = ()
     optional: tuple[str, ...] = ()
     validity: tuple[str, ...] = ()
+    #: The driven third-party library, or `None` for project-owned arithmetic.
+    #: Defaulted rather than required because `None` is the common case -- ten of
+    #: the thirteen records -- and, unlike `inputs=()`, it is not a claim that can
+    #: be made by omission: a record that drives a backend and forgets to say so
+    #: fails G1 against its own `implementation` path.
+    backend: str | None = None
     capabilities: str | None = None
     cost: str | None = None
     derivative: str = "forward_only"
@@ -375,10 +459,10 @@ class OperationDescriptor:
             problems.append(
                 f"`inputs` is empty but `kind` is {getattr(self.kind, 'value', self.kind)!r}. "
                 f"Only {sorted(ENTRY_KINDS)} may be a graph entry: a source initializes a "
-                "representation from source parameters alone, and a problem-driven solve "
-                "turns a problem statement into one. A coupler changes the representation "
-                "of something, an operator changes the state of something, and a "
-                "measurement observes something."
+                "representation from source parameters alone, whether those parameters "
+                "describe the light or a system to launch into. A coupler changes the "
+                "representation of something, an operator changes the state of something, "
+                "and a measurement observes something."
             )
 
         if not self.returns:
@@ -429,6 +513,12 @@ class OperationDescriptor:
                 f"{sorted(overlap)} appear in both `requires` and `optional`. A parameter "
                 "either has a default or it does not."
             )
+        if self.backend is not None and not self.backend.strip():
+            problems.append(
+                "`backend` is an empty string. `None` is how a record says it drives no "
+                "third-party library; a blank name says it drives one and declines to "
+                "say which."
+            )
         if ":" not in self.implementation or self.implementation.startswith(":"):
             problems.append(
                 f"`implementation` is {self.implementation!r}; it must be "
@@ -474,8 +564,8 @@ class OperationDescriptor:
     def is_graph_entry(self) -> bool:
         """Whether this operation consumes no upstream representation.
 
-        Question 1. `inputs == ()`, which `ENTRY_KINDS` restricts to `solver`-kind,
-        so this is also "is this a source or a problem-driven solve".
+        Question 1. `inputs == ()`, which `ENTRY_KINDS` restricts to `source`-kind,
+        so since CHE-224 (R15.1) this is exactly "is this a source".
         """
         return not self.inputs
 

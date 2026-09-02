@@ -321,9 +321,12 @@ def launch(
 
     The operation this ticket exists for: a declarative source plus a constructed
     optical system plus a sampling request, in; the physical launch representation
-    plus the declarations the trace path needs, out. Descriptor kind `solver` -- a
-    problem statement becomes a representation -- and it consumes no
-    representation, which is why it is not a coupler or an operator.
+    plus the declarations the trace path needs, out. It consumes no representation,
+    which is why it is not a coupler or an operator: the kind it would carry is
+    `source` (`solver` before CHE-224 / R15.1), with `backend="optiland"`. It
+    carries none today, because it is deliberately not in the catalog -- see this
+    package's `__init__` on why a public launch operation needs a neutral
+    signature first.
 
     Parameters
     ----------

@@ -55,7 +55,7 @@ The four argument tuples are checked against the code, not just written
 ------------------------------------------------------------------------
 `inputs`, `requires`, `optional` and the arity of `returns` are all derivable from
 `inspect.signature`, and `tests/operations/test_catalog_signatures.py` derives them
-for all fourteen records and compares. So this file is a *checked* restatement of
+for all thirteen records and compares. So this file is a *checked* restatement of
 the signatures rather than a hand-maintained one: renaming a parameter, giving one
 a default, removing one or adding a required argument fails that gate.
 
@@ -65,15 +65,32 @@ drifts, and two records here were already wrong before the check existed --
 their callables do not accept. `approximation`, `validity` and `evidence` remain
 unguarded prose; nothing can derive those.
 
-Two records may name one callable
----------------------------------
-`S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` both resolve to
-`backends.chromatix.solver:propagate`, and they are two records on purpose. One
+Two records may name one callable -- and none does any more
+-----------------------------------------------------------
+This section is kept and rewritten rather than deleted, because the arrangement it
+described is gone and the reason is worth having next to the catalog it shaped.
+
+It used to say: `S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` both resolve to
+`backends.chromatix.solver:propagate`, and they are two records on purpose -- one
 answers "what backend does this project drive, and in which measured capability
-row"; the other answers "what happens to the physical state". Their `kind`,
-`approximation` and `validity` all differ. The completeness gate is written to
-allow this and to allow only this: one record per `(implementation, kind)` pair,
-and at least one record per name in `OPERATIONS`.
+row", the other "what happens to the physical state". Their `kind`, `approximation`
+and `validity` all differed, and the completeness gate was keyed on
+`(implementation, kind)` to allow exactly that one case.
+
+**CHE-224 (R15.1) removed the need for it.** The sentence names two questions, and
+naming two questions is the diagnosis: `kind` was being asked both, so the only way
+to answer both was two records over one function. `backend` on
+`OperationDescriptor` now answers "which library executes this" and `kind` answers
+only "what happens to physical state". `S_WAVE_CHROMATIX` is deleted;
+`O_ASM_PROPAGATE` carries `backend="chromatix"` and the one sentence of its
+`approximation` that the pair only said between them. The gate is keyed on
+`implementation` alone, because no case needs two.
+
+What that cost and what it bought: a planner enumerating routes over the catalog
+used to see two candidates for one callable and had no field distinguishing them
+except prose, and `capabilities` was cited twice for one measured row. Nothing was
+lost -- the two records' `kind` values were `solver` and `physical_operator`, and
+`solver` was never a statement about physical state.
 
 What is deliberately absent from the catalog
 --------------------------------------------
@@ -93,8 +110,8 @@ What is deliberately absent from the catalog
 
 The prose below is migrated, not rewritten
 ------------------------------------------
-Eleven of these fourteen records were defined in test fixtures, because no
-production home existed. Their `approximation`, `validity` and `evidence` text is
+Eleven of these records were defined in test fixtures, because no production
+home existed. Their `approximation`, `validity` and `evidence` text is
 reviewed physics and was moved verbatim, so a reviewer can diff the fixture text
 against this file. **Two exceptions, both flagged on CHE-221 rather than made
 silently:** `O_PROPAGATE_RAYS` and `O_DIFFRACTIVE_SURFACE` each carried a validity
@@ -120,10 +137,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # --- backends/optiland ---------------------------------------------------
     OperationDescriptor(
         operation_id="S_RAY_OPTILAND",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("ray_bundle",),
         implementation="backends.optiland.solver:trace",
+        backend="optiland",
         requires=("setup", "source", "sampling", "execution"),
         optional=("aiming",),
         approximation=(
@@ -136,11 +154,12 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         derivative="forward_only",
     ),
     OperationDescriptor(
-        operation_id="S_RAY_OPTILAND_BUNDLE",
-        kind=OperationKind.SOLVER,
+        operation_id="O_RAY_TRACE",
+        kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("ray_bundle",),
         returns=("ray_bundle",),
         implementation="backends.optiland.solver:trace_rays",
+        backend="optiland",
         requires=("setup", "execution"),
         approximation=(
             "the same sequential geometric ray trace as S_RAY_OPTILAND, over an "
@@ -168,34 +187,30 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         derivative="forward_only",
     ),
     # --- backends/chromatix --------------------------------------------------
-    OperationDescriptor(
-        operation_id="S_WAVE_CHROMATIX",
-        kind=OperationKind.SOLVER,
-        inputs=("scalar_field",),
-        returns=("scalar_field",),
-        implementation="backends.chromatix.solver:propagate",
-        requires=("distance_m", "model"),
-        approximation=(
-            "scalar diffraction: one complex amplitude per sample, no polarization "
-            "and no vectorial coupling, evaluated in complex64 because the backend "
-            "has no other field storage"
-        ),
-        evidence=("tests/physics/test_scalar_wave_propagation.py",),
-        capabilities="M_WAVE_CHROMATIX",
-        derivative="forward_only",
-    ),
+    #
+    # One record over `propagate`, not two. `S_WAVE_CHROMATIX` was the second, and
+    # CHE-224 (R15.1) deleted it: it existed to answer "what backend does this
+    # project drive", which `backend` now answers as a field. Its `approximation`
+    # said what the scalar model itself omits -- one complex amplitude per sample,
+    # no polarization, no vectorial coupling, complex64 because the backend has no
+    # other field storage -- and that sentence is carried below rather than dropped,
+    # because it is a different claim from what the angular-spectrum kernel
+    # approximates and the surviving record did not already make it.
     OperationDescriptor(
         operation_id="O_ASM_PROPAGATE",
         kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("scalar_field",),
         returns=("scalar_field",),
         implementation="backends.chromatix.solver:propagate",
+        backend="chromatix",
         requires=("distance_m", "model"),
         approximation=(
             "the exact (non-paraxial) angular spectrum in a homogeneous isotropic "
             "medium: no Fresnel approximation and no term dropped, but the sampled "
             "window is periodic, so power that leaves it wraps back in unless the "
-            "grid is padded"
+            "grid is padded. Scalar throughout: one complex amplitude per sample, "
+            "no polarization and no vectorial coupling, evaluated in complex64 "
+            "because the backend has no other field storage"
         ),
         validity=(
             "z <= N pitch^2 / lambda, the transfer function's own sampling bound",
@@ -211,6 +226,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         inputs=("scalar_field",),
         returns=("scalar_field",),
         implementation="backends.chromatix.focal_plane:focal_plane_transform",
+        backend="chromatix",
         requires=("focal_length_m", "model"),
         approximation=(
             "the ideal thin lens between its two focal planes: one optical Fourier "
@@ -236,7 +252,12 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # Until CHE-222 (R03.5) the schema could not say that, and all three of these
     # (well, the one that existed) declared `input="scalar_field"` -- the
     # representation they *produce*, named on both sides. `ENTRY_KINDS` is what
-    # makes `()` a checked declaration: only a `solver` may be a graph entry.
+    # makes `()` a checked declaration: only a `source` may be a graph entry.
+    #
+    # `kind=OperationKind.SOURCE` since CHE-224 (R15.1). All three were `SOLVER`
+    # before it, because the enum had no `SOURCE` member -- so the `S_` on these
+    # three ids meant "source" while the `S_` on `S_RAY_OPTILAND` meant "solver",
+    # and `kind` could not tell a reader which.
     #
     # What a source consumes instead is in `requires`: a grid `shape`, a pitch, a
     # wavelength and a reference surface, plus the one geometric parameter that
@@ -248,7 +269,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # row would claim a measurement taken about something else.
     OperationDescriptor(
         operation_id="S_SOURCE_GAUSSIAN_BEAM",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.gaussian_beam:gaussian_beam",
@@ -294,7 +315,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     ),
     OperationDescriptor(
         operation_id="S_SOURCE_PLANE_WAVE",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.plane_wave:plane_wave",
@@ -324,7 +345,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     ),
     OperationDescriptor(
         operation_id="S_SOURCE_SPHERICAL_WAVE",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.spherical_wave:spherical_wave",

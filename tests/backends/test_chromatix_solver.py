@@ -249,17 +249,19 @@ def test_the_carrier_is_not_folded_back_into_the_field() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_solver_and_the_propagation_register_as_themselves() -> None:
-    """Criterion 4, executed end to end: both PRODUCTION records resolve to this
+def test_the_propagation_registers_as_itself_and_declares_its_backend() -> None:
+    """Criterion 4, executed end to end: the PRODUCTION record resolves to this
     function.
 
-    Two descriptors over one implementation, because they answer different
-    questions. `S_WAVE_CHROMATIX` is the *backend* -- what this project can drive,
-    and the capability row it executes within. `O_ASM_PROPAGATE` is the *physical
-    operation* -- what happens to the state, which is evolution through a declared
-    medium from one reference surface to another.
+    **One descriptor over this implementation, not two.** There used to be two,
+    because they answered different questions: `S_WAVE_CHROMATIX` was the *backend*
+    -- what this project can drive, and the capability row it executes within -- and
+    `O_ASM_PROPAGATE` was the *physical operation*, what happens to the state.
+    CHE-224 (R15.1) made the first question a field: `backend="chromatix"` on the
+    surviving record says what the deleted one was for, and `kind` is left saying
+    only what happens to the physical state.
 
-    Neither is a coupler, and that is the substantive half of the criterion: a
+    It is not a coupler, and that is the substantive half of the criterion: a
     coupler changes representation while preserving physical state. This changes
     physical state and preserves the representation, which is the exact opposite,
     and heavy numerics is not what decides the question.
@@ -273,23 +275,25 @@ def test_the_solver_and_the_propagation_register_as_themselves() -> None:
     record rather than a copy this file kept in step by hand.
     """
     catalogued = {d.operation_id: d for d in CATALOG}
-    solver = catalogued["S_WAVE_CHROMATIX"]
+    assert "S_WAVE_CHROMATIX" not in catalogued, (
+        "the merged record is back. The backend question is a descriptor field; a "
+        "second record over one callable answers it twice."
+    )
     operator = catalogued["O_ASM_PROPAGATE"]
 
-    assert solver.kind is OperationKind.SOLVER
     assert operator.kind is OperationKind.PHYSICAL_OPERATOR
-    assert OperationKind.COUPLER not in {solver.kind, operator.kind}
-    assert solver.implementation == operator.implementation
-    assert solver.capabilities == operator.capabilities == CAPABILITIES
-    assert solver.derivative == operator.derivative == DERIVATIVE
-    # The catalog now HAS couplers -- two of them -- so the old assertion that
-    # `find(kind=COUPLER)` is empty is no longer a statement about these records.
-    # What still holds, and is what the criterion meant, is that neither of these
-    # two is among them.
-    assert solver not in registry.find(kind=OperationKind.COUPLER)
+    assert operator.backend == "chromatix"
+    assert operator.capabilities == CAPABILITIES
+    assert operator.derivative == DERIVATIVE
+    # The catalog HAS couplers -- two of them -- so the old assertion that
+    # `find(kind=COUPLER)` is empty is no longer a statement about this record.
+    # What still holds, and is what the criterion meant, is that it is not one.
     assert operator not in registry.find(kind=OperationKind.COUPLER)
-    assert resolve("S_WAVE_CHROMATIX") is propagate
     assert resolve("O_ASM_PROPAGATE") is propagate
+    # And this is the only record over `propagate`, which is what the merge means.
+    assert [d.operation_id for d in CATALOG if d.implementation == operator.implementation] == [
+        "O_ASM_PROPAGATE"
+    ]
 
 
 def test_no_gradient_is_claimed() -> None:

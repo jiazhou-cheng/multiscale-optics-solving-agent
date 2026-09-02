@@ -356,7 +356,7 @@ def test_the_scalar_field_contract_refuses_the_rest() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_source_registers_as_a_solver() -> None:
+def test_the_source_registers_as_a_source() -> None:
     """Criterion 7. `solver`-kind, because that is what the definition says.
 
     A source maps a problem statement into a representation, which is
@@ -384,7 +384,11 @@ def test_the_source_registers_as_a_solver() -> None:
     record rather than a copy this file kept in step by hand.
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "S_SOURCE_PLANE_WAVE")
-    assert descriptor.kind is OperationKind.SOLVER
+    # `SOURCE` since CHE-224 (R15.1). It was `SOLVER` only because the enum had no
+    # `SOURCE` member -- which is what made the `S_` prefix ambiguous, since
+    # `S_RAY_OPTILAND`'s `S_` stood for solver and this one's for source.
+    assert descriptor.kind is OperationKind.SOURCE
+    assert descriptor.backend is None, "the project's own arithmetic drives no library"
     assert descriptor.implementation == "sources.plane_wave:plane_wave"
     assert descriptor.derivative == "forward_only"
     assert descriptor.derivative_evidence is None
@@ -408,7 +412,8 @@ def test_the_other_two_sources_have_records_too() -> None:
         ("S_SOURCE_SPHERICAL_WAVE", "sources.spherical_wave:spherical_wave"),
     ):
         descriptor = catalogued[operation_id]
-        assert descriptor.kind is OperationKind.SOLVER
+        assert descriptor.kind is OperationKind.SOURCE
+        assert descriptor.backend is None, "no source in sources/ drives a library"
         assert descriptor.implementation == implementation
         assert descriptor.capabilities is None, "no source imports a backend"
         assert descriptor.derivative == "forward_only"

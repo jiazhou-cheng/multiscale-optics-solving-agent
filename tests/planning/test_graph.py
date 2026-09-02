@@ -284,11 +284,20 @@ def test_a_state_with_nothing_composing_to_it_returns_no_route() -> None:
 def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> None:
     """Both cycles, and the fact that makes an unbounded default safe.
 
-    `scalar_field -> scalar_field` through four operations and
+    `scalar_field -> scalar_field` through three operations and
     `ray_bundle -> ray_bundle` through three. Termination therefore does **not**
     come from `max_steps` -- it comes from the no-repeat rule, which bounds a route
     by the catalog size. Asserted because `routes` now defaults to no bound on the
     strength of exactly that argument.
+
+    **The scalar count was four until CHE-224 (R15.1), and losing one is the point
+    rather than a regression.** The fourth was `S_WAVE_CHROMATIX`, which resolved to
+    the same callable as `O_ASM_PROPAGATE` and existed only because `kind` was being
+    asked both "which library runs this" and "what happens to the state". A planner
+    enumerating this graph therefore saw two distinguishable-looking candidates for
+    one function, differing in no field it could route on. `backend` answers the
+    first question as a field, the pair is merged, and the graph now has one edge
+    per thing the tree can actually do.
     """
     graph = capability_graph()
     catalogued = {descriptor.operation_id: descriptor for descriptor in CATALOG}
@@ -301,7 +310,7 @@ def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> Non
         for state, ids in graph.items()
         if state is not None
     }
-    assert len(cycles["scalar_field"]) == 4, cycles["scalar_field"]
+    assert len(cycles["scalar_field"]) == 3, cycles["scalar_field"]
     assert len(cycles["ray_bundle"]) == 3, cycles["ray_bundle"]
 
     # And the unbounded search returns: finite, and bounded by the catalog size.
@@ -397,7 +406,7 @@ def test_routing_over_a_synthetic_catalog_needs_no_monkeypatching() -> None:
         )
 
     synthetic = (
-        descriptor("X_ENTRY", (), ("ray_bundle",), OperationKind.SOLVER),
+        descriptor("X_ENTRY", (), ("ray_bundle",), OperationKind.SOURCE),
         descriptor("X_CROSS", ("ray_bundle",), ("scalar_field",), OperationKind.COUPLER),
         descriptor("X_OBSERVE", ("scalar_field",), ("psf",), OperationKind.MEASUREMENT),
     )

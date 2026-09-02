@@ -64,9 +64,10 @@ from backends.chromatix.solver import (
 #: Hand-maintained, and deliberately not derived from `__all__`:
 #: `carrier_phase_rad`, `edge_energy_fraction`, `fourier_plane_pitch_m`, `padded_shape` and
 #: `padded_field_bytes` are sizing and diagnostic helpers over declarations, not operations over
-#: a representation. Note that `propagate` carries TWO catalog records -- `S_WAVE_CHROMATIX` the
-#: backend and `O_ASM_PROPAGATE` the physical operation -- which the gate allows by keying
-#: uniqueness on (implementation, kind) rather than on implementation alone.
+#: a representation. Note that `propagate` used to carry TWO catalog records --
+#: `S_WAVE_CHROMATIX` the backend and `O_ASM_PROPAGATE` the physical operation -- and CHE-224
+#: (R15.1) merged them: the backend question is a `backend` field on the descriptor, so
+#: `O_ASM_PROPAGATE` alone says both and the gate keys uniqueness on `implementation`.
 #:
 #: The residual failure this cannot catch is someone landing a public operation and
 #: not adding it here. That is the honest limit of a mechanical gate -- the two

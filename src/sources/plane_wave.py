@@ -87,9 +87,10 @@ would cost ~6e-5 rad instead of the ~6e-8 the cast itself costs.
 Placement
 ---------
 `src/sources/` is a **new package and a deliberate architecture change**, made
-with the owner's decision on CHE-210: a source maps a problem statement into a
-representation, which is the definition of a `solver`, but it has no external
-backend and `backends/<backend>/` is organized per backend. The alternatives were
+with the owner's decision on CHE-210: a source initializes a representation from
+source parameters alone -- `source` is its own operation kind since CHE-224
+(R15.1) -- but it has no external backend and `backends/<backend>/` is organized
+per backend. The alternatives were
 worse in ways the ticket names: `representations/` would own physics it exists
 only to declare, `operators/` is wrong by definition because an operator consumes
 a representation, and quietly widening an existing package's remit is the move

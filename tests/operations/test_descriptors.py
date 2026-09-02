@@ -55,12 +55,20 @@ def a_descriptor(**overrides: object) -> OperationDescriptor:
 
 
 def test_there_are_exactly_four_kinds() -> None:
+    """Still four after CHE-224 (R15.1): `solver` left and `source` arrived.
+
+    The count is the same and the axis is not. `solver` described who executes an
+    operation while the other three describe what happens to physical state, so the
+    set had one member on a different axis from the rest. `backend` answers the
+    execution question now, and it is a field rather than a kind.
+    """
     assert [kind.value for kind in OperationKind] == [
-        "solver",
+        "source",
         "coupler",
         "physical_operator",
         "measurement",
     ]
+    assert not hasattr(OperationKind, "SOLVER")
 
 
 @pytest.mark.parametrize("kind", list(OperationKind))
@@ -114,7 +122,7 @@ def test_the_avoided_names_do_not_exist(absent: str) -> None:
 def test_the_descriptor_is_frozen() -> None:
     descriptor = a_descriptor()
     with pytest.raises(dataclasses.FrozenInstanceError):
-        descriptor.kind = OperationKind.SOLVER  # type: ignore[misc]
+        descriptor.kind = OperationKind.SOURCE  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -366,7 +374,7 @@ def test_lists_are_accepted_and_stored_as_tuples() -> None:
 
 @pytest.mark.parametrize(
     "kind",
-    [OperationKind.COUPLER, OperationKind.SOLVER, OperationKind.PHYSICAL_OPERATOR],
+    [OperationKind.COUPLER, OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR],
 )
 def test_only_a_measurement_may_produce_an_observable(kind: OperationKind) -> None:
     """Criterion 3 of the parent, as a **construction error** rather than a loop.
@@ -428,13 +436,15 @@ def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
 def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
     """Acceptance criterion 9. `inputs=()` became expressible, so it needs a rule.
 
-    Only `solver`-kind: a source initializes a representation from source
-    parameters alone, and a problem-driven solve turns a problem statement into
-    one. The other three kinds are refused because each would be a claim about
-    nothing -- a coupler changing the representation of nothing, an operator
+    Only `source`-kind, since CHE-224 (R15.1) -- `solver`-kind before it, which
+    contradicted the `ENTRY_KINDS` docstring's own claim that a source is the one
+    operation with no input. A source initializes a representation from source
+    parameters alone, whether those parameters describe the light or a system to
+    launch into. The other three kinds are refused because each would be a claim
+    about nothing -- a coupler changing the representation of nothing, an operator
     changing the state of nothing, a measurement observing nothing.
     """
-    entry = a_descriptor(kind=OperationKind.SOLVER, inputs=())
+    entry = a_descriptor(kind=OperationKind.SOURCE, inputs=())
     assert entry.is_graph_entry is True
     assert not a_descriptor().is_graph_entry
 
@@ -458,7 +468,7 @@ def test_inputs_is_required_so_no_upstream_edge_has_to_be_written() -> None:
     with pytest.raises(TypeError):
         OperationDescriptor(  # type: ignore[call-arg]
             operation_id="X_NO_PORTS",
-            kind=OperationKind.SOLVER,
+            kind=OperationKind.SOURCE,
             returns=("ray_bundle",),
             implementation="tests.operations.nothing:run",
             approximation="none",
@@ -548,11 +558,16 @@ def test_two_records_may_share_an_implementation_and_stay_distinct() -> None:
     """Acceptance criterion 7, at the schema level.
 
     Nothing here refuses a duplicate `implementation`, and that is deliberate:
-    planning identity is the `operation_id`. `S_WAVE_CHROMATIX` and
-    `O_ASM_PROPAGATE` are the landed case, pinned against the real catalog by
-    `tests/operations/test_catalog.py`.
+    planning identity is the `operation_id`.
+
+    **No landed record relies on it any more.** `S_WAVE_CHROMATIX` and
+    `O_ASM_PROPAGATE` were the case that did, and CHE-224 (R15.1) merged them once
+    `backend` answered the question the pair was splitting. What this test pins is
+    that the *schema* still does not deduplicate by callable, which is a different
+    statement from the catalog happening to need it -- and the catalog gate now
+    asserts the opposite for the shipped records, one per `implementation`.
     """
-    first = a_descriptor(operation_id="X_ONE", kind=OperationKind.SOLVER)
+    first = a_descriptor(operation_id="X_ONE", kind=OperationKind.SOURCE)
     second = a_descriptor(operation_id="X_TWO", kind=OperationKind.PHYSICAL_OPERATOR)
     assert first.implementation == second.implementation
     assert first != second

@@ -6,7 +6,7 @@ does not accept, "checked … by inspecting the resolved signature, so the check
 against the code and not against a table". The signatures turn out to be fully
 machine-readable, so this module does the stronger thing: it **derives all four
 tuples** -- `inputs`, `requires`, `optional`, and the arity of `returns` -- from
-`inspect.signature` and compares them with the record, for all fourteen.
+`inspect.signature` and compares them with the record, for all thirteen.
 
 That makes the descriptor's argument metadata a *checked* restatement rather than a
 hand-maintained one, which matters because a second source of truth beside a
@@ -176,7 +176,7 @@ def test_the_declared_ports_are_the_ones_the_callable_takes(
 def test_the_declared_requirements_are_the_arguments_with_no_default(
     operation_id: str, record: object
 ) -> None:
-    """Criterion 3. Twelve of the fourteen need a value the old schema never mentioned.
+    """Criterion 3. Eleven of the thirteen need a value the old schema never mentioned.
 
     The ticket says nine, counting from a table that predated three of the records;
     the measured figure is twelve -- everything except `O_COMPLEX_TRANSMISSION` and
@@ -230,7 +230,7 @@ def test_the_derivation_is_not_vacuous() -> None:
     thing for every operation would pass all fifty-six. These four facts are what
     say it does not.
     """
-    assert len(CASES) == 14
+    assert len(CASES) == 13
     assert _derive("S_SOURCE_PLANE_WAVE")["inputs"] == ()
     assert _derive("O_PROPAGATE_RAYS")["inputs"] == ("ray_bundle",)
     assert _derive("O_PROPAGATE_RAYS")["return_arity"] == 1
