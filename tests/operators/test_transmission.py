@@ -21,7 +21,6 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from numerics import CHROMATIX_CAPABILITIES
 from operations import CATALOG, OperationKind, resolve
 from operators import (
     EDGES,
@@ -441,8 +440,9 @@ def test_the_element_registers_as_a_physical_operator() -> None:
 
     `capabilities=None` is the honest citation: this operator has no measured
     device/dtype row of its own because it runs in whatever namespace the field
-    carries. `CHROMATIX_CAPABILITIES` is imported here only to assert that it is
-    *not* cited.
+    carries. The chromatix component id is named here only to assert that it is
+    *not* cited -- CHE-223 (R03.6) made the record data rather than a constant, and
+    a descriptor cites the id, so the id is what a wrong citation would be.
     """
     descriptor = next(d for d in CATALOG if d.operation_id == "O_COMPLEX_TRANSMISSION")
     assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
@@ -450,7 +450,7 @@ def test_the_element_registers_as_a_physical_operator() -> None:
     assert descriptor.implementation == "operators.transmission:complex_transmission"
     assert descriptor.derivative == "forward_only"
     assert descriptor.capabilities is None
-    assert descriptor.capabilities != CHROMATIX_CAPABILITIES.component
+    assert descriptor.capabilities != "M_WAVE_CHROMATIX"
     assert resolve("O_COMPLEX_TRANSMISSION") is complex_transmission
 
 

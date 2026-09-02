@@ -76,10 +76,10 @@ from typing import Any
 import numpy as np
 
 from numerics import (
-    CHROMATIX_CAPABILITIES,
     ArrayState,
     DType,
     array_state,
+    load_capabilities,
     negotiate,
     numpy_dtype,
     refusal,
@@ -103,9 +103,16 @@ __all__ = [
     "to_native",
 ]
 
-#: The row of `numerics.COMPONENT_CAPABILITIES` this package executes within.
+#: The measured capability record this package executes within, loaded once at
+#: module scope from `knowledge/capabilities/M_WAVE_CHROMATIX.json` (CHE-223 /
+#: R03.6). It used to be `numerics.CHROMATIX_CAPABILITIES`; the data moved to the
+#: knowledge pack because backend-free discovery cites the same measurement and
+#: cannot import this package. Loading it imports no backend.
+_CAPABILITIES = load_capabilities("M_WAVE_CHROMATIX")
+
+#: The row of the capability pack this package executes within.
 #: Cited by name; the measurement stays with its probe.
-CAPABILITIES = CHROMATIX_CAPABILITIES.component
+CAPABILITIES = _CAPABILITIES.component
 
 #: The one storage dtype the backend has. Not a policy: see the module docstring.
 NATIVE_DTYPE = DType.COMPLEX64
@@ -185,7 +192,7 @@ def native_state(field: ScalarField) -> ArrayState:
             field -- the backend will ingest it and truncate it internally, and
             this boundary's job is to make that visible rather than absorb it.
     """
-    return negotiate(field.state, CHROMATIX_CAPABILITIES)
+    return negotiate(field.state, _CAPABILITIES)
 
 
 def to_native(field: ScalarField) -> tuple[Any, ArrayState]:
@@ -258,7 +265,7 @@ def from_native(
             ),
             requested=requested.device,
             supported=[str(observed.device)],
-            evidence=CHROMATIX_CAPABILITIES.evidence,
+            evidence=_CAPABILITIES.cited_evidence,
         )
 
     native_pitch = np.asarray(native.dx).reshape(-1)

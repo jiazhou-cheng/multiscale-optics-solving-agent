@@ -1,4 +1,4 @@
-"""Precision, device and namespace vocabulary, plus the measured capability table.
+"""Precision, device and namespace vocabulary, and the capability *contract*.
 
 CHE-173 (R02.1). Three things that a single `config["dtype"] = "float64"` string
 used to conflate, separated here because the pinned backends disagree about all
@@ -19,19 +19,22 @@ three:
     device is not evidence of an actual one, which is why the two are named
     differently everywhere in this package.
 
-The capability table
---------------------
-Every row below was **executed** against the pinned installs in the
-`agent_solver` / `agent_solver_gpu` images. A row copied from an API signature
-would be worse than no row, because it would be trusted, so `ComponentCapabilities`
-refuses to be constructed without a probe path and an evidence sentence, and
-refuses declarations that are internally wider than what they state
-(see `__post_init__`).
+The capability contract, and where the rows are not
+---------------------------------------------------
+`ComponentCapabilities` is the declaration a solver and a descriptor reason
+against. A row copied from an API signature would be worse than no row, because it
+would be trusted -- so it refuses to be constructed without a probe path, a probe
+tag and an evidence sentence, and refuses declarations that are internally wider
+than what they state (see `__post_init__`, ten rules).
 
-The probes are cited at the frozen tag `pre-rewrite-2026-08-30`, because the
-greenfield deletion removed `benchmarks/` from the working tree. They are
-reproducible from that tag; re-running them is what a *widening* of any row
-costs.
+**The measured rows themselves are not in this module and this module names no
+backend.** They are one JSON file per component under `knowledge/capabilities/`,
+read by `numerics.knowledge.load_capabilities` -- CHE-223 (R03.6), and the section
+lower down says why solver-local ownership could not be the single source. Each
+record carries the git tag its probe path resolves against, in `probe_tag`, because
+that is a property of the measurement rather than of this module: `benchmarks/` is
+not in the working tree, so a path with no revision names nothing, and re-running
+the probe is what a *widening* of any record costs.
 
 Failure vocabulary
 ------------------
@@ -49,9 +52,6 @@ from enum import StrEnum
 from typing import Any
 
 __all__ = [
-    "CHROMATIX_CAPABILITIES",
-    "COMPONENT_CAPABILITIES",
-    "OPTILAND_CAPABILITIES",
     "PHASE_ACCUMULATION_FLOOR",
     "REFUSAL_CODES",
     "ArrayNamespace",
@@ -61,8 +61,6 @@ __all__ = [
     "DeviceKind",
     "DevicePlacement",
     "Precision",
-    "capabilities_for",
-    "capability_rows",
     "compute_dtype",
     "negotiate",
     "refusal",
@@ -466,10 +464,16 @@ class ComponentCapabilities:
     #: on the numpy backend -- and declaring that here rather than as an
     #: `if backend == ...` branch is what keeps the two from drifting.
     device_namespaces: Mapping[DeviceKind, frozenset[ArrayNamespace]]
-    #: Where the claims above were executed. Both required: a capability with no
-    #: probe is an intention, and an intention that reads like a measurement is
-    #: the specific failure this field exists to prevent.
+    #: Where the claims above were executed. All three required: a capability with
+    #: no probe is an intention, and an intention that reads like a measurement is
+    #: the specific failure these fields exist to prevent.
     probe: str
+    #: The git tag the `probe` path resolves against. CHE-223 (R03.6) moved it here
+    #: from a `PROBE_TAG` module constant that the tests declared a second copy of:
+    #: it belongs to the measurement, not to this module, and a record measured at a
+    #: different tag is a different measurement. `tests/knowledge/` drives
+    #: `git cat-file -e <probe_tag>:<probe>` from this field.
+    probe_tag: str
     evidence: str
     lossy_input_dtypes: frozenset[DType] = frozenset()
     minimum_compute_precision: Precision = PHASE_ACCUMULATION_FLOOR
@@ -489,6 +493,11 @@ class ComponentCapabilities:
             problems.append("`probe` must cite a path under benchmarks/probes/")
         if not self.evidence.strip():
             problems.append("`evidence` is empty; a capability with no measurement is a guess")
+        if not self.probe_tag.strip():
+            problems.append(
+                "`probe_tag` is empty; a probe path with no tag to resolve against is not "
+                "a citation"
+            )
         for name in ("devices", "precisions", "accepted_input_dtypes",
                      "native_compute_dtypes", "output_dtypes"):
             if not getattr(self, name):
@@ -550,6 +559,21 @@ class ComponentCapabilities:
         """
         return frozenset().union(*self.device_namespaces.values())
 
+    @property
+    def cited_evidence(self) -> str:
+        """The evidence sentence with the citation that makes it checkable appended.
+
+        What every refusal that cites this declaration should pass as `evidence=`.
+        CHE-223 (R03.6) moved the frozen tag out of the prose and into `probe_tag`,
+        which removed the duplicate but also silently shortened the refusal
+        messages: an FP16 refusal used to read `(pre-rewrite-2026-08-30,
+        agent_solver_gpu, ...)` and would otherwise now read `(agent_solver_gpu,
+        ...)`. A refused caller is exactly the person who needs to know which
+        revision to re-run the probe from, so the citation is reassembled here
+        rather than restored to the prose.
+        """
+        return f"{self.evidence} [{self.probe_tag}:{self.probe}]"
+
     def namespaces_for(self, device: DeviceKind) -> frozenset[ArrayNamespace]:
         return self.device_namespaces.get(device, frozenset())
 
@@ -592,130 +616,53 @@ class ComponentCapabilities:
             "lossy_input_dtypes": sorted(d.value for d in self.lossy_input_dtypes),
             "minimum_compute_precision": self.minimum_compute_precision.value,
             "probe": self.probe,
+            "probe_tag": self.probe_tag,
             "evidence": self.evidence,
             "notes": self.notes,
         }
 
 
-_REAL_DTYPES = frozenset({DType.FLOAT32, DType.FLOAT64})
-
-#: The frozen reference tag the probe paths resolve against. `benchmarks/` was
-#: deleted from the working tree by the greenfield rewrite; the probes are still
-#: reproducible, and a widening of any row below costs a re-run against the
-#: pinned image, not a re-reading of the packages' documentation.
-PROBE_TAG = "pre-rewrite-2026-08-30"
-
-
-# The two rows below are bootstrap anchors, not their permanent home. They live
-# here because R02.1 needed something real for `negotiate()` to negotiate
-# against and neither `solvers/` nor `operations/` exists yet -- but a static
-# registry of concrete solver names in the foundational layer is closed against
-# extension. **CHE-206** moves them into `solvers/<backend>/` when that package
-# lands, and carries the three things that have to move with them: the
-# `git cat-file` probe-citation test, the widening refusals on
-# `ComponentCapabilities.__post_init__`, and the "reading a capability imports
-# no backend" assertion.
-OPTILAND_CAPABILITIES = ComponentCapabilities(
-    component="M_RAY_OPTILAND",
-    devices=frozenset({DeviceKind.CPU, DeviceKind.CUDA}),
-    precisions=frozenset({Precision.FP32, Precision.FP64}),
-    accepted_input_dtypes=_REAL_DTYPES,
-    native_compute_dtypes=_REAL_DTYPES,
-    output_dtypes=_REAL_DTYPES,
-    device_namespaces={
-        DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY, ArrayNamespace.TORCH}),
-        DeviceKind.CUDA: frozenset({ArrayNamespace.TORCH}),
-    },
-    minimum_compute_precision=Precision.FP32,
-    probe="benchmarks/probes/precision/optiland_capability.py",
-    evidence=(
-        "optiland 0.6.0: set_precision is Literal['float32','float64'] and raises "
-        "ValueError for anything else; set_device raises BackendCapabilityError on the "
-        "numpy backend, so CUDA is reachable only through the torch backend. With "
-        "set_backend('torch'); set_device('cuda'), be.array(...) returns a Tensor on "
-        "cuda:0 in the selected precision, float32 and float64 both confirmed "
-        f"({PROBE_TAG}, agent_solver_gpu, RTX A6000, torch 2.13.0+cu126)"
-    ),
-    notes=(
-        "There is no float16 row and this project will not invent one: Optiland has no "
-        "float16 mode to execute, and geometry, OPL and direction cosines all accumulate."
-    ),
-)
-
-
-CHROMATIX_CAPABILITIES = ComponentCapabilities(
-    component="M_WAVE_CHROMATIX",
-    devices=frozenset({DeviceKind.CPU, DeviceKind.CUDA}),
-    # FP32 only. Not a policy choice -- there is no complex128 storage in the
-    # package, so an FP64 request has nothing to execute.
-    precisions=frozenset({Precision.FP32}),
-    accepted_input_dtypes=frozenset({DType.COMPLEX64}),
-    native_compute_dtypes=frozenset({DType.COMPLEX64}),
-    output_dtypes=frozenset({DType.COMPLEX64}),
-    device_namespaces={
-        DeviceKind.CPU: frozenset({ArrayNamespace.JAX}),
-        DeviceKind.CUDA: frozenset({ArrayNamespace.JAX}),
-    },
-    lossy_input_dtypes=frozenset({DType.COMPLEX128}),
-    minimum_compute_precision=Precision.FP32,
-    probe="benchmarks/probes/precision/chromatix_capability.py",
-    evidence=(
-        "chromatix 0.6.0 @ d24bdf0: ScalarField.__init__ is "
-        "jnp.asarray(u, dtype=jnp.complex64) unconditionally, and Field.build(complex128) "
-        "returns complex64 even under jax_enable_x64=True, so there is no complex128 path "
-        "at any device; asm_propagate returns complex64 on cuda:0 "
-        f"({PROBE_TAG}, agent_solver_gpu, jax 0.6.2 backend gpu)"
-    ),
-    notes=(
-        "complex128 is ingestible and silently truncated by Chromatix itself, which is "
-        "why it is declared lossy rather than accepted: the loss then happens at a "
-        "boundary that records it, instead of inside ScalarField where nothing measures "
-        "it. A requested device must never be reported as an actual one -- a "
-        "process-global JAX platform pin produces a successful complex64 run on the host "
-        "while the caller asked for CUDA, with no error raised."
-    ),
-)
-
-
-#: Every component with an executed capability declaration.
-#:
-#: Two rows, not the reference implementation's seven. The five coupler and
-#: operator rows described implementations that do not exist in this tree yet;
-#: their capability is set by what their shared implementation is written
-#: against, so R07/R08 declare them with their own evidence when there is an
-#: implementation to measure. A row for unwritten code would be the exact
-#: failure this module's docstring names.
-COMPONENT_CAPABILITIES: dict[str, ComponentCapabilities] = {
-    capability.component: capability
-    for capability in (OPTILAND_CAPABILITIES, CHROMATIX_CAPABILITIES)
-}
-
-
-def capabilities_for(component: str) -> ComponentCapabilities:
-    """Look up a component's declaration, or fail naming what exists."""
-    try:
-        return COMPONENT_CAPABILITIES[component]
-    except KeyError as exc:
-        raise refusal(
-            code="UNKNOWN_COMPONENT",
-            component=component,
-            message="no executable capability declaration exists for this component.",
-            requested=component,
-            supported=COMPONENT_CAPABILITIES,
-            remedy=(
-                "Add one with the probe evidence behind it. A component with no "
-                "declaration has no validated device or dtype support, and this project "
-                "will not guess one."
-            ),
-        ) from exc
-
-
-def capability_rows() -> list[dict[str, Any]]:
-    """The whole table, generated from the declarations."""
-    return [
-        COMPONENT_CAPABILITIES[name].capability_row()
-        for name in sorted(COMPONENT_CAPABILITIES)
-    ]
+# ---------------------------------------------------------------------------
+# The measured rows are NOT here, and CHE-223 (R03.6) is why
+# ---------------------------------------------------------------------------
+#
+# `OPTILAND_CAPABILITIES`, `CHROMATIX_CAPABILITIES`, `COMPONENT_CAPABILITIES`,
+# `capabilities_for` and `PROBE_TAG` used to live at this point in the file. R02.1
+# put them here as bootstrap anchors -- `negotiate()` needed something real to
+# negotiate against and neither `solvers/` nor `operations/` existed -- and this
+# module's own comment called them "not their permanent home".
+#
+# They are now one JSON file per component under `knowledge/capabilities/`, loaded
+# by `numerics.knowledge.load_capabilities`. What stays here is the *contract*:
+# `ComponentCapabilities` with all ten of its widening refusals, `negotiate()`,
+# and every refusal code. This module keeps no copy of the data, so the foundational
+# layer no longer knows a backend's name.
+#
+# **CHE-206's plan is superseded, and not because it was wrong when written.** It
+# proposed moving each row into `solvers/<backend>/`, which was the obvious answer
+# before either consumer existed. There are now two, on opposite sides of the
+# dependency graph: solver runtime reads the row at roughly fifteen refusal sites,
+# and backend-free discovery in `operations/` cites the same component id while
+# guaranteeing that reading it loads no backend. Solver-local ownership cannot be
+# the single source for both -- it would force `operations -> solvers` (which
+# `scripts/check_dependencies.py` names as the edge that ends the only property
+# `operations/` has), a duplicate copy inside `operations/`, or a backend-adjacent
+# import behind every capability query. Shared *data* is one source usable from
+# both sides with no edge in either direction.
+#
+# CHE-206's steps 3 and 4 are kept verbatim: numerics holds only contracts and the
+# pure `negotiate()`, and numerics knows no concrete solver names. So are its three
+# constraints that had to survive the move -- the probe-citation test, the widening
+# refusals, and "reading a capability imports no backend" -- with its refusal count
+# corrected from five to nine.
+#
+# Why there are two rows and not seven is unchanged and still belongs here, because
+# it is a rule about what may be declared rather than a fact about either backend:
+# the reference implementation's five coupler and operator rows described
+# capability nobody measured. A coupler's or operator's capability is set by what
+# its shared implementation is written against, so the ticket that measures one
+# declares it with its own evidence. A row for unwritten code is the failure this
+# module's docstring names.
 
 
 # ---------------------------------------------------------------------------

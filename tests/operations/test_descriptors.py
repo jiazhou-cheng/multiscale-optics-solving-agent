@@ -23,7 +23,6 @@ from pathlib import Path
 
 import pytest
 
-from numerics import COMPONENT_CAPABILITIES
 from operations import descriptors as descriptors_module
 from operations.descriptors import (
     DERIVATIVE_MODES,
@@ -124,13 +123,16 @@ def test_the_descriptor_is_frozen() -> None:
 
 
 def test_capabilities_are_cited_not_copied() -> None:
-    """A descriptor names a row of the measured table; it does not restate it."""
+    """A descriptor names a measured component; it does not restate the measurement.
+
+    The no-copy half is the field-name check below and is unchanged. What CHE-223
+    (R03.6) changed is that the citation is no longer resolved *here*: the record
+    lives in `knowledge/capabilities/` and nothing in this module loads one, so a
+    descriptor is constructible in an interpreter that has never seen the pack.
+    `tests/operations/test_capability_references.py` is where the ids are resolved.
+    """
     descriptor = a_descriptor(capabilities="M_WAVE_CHROMATIX")
     assert descriptor.capabilities == "M_WAVE_CHROMATIX"
-    row = COMPONENT_CAPABILITIES[descriptor.capabilities]
-    # The evidence stays with the measurement. Nothing on the descriptor could
-    # disagree with the row, because nothing on the descriptor restates it.
-    assert row.probe.startswith("benchmarks/probes/")
     descriptor_fields = {field.name for field in dataclasses.fields(OperationDescriptor)}
     assert not descriptor_fields & {
         "devices",
@@ -141,12 +143,50 @@ def test_capabilities_are_cited_not_copied() -> None:
         "accepted_input_dtypes",
         "native_compute_dtypes",
         "output_dtypes",
-    }, "device/dtype support is measured in numerics; a copy here is a second source"
+    }, (
+        "device/dtype support is measured and lives in knowledge/capabilities/; a copy "
+        "here is a second source"
+    )
 
 
-def test_citing_a_capability_row_that_does_not_exist_is_refused() -> None:
-    with pytest.raises(ValueError, match="COMPONENT_CAPABILITIES"):
-        a_descriptor(capabilities="M_RAY_INVENTED")
+def test_a_capability_citation_is_validated_by_shape_and_not_by_membership() -> None:
+    """CHE-223 (R03.6): the last eager coupling, and why removing it mattered.
+
+    `__post_init__` used to check `capabilities` against
+    `numerics.COMPONENT_CAPABILITIES`, so constructing *any* descriptor required the
+    concrete measured table to be importable. That was an asymmetry inside one
+    dataclass -- `implementation` was a lazily resolved string and `capabilities`
+    was a string plus an eager global -- and it was the last thing pinning the rows
+    into the foundational layer.
+
+    A well-formed id nothing has measured is therefore **accepted here**, and
+    refused by `tests/operations/test_capability_references.py`. That is the same
+    division `implementation` has always had: shape at construction, resolution when
+    someone asks.
+    """
+    assert a_descriptor(capabilities="M_RAY_INVENTED").capabilities == "M_RAY_INVENTED"
+    # An operation-level id has to stay expressible: CHE-223 permits a record
+    # measured for one operation rather than a whole component, so the shape must
+    # not demand an `M_` prefix.
+    assert a_descriptor(capabilities="O_ASM_PROPAGATE").capabilities == "O_ASM_PROPAGATE"
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    ["", "  ", "m_ray_optiland", " M_RAY_OPTILAND", "M_RAY_OPTILAND ", "9_LEADING_DIGIT",
+     "M-RAY-OPTILAND", "M_RAY OPTILAND"],
+)
+def test_a_capability_citation_that_is_not_a_component_id_is_refused(
+    malformed: str,
+) -> None:
+    """Shape, and it is not a formality.
+
+    `"m_ray_optiland"` is the failure this catches: a lower-cased id is a citation
+    that resolves to no file, and with membership validation gone there would be
+    nothing between it and a planner reading it as a measured capability.
+    """
+    with pytest.raises(ValueError, match="component id"):
+        a_descriptor(capabilities=malformed)
 
 
 def test_no_capability_row_is_allowed_and_means_no_measurement() -> None:

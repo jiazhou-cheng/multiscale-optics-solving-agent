@@ -23,7 +23,7 @@ from __future__ import annotations
 import pytest
 
 from numerics.arrays import _jax_device, array_state, device_of, to_namespace, to_state
-from numerics.precision import OPTILAND_CAPABILITIES as OPTILAND
+from numerics.knowledge import load_capabilities
 from numerics.precision import (
     ArrayNamespace,
     ArrayState,
@@ -32,6 +32,12 @@ from numerics.precision import (
     DType,
     negotiate,
 )
+
+#: The measured Optiland record, loaded rather than imported as a constant --
+#: CHE-223 (R03.6). This is one of the few tests that is genuinely *about* the
+#: measured facts (does a CUDA trace really come back in the declared precision),
+#: so it reads the record rather than a synthetic row.
+OPTILAND = load_capabilities("M_RAY_OPTILAND")
 
 pytestmark = pytest.mark.gpu
 

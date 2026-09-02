@@ -72,7 +72,7 @@ The capability gate runs before any solver call
 -----------------------------------------------
 A precision or device the measured capability table does not admit is refused
 before optiland or torch is imported, not discovered inside a trace. The table is
-`numerics.OPTILAND_CAPABILITIES`, which is probe-backed: `set_precision` accepts
+the `M_RAY_OPTILAND` capability record, which is probe-backed: `set_precision` accepts
 only `float32` / `float64`, and `set_device` raises `BackendCapabilityError` on
 the numpy backend, so CUDA is reachable **only** through torch. The one check that
 cannot be import-free is CUDA availability, because importing torch is how that
@@ -93,11 +93,11 @@ from __future__ import annotations
 from typing import Any, Literal, TypedDict
 
 from numerics import (
-    OPTILAND_CAPABILITIES,
     ArrayNamespace,
     DeviceKind,
     DevicePlacement,
     Precision,
+    load_capabilities,
     refusal,
 )
 from problems import OpticalSetup, SourceSpec
@@ -125,10 +125,19 @@ __all__ = [
     "trace_rays",
 ]
 
-#: The row of `numerics.COMPONENT_CAPABILITIES` this solver executes within.
+#: The measured capability record this solver executes within, loaded once at
+#: module scope from `knowledge/capabilities/M_RAY_OPTILAND.json` (CHE-223 / R03.6).
+#: It used to be `numerics.OPTILAND_CAPABILITIES`, a module constant in the
+#: foundational layer; the data moved to the knowledge pack because backend-free
+#: discovery in `operations/` cites the same measurement and cannot import this
+#: package. Loading it imports no backend -- it is `json` and this project's enums
+#: -- so the module-scope read costs nothing a caller did not already pay.
+_CAPABILITIES = load_capabilities("M_RAY_OPTILAND")
+
+#: The row of the capability pack this solver executes within.
 #: Cited by name rather than restated, so the declaration stays with the probe
 #: that measured it and there is one place to widen.
-CAPABILITIES = OPTILAND_CAPABILITIES.component
+CAPABILITIES = _CAPABILITIES.component
 
 #: What may be claimed about differentiating through a trace. See the module
 #: docstring: `forward_only`, with no argument that changes it.
@@ -240,16 +249,16 @@ def _resolve_execution(execution: Execution) -> tuple[DevicePlacement, Precision
     device = DevicePlacement.parse(execution["device"])
     precision = Precision.parse(execution["precision"])
 
-    if device.kind not in OPTILAND_CAPABILITIES.devices:
+    if device.kind not in _CAPABILITIES.devices:
         raise refusal(
             code="UNSUPPORTED_DEVICE",
             component=CAPABILITIES,
             message=f"device {device} is outside the measured capability table.",
             requested=device,
-            supported=sorted(str(kind) for kind in OPTILAND_CAPABILITIES.devices),
-            evidence=OPTILAND_CAPABILITIES.evidence,
+            supported=sorted(str(kind) for kind in _CAPABILITIES.devices),
+            evidence=_CAPABILITIES.cited_evidence,
         )
-    if precision not in OPTILAND_CAPABILITIES.precisions:
+    if precision not in _CAPABILITIES.precisions:
         raise refusal(
             code="UNSUPPORTED_DTYPE",
             component=CAPABILITIES,
@@ -259,8 +268,8 @@ def _resolve_execution(execution: Execution) -> tuple[DevicePlacement, Precision
                 f"{precision.real_dtype} mode to execute."
             ),
             requested=precision,
-            supported=sorted(str(p) for p in OPTILAND_CAPABILITIES.precisions),
-            evidence=OPTILAND_CAPABILITIES.evidence,
+            supported=sorted(str(p) for p in _CAPABILITIES.precisions),
+            evidence=_CAPABILITIES.cited_evidence,
         )
 
     namespace = _resolve_namespace(device, precision)
@@ -292,11 +301,13 @@ def _resolve_namespace(device: DevicePlacement, precision: Precision) -> ArrayNa
     Everything else -- which is the default path, host FP64 -- runs in numpy.
 
     This coupling is a property of the solver rather than of the project's
-    precision vocabulary, so it lives here and not in `numerics`. When CHE-206
-    moves the concrete capability rows into `solvers/<backend>/`, this is the fact
-    that row has to carry.
+    precision vocabulary, so it lives here and not in `numerics`. It is also the
+    fact the `M_RAY_OPTILAND` record has to carry, and does -- as
+    `device_namespaces[cuda] = {torch}`. (CHE-206 planned to move the rows into
+    `solvers/<backend>/`; CHE-223 superseded that, so the record is shared data
+    rather than a constant in either place. See `numerics/knowledge.py`.)
     """
-    admissible = OPTILAND_CAPABILITIES.namespaces_for(device.kind)
+    admissible = _CAPABILITIES.namespaces_for(device.kind)
     if ArrayNamespace.NUMPY in admissible and precision is not Precision.FP32:
         return ArrayNamespace.NUMPY
     if ArrayNamespace.TORCH not in admissible:  # pragma: no cover - the table admits it

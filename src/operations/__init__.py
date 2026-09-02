@@ -39,14 +39,16 @@ because of it. The eight questions those fields answer are listed in
 `inspect.signature` and compares -- so the metadata is a checked restatement of
 the code rather than a hand-maintained one.
 
-`capabilities` is the one field still awaiting a ticket: it stays an eagerly
-validated citation into `numerics.COMPONENT_CAPABILITIES`, and CHE-223 (R03.6)
-moves that evidence to a knowledge pack. It is not a blocker for reading the
-catalog.
+`capabilities` was the last field with an eager coupling, and CHE-223 (R03.6)
+removed it: the measured rows are data under `knowledge/capabilities/`, and a
+descriptor's `capabilities` is a component id validated for **shape** here and
+resolved by `tests/operations/test_capability_references.py`. So both reference
+fields now behave the same way, and this package imports nothing in the project --
+not even `numerics`.
 
-Device and dtype support is not stored here. A descriptor cites a row of
-`numerics.COMPONENT_CAPABILITIES` by name, so the measurement stays with the
-probe that produced it and there is exactly one place to change it. There is no
+Device and dtype support is not stored here. A descriptor cites a component by id
+and the measurement lives in `knowledge/capabilities/<component>.json` with the
+probe that produced it, so there is exactly one place to change it. There is no
 YAML mirror of this package and no generated manifest;
 `tests/operations/test_descriptors.py` asserts the absence, because the
 reference implementation's second source was 45 KB of YAML with a passing test

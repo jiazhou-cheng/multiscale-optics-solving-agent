@@ -16,9 +16,8 @@ import numpy as np
 import pytest
 
 from numerics.arrays import to_namespace, verify_dtype, xp_for
+from numerics.knowledge import load_capabilities
 from numerics.precision import (
-    CHROMATIX_CAPABILITIES,
-    OPTILAND_CAPABILITIES,
     REFUSAL_CODES,
     ArrayNamespace,
     ArrayState,
@@ -27,7 +26,6 @@ from numerics.precision import (
     DevicePlacement,
     DType,
     Precision,
-    capabilities_for,
     negotiate,
 )
 
@@ -45,12 +43,58 @@ def _invalid_capability() -> None:
         output_dtypes=frozenset({DType.FLOAT32}),
         device_namespaces={DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY})},
         probe="not/a/probe/path.py",
+        probe_tag="a-synthetic-tag",
         evidence="a claim with no measurement behind it",
     )
 
 
+#: A real-dtype declaration reachable on both devices, so the dtype-kind and
+#: device-transfer refusals below have something to fail against.
+#:
+#: Synthetic, since CHE-223 (R03.6): a refusal code's *reachability* is a property
+#: of `negotiate`, not of Optiland, and this table used to be built from the two
+#: measured rows. `UNKNOWN_COMPONENT` is the exception and now goes through the
+#: loader, which is where that refusal lives.
+REAL_DUAL_DEVICE = ComponentCapabilities(
+    component="T_REAL_DUAL_DEVICE",
+    devices=frozenset({DeviceKind.CPU, DeviceKind.CUDA}),
+    precisions=frozenset({Precision.FP32, Precision.FP64}),
+    accepted_input_dtypes=frozenset({DType.FLOAT32, DType.FLOAT64}),
+    native_compute_dtypes=frozenset({DType.FLOAT32, DType.FLOAT64}),
+    output_dtypes=frozenset({DType.FLOAT32, DType.FLOAT64}),
+    device_namespaces={
+        DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY, ArrayNamespace.TORCH}),
+        DeviceKind.CUDA: frozenset({ArrayNamespace.TORCH}),
+    },
+    probe="benchmarks/probes/precision/tolerance.py",
+    probe_tag="a-synthetic-tag",
+    evidence=(
+        "test fixture, not a component: real dtypes on both devices, so a complex input "
+        "and an unpermitted transfer are both reachable (synthetic, 0.0.0)"
+    ),
+)
+
+#: A complex, single-namespace declaration with a lossy input, so the downcast
+#: refusal is reachable. Synthetic, for the same reason.
+COMPLEX_LOSSY = ComponentCapabilities(
+    component="T_COMPLEX_LOSSY",
+    devices=frozenset({DeviceKind.CPU}),
+    precisions=frozenset({Precision.FP32}),
+    accepted_input_dtypes=frozenset({DType.COMPLEX64}),
+    native_compute_dtypes=frozenset({DType.COMPLEX64}),
+    output_dtypes=frozenset({DType.COMPLEX64}),
+    device_namespaces={DeviceKind.CPU: frozenset({ArrayNamespace.JAX})},
+    lossy_input_dtypes=frozenset({DType.COMPLEX128}),
+    probe="benchmarks/probes/precision/tolerance.py",
+    probe_tag="a-synthetic-tag",
+    evidence=(
+        "test fixture, not a component: one complex dtype with a declared lossy input "
+        "(synthetic, 0.0.0)"
+    ),
+)
+
 #: A host-only declaration, so "the target does not execute there" is reachable
-#: without widening a measured row. Both real rows declare CUDA.
+#: without widening a measured row. Both real records declare CUDA.
 HOST_ONLY = ComponentCapabilities(
     component="T_HOST_ONLY",
     devices=frozenset({DeviceKind.CPU}),
@@ -60,9 +104,10 @@ HOST_ONLY = ComponentCapabilities(
     output_dtypes=frozenset({DType.FLOAT32}),
     device_namespaces={DeviceKind.CPU: frozenset({ArrayNamespace.NUMPY})},
     probe="benchmarks/probes/precision/tolerance.py",
+    probe_tag="a-synthetic-tag",
     evidence=(
         "test fixture, not a component: a host-only row so the device refusal is "
-        "reachable (pre-rewrite-2026-08-30, 0.0.0)"
+        "reachable (synthetic, 0.0.0)"
     ),
 )
 
@@ -81,20 +126,20 @@ TRIGGERS: dict[str, Callable[[], object]] = {
     "UNKNOWN_PRECISION": lambda: Precision.parse("bfloat16"),
     "UNSUPPORTED_DTYPE": lambda: DType.parse("int32"),
     "UNSUPPORTED_DEVICE_SPELLING": lambda: DevicePlacement.parse("tpu:0"),
-    "UNKNOWN_COMPONENT": lambda: capabilities_for("C_RAY_TO_WAVE"),
+    "UNKNOWN_COMPONENT": lambda: load_capabilities("C_RAY_TO_WAVE"),
     "INVALID_CAPABILITY_DECLARATION": _invalid_capability,
     "NO_COMPATIBLE_DTYPE_KIND": lambda: negotiate(
-        ArrayState(DType.COMPLEX64, HOST, ArrayNamespace.JAX), OPTILAND_CAPABILITIES
+        ArrayState(DType.COMPLEX64, HOST, ArrayNamespace.JAX), REAL_DUAL_DEVICE
     ),
     "LOSSY_DOWNCAST_REQUIRED": lambda: negotiate(
-        ArrayState(DType.COMPLEX128, HOST, ArrayNamespace.JAX), CHROMATIX_CAPABILITIES
+        ArrayState(DType.COMPLEX128, HOST, ArrayNamespace.JAX), COMPLEX_LOSSY
     ),
     "UNSUPPORTED_DEVICE": lambda: negotiate(
         ArrayState(DType.FLOAT32, HOST, ArrayNamespace.NUMPY), HOST_ONLY, target_device=CUDA0
     ),
     "DEVICE_TRANSFER_NOT_PERMITTED": lambda: negotiate(
         ArrayState(DType.FLOAT32, HOST, ArrayNamespace.NUMPY),
-        OPTILAND_CAPABILITIES,
+        REAL_DUAL_DEVICE,
         target_device=CUDA0,
     ),
     "NAMESPACE_NOT_A_COMPUTE_NAMESPACE": lambda: xp_for(ArrayNamespace.TORCH),

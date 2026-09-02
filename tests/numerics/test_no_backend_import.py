@@ -48,10 +48,10 @@ def test_importing_numerics_pulls_no_backend() -> None:
 
 def test_listing_capabilities_pulls_no_backend() -> None:
     loaded = _modules_after(
-        "from numerics.precision import capability_rows, capabilities_for\n"
+        "from numerics.knowledge import capability_rows, load_capabilities\n"
         "rows = capability_rows()\n"
         "assert rows, 'the capability table is empty'\n"
-        "capabilities_for('M_WAVE_CHROMATIX')\n"
+        "load_capabilities('M_WAVE_CHROMATIX')\n"
     )
     assert not loaded & set(BACKENDS), (
         f"listing capabilities loaded {sorted(loaded & set(BACKENDS))}. A capability is a "

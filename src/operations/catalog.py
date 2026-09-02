@@ -16,9 +16,12 @@ R03.5 removed that: `inputs` is a tuple of ports with `()` for a graph entry,
 the arguments a caller must and may supply. The eight questions those fields answer
 are listed in `operations/descriptors.py`, and each has a test.
 
-What is still open is `capabilities`, which stays an eagerly validated citation
-into `numerics.COMPONENT_CAPABILITIES` -- CHE-223 (R03.6) moves that evidence to a
-knowledge pack. It is not a blocker for reading this file.
+`capabilities` was the last field with an eager coupling and CHE-223 (R03.6)
+removed it: the measured evidence moved to `knowledge/capabilities/`, and a value
+here is a component id checked for **shape** at construction and for **resolution**
+by `tests/operations/test_capability_references.py`. **This file imports `numerics`
+nowhere** -- it imports nothing in the project outside `operations/` -- which is the
+point: constructing the catalog needs neither a backend nor the measured table.
 
 Why the catalog lives here and needs no dependency change
 ---------------------------------------------------------
@@ -104,7 +107,6 @@ record changed.
 
 from __future__ import annotations
 
-from numerics import CHROMATIX_CAPABILITIES, OPTILAND_CAPABILITIES
 from operations.descriptors import OperationDescriptor, OperationKind
 
 __all__ = ["CATALOG"]
@@ -130,7 +132,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "interface"
         ),
         evidence=("tests/physics/test_optiland_rays.py",),
-        capabilities=OPTILAND_CAPABILITIES.component,
+        capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
     OperationDescriptor(
@@ -162,7 +164,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "ray survives is refused rather than returned as an all-zero bundle",
         ),
         evidence=("tests/solvers/test_optiland_bundle_trace.py",),
-        capabilities=OPTILAND_CAPABILITIES.component,
+        capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
     # --- solvers/chromatix --------------------------------------------------
@@ -179,7 +181,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "has no other field storage"
         ),
         evidence=("tests/physics/test_scalar_wave_propagation.py",),
-        capabilities=CHROMATIX_CAPABILITIES.component,
+        capabilities="M_WAVE_CHROMATIX",
         derivative="forward_only",
     ),
     OperationDescriptor(
@@ -200,7 +202,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "pitch <= lambda / (2 sin theta_max) for the field's own largest angle",
         ),
         evidence=("tests/physics/test_scalar_wave_propagation.py",),
-        capabilities=CHROMATIX_CAPABILITIES.component,
+        capabilities="M_WAVE_CHROMATIX",
         derivative="forward_only",
     ),
     OperationDescriptor(
@@ -224,7 +226,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "fields with different removed pistons may not be interfered directly",
         ),
         evidence=("tests/physics/test_focal_plane_transform.py",),
-        capabilities=CHROMATIX_CAPABILITIES.component,
+        capabilities="M_WAVE_CHROMATIX",
         derivative="forward_only",
     ),
     # --- sources ------------------------------------------------------------

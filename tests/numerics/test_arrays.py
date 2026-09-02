@@ -96,10 +96,12 @@ def test_an_admissible_artifact_is_not_copied_for_form() -> None:
 
 
 def test_to_state_executes_exactly_what_negotiate_decided() -> None:
-    from numerics.precision import OPTILAND_CAPABILITIES
+    from numerics.knowledge import load_capabilities
 
     array = np.zeros(4, dtype=np.float64)
-    target = negotiate(array_state(array), OPTILAND_CAPABILITIES)
+    # The one array test that is about a *measured* target rather than about the
+    # conversion machinery, so it loads the record rather than using a synthetic one.
+    target = negotiate(array_state(array), load_capabilities("M_RAY_OPTILAND"))
     out = to_state(array, target)
     assert array_state(out) == target
 

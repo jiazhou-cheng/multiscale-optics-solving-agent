@@ -53,7 +53,7 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from numerics import OPTILAND_CAPABILITIES, ArrayNamespace, DevicePlacement, Precision
+from numerics import ArrayNamespace, DevicePlacement, Precision, load_capabilities
 from operations import CATALOG, OperationKind, resolve
 from representations import RayBundle
 from solvers import optiland
@@ -262,7 +262,9 @@ def test_fp16_refusal_cites_the_measured_table() -> None:
     assert CAPABILITIES in message
     assert "fp32" in message and "fp64" in message
     assert "set_precision" in message, "the evidence sentence from the capability row"
-    assert OPTILAND_CAPABILITIES.precisions == frozenset({Precision.FP32, Precision.FP64})
+    assert load_capabilities("M_RAY_OPTILAND").precisions == frozenset(
+        {Precision.FP32, Precision.FP64}
+    )
 
 
 def test_the_refusal_happens_before_the_solver_is_imported() -> None:

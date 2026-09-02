@@ -96,9 +96,14 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   `rays.py` and `scalar.py`, and those do import `numerics`, so the
 #:   `representations -> numerics` edge is exercised.
 #: * `operations` -- landed by CHE-177/CHE-178 (R03.1/R03.2) as `descriptors.py` and
-#:   `registry.py`, joined by CHE-221 (R03.4)'s `catalog.py`. It imports `numerics`
-#:   (`COMPONENT_CAPABILITIES` and the two measured rows a descriptor cites rather
-#:   than copies) and nothing else in the project. The forbidden edges matter more
+#:   `registry.py`, joined by CHE-221 (R03.4)'s `catalog.py`. Its allowlist permits
+#:   `numerics` and, since CHE-223 (R03.6), it imports **nothing at all** in this
+#:   project. That is correct rather than incomplete, and it is the same situation
+#:   `problems` is in: the package holds references, and CHE-223 made the last one
+#:   -- `capabilities`, previously checked against `numerics.COMPONENT_CAPABILITIES`
+#:   at construction -- a format-validated string like `implementation` always was.
+#:   The `numerics` row stays because a descriptor field could legitimately need the
+#:   precision vocabulary; nothing needs it today. The forbidden edges matter more
 #:   here than anywhere else so far: `operations -> solvers` or `-> couplers` would
 #:   be the end of "listing the registry imports no backend", which is the single
 #:   property the package exists to provide. This allowlist entry and

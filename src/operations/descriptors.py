@@ -27,11 +27,23 @@ particular there is no `maturity`, no `tags`, no `version`, no `source`, no port
 *objects* and no separate spec type per kind.
 
 `capabilities` is a **citation, not a copy**. Device and dtype support is
-measured, and the measurement already lives in `numerics.COMPONENT_CAPABILITIES`
+measured, and the measurement lives in `knowledge/capabilities/<component>.json`
 with the probe that produced it. Restating either here would recreate exactly the
 two-source arrangement R03 exists to remove -- the old tree had a passing test
 asserting its two sources agreed, which made the duplication feel safe rather
-than removable. A descriptor names a row; the row stays where the evidence is.
+than removable. A descriptor names a component; the record stays where the
+evidence is.
+
+**And the citation is validated by format, not by membership** -- CHE-223 (R03.6).
+`__post_init__` used to check `capabilities` against
+`numerics.COMPONENT_CAPABILITIES`, which meant constructing any descriptor
+required the concrete measured table to be importable. That was an asymmetry
+inside one dataclass: `implementation` is a lazily resolved string and
+`capabilities` was a string *plus* an eager global. It was also the last thing
+pinning the rows into the foundational layer. Now both fields are references,
+checked for shape here and for resolution by
+`tests/operations/test_capability_references.py` -- the same division `resolve`
+already had.
 
 What a planner has to be able to ask, and CHE-222 (R03.5)
 ---------------------------------------------------------
@@ -84,17 +96,17 @@ resolve to `solvers.chromatix.solver:propagate` with different `approximation` a
 happens to the physical state". **Nothing may deduplicate the catalog by
 implementation string.** The id is the planning identity.
 
-Nothing here imports a backend. `implementation` is a string, and
-`operations.resolve` is the only function in the package that turns one into
-code.
+Nothing here imports a backend, and since CHE-223 (R03.6) this module imports
+nothing from this project at all: `implementation` is a string, `capabilities` is a
+string, and `operations.resolve` is the only function in the package that turns
+either kind of reference into anything.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
-
-from numerics import COMPONENT_CAPABILITIES
 
 __all__ = [
     "DERIVATIVE_MODES",
@@ -179,6 +191,20 @@ OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
 #: with no input would observe nothing. `__post_init__` refuses all three, which is
 #: the check that makes `inputs=()` an honest declaration rather than a hole.
 ENTRY_KINDS: frozenset[str] = frozenset({"solver"})
+
+#: The shape of a component id, which is what `capabilities` cites.
+#:
+#: Screaming snake case, starting with a letter. Deliberately permissive about the
+#: *prefix*: the two measured records today are component-level (`M_RAY_OPTILAND`,
+#: `M_WAVE_CHROMATIX`) because that is what the probes measured -- the packages'
+#: device and dtype behaviour, not any one semantic operation -- and CHE-223 keeps
+#: the door open for an operation-level record when one is independently measured.
+#: A pattern that demanded `M_` would forbid that; one that accepted anything would
+#: admit a typo like `"m_ray_optiland"` as a citation nothing resolves.
+#:
+#: Shape only. Whether a record exists is a question about the knowledge pack, and
+#: answering it here would put the concrete table back behind every construction.
+_COMPONENT_ID = re.compile(r"[A-Z][A-Z0-9_]*")
 
 #: What may be claimed about differentiating through an operation.
 #:
@@ -269,8 +295,11 @@ class OperationDescriptor:
     `validity`
         Conditions under which the operation is applicable at all.
     `capabilities`
-        The name of a row in `numerics.COMPONENT_CAPABILITIES`, or `None`. Cited,
-        never copied.
+        The id of a component with a measured capability record under
+        `knowledge/capabilities/`, or `None`. Cited, never copied, and checked for
+        **shape** rather than for membership -- see above. `None` is the honest
+        citation for an operation with no measured device/dtype row of its own,
+        which is every operation that imports no backend.
     `cost`
         Scaling information when it is known, `None` when it is not.
     `derivative` / `derivative_evidence`
@@ -412,13 +441,16 @@ class OperationDescriptor:
             )
         if any(not str(item).strip() for item in self.evidence):
             problems.append("`evidence` contains an empty reference")
-        if self.capabilities is not None and self.capabilities not in COMPONENT_CAPABILITIES:
+        if self.capabilities is not None and not _COMPONENT_ID.fullmatch(self.capabilities):
             problems.append(
-                f"`capabilities` cites {self.capabilities!r}, which is not a row in "
-                f"numerics.COMPONENT_CAPABILITIES {sorted(COMPONENT_CAPABILITIES)}. Device "
-                "and dtype support is measured and lives with its probe; a descriptor "
-                "cites a row, and citing one that does not exist claims a measurement "
-                "nobody took."
+                f"`capabilities` cites {self.capabilities!r}, which is not the shape of a "
+                f"component id ({_COMPONENT_ID.pattern}). Device and dtype support is "
+                "measured and lives with its probe under knowledge/capabilities/; a "
+                "descriptor cites a component and nothing here loads one, so whether the "
+                "record EXISTS is checked by "
+                "tests/operations/test_capability_references.py rather than at "
+                "construction. Citing a well-formed id with no record behind it claims a "
+                "measurement nobody took, and that test is what catches it."
             )
         if self.derivative not in DERIVATIVE_MODES:
             problems.append(
