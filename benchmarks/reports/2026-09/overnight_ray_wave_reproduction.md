@@ -49,8 +49,9 @@ still brackets the shipped `S = 20 000`.
 **What the numbers cannot say.** Demo3's routes disagree at NCC 0.014 at a budget
 where each route's own seed-to-seed NCC is 0.004–0.046, so the reconstruction is
 noise-dominated and a bare cross-route NCC has no resolution on the optical model
-(§8.1–8.2). The probe's own noise-limited-agreement statistic predicts 0.0158
-against the measured 0.0143, a ratio of 0.91 — consistent with two noise-limited
+(§8.1–8.2). The probe's own noise-limited-agreement statistic, computed through its
+`--agreement-from` path over the full 3 × 3 cross-seed matrix, predicts 0.0158
+against a measured 0.0163 — **ratio 1.03**, consistent with two noise-limited
 estimates of the *same* signal, which is the strongest statement available without
 converging either. The committed baseline shows the same picture, so this is the
 existing state rather than a regression.
@@ -954,7 +955,33 @@ Carried through unchanged from the probe, and each is scored rather than argued:
 * **Origin at index `n // 2`**, this repository's rule, where upstream uses
   `(n−1)/2`.
 
-### 7.9 Resources
+### 7.9 The figure
+
+`outputs/che-238-overnight/workstream-c/figures/demo2_fig5b_sensor_fields.png`,
+rendered by the probes' own `demo_figures.py::figure_demo2` from this run's
+fields. Eight panels: the DOE transmission phase, the float64 ASM oracle at both
+paddings, the three routes, the spatially resolved RW-P residual, and a
+log-scale central row cut with all five curves overlaid.
+
+All five reconstructions are indistinguishable by eye, which is what the panel
+captions' numbers say quantitatively (NCC 1.000000 / 0.998693 / 0.999418). **The
+informative panel is the residual**: `|RW-P − matched oracle| / max|oracle|` is
+concentrated on the bright ring and arc edges rather than spread over the frame,
+which is the signature of estimator shot noise scaling with signal amplitude —
+not a structural error in the reconstruction.
+
+**How it was produced, because it required one extra run.** `figure_demo2` reads
+`demo2_paper_figure_jax_fields.npz`, and `*_fields.npz` is `.gitignore`d, so the
+figure cannot be rendered from a fresh checkout at all. The three-route run was
+therefore repeated with `--save-fields` under the name `che238_demo2_figure`
+(rw_f, rw_f_paper_budget, rw_p in one process, 73 s on GPU 6, numbers identical to
+§7.3–§7.4), and rendered through a scratch records directory that
+`demo_figures.RECORDS` was repointed at. **The figure code itself is unmodified
+and no tracked record was overwritten** — writing under the canonical name would
+have clobbered the committed `demo2_paper_figure_jax.json`. `git status` in the
+worktree stayed free of modifications throughout.
+
+### 7.10 Resources
 
 Swap **0 B** before, during and after. One GPU, one job at a time, nothing
 detached, and GPU 6 back to 2 MiB after each run. No stop condition fired.
@@ -1038,26 +1065,39 @@ unambiguous:
 | transcription error | not applicable — Option A | n/a |
 
 **The right statistic is one the probe already ships, and it changes the reading.**
-`demo3_hologram_lens.py::_noise_limited_agreement` exists for exactly this
-question, and its docstring says a bare cross-route NCC "on its own says nothing":
-if two routes estimate the *same* signal under independent noise, then
+`demo3_hologram_lens.py::_noise_limited_agreement`, reachable through the
+`--agreement-from` entry point, exists for exactly this question, and its
+docstring says a bare cross-route NCC "on its own says nothing": if two routes
+estimate the *same* signal under independent noise, then
 
     NCC(A, B) ~= sqrt( NCC(A, A') * NCC(B, B') )
 
-Computed from §8.2's own numbers — mean pairwise 0.0056150 (rw_f) and 0.0442990
-(rw_p):
+**Computed through the probe's own path**, not by hand — `--agreement-from` over
+two 3-seed field files, which averages the full 3 × 3 cross-seed matrix rather
+than one seed pair:
 
 | | value |
 | --- | --- |
-| predicted `sqrt(0.0056150 × 0.0442990)` | **0.015771** |
-| measured route-to-route NCC | **0.014333** |
-| ratio | **0.909** |
+| `mean_self_ncc`, rw_f | 0.0056150 |
+| `mean_self_ncc`, rw_p | 0.0442990 |
+| `predicted_if_same_field` = `sqrt(·×·)` | **0.015771** |
+| `mean_cross_route_ncc` (9 pairs) | **0.016312** |
+| **`ratio_measured_over_predicted`** | **1.034** |
 
 By the probe's own reading that is *evidence of agreement* — the two routes are as
 correlated as two noise-limited estimates of the same signal should be — and it is
 the strongest statement available without converging either. **The uncertainty on
-that ratio is not quantified here**, so it is reported as a consistency check and
-not as a measured agreement.
+that ratio is not quantified**, so it is a consistency check and not a measured
+agreement.
+
+An earlier draft of this section reported **0.909** for that ratio. That figure was
+computed by hand against the *same-seed* cross-route NCC (0.014333) where the
+statistic is defined on the **mean over all nine cross-seed pairs** (0.016312).
+Same-seed is the wrong numerator: two routes sharing a seed do not share an RNG
+stream, so it is one draw from the same distribution the other eight come from,
+and using it alone both biases the estimate and discards eight ninths of the data.
+The corrected value is closer to unity, so the conclusion strengthens rather than
+changes.
 
 One claim an earlier draft of this section made is **false and is withdrawn**: that
 "each route disagrees with itself across seeds by more than the two routes disagree
@@ -1292,7 +1332,45 @@ out of scope and would not be the probe the ticket names. Follow-up in §10.
   `decomposition` and `allocation`; the reduction question belongs to CHE-120 and
   is not this ticket's.
 
-### 8.8 Resources
+### 8.8 The figure
+
+`outputs/che-238-overnight/workstream-d/figures/demo3_fig5c_sensor_fields.png`,
+from `demo_figures.py::figure_demo3`. Six panels: the DOE phase profile, both
+routes at one seed, both routes as a coherent mean of the three seeds, and a text
+panel the figure generates itself.
+
+**The figure is honest about what it shows and the text panel is the reason to
+keep it.** It prints its own statistics — mean cross-route NCC 0.0163, predicted
+0.0158, ratio 1.03, seed-to-seed 0.0056 and 0.0443 — and then states the reading:
+*"each route disagrees with ITSELF at the same order as with the other one. Both
+routes are unbiased estimators of the same field. Their disagreement is fully
+explained by their own seed-to-seed scatter, so it is Monte-Carlo variance, not a
+physics discrepancy between the routes."* Note the phrasing the probe's author
+chose — **"at the same order as"**, not "by more than", which is exactly the
+hedging §8.1's first draft got wrong.
+
+The single-seed panels look like noise, and the figure's title says so:
+`NOISE-LIMITED, not converged`. The three-seed coherent means begin to show the
+ring structure, RW-P more visibly than RW-F. The figure also carries the
+convergence extrapolation — log-log slope 0.956 in ray count, NCC 0.9 at 1.78e9
+rays (~1.2 h per run) against the paper's own 2.6e9 — and states that no oracle
+panel exists because the paper states no conventional reference does.
+
+Producing it needed three extra runs: rw_f and rw_p each at the characterization
+preset with all three seeds (2 m 05 s and 2 m 59 s on GPU 6), then
+`--agreement-from` over the two field files. The single-route numbers are
+identical to §8.2's. Rendered through the same scratch-records indirection as
+§7.9; no tracked record was overwritten.
+
+**One demo3 figure cannot be produced at all.** `figure_demo3_kspace_rwf` — the
+*converged* full-aperture panel, and per `demo_figures.py`'s own docstring "the
+only demo3 panel here that is allowed to look like a formed image" — reads
+`demo3_enumerated_reference_rwf_{ramp,kspace}_fields.npz`, which are written by
+`demo3_enumerated_reference.py`. That is the 40 626-NUL-byte file of §8.6. So the
+corrupt script does not only block evidence item 5; it blocks the one demo3 figure
+that would show a converged image.
+
+### 8.9 Resources
 
 Swap **0 B** throughout, re-checked after every run. GPU 6 only, one job at a
 time, nothing detached; peak JAX in-use 2.38 GB (characterization) and 0.29 GB
@@ -1380,7 +1458,36 @@ copied out. `git worktree list` is back to the two pre-existing entries, no bran
 was created, and the working branch never moved off
 `chengjiazhou4802/che-152-greenfield-rewrite`.
 
-### 9.5 What did not run, across the whole night
+### 9.5 Figures — omitted on the first pass, then produced
+
+The parent's execution order names "figures + final report" as step 9. The first
+pass through this report produced the report and **no figures at all**, and did
+not list them in the not-run section either — so the omission was invisible in a
+document whose contract is that an unrun check says so. Both failures are mine and
+the second is the worse one.
+
+Two figures now exist, rendered by the probes' own `demo_figures.py` with the code
+unmodified:
+
+| figure | path |
+| --- | --- |
+| Demo2, paper Fig 5b | `outputs/che-238-overnight/workstream-c/figures/demo2_fig5b_sensor_fields.png` |
+| Demo3, paper Fig 5c | `outputs/che-238-overnight/workstream-d/figures/demo3_fig5c_sensor_fields.png` |
+
+Neither could be rendered from the records the first pass saved: `figure_demo2`
+and `figure_demo3` read `*_fields.npz` arrays, `benchmarks/probes/records/**/*_fields.npz`
+is `.gitignore`d, and workstream C never passed `--save-fields`. Four extra runs
+(73 s + 2 m 05 s + 2 m 59 s + an `--agreement-from` pass) supplied them. Details in
+§7.9 and §8.8.
+
+Producing them also **corrected a number in §8.1**: the noise-limited-agreement
+ratio is 1.034 through the probe's own path, not the 0.909 this report first
+carried from a hand computation against the wrong cross-route quantity.
+
+**A third demo3 figure remains unproducible** and its cause is §8.6's corrupt
+script — see §8.8.
+
+### 9.6 What did not run, across the whole night
 
 * The sampling-bound refusal (§6.4) — declared in the catalog, enforced nowhere,
   so there is nothing to test.
@@ -1393,6 +1500,9 @@ was created, and the working branch never moved off
 * Demo3's `candidates` / `ladder` / `l1map` variance stages, which belong to
   CHE-120 rather than to this ticket (§8.7).
 * No gradient was claimed anywhere. Every descriptor touched is `forward_only`.
+* `figure_demo3_kspace_rwf` and `figure_demo3_kspace` — the first blocked by the
+  corrupt script (§8.8), the second needing `demo3_stage_ramp` and
+  `demo3_kspace_rw_p` field dumps this run did not regenerate.
 
 ## 10. Follow-up tickets recommended
 
