@@ -18,7 +18,7 @@ below are the report.)*
 | --- | --- | --- |
 | A — ray tutorial / system regression | **run** — 38 Tier-1 rows, 96 Tier-2 rows; one confirmed defect | §5 |
 | B — wave kernel sweep | **run** — 24 rows; a second overstated record found | §6 |
-| C — Demo2 reproduction | not yet run | §7 |
+| C — Demo2 reproduction | **run, `PASS-native`** — Option B not needed | §7 |
 | D — Demo3 characterization | not yet run | §8 |
 
 ---
@@ -109,8 +109,17 @@ Installed packages, from `importlib.metadata` inside the container:
 | matplotlib | 3.11.1 |
 | pytest | 9.1.1 |
 
-`jax.devices()` inside the CPU image → `[CpuDevice(id=0)]`.
+`jax.devices()` inside the **CPU** image → `[CpuDevice(id=0)]`.
 `torch.cuda.is_available()` → `False`; `torch.version.cuda` → `None`.
+
+**Corrected during workstream C.** Those two lines describe the *CPU* image, which
+is what `./run.sh` uses by default, and §3.2 below originally generalized them into
+"the night's declared workloads are CPU-only". The separately-built
+`agent_solver_gpu` image exists (`b626c10c5dca`, 9.61 GB) and carries
+**`torch 2.13.0+cu126` with `torch.cuda.is_available() → True`** and a CUDA jaxlib
+(`jax.devices() → [CudaDevice(id=0)]`). Workstreams A and B genuinely needed no
+device; **workstream C ran on GPU 6**. The original sentence was true of the image
+it was measured in and false as a statement about the night.
 
 ### 3.1 Upstream pin vs installed version
 
@@ -131,11 +140,15 @@ Swap:  1.8Ti total, 0B used            <- baseline; any growth is a stop conditi
 GPU 0-7: NVIDIA RTX A6000, 49140 MiB each, 2 MiB used, 0% util   (all idle)
 ```
 
-The night's declared workloads are **CPU-only**: the default image ships
-`torch+cpu` and a CPU-only jaxlib, and none of the seven wave kernel checks or the
-three ray observables needs a device. No GPU was requested and `--gpu` was not
-used, so the GPU preference (6 or 7) never became relevant. This is stated because
-"we used GPU 6" and "we needed no GPU" are different results.
+**Workstreams A and B are CPU-only** and needed no device: none of the seven wave
+kernel checks or the three ray observables uses one. **Workstream C ran on GPU 6**
+through `MOA_GPUS=device=6 ./run.sh --gpu`, which is the `agent_solver_gpu` image
+described in the correction above — the Demo2 probes are GPU workloads by
+construction and their committed baselines were produced on one. Workstream D is
+not yet run and this section makes no claim about it.
+
+One GPU, never two, and never concurrently with another job. Swap was re-checked
+after every GPU run and stayed at **0 B**; GPU 6 returned to 2 MiB after each.
 
 ---
 
@@ -158,12 +171,17 @@ used, so the GPU preference (6 or 7) never became relevant. This is stated becau
   This is a deliberate trade: the gate says a committed record must have a
   declared generator in one of two trees, and honouring it costs a level of
   indirection rather than a widened rule.
+* Every record carries provenance: git SHA, branch, UTC timestamp, command,
+  device, package versions (including `optiland`), dtype, the numerical
+  parameters, seed where one exists, runtime, and status — **for the records this
+  run writes itself**. Workstreams C and D reuse the `che-140` probes' own record
+  writer, whose schema predates this contract and omits the branch, the command
+  and the status, and whose `commit` field returned `"unknown"` under a detached
+  worktree. Where that happens the report attests those fields instead and says so
+  (§7.1).
 * Records are **new files**; no historical record is overwritten. Where a
   workstream reads a `che-140` record for comparison it reads it out of that
   tree and writes its own result here.
-* Every record carries provenance: git SHA, branch, UTC timestamp, command,
-  device, package versions (including `optiland`), dtype, the numerical
-  parameters, seed where one exists, runtime, and status.
 * Status vocabulary is the ticket's: `PASS`, `PASS-refused`, `FAIL`, `BLOCKED`,
   `NOT-COVERED`, extended for C/D by CHE-241/242 §4.4 with `PASS-native`,
   `PASS-graph-only`, `PASS-transcribed`, `BLOCKED-no-backend`,
@@ -687,7 +705,230 @@ is invisible in a rotationally symmetric case).
 
 ## 7. Workstream C — Demo2 reproduction (CHE-241)
 
-*Not yet run.*
+**Status: `PASS-native`.** Option B (graph + PyTorch transcription) was not needed
+and, per the ticket, was therefore not run as a substitute.
+
+Ran against the `che-140` tree at `eb3d792` through a **detached `git worktree`**
+(CHE-238 §2.1) — the working branch never changed and no branch was created. All
+four probe records are copied to
+`outputs/che-238-overnight/workstream-c/che238_demo2_*.json`, byte-identical to
+the worktree originals.
+
+**These four records use the `che-140` probe's own schema, not §4's contract.**
+They carry `environment.commit: "unknown"`, `record_provenance.source_commit:
+null` and `working_tree_dirty: true`, and no branch, command or status field —
+because a detached worktree has no branch and the probe's provenance code reads
+`git` in a way that returned nothing here. So the SHA `eb3d792`, the branch, the
+commands and the `PASS-native` status are **this report's** attestation rather than
+the records' own. What the records do carry is a code fingerprint over 34 source
+files, the environment fingerprint, the full parameter set and every metric; the
+substance is intact and the provenance fields are not. §4's blanket "every record
+carries provenance" is false for these four and is corrected there.
+
+### 7.1 Capability preflight (§2), and the decision
+
+The 5-minute timebox was not needed; the preflight took under two minutes.
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | `torch.__version__`, build, CUDA, devices | CPU image: `2.13.0+cpu`, `cuda_is_available False`. **GPU image: `2.13.0+cu126`, `True`**, `jax.devices() → [CudaDevice(id=0)]` |
+| 2 | Do the descriptors declare a torch-capable backend, and can backend selection be pointed at torch without a code change? | **The question does not arise.** `demo2_hologram.py`'s own `--backend` choices are `numpy` and `jax`. Torch is not an option on this path and never was; the probe reaches jax through `_demo_support.enable_x64_if_needed` and numpy otherwise. |
+| 3 | Cheapest native smoke | `--preset smoke --backend numpy`: **succeeded in 3.6 s.** RW-F NCC 1.000000, complex rel-L2 7.34e-13 (7.11e-13 phase-aligned); RW-P NCC 0.844177 |
+
+**Decision: Option A (native).** The smoke succeeded, so §2 forbids running Option
+B at all. And the amendment's premise — "it is not yet established that the
+probe/solver path in this branch has a working PyTorch backend" — resolves in a
+way the amendment did not anticipate: the probe path does not *want* a torch
+backend. It offers numpy and jax, jax has a working CUDA build in the GPU image,
+and that is the path the committed baselines were produced on.
+
+So there is no graph serialization, no transcription, no parameter parity table
+and no `BLOCKED-no-backend` in this workstream. Nothing under
+`benchmarks/probes/records/ray_wave/transcription/` was created.
+
+### 7.2 What was run
+
+Four runs, all with `--output-name che238_*` so no historical record was touched.
+
+| run | device | routes | wall clock |
+| --- | --- | --- | --- |
+| `--preset smoke --backend numpy` | CPU | rw_f, rw_p | 3.6 s |
+| `--preset paper --backend jax` | **GPU 6** | rw_f, rw_p | 69 s |
+| `--preset paper --routes rw_f_paper_budget` | **GPU 6** | rw_f_paper_budget | 7 s |
+| `demo2_cost_sweep.py --backend jax` | **GPU 6** | 15 cells | 2 m 41 s |
+
+### 7.3 RW-F — the exactness anchor holds
+
+| configuration | rays | NCC | intensity MSE | complex rel-L2 | phase-aligned rel-L2 | peak GB | t |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| enumerated, every propagating mode | 39 601 | **1.000000** | **1.03e-32** | **7.34e-13** | **7.11e-13** | 0.228 | 2.64 s |
+| Table S2's stochastic budget | 1 100 000 | 0.998693 | 1.62e-10 | 8.87e-02 | 8.87e-02 | 6.327 | 3.49 s |
+
+One full-aperture patch enumerating every propagating mode reproduces the ASM
+reference **to float64 round-off** — rel-L2 7.3e-13 on the complex
+field, intensity MSE 1e-32. That is the anchor CHE-241 asks for and it is intact.
+
+Note what the second row shows: at the paper's own *stochastic* 1.1e6-secondary
+budget the same route gives rel-L2 8.9e-2 — a factor of 1.2e11 worse than
+enumerating. The anchor is a property of enumeration, not of the full-aperture
+patch.
+
+**Standing.** The oracle is `src/verification/asm_oracle.angular_spectrum_float64`
+— *this repository's own* float64 angular spectrum. `AGENTS.md` forbids repository
+numerical code as the sole correctness oracle for the same numerical code, so this
+is **characterization**, not validation. It establishes that the patch route and
+the ASM route agree where the theory says they must; it does not establish that
+either is right. The probe's own record says the oracle is "independent of the
+coupler under test", which is true of the *coupler* and not of the repository.
+
+### 7.4 RW-P — convergence toward the anchor
+
+**The precision differs between the two, and it is declared rather than implied.**
+`rw_f` ran fp64 / `complex128`; `rw_p` and every cost-sweep cell ran fp32 /
+`complex64` — which is the presets' own choice, not this run's. Nothing below is
+near a complex64 floor (the best rel-L2 is 2.9e-2, seven orders above it), so the
+convergence claim is unaffected; it is stated because the anchor and the sweep are
+different dtypes and dtype is one of this report's declared non-negotiables.
+
+The full 15-cell `(incident, secondary)` grid, no cells skipped:
+
+| incident \ secondary | 100 | 1 000 | 10 000 |
+| --- | --- | --- | --- |
+| **100** | 0.291035 | 0.808733 | 0.908363 |
+| **400** | 0.692094 | 0.954695 | 0.980163 |
+| **1 600** | 0.917171 | 0.987766 | 0.994256 |
+| **6 400** | 0.978978 | 0.995614 | 0.997272 |
+| **16 000** | 0.991700 | 0.998696 | **0.999418** |
+
+NCC against the matched-periodicity oracle. **Monotone in both arguments, every
+row and every column**, from 0.291 at 1e4 rays to 0.999418 at 1.6e8 — 4.2 decades
+of ray budget, with no non-monotonicity anywhere. `1 − NCC` falls 0.709 → 5.8e-4,
+about 3.1 decades, and complex rel-L2 falls 2.763 → 0.0286 over the same span. That is the convergence relationship CHE-241
+asks for, and it is not merely "monotone-ish".
+
+Cost, which is the other half of the sweep. **This is one slice** — the
+`secondary = 10 000` column, plus the 1e4 corner — and the slice matters, because
+total rays does not determine cost:
+
+| incident × secondary | total rays | wall clock | rays/s | batches |
+| --- | --- | --- | --- | --- |
+| 100 × 100 | 1e4 | 2.69 s | 3.7e3 | 1 |
+| 100 × 10 000 | 1e6 | 2.41 s | 4.1e5 | 1 |
+| 1 600 × 10 000 | 1.6e7 | 5.96 s | 2.7e6 | 4 |
+| 6 400 × 10 000 | 6.4e7 | 24.0 s | 2.7e6 | 16 |
+| **16 000 × 10 000** | **1.6e8** | **58.2 s** | **2.7e6** | **40** |
+
+Throughput saturates at ~2.7e6 rays/s **on this slice**, and the small cells are
+dominated by fixed cost — the shape the probe's own `cost_model` note predicts for
+an O(N_rays × N_pixels) reconstruction. Off the slice it does not hold: the
+*other* 1.6e7-ray cell (16 000 × 1 000) took 17.66 s at 9.1e5 rays/s, and the
+1.6e6-ray `secondary = 100` cell ran at 1.2e5 rays/s. Secondary count per
+incident, not total rays, is what sets throughput here.
+
+Peak device memory is omitted from the rows above rather than repeated: JAX
+reports a process high-water mark, so every cell after the first large one shows
+the same 11.52 GB and the column would say nothing per row. §7.9 has the figure
+and what it means.
+
+### 7.5 Comparison to the existing records — reproduces exactly
+
+Against the committed `che-140` records at commit `da2e757b`:
+
+| quantity | committed | this run | agreement |
+| --- | --- | --- | --- |
+| rw_f NCC (paper) | 1.000000 | 1.000000 | exact |
+| rw_f rel-L2 (paper) | 7.3383e-13 | 7.3383e-13 | exact |
+| rw_p NCC (paper) | 0.999418 | 0.999418 | exact |
+| rw_p rel-L2 (paper) | 2.8562e-02 | 2.8562e-02 | exact |
+| rw_f_paper_budget NCC | 0.998693 | 0.998693 | exact |
+| smoke-numpy rw_p NCC | 0.844177 | 0.844177 | exact |
+| cost sweep best NCC | 0.9994182326189224 | 0.9994182326189224 | exact |
+| cost sweep cells measured | 15 | 15 | — |
+
+Every accuracy number reproduces to all printed digits. Only wall clock differs
+(rw_p paper: 94.9 s committed against 62.5 s here — a different A6000 and a
+different driver, not a numerical change), which is the expected axis of variation
+and is why the ticket separates cost metrics from accuracy metrics.
+
+One pre-existing record does *not* line up with the current preset, and it is a
+record-vintage question rather than a discrepancy: `demo2_smoke_jax.json` reports
+`rw_f` with **20 000** rays at NCC 0.921456, where the current `smoke` preset's
+`rw_f` enumerates **39 601** modes at NCC 1.000000. The record predates a preset
+change. Recorded rather than chased — reproducing it was not asked for.
+
+### 7.6 Comparison to the paper — reported separately, never a threshold
+
+SI Table S2, System 2, on 1× RTX A6000 48 GB / CUDA 12.4:
+
+| | paper | this run | note |
+| --- | --- | --- | --- |
+| RW-F secondary rays | 1.1e6 | 1.1e6 (matched budget) | |
+| RW-F MSE | 4.414e-10 | 1.62e-10 | different reconstruction |
+| RW-F NCC | 0.997 | 0.998693 | |
+| RW-F peak memory | 8.086 GB | 6.327 GB | |
+| RW-F runtime | 0.097 s | 3.49 s | **36× slower** |
+| RW-P incident × secondary | 1.6e4 × 1e4 | 1.6e4 × 1e4 | matched |
+| RW-P batches | 2 | **40** | forced; see below |
+| RW-P peak memory | 29.213 GB | 11.52 GB | |
+| RW-P runtime | 2.275 s | 62.47 s | **27× slower** |
+
+The runtime gap is the probe's own documented cost-model difference, not a
+regression: this reconstruction is O(N_rays × N_pixels) — a separable
+`einsum("n,ny,nx->yx")` — where the paper's is O(N_rays) + one FFT. The 40 batches
+against the paper's 2 follow from the same fact: 1.6e8 rays at 100² needs ~256 GB
+of separable factors in one call — the probe's own estimate is "4e6 rays × 100
+pixels × 2 separable factors × 8 B is ~6 GB", which scales to 256 GB and is
+consistent with 40 × ~6.4 GB — and 40 chunks holds it to ~11.5 GB. Batching
+cannot change the estimator — the total is known before the first chunk, the
+`1/N` is applied once at `finalize`, and chunking is over whole patches
+(`_demo_support.patch_route`) — so it costs accuracy nothing. That argument is
+**structural and unmeasured here**: `demo2_cost_sweep.py` derives the batch count
+as `ceil(total / 4e6)`, so no cell in the grid holds the ray budget fixed while
+varying batches, and §7.4 therefore does not confirm it. A controlled
+batch-invariance run is a follow-up (§10).
+
+**None of these is a pass threshold.** Different implementation, different ray
+budget, different reconstruction algorithm — quoting NCC 0.997 as a gate would be
+circular validation, and the probe's own record says so in a top-level field.
+
+### 7.7 Optiland is not exercised
+
+Stated because it is the one thing a reader could wrongly infer. Demo2 is a bare
+SLM behind a circular amplitude mask and a sensor, with **no refractive surface**,
+so nothing here validates the ray engine either way. The probe records
+`optiland_used: false` with that reason attached, and this workstream adds no ray
+evidence to workstream A's.
+
+### 7.8 Three deliberate deviations from the notebook, preserved
+
+Carried through unchanged from the probe, and each is scored rather than argued:
+
+* **Coherent field accumulation** (SI eq S5) rather than the notebook's
+  `|field|²`-then-square-again. The notebook variant is computed alongside on
+  every route: NCC 0.982 against 1.000 on rw_f, 0.979 against 0.999 on rw_p.
+* **Unflipped phase.** The notebook's `flip(phase, dims=[0,1])` compensates
+  DeepLens's `Ray.flip_xy`, which this pipeline does not have. Both orientations
+  are scored once: the flipped mask scores 0.623 against 1.000 on rw_f, so the
+  flip is not physically required here.
+* **Origin at index `n // 2`**, this repository's rule, where upstream uses
+  `(n−1)/2`.
+
+### 7.9 Resources
+
+Swap **0 B** before, during and after. One GPU, one job at a time, nothing
+detached, and GPU 6 back to 2 MiB after each run. No stop condition fired.
+
+Two GPU-memory figures, and for a shared server the second is the load-bearing
+one:
+
+* **11.52 GB** is JAX's in-use high-water mark on the largest cell, which is what
+  the records carry as `device_memory.peak_bytes_in_use`. It is the accumulator's
+  own footprint.
+* **~38 GB** is what the process actually held. The records report
+  `bytes_limit = 38 275 448 832` — 75 % of the card — and neither `run.sh` nor the
+  probes set `XLA_PYTHON_CLIENT_PREALLOCATE`, so the JAX client reserved that much
+  on GPU 6 for the duration of each run. Anyone sizing a concurrent job on GPU 6
+  needs the 38 GB, not the 11.5 GB.
 
 ## 8. Workstream D — Demo3 characterization (CHE-242)
 
@@ -712,7 +953,8 @@ report. The one defect found (§5.3) is recorded and left unfixed on purpose.
 | `./run.sh ruff check .` | after CHE-239 | all checks passed |
 | `make test` | after CHE-239 | 1745 passed, 7 skipped, 12 deselected |
 | `./run.sh ruff check .` | after CHE-240 | all checks passed |
-| `make test` | after CHE-240 | see below |
+| `make test` | after CHE-240 | 1745 passed, 7 skipped, 12 deselected |
+| worktree cleanliness | after CHE-241 | `git status` in the `che-140` worktree shows only the four untracked `che238_*` records; every historical record untouched |
 
 ### 9.3 Resource incidents so far
 
@@ -726,7 +968,11 @@ tutorial 4f's entire lens, which was built in the same cell as a *commented-out*
 
 One Bash-level timeout left an orphaned `agent_solver` container running the
 Tier-2 sweep; it was `docker stop`ped before the next run. Swap stayed at 0 B
-throughout. No GPU was used. Peak RSS across the night so far: 1.0 GiB.
+throughout. Peak host RSS across the night so far: 1.0 GiB (workstream A's Tier 2).
+
+Workstream C used **GPU 6** and nothing else. Peak JAX in-use 11.52 GB with a
+~38 GB client reservation (§7.9); GPU 6 idle at 2 MiB before and after each run.
+No stop condition fired at any point.
 
 ## 10. Follow-up tickets recommended
 
@@ -765,6 +1011,10 @@ Also worth tickets:
   into `SourceSpec.object_distance_mm` and verify an object-height → field-angle
   conversion. That is what unblocks tutorial 4e and the `UVProjectionLens` sample
   (§5.5).
+* A controlled batch-count invariance run on Demo2: hold the ray budget fixed and
+  vary `--batches`. The estimator argument is structural and currently unmeasured
+  (§7.6), and the cost sweep cannot measure it because it derives batches from the
+  budget.
 * Exercise the clip/survival path. No system in workstream A declares a surface
   aperture, so `to_ray_bundle`'s filtering is untested by this run (§5.6 item 3).
 * Add `tqdm`, `scikit-learn` and `gymnasium` to the `agent_solver` image if
