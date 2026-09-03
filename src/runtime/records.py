@@ -17,11 +17,14 @@ The split the records are built around
 --------------------------------------
 An `ExecutionRecord` has two halves and they answer different questions:
 
-* `request` and `route` -- **what to run.** Typed inputs and operation ids. A
-  re-run reads these and nothing else, which is what makes the rule above
-  checkable rather than merely stated: the deletion test re-derives the physics
-  *from the record* after stripping each provenance field, so a field that
-  physics read would show up as a changed number.
+* `request`, `node_requests` and `route` -- **what to run.** Typed inputs and
+  operation ids. A re-run reads these and nothing else, which is what makes the
+  rule above checkable rather than merely stated: the deletion test re-derives the
+  physics *from the record* after stripping each provenance field, so a field that
+  physics read would show up as a changed number. `node_requests` is in this half
+  and not the other because a repeated operation's arguments are an input: a route
+  that transforms at f1 and then at f2 is a different system from one that
+  transforms twice at f1, and nothing else in the record can tell them apart.
 * `nodes` and `provenance` -- **what happened.** Statuses, structured
   diagnostics, the device and precision actually observed, and the fingerprints.
   Nothing in this half is an input to anything.
@@ -164,7 +167,13 @@ FINGERPRINTED_PACKAGES: tuple[str, ...] = (
 #: The provenance block's schema version. Read by `from_json`, which refuses a
 #: version it does not know -- a version nothing validates reads as a
 #: compatibility guarantee and is not one.
-PROVENANCE_SCHEMA_VERSION = 1
+#:
+#: Bumped to 2 when `node_requests` joined the "what to run" half, so a
+#: version-1 payload is missing a key this reader requires. Nothing serialized
+#: under version 1 is committed anywhere in the repository, so the bump strands no
+#: artifact -- and a reader that silently defaulted the new key would claim a run
+#: had no per-node arguments when the record simply predates them.
+PROVENANCE_SCHEMA_VERSION = 2
 
 #: What a fingerprinted payload may not contain, and the two shapes that put it
 #: there. A uuid or an ISO timestamp anywhere in a hashed payload makes the hash
@@ -253,8 +262,9 @@ class ExecutionRecord:
     """One execution, as what to re-run plus what happened.
 
     Minimality rule 2: this is the public serialized model, and the two halves are
-    the whole design -- see the module docstring. `route` and `request` are inputs
-    a re-run reads; `nodes` and `provenance` are observations nothing reads back.
+    the whole design -- see the module docstring. `route`, `request` and
+    `node_requests` are inputs a re-run reads; `nodes` and `provenance` are
+    observations nothing reads back.
 
     `status` is derived rather than stored: a record whose `status` could disagree
     with its nodes has two answers to "did this run", and the nodes are the ones
@@ -263,6 +273,22 @@ class ExecutionRecord:
 
     route: tuple[str, ...]
     request: Mapping[str, Any] = field(default_factory=dict)
+    #: One request per step of `route`, when the plan gave each occurrence its own,
+    #: and `()` when every node was bound from the shared `request`.
+    #:
+    #: **An input, not an observation**, which is why it sits in this half beside
+    #: `route` and not on `NodeRecord`. It exists because a route may repeat an
+    #: operation -- two focal-plane transforms at f1 and f2 -- and one flat mapping
+    #: keyed by parameter name cannot say which occurrence `focal_length_m` belongs
+    #: to. Measured before it existed: the six-node 4f plan bound f1 to *both* legs
+    #: and reported `completed`, with nothing in the record saying f2 had never been
+    #: read. So the per-node requests are recorded for the same reason `request` is
+    #: -- they are what a re-run reads -- and a record that dropped them would
+    #: describe a system it did not run.
+    #:
+    #: Aligned with `route` by index and validated to its length, so an entry cannot
+    #: belong to an operation other than the one it is written beside.
+    node_requests: tuple[Mapping[str, Any], ...] = ()
     nodes: tuple[NodeRecord, ...] = ()
     provenance: Mapping[str, Any] = field(default_factory=dict)
 
@@ -293,6 +319,21 @@ class ExecutionRecord:
                 object.__setattr__(self, name, dict(getattr(self, name)))
             except (TypeError, ValueError):
                 problems.append(f"`{name}` is not a mapping")
+        try:
+            per_node = tuple(dict(entry) for entry in self.node_requests)
+        except (TypeError, ValueError):
+            problems.append("`node_requests` is not a sequence of mappings")
+        else:
+            object.__setattr__(self, "node_requests", per_node)
+            if per_node and len(per_node) != len(self.route):
+                problems.append(
+                    f"{len(per_node)} per-node request(s) for a {len(self.route)}-operation "
+                    "route. `node_requests` is aligned with `route` by index, so a short "
+                    "one would silently attribute a request to the wrong occurrence of a "
+                    "repeated operation -- which is the failure it was added to end. It is "
+                    "either empty, meaning every node was bound from the shared `request`, "
+                    "or one entry per step."
+                )
         if problems:
             raise ValueError(
                 "execution record is not usable:\n  " + "\n  ".join(problems)
@@ -317,16 +358,23 @@ class ExecutionRecord:
     def fingerprinted(self) -> dict[str, Any]:
         """The part of this record a fingerprint is taken over.
 
-        `route`, `request` and each node's outcome -- with `strip_volatile` applied
-        and `provenance` excluded entirely, because provenance *contains* the
-        fingerprints and hashing it would be circular. This is what
-        `require_stable_payload` checks and what a caller compares between two runs
-        to ask "did the physics change".
+        `route`, `request`, `node_requests` and each node's outcome -- with
+        `strip_volatile` applied and `provenance` excluded entirely, because
+        provenance *contains* the fingerprints and hashing it would be circular.
+        This is what `require_stable_payload` checks and what a caller compares
+        between two runs to ask "did the physics change".
+
+        `node_requests` is in here for exactly that reason: it is what makes two
+        runs of one route with different per-node arguments -- an f1/f2 relay
+        against an f1/f1 one -- fingerprint differently. Left out, the two would
+        hash identically and the fingerprint would answer "nothing changed" about a
+        different optical system.
         """
         payload: dict[str, Any] = strip_volatile(
             {
                 "route": list(self.route),
                 "request": dict(self.request),
+                "node_requests": [dict(entry) for entry in self.node_requests],
                 "nodes": [
                     {
                         "operation_id": node.operation_id,
@@ -551,6 +599,7 @@ def to_json(record: ExecutionRecord) -> str:
             "schema_version": PROVENANCE_SCHEMA_VERSION,
             "route": list(record.route),
             "request": dict(record.request),
+            "node_requests": [dict(entry) for entry in record.node_requests],
             "nodes": [
                 {
                     "operation_id": node.operation_id,
@@ -584,7 +633,7 @@ def from_json(text: str) -> ExecutionRecord:
     payload = json.loads(text)
     if not isinstance(payload, dict):
         raise ValueError("an execution record is a JSON object")
-    expected = {"schema_version", "route", "request", "nodes", "provenance"}
+    expected = {"schema_version", "route", "request", "node_requests", "nodes", "provenance"}
     missing, unknown = expected - set(payload), set(payload) - expected
     if missing or unknown:
         raise ValueError(
@@ -605,6 +654,7 @@ def from_json(text: str) -> ExecutionRecord:
     return ExecutionRecord(
         route=tuple(payload["route"]),
         request=payload["request"],
+        node_requests=tuple(payload["node_requests"]),
         nodes=tuple(nodes),
         provenance=payload["provenance"],
     )

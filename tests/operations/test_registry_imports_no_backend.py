@@ -11,8 +11,8 @@ empty at import, so "enumerating it imported nothing" would have been true of a
 registry that imported everything -- and each subprocess below therefore
 *fabricated* four descriptors naming `optiland`, `chromatix`, `jax` and `torch`
 just to give the check something to catch. CHE-221 (R03.4) put the real catalog in
-`operations/catalog.py`, and it names `solvers.optiland.solver:trace` and
-`solvers.chromatix.solver:propagate` outright. So the check now runs against the
+`operations/catalog.py`, and it names `backends.optiland.solver:trace` and
+`backends.chromatix.solver:propagate` outright. So the check now runs against the
 production records, the fabrication is gone, and what is asserted is a property of
 the shipped catalog rather than of a test fixture.
 """
@@ -44,7 +44,7 @@ def _modules_after(statement: str) -> set[str]:
 def test_importing_operations_pulls_no_backend() -> None:
     """And it is no longer importing an empty package: the catalog is built here.
 
-    `operations/__init__.py` imports `catalog`, which constructs fourteen
+    `operations/__init__.py` imports `catalog`, which constructs fifteen
     descriptors naming two backends. That construction is what used to be the
     fixture's job, and it happens at import with nothing loaded.
     """
@@ -63,7 +63,7 @@ def test_enumerating_the_whole_catalog_pulls_no_backend() -> None:
 import operations
 
 found = operations.find()
-assert len(found) == 14, found
+assert len(found) == 17, found
 for descriptor in found:
     # Read every field of every descriptor.
     assert descriptor.implementation and descriptor.approximation
@@ -73,9 +73,9 @@ for descriptor in found:
     assert descriptor.inputs is not None and descriptor.requires is not None
     assert descriptor.is_graph_entry in (True, False)
     _ = descriptor.capabilities, descriptor.cost, descriptor.derivative_evidence
-assert operations.find(input="ray_bundle", kind="solver")
+assert operations.find(input="ray_bundle", kind="physical_operator")
 assert operations.find(kind="coupler")
-assert len(operations.registered_ids()) == 14
+assert len(operations.registered_ids()) == 17
 """
     )
     assert not loaded & set(BACKENDS), (
@@ -88,8 +88,8 @@ def test_resolving_every_operation_still_loads_no_backend() -> None:
     """Measured, and stronger than the criterion asks for -- so it is recorded here.
 
     `resolve` is the only call in `operations/` *permitted* to import a backend.
-    It turns out that resolving all fourteen imports none, because every adapter
-    defers its own backend import into a function body: `solvers/optiland/system.py`
+    It turns out that resolving all fifteen imports none, because every adapter
+    defers its own backend import into a function body: `backends/optiland/system.py`
     has `_import_optiland_construction`, and importing the module gives a caller
     the neutral signature without paying for torch.
 
@@ -125,10 +125,17 @@ def test_the_check_would_notice_a_backend() -> None:
         """
 import operations
 
-descriptor = operations.find(input="ray_bundle", kind="solver")[0]
+# The one graph entry that produces a ray bundle. Selected by `entry=True` and not
+# by `kind="source"`: this record is a composite, so CHE-237 (R03.7) gives it
+# `kind="composed"` and its terminal stage is `physical_operator` -- a source query
+# finds it under neither, while the entry query a planner actually asks still does.
+descriptor = operations.find(entry=True, output="ray_bundle")[0]
 implementation = operations.resolve(descriptor.operation_id)
 assert callable(implementation)
-assert descriptor.implementation.startswith("solvers.optiland")
+assert descriptor.implementation.startswith("backends.optiland")
+assert descriptor.backend == "optiland"
+assert descriptor.kind == "composed"
+assert descriptor.entry_stage == "source" and descriptor.terminal_stage == "physical_operator"
 
 # What executing it would do. Imported explicitly so the probe below is testing
 # the probe, not the adapter's laziness.

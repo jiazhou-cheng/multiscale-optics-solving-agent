@@ -28,13 +28,23 @@ of the same fact that could disagree with the entries under it.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-__all__ = ["ORACLE_KINDS", "control", "environment", "gate", "write_record"]
+__all__ = [
+    "ORACLE_KINDS",
+    "control",
+    "describe_plan",
+    "describe_request",
+    "environment",
+    "gate",
+    "write_record",
+]
 
 #: What a comparison is allowed to decide.
 #:
@@ -106,6 +116,68 @@ def control(
         "reference": reference,
         "broke_the_gate": bool(broke),
     }
+
+
+def describe_request(request: Mapping[str, Any]) -> dict[str, Any]:
+    """One node's request as JSON: scalars verbatim, bulk arrays as a digest.
+
+    A record has to say *exactly* what was executed, and a plan's per-node requests
+    are what says it -- the two focal lengths, the two target surfaces, the
+    normalization. Those are scalars and they are written out.
+
+    An amplitude mask is not: it is 192 x 256 float64, and embedding it would make
+    the record a data file. It is described by its shape, its dtype and a sha256 of
+    its bytes, which is what makes the claim checkable rather than decorative -- two
+    runs that filtered through different pupils have different digests, and a reader
+    who wants to know *which* mask can recompute one. A shape alone would not
+    distinguish an open pupil from a stop.
+
+    Anything else -- a `ReferenceSurface`, an enum -- is `repr`'d. That is lossy and
+    is meant to be: the record is provenance, and the code that built the request is
+    what a re-run reads.
+    """
+    return {name: _describe(value) for name, value in sorted(request.items())}
+
+
+def _describe(value: Any) -> Any:
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    if isinstance(value, Mapping):
+        return {str(key): _describe(item) for key, item in value.items()}
+    buffer = getattr(value, "tobytes", None)
+    shape = getattr(value, "shape", None)
+    if buffer is not None and shape is not None:
+        return {
+            "array": list(shape),
+            "dtype": str(getattr(value, "dtype", "unknown")),
+            "sha256": hashlib.sha256(buffer()).hexdigest()[:16],
+        }
+    if isinstance(value, Sequence):
+        return [_describe(item) for item in value]
+    return repr(value)
+
+
+def describe_plan(
+    steps: Sequence[tuple[str, Mapping[str, Any]]], *, chain: Sequence[str] = ()
+) -> list[dict[str, Any]]:
+    """A normalized plan as a list of `{step, operation, produces, request}`.
+
+    `chain` is the semantic type each step produces, from the caller's edge check
+    against `planning.capability_graph()`; it is recorded beside the ids so a reader
+    can see that the plan is a walk of the capability graph and not an arbitrary
+    ordering. Omitted, the field is absent rather than guessed.
+    """
+    described: list[dict[str, Any]] = []
+    for index, (operation_id, request) in enumerate(steps):
+        entry: dict[str, Any] = {
+            "step": index,
+            "operation": operation_id,
+            "request": describe_request(request),
+        }
+        if index < len(chain):
+            entry["produces"] = chain[index]
+        described.append(entry)
+    return described
 
 
 def environment() -> dict[str, str]:

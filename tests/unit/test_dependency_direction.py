@@ -106,8 +106,11 @@ def test_importing_through_the_src_namespace_root_is_a_violation() -> None:
 
     The concrete case that motivated it was `from src.core.boundary import
     RayBundle` reaching the reference tree. That tree is gone, but the bypass is
-    structural rather than tied to any package: `src.couplers`, `src.solvers` or
+    structural rather than tied to any package: `src.couplers`, `src.backends` or
     anything a later ticket adds would resolve the same way.
+
+    (`src.solvers` was the second example until CHE-224 (R15.1) renamed the
+    package; the point is that the spelling of the target is irrelevant.)
     """
     rule = _classify("representations", NAMESPACE_ROOT)
     assert rule is not None, (
@@ -141,12 +144,12 @@ def test_every_top_level_name_in_src_is_classified() -> None:
     )
 
 
-def test_importing_a_solver_backend_outside_solvers_is_a_violation() -> None:
+def test_importing_a_solver_backend_outside_backends_is_a_violation() -> None:
     for backend in sorted(BACKENDS):
         assert _classify("representations", backend) is not None
         assert _classify("couplers", backend) is not None
         # A solver adapter is the one place a backend belongs.
-        assert _classify("solvers", backend) is None
+        assert _classify("backends", backend) is None
 
 
 def test_numerics_may_import_nothing_in_the_project() -> None:
@@ -161,11 +164,11 @@ def test_numerics_may_import_nothing_in_the_project() -> None:
 def test_operations_may_not_import_a_solver_or_a_coupler() -> None:
     """The forbidden edge that makes lazy resolution structural.
 
-    `operations/` holds import paths as strings. If it could import `solvers/`,
+    `operations/` holds import paths as strings. If it could import `backends/`,
     "reading the registry pulls no backend" would be a discipline someone
     maintains rather than a fact about the import graph.
     """
-    for target in ("solvers", "couplers"):
+    for target in ("backends", "couplers"):
         rule = _classify("operations", target)
         assert rule is not None, f"operations/ -> {target}/ was not flagged"
 
@@ -232,10 +235,15 @@ def test_a_package_under_a_reference_tree_name_is_not_pre_approved(
     `verify()` against a synthetic tree to show the hole is actually closed, rather
     than inferring it from the set arithmetic.
 
-    **All three `SHARED_NAMES` are landed now** -- `couplers` at CHE-185 (R07.1),
-    `solvers` at R05, `runtime` at CHE-199 (R13.1) -- so none of them can play the
-    unlanded package any more. `runtime` is un-landed for the length of this test,
-    which is the same technique
+    **`SHARED_NAMES` is down to two, and both are landed** -- `couplers` at CHE-185
+    (R07.1) and `runtime` at CHE-199 (R13.1) -- so neither can play the unlanded
+    package any more. The third was `solvers`, landed at R05; CHE-224 (R15.1)
+    renamed that package to `backends/` and moved the name to `OLD_TREE_ONLY`,
+    because a name the reference tree used and the target architecture does not is
+    that set's definition. `backends` is not in `SHARED_NAMES`: the reference tree
+    never used it, so there is nothing shared to record.
+
+    `runtime` is un-landed for the length of this test, which is the same technique
     `test_an_allowed_direction_to_an_unlanded_package_is_still_refused` uses and for
     the same reason: what is pinned is the rule, not which packages happen to exist.
     """

@@ -3,7 +3,7 @@
 CHE-209 (R06.4). One public function:
 
 ```python
-solvers.chromatix.focal_plane_transform(field, *, focal_length_m, model) -> ScalarField
+backends.chromatix.focal_plane_transform(field, *, focal_length_m, model) -> ScalarField
 ```
 
 A `representations.ScalarField` at the front focal plane goes in and a
@@ -78,14 +78,14 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
-from representations import ReferenceSurface, ScalarField, ValidityFlag
-from representations.contracts import ContractError
-from solvers.chromatix.fields import (
+from backends.chromatix.fields import (
     fourier_plane_pitch_m,
     from_native,
     import_backend,
     to_native,
 )
+from representations import ReferenceSurface, ScalarField, ValidityFlag
+from representations.contracts import ContractError
 
 __all__ = ["DIRECTIONS", "focal_plane_transform"]
 

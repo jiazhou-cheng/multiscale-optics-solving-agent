@@ -92,6 +92,18 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
+from backends.optiland.launch import AIMING_MODES, DEFAULT_AIMING, launch
+from backends.optiland.rays import (
+    NATIVE_WAVELENGTH_M,
+    REFERENCE_SURFACES,
+    SKIP_OBJECT_SURFACE,
+    hexapolar_ray_count,
+    require_launch_surface,
+    to_native_rays,
+    to_ray_bundle,
+    to_traced_ray_bundle,
+)
+from backends.optiland.system import build_lens
 from numerics import (
     ArrayNamespace,
     DeviceKind,
@@ -102,18 +114,6 @@ from numerics import (
 )
 from problems import OpticalSetup, SourceSpec
 from representations import RayBundle
-from solvers.optiland.launch import AIMING_MODES, DEFAULT_AIMING, launch
-from solvers.optiland.rays import (
-    NATIVE_WAVELENGTH_M,
-    REFERENCE_SURFACES,
-    SKIP_OBJECT_SURFACE,
-    hexapolar_ray_count,
-    require_launch_surface,
-    to_native_rays,
-    to_ray_bundle,
-    to_traced_ray_bundle,
-)
-from solvers.optiland.system import build_lens
 
 __all__ = [
     "CAPABILITIES",
@@ -304,7 +304,7 @@ def _resolve_namespace(device: DevicePlacement, precision: Precision) -> ArrayNa
     precision vocabulary, so it lives here and not in `numerics`. It is also the
     fact the `M_RAY_OPTILAND` record has to carry, and does -- as
     `device_namespaces[cuda] = {torch}`. (CHE-206 planned to move the rows into
-    `solvers/<backend>/`; CHE-223 superseded that, so the record is shared data
+    `backends/<backend>/`; CHE-223 superseded that, so the record is shared data
     rather than a constant in either place. See `numerics/knowledge.py`.)
     """
     admissible = _CAPABILITIES.namespaces_for(device.kind)

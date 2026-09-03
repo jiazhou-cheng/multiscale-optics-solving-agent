@@ -1,7 +1,7 @@
 """The translation boundary: what crosses it, what is refused, and what it costs.
 
 CHE-183 (R06.1) acceptance criteria 1, 2, 4 and 5. Criterion 3 -- no chromatix or
-JAX object outside the package -- is `tests/solvers/test_chromatix_boundary.py`,
+JAX object outside the package -- is `tests/backends/test_chromatix_boundary.py`,
 because it is an AST walk over the whole tree rather than a statement about this
 module.
 
@@ -25,10 +25,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from numerics import ArrayNamespace, ArrayState, DevicePlacement, DType
-from representations import ContractError, ReferenceSurface, ScalarField
-from solvers.chromatix import fields
-from solvers.chromatix.fields import (
+from backends.chromatix import fields
+from backends.chromatix.fields import (
     NATIVE_DTYPE,
     edge_energy_fraction,
     fourier_plane_pitch_m,
@@ -37,10 +35,12 @@ from solvers.chromatix.fields import (
     padded_field_bytes,
     padded_shape,
 )
-from solvers.chromatix.solver import propagate
+from backends.chromatix.solver import propagate
+from numerics import ArrayNamespace, ArrayState, DevicePlacement, DType
+from representations import ContractError, ReferenceSurface, ScalarField
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "src" / "solvers" / "chromatix"
+PACKAGE = ROOT / "src" / "backends" / "chromatix"
 
 WAVELENGTH_M = 0.532e-6
 PITCH_M = (0.30e-6, 0.25e-6)
@@ -118,7 +118,7 @@ def test_the_refusal_happens_before_the_backend_is_imported() -> None:
         "import sys\n"
         "import numpy as np\n"
         "from representations import ReferenceSurface, ScalarField\n"
-        "from solvers.chromatix.fields import native_state\n"
+        "from backends.chromatix.fields import native_state\n"
         "field = ScalarField(np.ones((4, 4), np.complex128), (1e-6, 1e-6), 5e-7,\n"
         "                    ReferenceSurface('s', 0.0, 1.0))\n"
         "try:\n"

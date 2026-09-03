@@ -27,13 +27,13 @@ Why the catalog lives here and needs no dependency change
 ---------------------------------------------------------
 `scripts/check_dependencies.py::ALLOWED` gives `operations` one edge, to
 `numerics`, and gives no implementation package an edge to `operations`. That is
-deliberate and load-bearing: `operations -> solvers` would end the one property
-this package exists to provide, and `solvers -> operations` would end it from the
+deliberate and load-bearing: `operations -> backends` would end the one property
+this package exists to provide, and `backends -> operations` would end it from the
 other side, because listing the registry would then have loaded torch and JAX.
 
 The escape is not a widening. `implementation` is already a `"module.path:attribute"`
 string, so a catalog *inside* `operations/` needs no edge at all -- it names
-`solvers.optiland.solver:trace` without importing it, and `operations.resolve` is
+`backends.optiland.solver:trace` without importing it, and `operations.resolve` is
 still the only function in the package that imports anything.
 
 Registration therefore stays **pulled, never pushed**. No implementation package
@@ -55,33 +55,50 @@ The four argument tuples are checked against the code, not just written
 ------------------------------------------------------------------------
 `inputs`, `requires`, `optional` and the arity of `returns` are all derivable from
 `inspect.signature`, and `tests/operations/test_catalog_signatures.py` derives them
-for all fourteen records and compares. So this file is a *checked* restatement of
+for all fifteen records and compares. So this file is a *checked* restatement of
 the signatures rather than a hand-maintained one: renaming a parameter, giving one
 a default, removing one or adding a required argument fails that gate.
 
 That matters because a second source of truth beside a signature is precisely what
 drifts, and two records here were already wrong before the check existed --
-`S_SOURCE_PLANE_WAVE` and `S_RAY_OPTILAND` each declared a representation input
-their callables do not accept. `approximation`, `validity` and `evidence` remain
-unguarded prose; nothing can derive those.
+`S_SOURCE_PLANE_WAVE` and `S_RAY_OPTILAND` (now `SO_RAY_LAUNCH_TRACE`) each
+declared a representation input their callables do not accept. `approximation`,
+`validity` and `evidence` remain unguarded prose; nothing can derive those.
 
-Two records may name one callable
----------------------------------
-`S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` both resolve to
-`solvers.chromatix.solver:propagate`, and they are two records on purpose. One
+Two records may name one callable -- and none does any more
+-----------------------------------------------------------
+This section is kept and rewritten rather than deleted, because the arrangement it
+described is gone and the reason is worth having next to the catalog it shaped.
+
+It used to say: `S_WAVE_CHROMATIX` and `O_ASM_PROPAGATE` both resolve to
+`backends.chromatix.solver:propagate`, and they are two records on purpose -- one
 answers "what backend does this project drive, and in which measured capability
-row"; the other answers "what happens to the physical state". Their `kind`,
-`approximation` and `validity` all differ. The completeness gate is written to
-allow this and to allow only this: one record per `(implementation, kind)` pair,
-and at least one record per name in `OPERATIONS`.
+row", the other "what happens to the physical state". Their `kind`, `approximation`
+and `validity` all differed, and the completeness gate was keyed on
+`(implementation, kind)` to allow exactly that one case.
+
+**CHE-224 (R15.1) removed the need for it.** The sentence names two questions, and
+naming two questions is the diagnosis: `kind` was being asked both, so the only way
+to answer both was two records over one function. `backend` on
+`OperationDescriptor` now answers "which library executes this" and `kind` answers
+only "what happens to physical state". `S_WAVE_CHROMATIX` is deleted;
+`O_ASM_PROPAGATE` carries `backend="chromatix"` and the one sentence of its
+`approximation` that the pair only said between them. The gate is keyed on
+`implementation` alone, because no case needs two.
+
+What that cost and what it bought: a planner enumerating routes over the catalog
+used to see two candidates for one callable and had no field distinguishing them
+except prose, and `capabilities` was cited twice for one measured row. Nothing was
+lost -- the two records' `kind` values were `solver` and `physical_operator`, and
+`solver` was never a statement about physical state.
 
 What is deliberately absent from the catalog
 --------------------------------------------
-* `solvers.optiland.launch:launch` -- not in `solvers.optiland.__all__`, and
-  `src/solvers/optiland/__init__.py` records why: it takes native solver state (a
+* `backends.optiland.launch:launch` -- not in `backends.optiland.__all__`, and
+  `src/backends/optiland/__init__.py` records why: it takes native solver state (a
   constructed `Optic`) and is package-facing by construction. A public launch
   operation needs a neutral signature first.
-* `solvers.optiland.solver:configure_execution` and every other public name that
+* `backends.optiland.solver:configure_execution` and every other public name that
   is not a semantic operation -- mask builders, unit converters, diagnostics
   records, enums, declaration tables. This is why completeness is checked against
   `OPERATIONS` rather than against `__all__`: `couplers.__all__` has 20 names of
@@ -93,8 +110,8 @@ What is deliberately absent from the catalog
 
 The prose below is migrated, not rewritten
 ------------------------------------------
-Eleven of these fourteen records were defined in test fixtures, because no
-production home existed. Their `approximation`, `validity` and `evidence` text is
+Eleven of these records were defined in test fixtures, because no production
+home existed. Their `approximation`, `validity` and `evidence` text is
 reviewed physics and was moved verbatim, so a reviewer can diff the fixture text
 against this file. **Two exceptions, both flagged on CHE-221 rather than made
 silently:** `O_PROPAGATE_RAYS` and `O_DIFFRACTIVE_SURFACE` each carried a validity
@@ -117,13 +134,25 @@ __all__ = ["CATALOG"]
 #: `find()` sorts by id and the index is a dict, so nothing depends on this
 #: sequence.
 CATALOG: tuple[OperationDescriptor, ...] = (
-    # --- solvers/optiland ---------------------------------------------------
+    # --- backends/optiland ---------------------------------------------------
+    # The one composite record -- CHE-225 (R15.2). `trace` is `build_lens` ->
+    # `launch` (materialize and declare the rays) -> `lens.trace` (refract through
+    # every surface) -> `to_ray_bundle`, so it initializes state AND evolves it.
+    # CHE-224 declared it `SOURCE` and that was a false claim, contradicted by this
+    # record's own `approximation` below: "a surface interaction is refraction at a
+    # real interface". CHE-225 then made `kind` the TERMINAL stage, and CHE-237
+    # (R03.7) made it `COMPOSED`: the fusion itself is what this field now names,
+    # and `terminal_stage` is the property that says where the state ends up.
+    # `operations/descriptors.py` holds the retraction and the reason the honest
+    # decomposition is blocked on numbers rather than on taxonomy.
     OperationDescriptor(
-        operation_id="S_RAY_OPTILAND",
-        kind=OperationKind.SOLVER,
+        operation_id="SO_RAY_LAUNCH_TRACE",
+        kind=OperationKind.COMPOSED,
+        composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
         inputs=(),
         returns=("ray_bundle",),
-        implementation="solvers.optiland.solver:trace",
+        implementation="backends.optiland.solver:trace",
+        backend="optiland",
         requires=("setup", "source", "sampling", "execution"),
         optional=("aiming",),
         approximation=(
@@ -136,14 +165,15 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         derivative="forward_only",
     ),
     OperationDescriptor(
-        operation_id="S_RAY_OPTILAND_BUNDLE",
-        kind=OperationKind.SOLVER,
+        operation_id="O_RAY_TRACE",
+        kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("ray_bundle",),
         returns=("ray_bundle",),
-        implementation="solvers.optiland.solver:trace_rays",
+        implementation="backends.optiland.solver:trace_rays",
+        backend="optiland",
         requires=("setup", "execution"),
         approximation=(
-            "the same sequential geometric ray trace as S_RAY_OPTILAND, over an "
+            "the same sequential geometric ray trace as SO_RAY_LAUNCH_TRACE, over an "
             "externally supplied ensemble rather than a generated pupil fan: the "
             "geometry evolves and the optical path is composed onto the incoming one, "
             "while the complex amplitude and the sampling measure are the caller's and "
@@ -163,39 +193,153 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "with the caller's arrays row for row -- but a trace in which NO supplied "
             "ray survives is refused rather than returned as an all-zero bundle",
         ),
-        evidence=("tests/solvers/test_optiland_bundle_trace.py",),
+        evidence=("tests/backends/test_optiland_bundle_trace.py",),
         capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
-    # --- solvers/chromatix --------------------------------------------------
+    # The second composite -- CHE-226 (R16), and the first three-stage one. The
+    # pinned solver's own spot analysis: `build_lens` -> Optiland generates its own
+    # pupil fan from the declared field -> it refracts them through every surface ->
+    # it reduces the intersections to a spot. So the record initializes state,
+    # evolves it AND observes it, and the terminal stage is the measurement as
+    # CHE-225 defined it -- `kind` was `MEASUREMENT` until CHE-237 (R03.7) moved the
+    # terminal stage to `terminal_stage` and made `kind` name the composition.
+    # `inputs=()` with a bare `measurement` kind is refused by
+    # `OperationDescriptor.__post_init__` -- only a source may begin a graph entry --
+    # and that refusal is right: this operation consumes no upstream representation
+    # because it makes its own rays. `M_SPOT_DIAGRAM` below is the *other* path, and
+    # the pair is the point: one generates rays, one consumes them as supplied.
     OperationDescriptor(
-        operation_id="S_WAVE_CHROMATIX",
-        kind=OperationKind.SOLVER,
-        inputs=("scalar_field",),
-        returns=("scalar_field",),
-        implementation="solvers.chromatix.solver:propagate",
-        requires=("distance_m", "model"),
-        approximation=(
-            "scalar diffraction: one complex amplitude per sample, no polarization "
-            "and no vectorial coupling, evaluated in complex64 because the backend "
-            "has no other field storage"
+        operation_id="SOM_SPOT_DIAGRAM",
+        kind=OperationKind.COMPOSED,
+        composes=(
+            OperationKind.SOURCE,
+            OperationKind.PHYSICAL_OPERATOR,
+            OperationKind.MEASUREMENT,
         ),
-        evidence=("tests/physics/test_scalar_wave_propagation.py",),
-        capabilities="M_WAVE_CHROMATIX",
+        inputs=(),
+        returns=("spot",),
+        implementation="backends.optiland.analysis:spot_diagram",
+        backend="optiland",
+        requires=("setup", "source", "num_rings", "execution"),
+        optional=("distribution", "coordinates", "reference"),
+        approximation=(
+            "the same sequential geometric ray trace as SO_RAY_LAUNCH_TRACE, reduced to "
+            "spot statistics by the pinned solver's own analysis rather than by this "
+            "project: intensity selects rays and never weights a moment, the centroid "
+            "is an unweighted mean, and the two radii are unweighted moments about "
+            "the centre the `reference` argument selects -- the CHIEF RAY by the "
+            "solver's default, which off axis is not the centroid the same call "
+            "reports (backends.optiland.analysis.NATIVE_SPOT_METRIC_DEFINITIONS, read "
+            "from the pinned implementation). Diffraction is not modelled, so a "
+            "geometric spot smaller than the Airy radius is a statement about the rays "
+            "and not about the image"
+        ),
+        validity=(
+            "infinite-conjugate angular sources only: a source declaring a finite "
+            "object distance is refused with NotImplementedError rather than having its "
+            "field angle reinterpreted as a direction, because at a finite distance "
+            "that angle is a position",
+            "exactly one field and one wavelength, because build_lens declares exactly "
+            "one of each -- so 'all' means 'the one declared' and a multi-field "
+            "aberration curve is NOT what this returns",
+            "no RayBundle exists anywhere in this call: the rays are generated inside "
+            "the solver and are not observable, which is the whole difference from "
+            "M_SPOT_DIAGRAM",
+        ),
+        evidence=("tests/backends/test_optiland_analysis.py",),
+        capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
+    # The second native analysis on the same path -- CHE-236 (R16.1), which R16
+    # said would be additive: "a second analysis here is a second function and a
+    # second record". `method` is an `optional` argument and NOT a dispatcher: all
+    # three of the pinned solver's scalar PSF implementations return one intensity
+    # map under one normalization, so the return type does not vary with it and one
+    # record describes the callable. Three records for one physical measurement
+    # would be the false claim.
+    OperationDescriptor(
+        operation_id="SOM_PSF",
+        kind=OperationKind.COMPOSED,
+        composes=(
+            OperationKind.SOURCE,
+            OperationKind.PHYSICAL_OPERATOR,
+            OperationKind.MEASUREMENT,
+        ),
+        inputs=(),
+        returns=("psf",),
+        implementation="backends.optiland.analysis:psf",
+        backend="optiland",
+        requires=("setup", "source", "method", "num_rays", "execution"),
+        optional=("strategy", "remove_tilt", "grid_size", "image_size", "pixel_pitch_m"),
+        approximation=(
+            "scalar diffraction from a geometrically traced wavefront: the pinned solver "
+            "samples the pupil, refracts the rays through every surface to the image "
+            "surface, builds a reference sphere by the selected strategy, extends each "
+            "ray's final direction BACKWARD in the image-space medium to that sphere -- a "
+            "geometric image-space retrace only, not a retrace through the surfaces -- and "
+            "turns the accumulated optical path into an OPD in waves relative to the "
+            "reference ray. Diffraction enters only in the propagation of that pupil, so "
+            "the aberration content is entirely geometric and no ray in the pupil is "
+            "diffracted by an aperture edge. Which propagation is the `method` argument: "
+            "'fft' is zero-padded FFT of sqrt(I) exp(-2i pi W) on the circular normalized "
+            "pupil mask, with Zemax-compatible grid sampling; 'mmdft' is the same pupil "
+            "through a matrix DFT with explicitly controlled output sampling; 'huygens' is "
+            "a coherent sum over the physical 3-D reference-sphere intersections to the "
+            "actual image-surface geometry, with the 1/R and obliquity factors. THE THREE "
+            "ARE NOT INTERCHANGEABLE AT COARSE SAMPLING -- measured on the R05 singlet at "
+            "num_rays=32, fft peaks at 99.91 and huygens at 32x32 peaks at 82.70"
+        ),
+        validity=(
+            "scalar and monochromatic: one field, one wavelength, no polarization. The "
+            "vectorial classes the backend also ships are not reachable from here",
+            "infinite-conjugate angular sources only, for the reason SOM_SPOT_DIAGRAM is: "
+            "at a finite object distance a field angle is a position",
+            "exactly one field and one wavelength, because build_lens declares one of each",
+            "the normalization is Optiland's Strehl-percent convention and NOT this "
+            "project's PsfNormalization vocabulary; 100.0 is the unaberrated peak of the "
+            "same aperture, so the number is a Strehl ratio times 100 and is blind to any "
+            "constant multiplicative error in the same way peak normalization is",
+            "no complex pupil, no ScalarField and no wavefront crosses this boundary -- "
+            "only an intensity map -- so the phasor sign the backend uses internally "
+            "(exp(-2i pi W)) never has to be reconciled with this project's convention",
+            "the sampled window only, as M_PSF: energy outside the returned grid was not "
+            "measured, and unless grid_size is given the fft path's grid is DERIVED from "
+            "num_rays rather than chosen -- and num_rays is reduced in the same step, so "
+            "the record reports the pupil sampling that ran and not the one requested",
+        ),
+        evidence=(
+            "tests/backends/test_optiland_psf.py",
+            "tests/physics/test_native_psf_airy.py",
+        ),
+        capabilities="M_RAY_OPTILAND",
+        derivative="forward_only",
+    ),
+    # --- backends/chromatix --------------------------------------------------
+    #
+    # One record over `propagate`, not two. `S_WAVE_CHROMATIX` was the second, and
+    # CHE-224 (R15.1) deleted it: it existed to answer "what backend does this
+    # project drive", which `backend` now answers as a field. Its `approximation`
+    # said what the scalar model itself omits -- one complex amplitude per sample,
+    # no polarization, no vectorial coupling, complex64 because the backend has no
+    # other field storage -- and that sentence is carried below rather than dropped,
+    # because it is a different claim from what the angular-spectrum kernel
+    # approximates and the surviving record did not already make it.
     OperationDescriptor(
         operation_id="O_ASM_PROPAGATE",
         kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("scalar_field",),
         returns=("scalar_field",),
-        implementation="solvers.chromatix.solver:propagate",
+        implementation="backends.chromatix.solver:propagate",
+        backend="chromatix",
         requires=("distance_m", "model"),
         approximation=(
             "the exact (non-paraxial) angular spectrum in a homogeneous isotropic "
             "medium: no Fresnel approximation and no term dropped, but the sampled "
             "window is periodic, so power that leaves it wraps back in unless the "
-            "grid is padded"
+            "grid is padded. Scalar throughout: one complex amplitude per sample, "
+            "no polarization and no vectorial coupling, evaluated in complex64 "
+            "because the backend has no other field storage"
         ),
         validity=(
             "z <= N pitch^2 / lambda, the transfer function's own sampling bound",
@@ -205,12 +349,79 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         capabilities="M_WAVE_CHROMATIX",
         derivative="forward_only",
     ),
+    # The paraxial sibling of O_ASM_PROPAGATE -- CHE-228 (R06.11). A second record
+    # over a second callable rather than a third `method` on `propagate`, for two
+    # reasons. `O_ASM_PROPAGATE`'s `approximation` above says "no Fresnel
+    # approximation and no term dropped", so a paraxial method under that record
+    # would make the record's own prose false and put `O_ASM_` on a run that is not
+    # one; and one record per `implementation` is the rule since CHE-224 (R15.1), so
+    # a second record needs a second callable either way.
+    #
+    # The two kernels are one substitution apart and it is measured, not asserted:
+    # replacing `delay + 1.0` with `2.0` in `_carrier_removed_propagator` -- the
+    # k_z -> n k0 limit -- reproduces the backend's Fresnel phase with a maximum
+    # difference of exactly 0.0 in float32 over a 512^2 grid.
+    OperationDescriptor(
+        operation_id="O_FRESNEL_PROPAGATE",
+        kind=OperationKind.PHYSICAL_OPERATOR,
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
+        implementation="backends.chromatix.solver:fresnel_propagate",
+        backend="chromatix",
+        requires=("distance_m", "model"),
+        approximation=(
+            "the Fresnel (paraxial) transfer function in a homogeneous isotropic "
+            "medium: exp(-i pi (lambda_0/n) z f^2), which is exactly "
+            "O_ASM_PROPAGATE's carrier-removed kernel with the axial ratio "
+            "k_z/(n k0) replaced by 1. One term IS dropped, and that is the whole "
+            "difference from O_ASM_PROPAGATE: the phase error is "
+            "n k0 z (1 - cos theta - sin^2(theta)/2), i.e. n k0 z sin^4(theta)/8 to "
+            "leading order, at each direction cosine sin(theta) = lambda_0 f / n. "
+            "The kernel carries NO exp(i k n z) factor, so unlike the angular "
+            "spectrum there is no absolute-phase variant to choose: the result is "
+            "always relative to a removed piston of carrier_phase_rad(lambda_0, z, "
+            "n), the same constant 'asm_carrier_removed' removes. Sampling is "
+            "preserved, because the transfer method is a convolution; the sampled "
+            "window is periodic, so power that leaves it wraps back in unless the "
+            "grid is padded. Scalar throughout: one complex amplitude per sample, "
+            "no polarization and no vectorial coupling, evaluated in complex64 "
+            "because the backend has no other field storage"
+        ),
+        validity=(
+            "sin(theta_max) <= (lambda_0 / (n z))^(1/4) for the field's own largest "
+            "direction cosine -- the angle at which the leading phase error reaches "
+            "pi/4. On the Chromatix 101 tutorial's own grid (512^2, dx = 0.3 um, "
+            "lambda_0 = 0.532 um, n = 1.33, z = 50 um) that is sin(theta) <= 0.299, "
+            "i.e. 17.4 degrees, while the grid's own per-axis Nyquist is "
+            "sin(theta) = 0.667, where the exact error is 25.5 rad, and its corner "
+            "is 0.943, where it is 175 rad",
+            "the returned field declares 'paraxial', and that flag is the only "
+            "warning a consumer gets: the error is a phase error and |U|^2 does not "
+            "show it. Measured on that same grid, a hard-edged square aperture "
+            "differs from the exact angular spectrum by 2.3e-1 of peak intensity -- "
+            "pad-independent, so it is the approximation and not wraparound -- while "
+            "a soft-edged field on the identical grid differs by 4.9e-6",
+            "z <= N pitch^2 / lambda, the transfer function's own sampling bound, "
+            "the same one O_ASM_PROPAGATE carries",
+            "carrier_removed_phase: the phase is relative to a removed piston, and "
+            "two fields with different removed pistons may not be interfered "
+            "directly. This one removes the same constant asm_carrier_removed does",
+            "a tilted beam lands at z sin(theta), not z tan(theta): the kernel's "
+            "group delay is lambda_0 z f / n, linear in spatial frequency. That is a "
+            "property of the model rather than a defect in it, and it is the same "
+            "sine-condition content O_FOCAL_PLANE_TRANSFORM's f sin(theta) records",
+        ),
+        evidence=("tests/physics/test_fresnel_propagation.py",),
+        capabilities="M_WAVE_CHROMATIX",
+        derivative="forward_only",
+    ),
     OperationDescriptor(
         operation_id="O_FOCAL_PLANE_TRANSFORM",
         kind=OperationKind.PHYSICAL_OPERATOR,
         inputs=("scalar_field",),
         returns=("scalar_field",),
-        implementation="solvers.chromatix.focal_plane:focal_plane_transform",
+        implementation="backends.chromatix.focal_plane:focal_plane_transform",
+        backend="chromatix",
         requires=("focal_length_m", "model"),
         approximation=(
             "the ideal thin lens between its two focal planes: one optical Fourier "
@@ -236,7 +447,13 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # Until CHE-222 (R03.5) the schema could not say that, and all three of these
     # (well, the one that existed) declared `input="scalar_field"` -- the
     # representation they *produce*, named on both sides. `ENTRY_KINDS` is what
-    # makes `()` a checked declaration: only a `solver` may be a graph entry.
+    # makes `()` a checked declaration: only a `source` may be a graph entry.
+    #
+    # `kind=OperationKind.SOURCE` since CHE-224 (R15.1). All three were `SOLVER`
+    # before it, because the enum had no `SOURCE` member -- so the `S_` on these
+    # three ids meant "source" while the `S_` on `S_RAY_OPTILAND` meant "solver",
+    # a record CHE-225 (R15.2) then renamed to `SO_RAY_LAUNCH_TRACE`,
+    # and `kind` could not tell a reader which.
     #
     # What a source consumes instead is in `requires`: a grid `shape`, a pitch, a
     # wavelength and a reference surface, plus the one geometric parameter that
@@ -248,7 +465,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # row would claim a measurement taken about something else.
     OperationDescriptor(
         operation_id="S_SOURCE_GAUSSIAN_BEAM",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.gaussian_beam:gaussian_beam",
@@ -294,7 +511,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     ),
     OperationDescriptor(
         operation_id="S_SOURCE_PLANE_WAVE",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.plane_wave:plane_wave",
@@ -324,7 +541,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     ),
     OperationDescriptor(
         operation_id="S_SOURCE_SPHERICAL_WAVE",
-        kind=OperationKind.SOLVER,
+        kind=OperationKind.SOURCE,
         inputs=(),
         returns=("scalar_field",),
         implementation="sources.spherical_wave:spherical_wave",
@@ -586,6 +803,41 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "border_energy_fraction is the indicator for it",
         ),
         evidence=("tests/physics/test_psf.py",),
+        capabilities=None,
+        derivative="forward_only",
+    ),
+    OperationDescriptor(
+        operation_id="M_SPOT_DIAGRAM",
+        kind=OperationKind.MEASUREMENT,
+        inputs=("ray_bundle",),
+        returns=("spot",),
+        implementation="measurements.spot:spot_diagram",
+        approximation=(
+            "none in the reduction itself: the coordinates are the bundle's own "
+            "positions at its declared reference surface, untransformed, and the three "
+            "metrics are exact moments of them. What the caller must know is which "
+            "moments -- the centroid and the RMS radius are weighted by |a_i|^2 and "
+            "referred to that centroid, the geometric radius is an unweighted maximum "
+            "about it, and the sampling measure is deliberately NOT applied "
+            "(measurements.spot.SPOT_WEIGHTING)"
+        ),
+        validity=(
+            "the bundle must declare ray_splitting='unsplit'. A population containing "
+            "split-ray descendants, and one whose splitting provenance is undeclared, "
+            "are both refused -- with different codes -- because an unweighted moment "
+            "over branches of one incident ray is a statistic of the branching, and "
+            "nothing here infers provenance from the numbers",
+            "the bundle must carry an amplitude: it is where the per-ray intensity and "
+            "the survival of a ray both live, and weighting every row equally instead "
+            "would measure clipped rays as delivered ones",
+            "rays with |a|^2 = 0 are excluded as undelivered, so included_count may be "
+            "below ray_count; a bundle in which no ray survived is refused rather than "
+            "returned as a spot at the origin",
+            "under a non-uniform sampling density this is a sampling-weighted moment of "
+            "the irradiance rather than the irradiance moment; measure_kind is where a "
+            "caller reads which it has",
+        ),
+        evidence=("tests/physics/test_spot_diagram.py",),
         capabilities=None,
         derivative="forward_only",
     ),

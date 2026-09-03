@@ -156,7 +156,7 @@ def test_importing_operations_populates_the_catalog() -> None:
     )
     report = json.loads(completed.stdout)
     assert report["ids"], "importing operations left the index empty"
-    assert len(report["ids"]) == report["catalog"] == 14
+    assert len(report["ids"]) == report["catalog"] == 17
     assert report["ids"] == sorted(report["ids"]), "find() and registered_ids() sort by id"
     assert report["backends"] == [], report["backends"]
 
@@ -210,7 +210,7 @@ def test_find_distinguishes_no_input_filter_from_selecting_graph_entries() -> No
     readings is worse than the fake input the same ticket removed. So graph entry
     is its own tri-state argument.
     """
-    entry = put(a_descriptor(operation_id="X_ENTRY", kind=OperationKind.SOLVER, inputs=()))
+    entry = put(a_descriptor(operation_id="X_ENTRY", kind=OperationKind.SOURCE, inputs=()))
     consuming = put(a_descriptor(operation_id="X_CONSUMING"))
 
     # `input=None` still means "do not filter", and returns BOTH.
@@ -221,7 +221,7 @@ def test_find_distinguishes_no_input_filter_from_selecting_graph_entries() -> No
     assert registry.find(entry=False) == (consuming,)
     assert registry.find(entry=None) == (consuming, entry)
     # And it composes with the other filters rather than replacing them.
-    assert registry.find(entry=True, kind="solver") == (entry,)
+    assert registry.find(entry=True, kind="source") == (entry,)
     assert registry.find(entry=True, kind="coupler") == ()
     # A non-boolean is refused rather than matching nothing, which is the rule the
     # other two filters already follow: `matches` compares with `is`, so

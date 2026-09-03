@@ -613,7 +613,7 @@ def test_parseval_relates_the_two_powers_rather_than_equating_them() -> None:
 
 def test_the_module_imports_no_solver_and_no_backend() -> None:
     """Criterion 5. The same rule `test_ray_to_scalar.py` states for the package."""
-    forbidden = {"optiland", "chromatix", "jax", "torch", "solvers", "problems"}
+    forbidden = {"optiland", "chromatix", "jax", "torch", "backends", "problems"}
     tree = ast.parse(MODULE.read_text(encoding="utf-8"), filename=str(MODULE))
     imported: set[str] = set()
     for node in ast.walk(tree):
@@ -651,7 +651,7 @@ def test_no_round_trip_operation_landed() -> None:
     }
     # Names, not prose. The package docstring *says* there is no round trip here,
     # and a substring search over the source would flag that sentence -- the same
-    # trap `tests/solvers/test_optiland_boundary.py` documents when it exempts
+    # trap `tests/backends/test_optiland_boundary.py` documents when it exempts
     # docstrings: the only correct response to a gate that fails on its own
     # explanation is to stop explaining.
     for banned in ("round_trip", "roundtrip", "ray_to_wave_to_ray", "wave_to_ray_to_wave"):

@@ -7,7 +7,7 @@ costs a fraction of one, and `pyproject.toml`'s `testpaths` excludes
 default suite:
 
 1. **The scripts compose the public vocabulary and import no backend.** An AST
-   walk, the same rule `tests/solvers/test_chromatix_boundary.py` applies to
+   walk, the same rule `tests/backends/test_chromatix_boundary.py` applies to
    `src/` and `tests/` -- which does not walk `benchmarks/`, so this is the walk
    that covers it. A benchmark that reached past the boundary would be measuring
    the backend rather than this project.
@@ -43,7 +43,7 @@ SCRIPTS = sorted(
 RECORDS = sorted((BENCHMARKS / "systems" / "records").glob("*.json"))
 
 #: Distributions no benchmark may import. `chromatix` and `jax` are reachable only
-#: through `solvers.chromatix`, which is the whole point of the boundary; `numpy`
+#: through `backends.chromatix`, which is the whole point of the boundary; `numpy`
 #: and `scipy` are the oracle vocabulary and are allowed.
 BACKEND_IMPORTS = frozenset({"chromatix", "jax", "jaxlib", "optiland", "torch"})
 
@@ -70,10 +70,18 @@ def test_a_benchmark_imports_no_backend(script: Path) -> None:
     imported = _top_level_imports(script.read_text(encoding="utf-8"))
     assert not (BACKEND_IMPORTS & imported), (
         f"{script.relative_to(ROOT)} imports {sorted(BACKEND_IMPORTS & imported)}; a "
-        "benchmark composes sources / operators / solvers.chromatix and nothing past them"
+        "benchmark composes sources / operators / backends.chromatix and nothing past them"
     )
-    # ...and it really does reach the project through the public packages.
-    assert {"sources", "operators"} <= imported
+    # ...and it really does reach the project through the public packages. Two
+    # shapes are accepted, and a benchmark matches one of them: importing the
+    # operation packages and calling them in order, which is how CHE-212 and
+    # CHE-213 were first written, or naming catalog ids and handing the plan to
+    # `runtime.Executor`, which imports no operation here at all. What neither
+    # shape may do is reach a backend, which is the assertion above.
+    assert any(
+        shape <= imported
+        for shape in ({"sources", "operators"}, {"operations", "planning", "runtime"})
+    ), f"{script.relative_to(ROOT)} composes neither directly nor through a plan: {imported}"
 
 
 def test_the_detector_would_catch_a_violation() -> None:
@@ -82,7 +90,7 @@ def test_the_detector_would_catch_a_violation() -> None:
     assert BACKEND_IMPORTS & _top_level_imports("from jax import numpy\n")
     assert not (
         BACKEND_IMPORTS
-        & _top_level_imports("from solvers.chromatix import focal_plane_transform\n")
+        & _top_level_imports("from backends.chromatix import focal_plane_transform\n")
     )
 
 

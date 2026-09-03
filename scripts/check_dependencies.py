@@ -59,7 +59,7 @@ SRC = ROOT / "src"
 #: * `numerics` is empty. It is the bottom of the graph, and anything it imported
 #:   would become part of the bottom of the graph.
 #: * `operations` may import `numerics` and nothing else -- in particular not
-#:   `solvers` and not `couplers`. It holds import paths as *strings* and resolves
+#:   `backends` and not `couplers`. It holds import paths as *strings* and resolves
 #:   them lazily, which is what makes "reading the registry imports no backend" a
 #:   structural fact rather than a discipline someone maintains.
 ALLOWED: dict[str, frozenset[str]] = {
@@ -67,7 +67,7 @@ ALLOWED: dict[str, frozenset[str]] = {
     "representations": frozenset({"numerics"}),
     "problems": frozenset({"representations", "numerics"}),
     "operations": frozenset({"numerics"}),
-    "solvers": frozenset({"problems", "representations", "numerics"}),
+    "backends": frozenset({"problems", "representations", "numerics"}),
     "sources": frozenset({"problems", "representations", "numerics"}),
     "couplers": frozenset({"representations", "numerics"}),
     "operators": frozenset({"representations", "couplers", "numerics"}),
@@ -104,7 +104,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   at construction -- a format-validated string like `implementation` always was.
 #:   The `numerics` row stays because a descriptor field could legitimately need the
 #:   precision vocabulary; nothing needs it today. The forbidden edges matter more
-#:   here than anywhere else so far: `operations -> solvers` or `-> couplers` would
+#:   here than anywhere else so far: `operations -> backends` or `-> couplers` would
 #:   be the end of "listing the registry imports no backend", which is the single
 #:   property the package exists to provide. This allowlist entry and
 #:   `tests/operations/test_registry_imports_no_backend.py` are the two halves of
@@ -113,33 +113,33 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   **CHE-221 is the ticket that had to resolve this without widening anything.**
 #:   Eleven real descriptors had accumulated in test fixtures, and three landed
 #:   operations had none at all, because no
-#:   production home existed: `solvers -> operations` and `operations -> solvers`
+#:   production home existed: `backends -> operations` and `operations -> backends`
 #:   are both barred, so a registration site inside an implementation package was
 #:   impossible and one inside `operations/` looked impossible too. It was not. The
 #:   `implementation` field is already a `"module.path:attribute"` **string**, so
-#:   the catalog names `solvers.optiland.solver:trace` without importing it, and
+#:   the catalog names `backends.optiland.solver:trace` without importing it, and
 #:   `ALLOWED` gained no row. Each implementation package declares `OPERATIONS`, a
 #:   tuple of strings, which is the other half of the completeness gate and is
 #:   likewise not an import.
 #:
-#: * `solvers` -- landed by CHE-179/CHE-180/CHE-181 (R05.1/R05.2/R05.3) as
-#:   `solvers/optiland/`: `system.py`, `rays.py`, `solver.py`, joined by
+#: * `backends` -- landed by CHE-179/CHE-180/CHE-181 (R05.1/R05.2/R05.3) as
+#:   `backends/optiland/`: `system.py`, `rays.py`, `solver.py`, joined by
 #:   CHE-219 (R05.8)'s `launch.py`. The first package
 #:   with a *permitted* backend import, and the only one there will ever be a
-#:   permitted backend import from: `_classify` exempts `solvers` from the
+#:   permitted backend import from: `_classify` exempts `backends` from the
 #:   `BACKENDS` rule, which is the same fact stated as a rule about every other
 #:   package rather than as a privilege granted to this one. It imports `problems`
 #:   (the neutral problem it consumes), `representations` (the neutral bundle it
 #:   emits) and `numerics` (the capability row it executes within), so all three
 #:   of its allowed edges are now exercised. The forbidden edge that matters is
-#:   `solvers -> operations`: a solver holding its own descriptor would make
+#:   `backends -> operations`: a solver holding its own descriptor would make
 #:   listing the registry import a backend, which is the one property
 #:   `operations/` exists to provide. It is also why the trace's descriptor is not
 #:   in this package -- it is in `operations/catalog.py`, which names
-#:   `solvers.optiland.solver:trace` as a string (CHE-221 / R03.4). What this
-#:   package declares instead is `solvers.optiland.OPERATIONS` and
-#:   `solvers.chromatix.OPERATIONS`, two tuples of strings the catalog's
-#:   completeness gate reads. `solvers/` has no package-level operation surface,
+#:   `backends.optiland.solver:trace` as a string (CHE-221 / R03.4). What this
+#:   package declares instead is `backends.optiland.OPERATIONS` and
+#:   `backends.chromatix.OPERATIONS`, two tuples of strings the catalog's
+#:   completeness gate reads. `backends/` has no package-level operation surface,
 #:   so the declaration is per backend subpackage.
 #:
 #: * `problems` -- landed by CHE-156 (R04): `ray_trace.py`, the neutral sequential
@@ -153,9 +153,9 @@ ALLOWED: dict[str, frozenset[str]] = {
 #: * `operators` -- landed by CHE-211 (R06.6): `transmission.py`, the single thin
 #:   element `U * A * exp(i phi)` and the mask builders that feed it, joined by
 #:   CHE-192 (R09.2)'s `ray_propagation.py`. The forbidden edge that matters is
-#:   `operators -> solvers`: a thin element needs no backend at all, and importing
+#:   `operators -> backends`: a thin element needs no backend at all, and importing
 #:   one would put JAX behind every mask multiply and end the package's backend
-#:   neutrality (`tests/solvers/test_chromatix_boundary.py` walks it).
+#:   neutrality (`tests/backends/test_chromatix_boundary.py` walks it).
 #:
 #:   **The `operators -> couplers` edge is now exercised**, and it took until R09 to
 #:   find a use that was not taxonomy. `transmission.py` still does not import
@@ -175,7 +175,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   `RayBundle` is now understood to be unproducible here. A launch position
 #:   depends on the stop, the entrance pupil, the surfaces before the stop, the
 #:   object distance, the field, the backend's pupil map and the ray aimer, so it
-#:   belongs to `solvers/optiland/launch.py`. Note that this gate could never have
+#:   belongs to `backends/optiland/launch.py`. Note that this gate could never have
 #:   caught the problem: the removed module imported only `numerics` and
 #:   `representations`, both allowed, and the defect was in *what it returned*.
 #:   `tests/sources/test_sources_package.py` is where the semantic rule is checked.
@@ -183,10 +183,11 @@ ALLOWED: dict[str, frozenset[str]] = {
 #:   covered it -- but it did change what this package *is*, and R05.8 changed it
 #:   back to one representation. **A new row in `ALLOWED`, and therefore a
 #:   deliberate architecture change**, decided by the
-#:   owner on that ticket rather than assumed here. A source maps a problem
-#:   statement into a representation -- the definition of a `solver`, which is what
-#:   its operations register as -- but it has no external backend, and
-#:   `solvers/<backend>/` is organized per backend. The three alternatives were each
+#:   owner on that ticket rather than assumed here. A source initializes a
+#:   representation from source parameters alone -- `source` is its own operation
+#:   kind since CHE-224 (R15.1), and was `solver` before it -- but it has no
+#:   external backend, and `backends/<backend>/` is organized per backend. The
+#:   three alternatives were each
 #:   worse: `representations/` would own physics it exists only to declare,
 #:   `operators/` is wrong by definition because an operator *consumes* a
 #:   representation, and widening an existing package's remit to make a source fit
@@ -198,7 +199,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 #: * `couplers` -- landed by CHE-185 (R07.1): `ray_to_scalar.py`, the coherent
 #:   wavelet sum from a ray ensemble onto a grid. It imports `representations` and
 #:   `numerics`, which is its whole row. Three forbidden edges matter here and each
-#:   has a reason that is not taxonomy: `couplers -> solvers` would let a coupler
+#:   has a reason that is not taxonomy: `couplers -> backends` would let a coupler
 #:   defect be misattributed to engine behaviour, which is the independence
 #:   property the old tree asserted with an AST walk and this tree inherits;
 #:   `couplers -> problems` would make a representation change depend on the
@@ -212,6 +213,7 @@ ALLOWED: dict[str, frozenset[str]] = {
 #: When the graph is complete this equals `ALLOWED.keys()`.
 LANDED: frozenset[str] = frozenset(
     {
+        "backends",
         "couplers",
         "measurements",  # CHE-197 (R11.1): `psf.py`, one measurement.
         "numerics",
@@ -221,20 +223,27 @@ LANDED: frozenset[str] = frozenset(
         "problems",
         "representations",
         "runtime",  # CHE-199 (R13.1): `records.py`, the execution record.
-        "solvers",
         "sources",
     }
 )
 
 #: Target-architecture names that the deleted reference tree also used.
 #:
-#: `solvers` is now on disk again -- landed fresh by R05, not revived -- and the
-#: other two are not. Membership here has no effect on whether a name is checked;
+#: Neither is on disk. Membership here has no effect on whether a name is checked;
 #: it only sharpens the message a violation carries. They are kept as a record
 #: of *which* target names were previously occupied, because that is the set most
 #: likely to be resurrected by a partial revert, a `git checkout` of an old path,
 #: or a copy from the `pre-rewrite-2026-08-30` tag. A package appearing under one
 #: of these names is a package that has to be argued in like any other.
+#:
+#: **`solvers` left this set on CHE-224 (R15.1)** and moved to `OLD_TREE_ONLY`.
+#: The rename of `src/solvers/` to `src/backends/` made it a name the reference
+#: tree used and the target architecture does not, which is that other set's
+#: definition exactly. Leaving it here would have been a hole rather than a stale
+#: comment: `_classify` returns early for anything absent from `ALLOWED`, so once
+#: `solvers` lost its row an `import solvers` from the new tree would have been
+#: classified as third-party and allowed. `backends` is *not* added here, because
+#: the reference tree never used that name.
 #:
 #: **The exemption these names used to carry has been removed.** While the old
 #: tree was on disk they were skipped by the "on disk but not in LANDED"
@@ -244,7 +253,7 @@ LANDED: frozenset[str] = frozenset(
 #: walked and counted *zero* of it. With the old tree gone the skip has no
 #: remaining benefit, so it is gone too -- these names are now checked exactly
 #: like every other, and landing one still requires the same LANDED edit.
-SHARED_NAMES: frozenset[str] = frozenset({"couplers", "solvers", "runtime"})
+SHARED_NAMES: frozenset[str] = frozenset({"couplers", "runtime"})
 
 #: Top-level names that belonged to the reference implementation and to nothing
 #: else. An import of one from the new tree is the violation R01 exists to
@@ -259,14 +268,27 @@ SHARED_NAMES: frozenset[str] = frozenset({"couplers", "solvers", "runtime"})
 #: `docs/rewrite/reference_inventory.md` cites them by path. Re-deriving from the
 #: tag is the supported route, importing is not, and this is where that is said.
 #: The set is an anti-pollution guard, not a description of the current disk.
+#: **`solvers` joined this set on CHE-224 (R15.1)**, when `src/solvers/` became
+#: `src/backends/`. It is not a revived package name being banned pre-emptively:
+#: it is a name the reference tree occupied, which the target architecture no
+#: longer claims, and that is what every other member of this set is.
 OLD_TREE_ONLY: frozenset[str] = frozenset(
-    {"agent", "cli", "core", "discovery", "registry", "studies", "verification"}
+    {
+        "agent",
+        "cli",
+        "core",
+        "discovery",
+        "registry",
+        "solvers",
+        "studies",
+        "verification",
+    }
 )
 
 #: `src` itself, which is the shortest way to defeat everything above.
 #:
 #: `src/` has no `__init__.py`, so PEP 420 makes `src.core`, `src.couplers` and
-#: `src.solvers` importable namespace paths whenever the repository root is on
+#: `src.backends` importable namespace paths whenever the repository root is on
 #: `sys.path` -- which it is for a bare `python`, `python -m` or pytest run from
 #: the root. `from src.core.boundary import RayBundle` therefore *resolves*, and an
 #: earlier revision of this script classified its first segment (`"src"`) as
@@ -275,7 +297,7 @@ OLD_TREE_ONLY: frozenset[str] = frozenset(
 #: the package name alone is the import.
 NAMESPACE_ROOT = "src"
 
-#: Solver backends. Only `solvers/<backend>/` may import one. A representation or
+#: Solver backends. Only `backends/<backend>/` may import one. A representation or
 #: a coupler that imports a backend has stopped being neutral ground -- this is
 #: the "representations/ -> any backend" forbidden edge, generalized to every
 #: package that is not a solver adapter.
@@ -328,9 +350,9 @@ def _classify(package: str, imported: str) -> str | None:
             "be built on the tree it replaces (R01 acceptance criterion 3); reuse the "
             "physics by re-deriving it from the pre-rewrite tag, not by importing it."
         )
-    if imported in BACKENDS and package != "solvers":
+    if imported in BACKENDS and package != "backends":
         return (
-            f"{imported!r} is a solver backend. Only solvers/<backend>/ may import one; "
+            f"{imported!r} is a solver backend. Only backends/<backend>/ may import one; "
             "everywhere else it makes the package depend on an external solver's "
             "conventions."
         )

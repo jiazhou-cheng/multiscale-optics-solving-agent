@@ -50,23 +50,42 @@ def a_descriptor(**overrides: object) -> OperationDescriptor:
 
 
 # ---------------------------------------------------------------------------
-# Criterion 1 -- one record, four kinds, no hierarchy
+# Criterion 1 -- one record, five kinds, no hierarchy
 # ---------------------------------------------------------------------------
 
 
-def test_there_are_exactly_four_kinds() -> None:
+def test_there_are_exactly_five_kinds() -> None:
+    """Still four after CHE-224 (R15.1): `solver` left and `source` arrived.
+
+    The count is the same and the axis is not. `solver` described who executes an
+    operation while the other three describe what happens to physical state, so the
+    set had one member on a different axis from the rest. `backend` answers the
+    execution question now, and it is a field rather than a kind.
+    """
     assert [kind.value for kind in OperationKind] == [
-        "solver",
+        "source",
         "coupler",
         "physical_operator",
         "measurement",
+        # Not a primitive and not on the same axis as the four -- CHE-237 (R03.7).
+        # It says "this callable fuses more than one primitive"; `composes` says
+        # which, and `terminal_stage` answers what `kind` used to.
+        "composed",
     ]
+    assert not hasattr(OperationKind, "SOLVER")
 
 
 @pytest.mark.parametrize("kind", list(OperationKind))
 def test_every_kind_uses_the_same_record(kind: OperationKind) -> None:
-    """The point of the enum: four kinds, one type, no per-kind construction path."""
-    assert type(a_descriptor(kind=kind)) is OperationDescriptor
+    """The point of the enum: five kinds, one type, no per-kind construction path."""
+    # `COMPOSED` is the one kind that cannot stand alone, because `composes` is
+    # derived from it: a composite with no stages is refused (CHE-237).
+    extra: dict[str, object] = (
+        {"composes": (OperationKind.COUPLER, OperationKind.COUPLER)}
+        if kind is OperationKind.COMPOSED
+        else {}
+    )
+    assert type(a_descriptor(kind=kind, **extra)) is OperationDescriptor
 
 
 def test_a_kind_may_be_given_as_its_string() -> None:
@@ -114,7 +133,7 @@ def test_the_avoided_names_do_not_exist(absent: str) -> None:
 def test_the_descriptor_is_frozen() -> None:
     descriptor = a_descriptor()
     with pytest.raises(dataclasses.FrozenInstanceError):
-        descriptor.kind = OperationKind.SOLVER  # type: ignore[misc]
+        descriptor.kind = OperationKind.SOURCE  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +232,20 @@ def test_there_is_no_yaml_or_manifest_mirror_of_the_registry() -> None:
 
 
 def test_implementation_is_a_string_and_is_not_imported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Constructing a descriptor resolves nothing, asserted as a delta and not a state.
+
+    The last assertion used to be `"chromatix" not in sys.modules`, which is a claim
+    about the whole interpreter rather than about this construction, and it held only
+    while nothing earlier in the session had imported the backend. CHE-224 (R15.1)
+    renamed `tests/solvers/` to `tests/backends/`, which moved those modules ahead of
+    this one in collection order, and the assertion started failing on a test that
+    had not changed -- so what it was really pinning was the alphabet.
+
+    The before/after difference is the property the test is named for. The absolute
+    version of it is a real property and it is checked where it can be:
+    `test_registry_imports_no_backend.py` runs a **fresh interpreter** per probe,
+    which is the only place `sys.modules` means what this line wanted it to mean.
+    """
     import importlib
     import sys
 
@@ -220,10 +253,11 @@ def test_implementation_is_a_string_and_is_not_imported(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         importlib, "import_module", lambda name, *a, **k: calls.append(name)  # type: ignore[misc]
     )
+    before = set(sys.modules)
     descriptor = a_descriptor(implementation="chromatix.functional:transfer_propagate")
     assert isinstance(descriptor.implementation, str)
     assert calls == []
-    assert "chromatix" not in sys.modules
+    assert set(sys.modules) - before == set()
 
 
 @pytest.mark.parametrize("bad", ["chromatix.functional", "", ":run"])
@@ -278,7 +312,7 @@ def test_semantic_types_are_the_boundaries_that_landed() -> None:
     exemplar below had to move off `psf` when `measurements/psf.py` landed. That
     is the vocabulary working, not the test being brittle.
     """
-    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf")
+    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf", "spot")
 
 
 @pytest.mark.parametrize("field", ["inputs", "returns"])
@@ -351,7 +385,7 @@ def test_lists_are_accepted_and_stored_as_tuples() -> None:
 
 @pytest.mark.parametrize(
     "kind",
-    [OperationKind.COUPLER, OperationKind.SOLVER, OperationKind.PHYSICAL_OPERATOR],
+    [OperationKind.COUPLER, OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR],
 )
 def test_only_a_measurement_may_produce_an_observable(kind: OperationKind) -> None:
     """Criterion 3 of the parent, as a **construction error** rather than a loop.
@@ -410,16 +444,18 @@ def test_nothing_consumes_an_observable(kind: OperationKind) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
+def test_a_graph_entry_is_declared_and_only_a_source_stage_may_begin_one() -> None:
     """Acceptance criterion 9. `inputs=()` became expressible, so it needs a rule.
 
-    Only `solver`-kind: a source initializes a representation from source
-    parameters alone, and a problem-driven solve turns a problem statement into
-    one. The other three kinds are refused because each would be a claim about
-    nothing -- a coupler changing the representation of nothing, an operator
+    Only `source`-kind, since CHE-224 (R15.1) -- `solver`-kind before it, which
+    contradicted the `ENTRY_KINDS` docstring's own claim that a source is the one
+    operation with no input. A source initializes a representation from source
+    parameters alone, whether those parameters describe the light or a system to
+    launch into. The other three kinds are refused because each would be a claim
+    about nothing -- a coupler changing the representation of nothing, an operator
     changing the state of nothing, a measurement observing nothing.
     """
-    entry = a_descriptor(kind=OperationKind.SOLVER, inputs=())
+    entry = a_descriptor(kind=OperationKind.SOURCE, inputs=())
     assert entry.is_graph_entry is True
     assert not a_descriptor().is_graph_entry
 
@@ -428,8 +464,84 @@ def test_a_graph_entry_is_declared_and_only_a_solver_may_be_one() -> None:
         OperationKind.PHYSICAL_OPERATOR,
         OperationKind.MEASUREMENT,
     ):
-        with pytest.raises(ValueError, match="may be a graph entry"):
+        with pytest.raises(ValueError, match="may begin a graph entry"):
             a_descriptor(kind=kind, inputs=())
+
+    # A composite is admitted on its FIRST stage, not on `kind` -- CHE-225 (R15.2),
+    # and mandatory since CHE-237 (R03.7) made `kind` name no stage at all. This is
+    # the shape `SO_RAY_LAUNCH_TRACE` needs: it consumes no upstream representation,
+    # and it leaves the state somewhere a source could not.
+    fused = a_descriptor(
+        kind=OperationKind.COMPOSED,
+        inputs=(),
+        composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
+    )
+    assert fused.is_graph_entry is True
+    assert fused.entry_stage is OperationKind.SOURCE
+    assert fused.terminal_stage is OperationKind.PHYSICAL_OPERATOR
+    # And a composition that does NOT begin with a source is still refused, so the
+    # entry rule is keyed on the stage rather than merely bypassed by `composes`.
+    with pytest.raises(ValueError, match="may begin a graph entry"):
+        a_descriptor(
+            kind=OperationKind.COMPOSED,
+            inputs=(),
+            composes=(OperationKind.COUPLER, OperationKind.MEASUREMENT),
+        )
+
+
+def test_a_composed_entry_carries_the_kind_and_its_real_members() -> None:
+    """CHE-237 (R03.7), the composite branch of the derivation.
+
+    The three things the ticket asks of a fused record, on one object: the kind is
+    the string `"composed"` -- lowercase, like the four primitives -- and nothing
+    else, `composes` holds the actual stages in order, and the question `kind` used
+    to answer is still answerable off `terminal_stage`, which is the last member
+    rather than a value chosen by hand.
+    """
+    fused = a_descriptor(
+        kind=OperationKind.COMPOSED,
+        inputs=(),
+        composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
+    )
+    assert fused.kind is OperationKind.COMPOSED
+    assert fused.kind == "composed"
+    assert fused.composes == (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR)
+    assert fused.entry_stage is OperationKind.SOURCE
+    assert fused.terminal_stage is OperationKind.PHYSICAL_OPERATOR
+    # The stages are normalized to enum members even when written as strings, so a
+    # caller cannot smuggle a raw string past the `composes` reads above.
+    from_strings = a_descriptor(
+        kind="composed",
+        inputs=(),
+        composes=("source", "physical_operator"),
+    )
+    assert from_strings.composes == fused.composes
+    assert all(isinstance(stage, OperationKind) for stage in from_strings.composes)
+
+
+def test_a_non_composed_entry_leaves_composes_as_none() -> None:
+    """CHE-237 (R03.7), the primitive branch -- `None`, not `()` and not `{}`.
+
+    The distinction is the point of the ticket rather than a style preference. An
+    empty tuple is falsy and present, so `if record.composes` read it the same as
+    absent while `record.composes == ()` read it as a positive claim, and that is
+    the gap the two fields drifted through. `None` is unambiguous, and setting
+    `composes` at all on a primitive is now a construction error.
+    """
+    for kind in (
+        OperationKind.SOURCE,
+        OperationKind.COUPLER,
+        OperationKind.PHYSICAL_OPERATOR,
+        OperationKind.MEASUREMENT,
+    ):
+        inputs = () if kind is OperationKind.SOURCE else ("ray_bundle",)
+        record = a_descriptor(kind=kind, inputs=inputs)
+        assert record.composes is None, kind
+        assert record.composes != ()
+        assert record.composes != {}
+        # And the terminal stage of a primitive is the primitive itself, so the
+        # property is not a composite-only accessor.
+        assert record.terminal_stage is kind
 
 
 def test_inputs_is_required_so_no_upstream_edge_has_to_be_written() -> None:
@@ -443,7 +555,7 @@ def test_inputs_is_required_so_no_upstream_edge_has_to_be_written() -> None:
     with pytest.raises(TypeError):
         OperationDescriptor(  # type: ignore[call-arg]
             operation_id="X_NO_PORTS",
-            kind=OperationKind.SOLVER,
+            kind=OperationKind.SOURCE,
             returns=("ray_bundle",),
             implementation="tests.operations.nothing:run",
             approximation="none",
@@ -533,11 +645,16 @@ def test_two_records_may_share_an_implementation_and_stay_distinct() -> None:
     """Acceptance criterion 7, at the schema level.
 
     Nothing here refuses a duplicate `implementation`, and that is deliberate:
-    planning identity is the `operation_id`. `S_WAVE_CHROMATIX` and
-    `O_ASM_PROPAGATE` are the landed case, pinned against the real catalog by
-    `tests/operations/test_catalog.py`.
+    planning identity is the `operation_id`.
+
+    **No landed record relies on it any more.** `S_WAVE_CHROMATIX` and
+    `O_ASM_PROPAGATE` were the case that did, and CHE-224 (R15.1) merged them once
+    `backend` answered the question the pair was splitting. What this test pins is
+    that the *schema* still does not deduplicate by callable, which is a different
+    statement from the catalog happening to need it -- and the catalog gate now
+    asserts the opposite for the shipped records, one per `implementation`.
     """
-    first = a_descriptor(operation_id="X_ONE", kind=OperationKind.SOLVER)
+    first = a_descriptor(operation_id="X_ONE", kind=OperationKind.SOURCE)
     second = a_descriptor(operation_id="X_TWO", kind=OperationKind.PHYSICAL_OPERATOR)
     assert first.implementation == second.implementation
     assert first != second

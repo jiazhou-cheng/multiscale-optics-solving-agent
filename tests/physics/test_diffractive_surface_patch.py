@@ -747,7 +747,7 @@ def test_no_thread_pool_or_cost_model_landed() -> None:
     )
     # Imports, not prose: the module docstring *names* `PatchEmitterCostModel` as
     # a thing that did not land, and a substring search would flag that sentence --
-    # the trap `tests/solvers/test_optiland_boundary.py` documents when it exempts
+    # the trap `tests/backends/test_optiland_boundary.py` documents when it exempts
     # docstrings. The defined-name walk below covers the rest.
     imported = {
         alias.name.split(".")[0]

@@ -238,7 +238,7 @@ def _import_optiland_construction() -> tuple[Any, Any, Any, Any, Any]:
     """Import exactly what construction needs, and nothing else.
 
     Kept inside the function so importing this module imports no solver:
-    `tests/solvers/test_optiland_boundary.py` asserts that in a fresh
+    `tests/backends/test_optiland_boundary.py` asserts that in a fresh
     interpreter, and it is what lets a caller read the module without paying for
     torch.
     """
@@ -484,7 +484,7 @@ def build_lens(setup: OpticalSetup, source: SourceSpec | None = None) -> Any:
     """Construct the Optiland system an `OpticalSetup` describes.
 
     The returned object is an ordinary `optiland.optic.Optic`. It is native solver
-    state and is not a project type: it stays inside `solvers/optiland/`, which is
+    state and is not a project type: it stays inside `backends/optiland/`, which is
     why the annotation is `Any` rather than a name this module would have to
     export.
 

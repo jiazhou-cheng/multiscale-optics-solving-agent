@@ -32,6 +32,17 @@ A **set**, not one value, because the limitations are independent and the risk i
 that expressing one hides the other. A carrier-removed field with no curvature
 term declares both; a field with neither declares the empty set, which is the
 default and the strongest statement this type can make.
+
+Four flags since CHE-227 (R02.5), and they stay independent
+------------------------------------------------------------
+`paraxial` joined the vocabulary because a Fresnel-propagated field had no true
+thing to declare. `S_SOURCE_GAUSSIAN_BEAM`'s validity already recorded the gap in
+so many words -- "an off-waist Gaussian is a paraxial solution and no ValidityFlag
+says 'paraxial'" -- and R06.11's `fresnel_propagate` is the first operation that
+sets it. The flag is orthogonal to the other three: a Fresnel result of a
+ray-reconstructed field declares `paraxial` *and*
+`no_wavefront_curvature_term`, and its phase is also carrier-removed, so all
+three can be true of one array at once.
 """
 
 from __future__ import annotations
@@ -62,12 +73,14 @@ ValidityFlag = Literal[
     "surface_only",
     "no_wavefront_curvature_term",
     "carrier_removed_phase",
+    "paraxial",
 ]
 
 VALIDITY_FLAGS: tuple[ValidityFlag, ...] = (
     "surface_only",
     "no_wavefront_curvature_term",
     "carrier_removed_phase",
+    "paraxial",
 )
 
 #: What each flag costs a consumer, with the measurement behind it.
@@ -92,6 +105,21 @@ VALIDITY_NOTES: dict[str, str] = {
         "The phase is relative to a removed linear carrier, not absolute. Two fields "
         "with different removed carriers may not be added or interfered without "
         "restoring them first."
+    ),
+    "paraxial": (
+        "Computed under the paraxial (Fresnel) approximation: the transfer function's "
+        "phase is -(1/2) n k0 z sin^2(theta) rather than n k0 z cos(theta), so the "
+        "field carries a phase error of n k0 z (1 - cos(theta) - sin^2(theta)/2) = "
+        "n k0 z sin^4(theta)/8 + O(sin^6(theta)) at each direction cosine "
+        "sin(theta) = lambda_0 f / n. It is usable where the field's own largest "
+        "direction cosine satisfies sin(theta_max) <= (lambda_0 / (n z))^(1/4), at "
+        "which the leading error reaches pi/4. Measured consequence: on a 512^2 grid "
+        "at dx = 0.3 um, lambda_0 = 0.532 um, n = 1.33, z = 50 um, a hard-edged square "
+        "aperture puts 4.5e-3 of its spectral power beyond that bound and the "
+        "intensity then differs from the exact angular spectrum by 2.3e-1 of peak, "
+        "while a soft-edged field on the identical grid differs by 4.9e-6 -- so "
+        "|U|^2 will not warn a consumer whose field has a hard edge, and this flag is "
+        "the only thing that will."
     ),
 }
 

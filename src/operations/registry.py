@@ -18,7 +18,7 @@ backend-free can pull one three levels down.
 
 Registration is *pulled*, never *pushed*
 ----------------------------------------
-The tempting arrangement is for `solvers/optiland/solver.py` to call a
+The tempting arrangement is for `backends/optiland/solver.py` to call a
 `register(...)` at import time. That inverts the dependency -- an implementation
 would import `operations/` -- and it defeats the property above the moment
 anything imports the implementation package for any other reason, because then
@@ -26,10 +26,10 @@ listing the registry means the implementations were already loaded. So there is
 no import-time scan, no filename convention and no entry-point discovery.
 
 **The registration site is `operations.catalog`, inside this package.** CHE-221
-put the fourteen landed operations there, and this module builds its by-id index
+put the landed operations there, and this module builds its by-id index
 from `catalog.CATALOG` at import. That needs no dependency edge in either
 direction, because `implementation` is a string: the catalog *names*
-`solvers.optiland.solver:trace` without importing it.
+`backends.optiland.solver:trace` without importing it.
 
 So there is no public `register()` any more. `_build_index` below is what replaced
 it, and it kept the one behaviour that mattered -- a duplicate id is refused
@@ -80,8 +80,10 @@ def _build_index(
                 f"{descriptor.operation_id!r} appears twice in the catalog, as "
                 f"{existing.implementation!r} and {descriptor.implementation!r}. Ids are "
                 "unique; keeping one of the two would make the answer depend on "
-                "declaration order. Two records MAY name one callable -- "
-                "S_WAVE_CHROMATIX and O_ASM_PROPAGATE do -- but they need two ids."
+                "declaration order. A callable may carry more than one record only "
+                "with more than one id, and since CHE-224 (R15.1) none does: the one "
+                "pair that did was two answers to two different questions, and the "
+                "second question now has its own field."
             )
         index[descriptor.operation_id] = descriptor
     return index
@@ -106,7 +108,7 @@ def find(
 
     No argument enumerates the whole catalog, which is what makes "listing
     everything imports no backend" a statement about a real call -- and since
-    CHE-221 it is a statement about fourteen real records naming `optiland` and
+    CHE-221 it is a statement about fifteen real records naming `optiland` and
     `chromatix`, rather than about an empty dict.
 
     An unknown semantic type or kind is an error, not an empty result. A query

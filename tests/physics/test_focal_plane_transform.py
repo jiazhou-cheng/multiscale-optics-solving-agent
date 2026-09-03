@@ -15,7 +15,7 @@ forward then inverse         ``-U_in`` (see below)                      1.5e-7 r
 power                        discrete Parseval: unchanged               exact (f64)
 ===========================  =========================================  ===========
 
-`tests/solvers/test_chromatix_focal_plane.py` holds the refusals, the pad-width
+`tests/backends/test_chromatix_focal_plane.py` holds the refusals, the pad-width
 decision and the registration; this file is the physics.
 
 Two signs, both measured rather than assumed
@@ -46,8 +46,8 @@ import math
 import numpy as np
 import pytest
 
+from backends.chromatix import focal_plane_transform, fourier_plane_pitch_m
 from representations import ReferenceSurface, ScalarField
-from solvers.chromatix import focal_plane_transform, fourier_plane_pitch_m
 
 WAVELENGTH_M = 0.532e-6
 FOCAL_LENGTH_M = 20e-3

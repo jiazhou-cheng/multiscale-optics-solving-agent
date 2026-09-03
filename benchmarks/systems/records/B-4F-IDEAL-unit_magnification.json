@@ -1,5 +1,5 @@
 {
-  "written_at_utc": "2026-09-01T11:43:54Z",
+  "written_at_utc": "2026-09-02T23:24:45Z",
   "environment": {
     "numpy": "2.2.6",
     "scipy": "1.15.3",
@@ -11,12 +11,126 @@
   "configuration": "unit_magnification",
   "produced_by": "benchmarks/systems/b4f_ideal.py",
   "composition": [
-    "sources.plane_wave",
-    "operators.complex_transmission",
-    "solvers.chromatix.focal_plane_transform",
-    "operators.complex_transmission",
-    "solvers.chromatix.focal_plane_transform"
+    "S_SOURCE_PLANE_WAVE",
+    "O_COMPLEX_TRANSMISSION",
+    "O_FOCAL_PLANE_TRANSFORM",
+    "O_COMPLEX_TRANSMISSION",
+    "O_FOCAL_PLANE_TRANSFORM"
   ],
+  "execution_path": "runtime.Executor.execute(plan) over a hardcoded plan of per-node requests, with the result read from Executor.result. The benchmark imports no operation: every step above is a catalog id resolved by operations.resolve inside the executor. planning.routes cannot enumerate this plan -- an operation may not repeat in a route and this one repeats two -- so the plan is written down here and every consecutive edge is checked against planning.capability_graph()",
+  "plan": {
+    "steps": [
+      {
+        "step": 0,
+        "operation": "S_SOURCE_PLANE_WAVE",
+        "request": {
+          "reference_surface": "ReferenceSurface(name='front_focal', z_m=0.0, medium_index=1.0, normal=(0.0, 0.0, 1.0))",
+          "sample_pitch_m": [
+            6e-07,
+            5e-07
+          ],
+          "shape": [
+            192,
+            256
+          ],
+          "transverse_wavevector_rad_per_m": [
+            0.0,
+            0.0
+          ],
+          "wavelength_m": 5.32e-07
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 1,
+        "operation": "O_COMPLEX_TRANSMISSION",
+        "request": {
+          "amplitude": {
+            "array": [
+              192,
+              256
+            ],
+            "dtype": "float64",
+            "sha256": "45cd869eedcee0c2"
+          },
+          "target_surface": "object"
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 2,
+        "operation": "O_FOCAL_PLANE_TRANSFORM",
+        "request": {
+          "focal_length_m": 0.02,
+          "model": {
+            "target_surface": "fourier",
+            "direction": "forward"
+          }
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 3,
+        "operation": "O_COMPLEX_TRANSMISSION",
+        "request": {
+          "amplitude": {
+            "array": [
+              192,
+              256
+            ],
+            "dtype": "float64",
+            "sha256": "2f2a352802227709"
+          },
+          "target_surface": "fourier_stopped"
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 4,
+        "operation": "O_FOCAL_PLANE_TRANSFORM",
+        "request": {
+          "focal_length_m": 0.02,
+          "model": {
+            "target_surface": "image",
+            "direction": "forward"
+          }
+        },
+        "produces": "scalar_field"
+      }
+    ],
+    "semantic_chain": [
+      "scalar_field",
+      "scalar_field",
+      "scalar_field",
+      "scalar_field",
+      "scalar_field"
+    ],
+    "enumerable_by_planning_routes": false,
+    "why_not_enumerable": "planning.routes admits no repeated operation in a route, and this plan repeats O_FOCAL_PLANE_TRANSFORM and O_COMPLEX_TRANSMISSION. planning/graph.py records that as an open decision rather than an oversight; the edge check above is the part of planning that does apply to a plan a caller wrote down",
+    "execution": {
+      "status": "completed",
+      "route": [
+        "S_SOURCE_PLANE_WAVE",
+        "O_COMPLEX_TRANSMISSION",
+        "O_FOCAL_PLANE_TRANSFORM",
+        "O_COMPLEX_TRANSMISSION",
+        "O_FOCAL_PLANE_TRANSFORM"
+      ],
+      "node_statuses": [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed"
+      ],
+      "per_node_requests_recorded": 5,
+      "per_node_focal_lengths_m": [
+        0.02,
+        0.02
+      ],
+      "resource_failure": null
+    }
+  },
   "parameters": {
     "wavelength_m": 5.32e-07,
     "medium_index": 1.0,

@@ -77,15 +77,14 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from representations import RayBundle
-from solvers.optiland import trace
-from solvers.optiland.launch import (
+from backends.optiland import trace
+from backends.optiland.launch import (
     _object_space_reference,
     capture_launch_rays,
     launch,
     normalized_field,
 )
-from solvers.optiland.rays import (
+from backends.optiland.rays import (
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
     NATIVE_LENGTH_M,
@@ -93,7 +92,8 @@ from solvers.optiland.rays import (
     require_declared_optical_path,
     to_ray_bundle,
 )
-from solvers.optiland.system import build_lens
+from backends.optiland.system import build_lens
+from representations import RayBundle
 
 WAVELENGTH_UM = 0.55
 WAVELENGTH_M = WAVELENGTH_UM * 1.0e-6
@@ -165,7 +165,7 @@ def _captured_columns(lens: object, field_deg: tuple[float, float]) -> dict[str,
     not a hand-built pair, so the term is measured on exactly what `launch` feeds
     it.
     """
-    from solvers.optiland.launch import _launch_columns
+    from backends.optiland.launch import _launch_columns
 
     native, _, _ = capture_launch_rays(
         lens,
@@ -279,7 +279,7 @@ def test_the_captured_launch_state_reproduces_the_trace(
     """Bit-identical, which is what lets a per-ray term measured from it be used.
 
     **CHE-219 (R05.8) acceptance criterion 9, in the case where path unification
-    was deferred.** `solvers.optiland.trace` still runs `Optic.trace`, which
+    was deferred.** `backends.optiland.trace` still runs `Optic.trace`, which
     regenerates its own rays internally, so the launch declaration only describes
     the traced rows if the captured state and the trace's own launch agree row for
     row. They do, exactly: the captured state traced through the system reproduces
@@ -355,7 +355,7 @@ def test_an_extended_finite_source_is_refused_rather_than_approximated() -> None
     no problem this schema can state produces an extended source -- and a refusal
     with no reachable case is a claim about a path that does not exist.
     """
-    from solvers.optiland.launch import _point_source_reference
+    from backends.optiland.launch import _point_source_reference
 
     coincident = np.zeros(5)
     good = _point_source_reference(coincident, coincident, coincident - 9.0, index=1.0)

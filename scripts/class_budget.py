@@ -218,7 +218,7 @@ SRC = ROOT / "src"
 #: `core/optical_assembly.py`'s three and every builder.
 #: `tests/problems/test_ray_trace.py` asserts their absence, and now also asserts
 #: that `RayTraceProblem` is gone rather than aliased.
-#: `solvers` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
+#: `backends` is 2, raised from 0 by CHE-181 (R05.3). **Both are `TypedDict`s and
 #: neither is a public class**: R05 budgets "0 public classes, at most 1 private",
 #: and the private one (`_OptilandTraceBatch`, for grouped native ray state) did
 #: not land -- the native columns are a local dict inside one function, and no
@@ -238,13 +238,44 @@ SRC = ROOT / "src"
 #:                state whose inheritance was a measured source of
 #:                nondeterminism.
 #:
+#: **Raised to 3 by CHE-226 (R16)**, which adds `NativeSpotAnalysis` to
+#: `backends/optiland/analysis.py` -- the delegated spot analysis's neutral result,
+#: on **rule 2**: a public record whose fields are the ticket's own acceptance
+#: criteria (the intersections in metres, the three metrics, which field and
+#: wavelength were analysed, which implementation at which version produced them).
+#: It is the first non-`TypedDict` class in this package.
+#:
+#: Why it is not `measurements.SpotResult`, since both carry a spot. Two reasons,
+#: and the second is structural rather than aesthetic. The numbers are computed
+#: under **different declared definitions** -- the pinned solver's metrics are
+#: unweighted and this project's centroid and RMS are weighted by `|a|^2`
+#: (`NATIVE_SPOT_METRIC_DEFINITIONS`) -- so one record spanning both would need a
+#: field saying which set applied, i.e. two records with a tag. And
+#: `check_dependencies.ALLOWED` gives `backends` no edge to `measurements`;
+#: importing that record here to save a class would trade a real architectural
+#: property for a budget line.
+#:
+#: Two names did **not** land against that +1, and `tests/backends/test_optiland_analysis.py`
+#: asserts their absence: `AnalysisRequest` (an argument bag over a signature that
+#: already types its four arguments) and `AnalysisType` as an enum with a dispatch
+#: table -- one callable per analysis is what the catalog's per-record signature
+#: gate can describe, so the enum would have bought nothing and cost a class.
+#:
+#: **Raised to 4 by CHE-236 (R16.1)**, which adds `NativePsfAnalysis` to the same
+#: module -- the native PSF path's neutral result, on **rule 2**, and separate from
+#: `measurements.PsfResult` for both of the reasons above with the definitions
+#: replaced by *normalizations*: this record's scale is Optiland's Strehl-percent
+#: convention and `PsfResult`'s is `raw`/`peak`/`energy` on `|u|^2`. See the
+#: `PROJECT_CEILING` note for the four class names the alternative design would
+#: have cost.
+#:
 #: Six class names did **not** land against that +2, and the tests name them:
 #: `OptilandAdapter` (a one-instance facade behind `get_adapter()`),
 #: `OptilandExecutionState`, `TracePlans`, `OptilandRayRequest` /
 #: `OptilandRayFailure` / `OptilandRayResult`, `PatchEmitterCostModel`, and
 #: `HandoffPlaneError` as a separate exception type -- an unresolvable plane is a
 #: `ContractError` with a code, because a coupler branches on the code and not on
-#: the class. `solvers/optiland/baseline.py` did not land either, in its entirety.
+#: the class. `backends/optiland/baseline.py` did not land either, in its entirety.
 #: `operators` is **1**, raised from 0 by CHE-194 (R10.2), which adds
 #: `DiffractiveSurface` -- rules 1 and 2. Rule 1: the transmission, the pitch it is
 #: sampled at and the surface it lives on are one physical object, and the failure
@@ -328,8 +359,9 @@ SRC = ROOT / "src"
 #: `PositionPlan`, `PatchPlan` and `Ensemble`.
 #:
 BUDGETS: dict[str, int] = {
+    "backends": 4,
     "couplers": 4,
-    "measurements": 1,
+    "measurements": 2,
     "numerics": 7,
     "operations": 2,
     "operators": 1,
@@ -367,7 +399,6 @@ BUDGETS: dict[str, int] = {
     #: real lifetime; the raise is unchanged and the justification is now the one
     #: the code supports.
     "runtime": 3,
-    "solvers": 2,
     "sources": 0,
 }
 
@@ -415,6 +446,16 @@ BUDGETS: dict[str, int] = {
 #: `PsfNormalization` is a `Literal` rather than the `StrEnum` the ticket names,
 #: for the reason R08.1 established: this gate counts a `StrEnum` as a class, the
 #: two readings of "+1" differ by one, and the stricter one is taken.
+#:
+#: `measurements` is **raised to 2 by CHE-226 (R16)**, which adds `SpotResult` --
+#: rule 2 again, and the same argument `PsfResult` stands on: it is the public
+#: record a consumer reads back, and five of R16's acceptance criteria are
+#: statements about what it carries (which rays were included, from which
+#: reference, under which weighting, at which plane, under which splitting
+#: provenance). Its three metrics are three fields rather than a `SpotMetric`
+#: registry or three free functions with a shared reference argument, because there
+#: is one declared definition each and a caller that has to re-supply the reference
+#: to two of them can get two numbers about different centres.
 #:
 #: **25 -> 26 for CHE-200 (R13.2), and this is the first raise that does *not*
 #: land in the commit that adds the class.** The class is `Executor`, in
@@ -485,12 +526,54 @@ BUDGETS: dict[str, int] = {
 #: spending the unit reserved at 25 -> 26 above, which is what it was reserved
 #: for. Note that this raise lands *with* its classes, unlike that one.
 #:
+#: **29 -> 31 by CHE-226 (R16)**, and this is the second raise of *two*. **Flagged
+#: for the owner** for the same reason CHE-199's was: the ratchet's value is that a
+#: raise is one visible line per class, so a raise of two has to say why it is not
+#: two tickets' worth of authorization being spent at once.
+#:
+#: The two are `measurements.SpotResult` and
+#: `backends.optiland.analysis.NativeSpotAnalysis`, both on **rule 2**, and both
+#: justified in the per-package notes above. Why two and not one: they are the two
+#: paths R16 exists to keep separate, they carry numbers computed under different
+#: declared metric definitions, and the dependency allowlist forbids the import that
+#: would let one record serve both. Collapsing them needs a `backends ->
+#: measurements` edge, which is an architecture change and not a saving.
+#:
+#: R16 adds no other class. `RaySplitting` is a `Literal` and not a `StrEnum`, for
+#: the reason R08.1 established and R11.1 repeated -- this gate counts a `StrEnum`
+#: as a class and the stricter reading is taken -- and the two operation records are
+#: entries in an existing tuple.
+#:
+#: **31 -> 32 by CHE-236 (R16.1)**, one class: `NativePsfAnalysis`, on **rule 2**,
+#: the public serialized record the native PSF path returns and that five of
+#: R16.1's acceptance criteria are statements about (which normalization, which
+#: sampling, which field, which method, what the units are). `BUDGETS["backends"]`
+#: goes 3 -> 4 with it.
+#:
+#: Why it is not `measurements.PsfResult` reused, which would have cost nothing:
+#: the two carry numbers under *different declared normalizations* --
+#: `PsfResult.normalization` is `raw`/`peak`/`energy` on `|u|^2`, and this one is
+#: Optiland's Strehl-percent convention where an unaberrated pupil of the same
+#: aperture peaks at 100. One record spanning both is two records with a tag. It is
+#: also the same allowlist argument `NativeSpotAnalysis` rests on: sharing needs a
+#: `backends -> measurements` edge, which is an architecture change and not a
+#: saving. R16.1 adds no other class -- `PsfMethod` is a `Literal` and not a
+#: `StrEnum`, for the reason R08.1 established and R11.1 and R16 repeated, and the
+#: operation record is an entry in an existing tuple.
+#:
+#: **The design this raise is small because of.** The alternative shape for R16.1
+#: was a decomposition of the pinned solver's PSF pipeline into public
+#: `WavefrontNode`, `PupilField`, propagation-kernel and measurement types -- four
+#: classes rather than one, for graph flexibility no current consumer wants.
+#: `tests/backends/test_optiland_psf.py` asserts those four names are absent, the
+#: way R08.1's five and R16's two are.
+#:
 #: Flagged for the owner on CHE-218, because the standing question above is now
 #: two units old: this constant has ratcheted five times without ever being
 #: re-derived from the new tree, and `AGENTS.md` says a class budget introduced
 #: later should be derived from that tree and made a visibility gate. The
 #: per-package equality gates are the half doing real work.
-PROJECT_CEILING = 29
+PROJECT_CEILING = 32
 
 
 @dataclass(frozen=True)

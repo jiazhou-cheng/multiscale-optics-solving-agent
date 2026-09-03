@@ -63,16 +63,36 @@ Two concepts: **representations** are physical state at a declared boundary;
 **operations** consume and produce representations, problems, or measurements —
 except a **source**, which produces one without consuming any.
 
-There are four operation kinds — `solver`, `coupler`, `physical_operator`, and
-`measurement` — represented as **descriptor metadata, not four class
-hierarchies**. A source is `solver`-kind; there is no fifth kind.
+There are four *primitive* operation kinds — `source`, `coupler`,
+`physical_operator`, and `measurement` — represented as **descriptor metadata, not
+four class hierarchies**. The `kind` field has a fifth value, `composed`, which is
+not a primitive and names a fusion of them. A **backend is not one of them**: which third-party library
+executes an operation is a separate axis from what the operation does to physical
+state, and it is a separate descriptor field (`backend`). CHE-224 (R15.1)
+separated the two, replacing a `solver` kind with `source`; see
+`docs/architecture_principles.md` §2.
+
+The four are **primitive**. One callable may fuse several of them; it carries
+`kind=composed` and declares the ordered stages in `OperationDescriptor.composes`.
+Where it *leaves* the state is `composes[-1]`, read off the `terminal_stage`
+property. CHE-237 (R03.7) decided this and reversed CHE-225 (R15.2), under which
+`kind` named the terminal stage and a composite therefore borrowed the kind of its
+last stage. `composes` is non-`None` **if and only if** `kind is composed`, so the
+two cannot disagree; every stage is still primitive, and `SO_`/`SOM_` remain id
+prefixes rather than kinds. There are three composites today —
+`SO_RAY_LAUNCH_TRACE`, which initializes rays and then refracts them through every
+surface so neither `source` nor `physical_operator` alone is a true claim about it,
+plus `SOM_SPOT_DIAGRAM` and `SOM_PSF`, which then reduce the result to an
+observable. A composition is **not** a pipeline description and nothing can execute
+a stage of one.
 
 - **representation** — physical state with explicit conventions. The initial public target is one ray representation and one scalar-field representation. PSF is a measurement, not a representation. Coherence is a stronger contract by default, not a subtype.
-- **solver** — maps a problem into a representation and owns external-backend API, compatibility, and version-specific behavior.
-- **source** — owns the physically meaningful **initialization** of a representation. A representation defines the structure and conventions of physical state at a declared boundary; a source defines how that state is initialized from physical source parameters — a plane-wave source initializes a `ScalarField`'s complex amplitude and phase from its wavelength, propagation direction, amplitude, sampling grid and reference surface. **A source does not consume an existing physical representation; it creates the initial state of one.** But **a source may be described without an optical system and a ray launch may not**: the launch positions and directions of a source into a system depend on the stop, the entrance pupil, the surfaces before the stop, the object distance, the field, the backend's pupil map and the ray aimer, so ray launch is a `solvers/<backend>/` operation taking the constructed system as a required argument, and `sources/` produces no system-launch `RayBundle`. CHE-219 (R05.8) decided this; see `docs/architecture_principles.md` §2. It registers as `solver`-kind, and what separates it from `solvers/<backend>/` is that it has no external backend.
+- **backend** — an adapter package that **provides** operations of the other kinds and is not itself an operation kind. It owns external-library API, compatibility, and version-specific behavior, and `backends/<backend>/` is the only place permitted to import that library. A backend answers *who executes*; a kind answers *what happens to physical state*, and an operation has exactly one of each. Package location follows the provider; kind is declared in the catalog — so a backend-provided measurement lives in `backends/<backend>/` and needs no `measurements/ -> backends/` edge.
+- **source** — owns the physically meaningful **initialization** of a representation. A representation defines the structure and conventions of physical state at a declared boundary; a source defines how that state is initialized from physical source parameters — a plane-wave source initializes a `ScalarField`'s complex amplitude and phase from its wavelength, propagation direction, amplitude, sampling grid and reference surface. **A source does not consume an existing physical representation; it creates the initial state of one.** But **a source may be described without an optical system and a ray launch may not**: the launch positions and directions of a source into a system depend on the stop, the entrance pupil, the surfaces before the stop, the object distance, the field, the backend's pupil map and the ray aimer, so ray launch is a `backends/<backend>/` operation taking the constructed system as a required argument, and `sources/` produces no system-launch `RayBundle`. CHE-219 (R05.8) decided this; see `docs/architecture_principles.md` §2. It registers as `source`-kind, and what separates `sources/` from `backends/<backend>/` is not the kind — both provide `source`-kind operations — but the provider: a source in `sources/` has no external backend, so its descriptor carries `backend=None`.
 - **coupler** — changes *representation* while preserving the same physical state at the same boundary. Heavy numerics do not make it an operator.
 - **physical operator** — changes physical state. Propagation and surface interactions are operators, not couplers.
 - **measurement** — derives an observable from state.
+- **composite operation** — one callable that fuses more than one primitive stage, declaring them in order. `kind` is `composed` and `terminal_stage` is where the state ends up; `composes` is `None` — not `()` — for everything that fuses nothing. The two rules that ask where an operation leaves the state, the observable-producer check and the `kind` query in `find`, read `terminal_stage`. A composite exists only where a single primitive kind would be a *false* claim, not merely a simplification — and it is not a route, a plan or a pipeline description. `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler and deliberately declares no composition, because its representation types do not change at its ports; whether it should is an open question, not a defect.
 - **operation descriptor** — lightweight discovery/execution metadata; the target design resolves implementation paths lazily.
 
 The target dependency allowlist, **for packages that exist**, is:
@@ -82,7 +102,7 @@ numerics/            -> (nothing in the project)
 representations/     -> numerics
 problems/            -> representations, numerics
 operations/          -> numerics
-solvers/<backend>/   -> problems, representations, numerics (+ its backend)
+backends/<backend>/  -> problems, representations, numerics (+ its backend)
 sources/             -> problems, representations, numerics
 couplers/            -> representations, numerics
 operators/           -> representations, couplers, numerics
@@ -104,7 +124,7 @@ representation-explicit at every public operation**: it may initialize a
 source parameters alone, but each public operation's return representation must be
 unambiguous in the signature and in its descriptor. No subpackage per representation, and no constructor whose return
 representation depends on its arguments. `sources/` is upstream of everything that
-consumes state, so it may not import `solvers/`, `couplers/`, `operators/` or
+consumes state, so it may not import `backends/`, `couplers/`, `operators/` or
 `measurements/`.
 
 A class must justify itself by a shared invariant, versioned public data model,

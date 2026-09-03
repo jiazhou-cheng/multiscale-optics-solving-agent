@@ -45,12 +45,12 @@ identity, and a project that ships them separately has to keep them consistent
 forever.
 
 Wave propagation is also not here, and that is R09.1's decision rather than an
-omission: Chromatix owns those numerics and `solvers.chromatix.propagate` exposes
+omission: Chromatix owns those numerics and `backends.chromatix.propagate` exposes
 them as a `physical_operator`. A forwarding wrapper in this package would do no
 numerical work, and relocating semantic ownership is not a reason for a function to
 exist.
 
-Also not here: the ideal lens. `solvers.chromatix.focal_plane_transform` is a
+Also not here: the ideal lens. `backends.chromatix.focal_plane_transform` is a
 `physical_operator` too, and it lives with its backend because backend ownership
 beats taxonomy -- a forwarding wrapper in this package would put a second name on
 one implementation without adding a boundary.

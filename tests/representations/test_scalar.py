@@ -203,6 +203,146 @@ def test_every_flag_carries_its_measured_consequence() -> None:
     assert set(VALIDITY_NOTES) == set(VALIDITY_FLAGS)
     assert "1.2 rad" in VALIDITY_NOTES["no_wavefront_curvature_term"]
     assert "1e-3" in VALIDITY_NOTES["no_wavefront_curvature_term"]
+    # CHE-227 (R02.5): the same requirement applied to the fourth flag. The two
+    # numbers are the pair that makes the flag worth having -- the same grid, a
+    # hard edge and a soft one, four orders of magnitude apart.
+    assert "2.3e-1" in VALIDITY_NOTES["paraxial"]
+    assert "4.9e-6" in VALIDITY_NOTES["paraxial"]
+
+
+# --- CHE-227 (R02.5): the fourth flag ---
+
+
+def test_the_vocabulary_is_the_four_flags_that_have_landed() -> None:
+    """The ratchet. A flag joins in the change that gives something to declare.
+
+    `paraxial` is CHE-227 (R02.5), and it exists because R06.11's Fresnel
+    propagation had nothing true to say about itself:
+    `S_SOURCE_GAUSSIAN_BEAM`'s validity already recorded the gap -- "an off-waist
+    Gaussian is a paraxial solution and no ValidityFlag says 'paraxial'".
+    """
+    assert VALIDITY_FLAGS == (
+        "surface_only",
+        "no_wavefront_curvature_term",
+        "carrier_removed_phase",
+        "paraxial",
+    )
+
+
+def test_a_paraxial_field_constructs_and_round_trips_the_flag() -> None:
+    assert _field(validity={"paraxial"}).validity == frozenset({"paraxial"})
+
+
+def test_paraxial_is_independent_of_the_other_three() -> None:
+    """AC 4. All four are true of one array at once, and none hides another.
+
+    A Fresnel propagation of a ray-reconstructed field is the concrete case: it is
+    paraxial, its phase is carrier-removed, and the wavelet sum that produced it
+    carried no curvature term. Declaring the union has to leave all of them
+    readable, which is the whole reason `validity` is a set.
+    """
+    every = _field(validity=set(VALIDITY_FLAGS))
+    assert every.validity == frozenset(VALIDITY_FLAGS)
+
+    only_paraxial = _field(validity={"paraxial"})
+    assert "carrier_removed_phase" not in only_paraxial.validity
+    assert "no_wavefront_curvature_term" not in only_paraxial.validity
+    assert "surface_only" not in only_paraxial.validity
+
+
+def _flag_literals(path: Any) -> set[str]:
+    """Validity flags named as string *constants* in one module, docstrings stripped.
+
+    The same AST reading `tests/planning/test_graph.py::_string_constants` uses, and
+    for the same reason: prose has to be able to name a flag -- `sources/` and
+    `operations/catalog.py` both discuss `paraxial` at length -- while a literal in
+    the code is a declaration. Quoting style cannot hide one either way.
+    """
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef):
+            continue
+        body = node.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            docstrings.add(id(body[0].value))
+    return {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+        and node.value in VALIDITY_FLAGS
+    }
+
+
+def test_exactly_one_landed_operation_declares_paraxial() -> None:
+    """The other side of R02.5's AC 5, turned over by CHE-228 (R06.11).
+
+    R02.5 landed the flag with **nothing** setting it, and this test asserted that
+    -- a flag no producer sets is a claim nothing can make, so the vocabulary had to
+    be seen to arrive before its first user rather than beside it. R06.11 is that
+    first user, so the assertion flips from "none" to "exactly this one" rather than
+    being deleted. `test_semantic_types_are_the_boundaries_that_landed` is the same
+    ratchet on the other closed vocabulary, and its docstring says the same thing:
+    the exemplar moving is the vocabulary working, not the test being brittle.
+
+    Exactly one, not at least one: the point is that a second producer is a
+    physical claim someone reviews, not an edit that slips past.
+
+    A *literal*, not a mention: `sources/gaussian_beam.py` and
+    `operations/catalog.py` both say the word in prose, and one of them says it to
+    record that this flag did not exist.
+
+    And only where a `ScalarField` could be built, because **the word is
+    overloaded and the vocabularies are unrelated**: `backends/optiland/launch.py`
+    has `AIMING_MODES = ("paraxial", "iterative", "robust")`, the pinned solver's
+    ray-aiming setting. It is a literal, it is not a docstring, and it is not a
+    validity flag -- that module never imports `ScalarField` and could not declare
+    one. Scoping to the importers is what tells the two apart without this test
+    having to know about ray aiming.
+    """
+    from pathlib import Path
+
+    root = Path(representations.scalar.__file__).resolve().parents[1]
+    declared_in = Path(representations.scalar.__file__).resolve()
+    declaring = sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*.py")
+        if "__pycache__" not in str(path)
+        and path.resolve() != declared_in
+        and "ScalarField" in path.read_text(encoding="utf-8")
+        and "paraxial" in _flag_literals(path)
+    )
+    assert declaring == ["backends/chromatix/solver.py"], (
+        f"{declaring} declare the 'paraxial' flag. `fresnel_propagate` is the one "
+        "operation with a paraxial kernel; a second declarer is a physical claim "
+        "that belongs on its own ticket, and this test is where it gets noticed."
+    )
+
+
+def test_the_literal_check_can_fail(tmp_path: Any) -> None:
+    """The meta-check: a prose mention must not count and a declaration must.
+
+    Without this the assertion above would pass on an empty reading of every
+    module, which is the failure `tests/planning/test_graph.py` records having made
+    with the same check.
+    """
+    from pathlib import Path
+
+    module = Path(tmp_path) / "probe.py"
+    for source in ('V = {"paraxial"}\n', "V = {'paraxial'}\n", 'f(validity={"paraxial"})\n'):
+        module.write_text(source)
+        assert "paraxial" in _flag_literals(module), source
+    module.write_text('"""No ValidityFlag says paraxial or \'paraxial\'."""\n')
+    assert _flag_literals(module) == set()
 
 
 # --- acceptance criterion 5: exactly one scalar representation ---

@@ -46,9 +46,9 @@ from fixtures.systems import (
     singlet_ref,
 )
 
+from backends.optiland import system as system_module
+from backends.optiland.system import NATIVE_UNITS, build_lens
 from problems.ray_trace import UNAPERTURED, Material, OpticalSetup, SourceSpec, SurfaceSpec
-from solvers.optiland import system as system_module
-from solvers.optiland.system import NATIVE_UNITS, build_lens
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -95,7 +95,7 @@ def test_one_generic_construction_function() -> None:
 
 def test_no_per_system_builder_and_no_name_resolution() -> None:
     """No builder class, and nothing turns a name into a lens."""
-    source = (ROOT / "src" / "solvers" / "optiland" / "system.py").read_text(encoding="utf-8")
+    source = (ROOT / "src" / "backends" / "optiland" / "system.py").read_text(encoding="utf-8")
     for name in AVOIDED_NAMES:
         assert f"class {name}" not in source
         assert f"def {name}" not in source
@@ -557,7 +557,7 @@ def test_the_surface_type_and_its_keywords_are_decided_together() -> None:
     import optiland.backend as be
     from optiland.physical_apertures.radial import RadialAperture
 
-    from solvers.optiland.system import _geometry_arguments
+    from backends.optiland.system import _geometry_arguments
 
     aspheric = SurfaceSpec(
         radius_mm=ASPHERE_RADIUS_MM,
@@ -666,7 +666,7 @@ def test_the_field_of_a_finite_conjugate_is_a_position() -> None:
     )
     from optiland.distribution import create_distribution
 
-    from solvers.optiland.launch import normalized_field as _normalized_field
+    from backends.optiland.launch import normalized_field as _normalized_field
 
     distribution = create_distribution("hexapolar")
     distribution.generate_points(2)

@@ -17,7 +17,7 @@ docstrings, with the same ticket citations:
 
 | pack item | where it is now |
 | -- | -- |
-| H1, the traced path's sign and reference (CHE-30/CHE-41) | `solvers/optiland/rays.py` |
+| H1, the traced path's sign and reference (CHE-30/CHE-41) | `backends/optiland/rays.py` |
 | H2, `intensity` is a weight not an amplitude | `AMPLITUDE_MAPPING`, same module |
 | H3, the wave backend returns padded arrays | `pad_width`/`padded` on `representations/scalar.py` |
 | H4, near-grazing phase cancellation (CHE-70) | `grazing_floor_for_phase_budget` |
@@ -80,7 +80,7 @@ _PATH_LIKE = re.compile(r"^[A-Za-z0-9_./-]+(?:\.(?:md|py|json|yaml|yml|sh|toml)|
 
 #: Tokens that look like paths and are not references to be resolved.
 #:
-#: `solvers/<backend>/` is a template -- the angle brackets are the tell, and the
+#: `backends/<backend>/` is a template -- the angle brackets are the tell, and the
 #: regex above already excludes them. The rest are named in order to say they must
 #: **not** exist: `src/io/` because a top-level `io` package would shadow the
 #: standard library's, and the junk-drawer names because a package that names no
@@ -186,7 +186,7 @@ def test_the_extractor_finds_paths_and_not_prose() -> None:
     """The meta-check: an extractor that found nothing would pass everything."""
     found = _paths_in(
         "See `docs/architecture_principles.md` and `src/numerics/arrays.py`, or "
-        "`and/or` which is not one, or `solvers/<backend>/` which is a template."
+        "`and/or` which is not one, or `backends/<backend>/` which is a template."
     )
     assert found == {"docs/architecture_principles.md", "src/numerics/arrays.py"}
     # And the real files yield a useful number, so the parametrized test is not
@@ -228,13 +228,13 @@ def test_the_archive_index_is_exempt_and_still_cites_the_deleted_tree() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_surviving_pack_uses_the_four_operation_kinds() -> None:
+def test_the_surviving_pack_uses_the_declared_operation_kinds() -> None:
     """Acceptance criterion 2. A pack describing an operator may not call it a coupler.
 
     The ticket's concern was that "three of the five coupler packs describe what are
     now **physical operators**, not couplers". Those five packs are gone, so what is
     left to check is that the surviving prose does not reintroduce the old taxonomy:
-    `knowledge/README.md` may use the words, and where it does they must be the four
+    `knowledge/README.md` may use the words, and where it does they must be the
     declared kinds used correctly -- it describes the five reference rows as
     "couplers and operators whose capability nobody had measured", which is the
     distinction, not a conflation.
@@ -243,7 +243,10 @@ def test_the_surviving_pack_uses_the_four_operation_kinds() -> None:
 
     text = (ROOT / "knowledge" / "README.md").read_text(encoding="utf-8")
     kinds = {kind.value for kind in OperationKind}
-    assert kinds == {"solver", "coupler", "physical_operator", "measurement"}
+    # The four PRIMITIVE kinds, which are the taxonomy a pack's prose can get
+    # wrong. `composed` joined the enum on CHE-237 (R03.7) and is not one of them:
+    # it names a fusion of primitives rather than a category of physical effect.
+    assert kinds - {"composed"} == {"source", "coupler", "physical_operator", "measurement"}
     # No pack card in the surviving tree, so no card can miscategorize one.
     cards = list((ROOT / "knowledge").rglob("card.yaml"))
     assert cards == [], f"a pack card is back without a taxonomy review: {cards}"
@@ -294,7 +297,7 @@ def test_the_carried_pack_items_are_in_the_code() -> None:
         "H2 -- intensity is a weight, not an amplitude": "AMPLITUDE_MAPPING",
         "the omitted Kirchhoff prefactor": "Kirchhoff",
         # Cited by ticket rather than by the native attribute's name: that name is
-        # confined to `solvers/optiland/` by `test_optiland_boundary.py`, and
+        # confined to `backends/optiland/` by `test_optiland_boundary.py`, and
         # widening its exemption for a documentation test would be the wrong
         # direction. `CHE-41` is the ticket that characterized the reference
         # surface, and is just as distinctive.
@@ -374,6 +377,22 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
     `benchmarks/` is a driver plus its records. A tree that quietly reacquired forty
     files would be the pack coming back without the taxonomy review criterion 2 asks
     for.
+
+    `benchmarks/` moved 10 -> 17 for CHE-238 through CHE-240, and the growth is the kind the
+    docstring above sanctions rather than the kind it guards against. What arrived is
+    one report (`reports/2026-09/`) and one verification harness
+    (`verification/`, six modules) for the overnight ray/wave verification run --
+    executable evidence and the document it writes into, not prose restating what a
+    module already says. The distinction the count exists to catch is a *prose pack*
+    reappearing; this is the opposite kind of file.
+
+    `verification/` is deliberately not `systems/`. A benchmark there composes this
+    project's public primitives and gates itself on closed-form optics, and
+    `tests/benchmarks/test_records.py` enforces that for `systems/*.py` only. A
+    verification harness reads a third-party prescription, runs the same
+    configuration through this project's catalogued operations, and reports the
+    difference -- which needs a direct `optiland` import and has no closed form to
+    gate on. Two kinds of thing, two directories.
     """
     tracked = subprocess.run(
         ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
@@ -382,4 +401,4 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
         tree: len([path for path in tracked if path.startswith(f"{tree}/")])
         for tree in ("knowledge", "benchmarks", "docs")
     }
-    assert counts == {"knowledge": 3, "benchmarks": 10, "docs": 2}, counts
+    assert counts == {"knowledge": 3, "benchmarks": 17, "docs": 2}, counts

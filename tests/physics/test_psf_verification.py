@@ -34,7 +34,7 @@ The propagation leg is missing, on purpose
 The ticket's chain reads `trace -> ray_to_scalar -> propagate -> psf`. **That
 chain is refused by the tree's own contracts**, and the refusal is correct:
 `ray_to_scalar` stamps `surface_only` on the field it emits -- the reconstruction
-carries no `exp(i k r^2 / 2R)` curvature term -- and `solvers.chromatix.propagate`
+carries no `exp(i k r^2 / 2R)` curvature term -- and `backends.chromatix.propagate`
 refuses a field carrying that flag. It is invisible in `|U|^2`, which is why the
 intensity gate converges anyway, and it is not invisible to a caller who
 propagates further. The frozen bundle's own caution #2 says the same thing in
@@ -79,12 +79,12 @@ from ray_support import (
     plateau_radius_m,
 )
 
+from backends.chromatix import propagate
+from backends.optiland import trace
 from couplers import ray_to_scalar
 from measurements import psf
 from operators import propagate_rays
 from representations import ContractError, RayBundle, ReferenceSurface
-from solvers.chromatix import propagate
-from solvers.optiland import trace
 
 #: The frozen gate and the frozen observation, from
 #: `pre-rewrite-2026-08-30:benchmarks/physics/L2-PSF-01/tolerances.yaml`.
@@ -691,7 +691,7 @@ def test_the_reconstructed_field_may_not_be_propagated() -> None:
 
     The wavelet sum carries no `exp(i k r^2 / 2R)` curvature term, so the field it
     emits is valid **at its own surface and nowhere else** -- `ray_to_scalar`
-    stamps `surface_only` and `solvers.chromatix.propagate` refuses it. The frozen
+    stamps `surface_only` and `backends.chromatix.propagate` refuses it. The frozen
     bundle's caution #2 says exactly this in prose: invisible in `|U|^2`, which is
     why the intensity gate above converges anyway; not invisible to a caller who
     propagates further.

@@ -1,5 +1,5 @@
 {
-  "written_at_utc": "2026-09-01T11:43:58Z",
+  "written_at_utc": "2026-09-02T23:24:50Z",
   "environment": {
     "numpy": "2.2.6",
     "scipy": "1.15.3",
@@ -11,14 +11,148 @@
   "configuration": "magnifying_relay",
   "produced_by": "benchmarks/systems/b_fourier_ptychography.py",
   "composition": [
-    "sources.plane_wave",
-    "operators.complex_transmission",
-    "solvers.chromatix.focal_plane_transform",
-    "operators.complex_transmission",
-    "solvers.chromatix.focal_plane_transform",
-    "measurements.psf"
+    "S_SOURCE_PLANE_WAVE",
+    "O_COMPLEX_TRANSMISSION",
+    "O_FOCAL_PLANE_TRANSFORM",
+    "O_COMPLEX_TRANSMISSION",
+    "O_FOCAL_PLANE_TRANSFORM",
+    "M_PSF"
   ],
-  "intensity_path": "measurements.psf(field, normalization='raw').intensity -- the project's only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own local implementation was deleted in the same change that pointed it here, which is what benchmarks/observables.py said would happen",
+  "execution_path": "runtime.Executor.execute(plan) over a hardcoded plan of per-node requests, with the result read from Executor.result. The benchmark imports no operation: every step above is a catalog id resolved by operations.resolve inside the executor. planning.routes cannot enumerate this plan -- an operation may not repeat in a route and this one repeats two -- so the plan is written down here and every consecutive edge is checked against planning.capability_graph()",
+  "plan": {
+    "steps": [
+      {
+        "step": 0,
+        "operation": "S_SOURCE_PLANE_WAVE",
+        "request": {
+          "reference_surface": "ReferenceSurface(name='front_focal', z_m=0.0, medium_index=1.0, normal=(0.0, 0.0, 1.0))",
+          "sample_pitch_m": [
+            6e-07,
+            5e-07
+          ],
+          "shape": [
+            96,
+            512
+          ],
+          "transverse_wavevector_rad_per_m": [
+            0.0,
+            0.0
+          ],
+          "wavelength_m": 5.32e-07
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 1,
+        "operation": "O_COMPLEX_TRANSMISSION",
+        "request": {
+          "amplitude": {
+            "array": [
+              96,
+              512
+            ],
+            "dtype": "float64",
+            "sha256": "ad4fabce4dc172d2"
+          },
+          "phase_rad": {
+            "array": [
+              96,
+              512
+            ],
+            "dtype": "float64",
+            "sha256": "55452bcf79afb9b3"
+          },
+          "target_surface": "object"
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 2,
+        "operation": "O_FOCAL_PLANE_TRANSFORM",
+        "request": {
+          "focal_length_m": 0.02,
+          "model": {
+            "target_surface": "fourier",
+            "direction": "forward"
+          }
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 3,
+        "operation": "O_COMPLEX_TRANSMISSION",
+        "request": {
+          "amplitude": {
+            "array": [
+              96,
+              512
+            ],
+            "dtype": "float64",
+            "sha256": "786f2ad0e75eadfc"
+          },
+          "target_surface": "pupil"
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 4,
+        "operation": "O_FOCAL_PLANE_TRANSFORM",
+        "request": {
+          "focal_length_m": 0.04,
+          "model": {
+            "target_surface": "image",
+            "direction": "forward"
+          }
+        },
+        "produces": "scalar_field"
+      },
+      {
+        "step": 5,
+        "operation": "M_PSF",
+        "request": {
+          "normalization": "raw"
+        },
+        "produces": "psf"
+      }
+    ],
+    "semantic_chain": [
+      "scalar_field",
+      "scalar_field",
+      "scalar_field",
+      "scalar_field",
+      "scalar_field",
+      "psf"
+    ],
+    "enumerable_by_planning_routes": false,
+    "why_not_enumerable": "planning.routes admits no repeated operation in a route, and this plan repeats O_FOCAL_PLANE_TRANSFORM and O_COMPLEX_TRANSMISSION. planning/graph.py records that as an open decision rather than an oversight; the edge check above is the part of planning that does apply to a plan a caller wrote down",
+    "swept_parameter": "transverse_wavevector_rad_per_m in step 0's request. The seven on-grid angles are seven runs of this one plan, which is what makes the sweep a parameterized family rather than seven systems",
+    "execution": {
+      "status": "completed",
+      "route": [
+        "S_SOURCE_PLANE_WAVE",
+        "O_COMPLEX_TRANSMISSION",
+        "O_FOCAL_PLANE_TRANSFORM",
+        "O_COMPLEX_TRANSMISSION",
+        "O_FOCAL_PLANE_TRANSFORM",
+        "M_PSF"
+      ],
+      "node_statuses": [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed"
+      ],
+      "per_node_requests_recorded": 6,
+      "per_node_focal_lengths_m": [
+        0.02,
+        0.04
+      ],
+      "resource_failure": null
+    }
+  },
+  "intensity_path": "the M_PSF node of the plan, which the executor resolves to measurements.psf(field, normalization='raw').intensity -- the project's only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own local implementation was deleted in the same change that pointed it here, which is what benchmarks/observables.py said would happen",
   "approximation_the_method_rests_on": "O(x) exp(i k_j x) has spectrum O~(k - k_j) exactly, because the object is a thin, angle-independent transmission (operators.complex_transmission's declared approximation). The equivalence between tilting the illumination and shifting the object spectrum would not hold for a thick or angle-dependent sample",
   "parameters": {
     "wavelength_m": 5.32e-07,

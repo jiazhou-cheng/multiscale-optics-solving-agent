@@ -111,10 +111,7 @@ from typing import Any
 
 import numpy as np
 
-from problems import SourceSpec
-from representations import ContractError, Frame, RayBundle, ReferenceSurface
-from representations.rays import MeasureKind
-from solvers.optiland.rays import (
+from backends.optiland.rays import (
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
     NATIVE_LENGTH_M,
@@ -125,6 +122,9 @@ from solvers.optiland.rays import (
     hexapolar_ray_count,
     hexapolar_ring_index,
 )
+from problems import SourceSpec
+from representations import ContractError, Frame, RayBundle, ReferenceSurface
+from representations.rays import MeasureKind
 
 __all__ = [
     "AIMING_MODES",
@@ -166,7 +166,7 @@ LAUNCH_OPL_REFERENCE = "optiland-launch-opl/v1"
 #: as collimated.
 #:
 #: Reused verbatim from the reference implementation's float64 direction bound
-#: (`pre-rewrite-2026-08-30:src/solvers/optiland/constants.py:_DIRECTION_NORM_TOLERANCE`),
+#: (`pre-rewrite-2026-08-30:src/backends/optiland/constants.py:_DIRECTION_NORM_TOLERANCE`),
 #: and it earns its keep: the measured spread for a collimated off-axis bundle is
 #: 2.78e-17, i.e. float64 round-off in the direction generator rather than a real
 #: variation. An exact-zero test refuses a perfectly collimated bundle, which is a
@@ -321,9 +321,12 @@ def launch(
 
     The operation this ticket exists for: a declarative source plus a constructed
     optical system plus a sampling request, in; the physical launch representation
-    plus the declarations the trace path needs, out. Descriptor kind `solver` -- a
-    problem statement becomes a representation -- and it consumes no
-    representation, which is why it is not a coupler or an operator.
+    plus the declarations the trace path needs, out. It consumes no representation,
+    which is why it is not a coupler or an operator: the kind it would carry is
+    `source` (`solver` before CHE-224 / R15.1), with `backend="optiland"`. It
+    carries none today, because it is deliberately not in the catalog -- see this
+    package's `__init__` on why a public launch operation needs a neutral
+    signature first.
 
     Parameters
     ----------
@@ -466,12 +469,17 @@ def launch(
         # `intensity = ones_like(Px)` when there is no apodization, and neither
         # setup declares one. Read rather than assumed, because an apodization is
         # exactly the thing that would make it vary, and pinned by
-        # `tests/solvers/test_optiland_launch.py`.
+        # `tests/backends/test_optiland_launch.py`.
         amplitude=np.sqrt(columns["intensity"]),
         optical_path_m=optical_path_m,
         optical_path_reference=optical_path_reference,
         measure_weight=measure_weight,
         measure_kind=measure_kind,
+        # CHE-226 (R16). Nothing has divided: this is the generated fan itself, one
+        # row per pupil sample. `rays.to_ray_bundle` declares the same of the traced
+        # output for the same reason, and the two agree because the trace the
+        # declaration describes does not split rays either.
+        ray_splitting="unsplit",
     )
 
     declaration: dict[str, Any] = {

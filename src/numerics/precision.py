@@ -629,7 +629,7 @@ class ComponentCapabilities:
 # `OPTILAND_CAPABILITIES`, `CHROMATIX_CAPABILITIES`, `COMPONENT_CAPABILITIES`,
 # `capabilities_for` and `PROBE_TAG` used to live at this point in the file. R02.1
 # put them here as bootstrap anchors -- `negotiate()` needed something real to
-# negotiate against and neither `solvers/` nor `operations/` existed -- and this
+# negotiate against and neither `backends/` nor `operations/` existed -- and this
 # module's own comment called them "not their permanent home".
 #
 # They are now one JSON file per component under `knowledge/capabilities/`, loaded
@@ -639,12 +639,12 @@ class ComponentCapabilities:
 # layer no longer knows a backend's name.
 #
 # **CHE-206's plan is superseded, and not because it was wrong when written.** It
-# proposed moving each row into `solvers/<backend>/`, which was the obvious answer
+# proposed moving each row into `backends/<backend>/`, which was the obvious answer
 # before either consumer existed. There are now two, on opposite sides of the
 # dependency graph: solver runtime reads the row at roughly fifteen refusal sites,
 # and backend-free discovery in `operations/` cites the same component id while
 # guaranteeing that reading it loads no backend. Solver-local ownership cannot be
-# the single source for both -- it would force `operations -> solvers` (which
+# the single source for both -- it would force `operations -> backends` (which
 # `scripts/check_dependencies.py` names as the edge that ends the only property
 # `operations/` has), a duplicate copy inside `operations/`, or a backend-adjacent
 # import behind every capability query. Shared *data* is one source usable from

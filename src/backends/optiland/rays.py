@@ -754,7 +754,7 @@ def to_ray_bundle(
 ) -> tuple[RayBundle, dict[str, Any]]:
     """Translate one native trace into a neutral `RayBundle` plus diagnostics.
 
-    `launch` is the declaration `solvers.optiland.launch.launch` returned for the
+    `launch` is the declaration `backends.optiland.launch.launch` returned for the
     rays this trace was run on. **CHE-219 (R05.8) made that an input rather than
     something reconstructed here.** This function used to receive
     `field + wavelength_um + num_rings` and rebuild, from the traced output, two
@@ -1006,6 +1006,14 @@ def to_ray_bundle(
         optical_path_reference=optical_path_reference,
         measure_weight=None if measure_weight is None else measure_weight[alive],
         measure_kind=measure_kind,
+        # CHE-226 (R16). A sequential geometric trace divides no ray: one launched
+        # ray refracts along one path through every surface, and the rows here are
+        # the surviving subset of the launched fan rather than a set of branches.
+        # Declared where that is known -- at the adapter over the trace that has
+        # the property -- so a measurement downstream can require it instead of
+        # assuming it. Independent of `alive`: clipping removes rows, it does not
+        # create descendants.
+        ray_splitting="unsplit",
     )
     require_declared_optical_path(bundle)
 

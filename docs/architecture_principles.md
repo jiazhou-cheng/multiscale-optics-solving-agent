@@ -34,9 +34,24 @@ consume and produce representations, problems, or measurements — with one
 asymmetric case: a **source** produces a representation without consuming one,
 because it *initializes* physical state rather than transforming it (§2).
 
-There are four operation kinds — `solver`, `coupler`, `physical_operator`, and
-`measurement` — and they are **descriptor metadata, not four class hierarchies**.
-The kind is a field on one operation descriptor.
+There are four *primitive* operation kinds — `source`, `coupler`,
+`physical_operator`, and `measurement` — and they are **descriptor metadata, not
+four class hierarchies**. The kind is a field on one operation descriptor. That
+field has a fifth value, `composed`, which is not a primitive: it says the
+callable fuses several of the four (§2 *composite operation*).
+
+A **backend** is not among them. Which third-party library executes an operation
+is a separate axis from what the operation does to physical state, and it is a
+separate field: `OperationDescriptor.backend`. CHE-224 (R15.1) separated the two;
+see the `backend` term in §2.
+
+The four are **primitive**. One callable may fuse several of them, and it says so
+by carrying `kind=composed` and declaring the ordered stages in
+`OperationDescriptor.composes` — see *composite operation* in §2. CHE-237 (R03.7)
+made `kind` name the composition; it used to name the terminal stage, which is now
+the `terminal_stage` property. A composition is not a pipeline language: it exists
+because some landed operations initialize state *and* evolve it, so any single
+primitive word for them is a false claim.
 
 The previous implementation expressed these kinds as families of base classes,
 request/result envelopes, and per-family diagnostics. The clean rewrite must not
@@ -51,7 +66,7 @@ that satisfies the class-minimality rules below.
 
 ---
 
-## 2. The seven terms
+## 2. The eight terms
 
 Each term is defined by the boundary that separates it from its nearest
 neighbour. These definitions are target semantics even before their corresponding
@@ -75,15 +90,58 @@ representation. Coherence is a *stronger contract* on the ray representation
 (e.g. `require_coherent()`), not a subtype, unless a concrete implementation
 issue shows that distinct runtime identity is required.
 
-### solver
+### backend
 
-Maps a **problem** into a physical representation. A solver adapter is the
-boundary at which an external backend's API, conventions, compatibility logic, or
-version requirements may appear.
+An **adapter package that provides operations of the other kinds, and is not
+itself an operation kind.** A backend adapter is the boundary at which an external
+library's API, conventions, compatibility logic, or version requirements may
+appear, and the only place in the tree permitted to import that library. Backend
+imports belong in `backends/<backend>/`.
 
-**Boundary against *coupler*:** a solver is where an external solver enters the
-system; a coupler is repository-owned physics between representations. Backend
-imports belong in `solvers/<backend>/` once that adapter exists.
+**Boundary against *operation kind*:** a backend answers **who executes**; a kind
+answers **what happens to physical state**. Every operation has exactly one of
+each, and they are two fields — `backend` and `kind` — not one. A backend does not
+appear in `OperationKind` at all: `backends/optiland/` provides one
+`physical_operator` (`O_RAY_TRACE`) and three **composites** — one whose terminal
+stage is a physical operator (`SO_RAY_LAUNCH_TRACE`) and two whose terminal stage
+is a measurement (`SOM_SPOT_DIAGRAM`, `SOM_PSF`), all three `composed`-kind; see §2
+*composite operation*. A backend-provided `measurement` lives there too. The package a callable lives
+in follows its **provider**; its kind is declared in the catalog.
+
+**Boundary against *coupler*:** a backend adapter is where an external solver
+enters the system; a coupler is repository-owned physics between representations.
+
+*[JUDGEMENT]* **This term replaced a `solver` term on CHE-224 (R15.1), and the
+change is recorded rather than substituted.** The old term read "Maps a
+**problem** into a physical representation", with `solver` as one of the four
+operation kinds. What went wrong is that this definition and the boundary beneath
+it were about two different things: mapping a problem into a representation is a
+statement about state, and owning an external library's API is a statement about
+who executes. `coupler`, `physical_operator` and `measurement` are all the first
+kind of statement, so `solver` sat on a different axis from the other three.
+
+Three consequences were live in the tree, not hypothetical. `source` — a term this
+section has always defined — had no member in `OperationKind`, so all three source
+records declared `kind=solver`. The `S_` id prefix therefore meant "solver" on
+`S_RAY_OPTILAND` and "source" on `S_SOURCE_PLANE_WAVE`, and `kind` read `solver`
+for both. And `backends.chromatix.solver:propagate` needed **two** catalog records,
+because one field was answering two questions; `operations/catalog.py` said so in
+its own docstring.
+
+What replaces it: `backend` is a provider, defined above; `source` is the kind, and
+its definition below did not change a word. The fact that an operation drives a
+library is carried by `backend`.
+
+*[JUDGEMENT]* **CHE-224 also concluded that a backend adapter's *problem-driven
+solve* is therefore a plain `source`, and CHE-225 (R15.2) retracts that.** The
+argument was structural: an `OpticalSetup` is a constructor argument and not a
+port, so the schema "cannot distinguish `S_RAY_OPTILAND` from
+`S_SOURCE_PLANE_WAVE`". It proves too much. It reasons from *ports* to *kind*, and
+`kind` exists precisely to state what the ports cannot — on the state axis the two
+are not alike at all, because `trace` initializes rays **and then refracts them
+through every surface**. The record's own `approximation` said so, so the catalog
+carried a `kind` its own prose contradicted. That operation is now the composite
+`SO_RAY_LAUNCH_TRACE`; see *composite operation* below.
 
 ### source
 
@@ -112,9 +170,13 @@ aimer, so the launch state is a property of **source + system + backend**.
 A `RayBundle` built from caller-supplied points and a shared direction, with no
 system in scope, cannot say whether those points are the entrance pupil, the
 stop, the first traced surface, a valid finite-conjugate aim, or anything in the
-constructed system at all. That is why ray launch is a **solver** operation —
+constructed system at all. That is why ray launch belongs to the **backend** —
 backend ownership beats taxonomy — and why it takes the constructed system as a
-required argument. It is `solvers/optiland/launch.py` today.
+required argument. It is `backends/optiland/launch.py` today, and it is not in the
+catalog: it takes native solver state, and a public launch operation needs a
+neutral signature first. (This sentence read "is a **solver** operation" until
+CHE-224 (R15.1); `solver` was the operation kind then, and the claim it was making
+was about which package owns the code.)
 
 Note precisely what this does and does not narrow. `sources/` may still
 initialize any representation whose state is genuinely determined by source
@@ -139,11 +201,12 @@ is why it has its own package and its own row in §3.
 a source may live in `problems/`; the constructor that turns it into state is the
 source. A source may read a problem; it is not one.
 
-**Kind:** `solver`. A source maps a problem statement into a representation, which
-is this document's definition of a solver, and there is no fifth operation kind.
-What separates `sources/` from `solvers/<backend>/` is that a source has **no
-external backend**: it is the project's own arithmetic on the project's own grid,
-so per-backend organization has nothing to organize.
+**Kind:** `source`, which is its own member of `OperationKind` since CHE-224
+(R15.1) and was `solver` before it. What separates `sources/` from
+`backends/<backend>/` is not the kind — both provide `source`-kind operations —
+but the **provider**: a source in `sources/` has **no external backend**, so its
+descriptor carries `backend=None`, and it is the project's own arithmetic on the
+project's own grid, which per-backend organization has nothing to organize.
 
 `sources/` is **representation-independent at the package level and
 representation-explicit at each public operation.** A source operation may
@@ -161,7 +224,7 @@ convenience.
 *[LANDING GATE]* No operation in `sources/` produces a system-launch `RayBundle`,
 and the package resolves no pupil, stop, entrance-pupil, aiming or launch-surface
 quantity. This is a semantic rule and not a dependency-direction one: the
-dependency graph already forbids `sources/ -> solvers/`, and the hazard is a
+dependency graph already forbids `sources/ -> backends/`, and the hazard is a
 function that returns a launch `RayBundle` while importing nothing at all.
 `tests/sources/test_sources_package.py` checks it.
 
@@ -169,8 +232,11 @@ function that returns a launch `RayBundle` while importing nothing at all.
 made it able to.** `OperationDescriptor.inputs` is a tuple of representation ports,
 and `()` means this operation consumes no upstream representation. The three
 sources and the problem-driven ray solve declare it, and `ENTRY_KINDS` restricts
-`()` to `solver`-kind — a coupler with no input would change the representation of
+`()` to `source`-kind — a coupler with no input would change the representation of
 nothing, an operator the state of nothing, a measurement would observe nothing.
+(It restricted `()` to `solver`-kind until CHE-224 (R15.1), which **contradicted
+the sentence above it**: that set had to name `solver` because there was no
+`SOURCE` member to name.)
 
 This paragraph used to be a `[LANDING GATE]` recording the opposite: that
 `OperationDescriptor.input` had no vocabulary for "no input representation", so a
@@ -211,6 +277,84 @@ Derives an **observable** from physical state.
 *about* the state, not the state itself. PSF, Strehl ratio, and first-null radius
 are measurements.
 
+### composite operation
+
+One callable that **fuses more than one primitive stage**, declaring the ordered
+stages it fuses. `OperationDescriptor.composes` carries them and `kind` is
+`composed`. Where the operation *leaves* the state — and therefore which boundary
+its output sits at — is `composes[-1]`, exposed as the `terminal_stage` property.
+`composes` is `None` for a primitive, which is 14 of the 17 landed records.
+
+**`composed` is a fifth value of the kind field and is not a fifth primitive** —
+CHE-237 (R03.7). Until then `kind` named the terminal stage, so a composite
+borrowed the kind of its last stage and was indistinguishable from a primitive by
+that field alone; `composes` was the only thing that said otherwise, and it was
+possible to set the two inconsistently. The owner's decision was to make `kind`
+name the composition, so the two fields are now derived from each other in both
+directions: `composes` is non-`None` **if and only if** `kind is composed`.
+
+Every *stage* is still a primitive from the four — a `composed` stage inside
+`composes` is refused — and the id prefix still spells the composition rather than
+naming a new category: `SO_` is source-then-operator, `SOM_`
+source-then-operator-then-measurement. There are three today:
+`SO_RAY_LAUNCH_TRACE` (`backends.optiland.solver:trace`), which materializes and
+declares its rays and then refracts them through every surface, and
+`SOM_SPOT_DIAGRAM` and `SOM_PSF`, which do that and then reduce the result to an
+observable.
+
+**The rules that ask "where does this leave the state" ask `terminal_stage`, not
+`kind`.** Two do: only a `measurement` may produce an observable (so `SOM_PSF`,
+which returns a `psf`, is admitted on its last stage), and `find(kind=…)` matches
+either the record's `kind` or its terminal stage, so `find(kind=measurement)`
+still returns the composites that end in one while `find(kind=composed)` selects
+the three as a set. Graph entry is keyed on `composes[0]` — the `entry_stage`
+property — and was already, since CHE-225.
+
+**Boundary against *the primitive kinds*:** a primitive record answers "what
+happens to physical state" with one word. A composite exists only when one word is
+a *false* claim — not when it would merely be a simplification. `trace` initializes
+state and evolves it; calling it a source denies the refraction and calling it an
+operator denies that it consumes nothing.
+
+**Boundary against a route or a plan:** a composite is **not** a pipeline
+description. It records that a fusion happened and which primitives it fused —
+not the arguments each stage took, not their intermediate representations, and not
+a way to execute them separately. Nothing can run a stage. A route is
+`planning.routes`' business and lives outside the descriptor entirely.
+
+*[JUDGEMENT]* **Why this exists rather than a `solve` kind, and what it is
+labelling.** The honest decomposition is `launch` + `O_RAY_TRACE`, and it is
+blocked by measured numerical facts rather than by taxonomy: an object at infinity
+launches at `z = -EPD`, which is not the surface the trace starts from, and
+`to_traced_ray_bundle` composes the optical path under a different declared
+reference. Unifying moves frozen ray numbers, so it needs its own evidence and its
+own ticket. A fifth *primitive* kind was rejected then and still is: the operation
+is two known primitives fused, not a new category of physical effect. `composed`
+is not that — it is a statement that a fusion happened, on a different axis from
+the four.
+
+**The deeper reason a single `kind` could not express it** is that this schema has
+no notion of *which reference surface* a returned representation sits at. A source
+produces state where it initialized; `trace` returns state N interfaces
+downstream. `inputs=()` plus `returns=("ray_bundle",)` is true of both. So
+`composes` **labels that gap honestly; it does not close it.** Closing it is a
+port-vocabulary change and is what the decomposition ticket needs first.
+
+*[JUDGEMENT]* `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler
+and deliberately declares **no** composition. Its input and output representation
+types do not change and it presents a single operator-like transformation at its
+boundary, so its net primitive kind is the whole truth about it *at the ports*.
+Whether it should nonetheless expose that structure is an open design question to
+revisit once the composition model settles — recorded, not decided.
+
+*[LANDING GATE]* A composition is well-formed: `kind is composed`, at least two
+stages, and every stage a primitive kind. The biconditional is enforced from both
+sides at construction — stages on a primitive kind is refused, a `composed` record
+with no stages is refused, and `composes=()` is refused rather than accepted as a
+falsy spelling of "fuses nothing". That is what stops `kind` being a free choice
+between stages, the shape that produced CHE-224's false claim, and what stops the
+two fields disagreeing about whether a fusion happened at all.
+
 ### operation descriptor
 
 The lightweight record used to **discover and reason about** execution: what an
@@ -224,7 +368,7 @@ reading discovery metadata does not import solver backends.
 *[JUDGEMENT]* Every classification in this section.
 
 *[LANDING GATE]* When the relevant package lands, backend imports must stay
-inside solver adapters and discovery metadata must not require importing
+inside backend adapters and discovery metadata must not require importing
 implementation packages. Add executable dependency/import tests with that
 surface.
 
@@ -239,7 +383,7 @@ numerics/            -> (nothing in the project)
 representations/     -> numerics
 problems/            -> representations, numerics
 operations/          -> numerics
-solvers/<backend>/   -> problems, representations, numerics (+ its backend)
+backends/<backend>/  -> problems, representations, numerics (+ its backend)
 sources/             -> problems, representations, numerics
 couplers/            -> representations, numerics
 operators/           -> representations, couplers, numerics
@@ -275,7 +419,7 @@ the packages that already existed could hold it without changing what they are.
 `representations/` would own initialization physics it exists only to *declare*;
 `operators/` is wrong by definition, because an operator consumes a representation
 and a source does not; `problems/` may hold a source *declaration* but the
-constructor is not the problem; and `solvers/<backend>/` is organized per backend,
+constructor is not the problem; and `backends/<backend>/` is organized per backend,
 which a source has none of. Widening an existing package's remit to make a source
 fit is the move the allowlist exists to prevent, so the row was added instead.
 
@@ -283,7 +427,7 @@ The row is `sources/ -> problems, representations, numerics`. It reaches
 `representations/` because it constructs one, `numerics/` because an initialized
 state must respect the same dtype and device policy as everything downstream of
 it, and `problems/` because a source may read a physical source declaration. It
-may **not** import `solvers/`, `couplers/`, `operators/` or `measurements/`: a
+may **not** import `backends/`, `couplers/`, `operators/` or `measurements/`: a
 source is upstream of all of them by construction, and an edge in the other
 direction would describe an initial state that cannot be created without the
 thing that consumes it.

@@ -1,9 +1,24 @@
 """Execute a route and record what happened. One class, and the resource it owns.
 
-CHE-200 (R13.2). `runtime.execute(plan, *, request)` runs a route from
-`planning.routes` and returns an `ExecutionRecord`. It never records whether the
-result was *right*: that is the verification layer's question and this module has
-no field for an answer to it.
+CHE-200 (R13.2). `runtime.execute(plan, *, request)` runs a plan and returns an
+`ExecutionRecord`. It never records whether the result was *right*: that is the
+verification layer's question and this module has no field for an answer to it.
+
+What a plan is, and what this module is not
+-------------------------------------------
+A plan is an **ordered sequence of node instances**: a step is an operation id, or
+an `(operation_id, request)` pair giving that occurrence its own arguments. So a
+plan may repeat an operation -- two focal-plane transforms at f1 and then f2 --
+and the two occurrences are independent nodes rather than one entry in a shared
+mapping. `Executor.execute` records what that fixed, measured on the plan that
+made it necessary.
+
+The executor is the generic mechanism; **choosing** the plan is not its job. A
+plan may come from `planning.routes`, from a caller writing it down, or later from
+an agent generating one, and this module cannot tell the difference and does not
+try: it checks that every step is catalogued and runs them in order. That
+separation is the point -- `planning.routes` still cannot enumerate a plan with a
+repeated operation, and a plan that names one runs here anyway.
 
 The one class in the tree justified by rule 3, and what it owns
 --------------------------------------------------------------
@@ -29,9 +44,9 @@ and chromatix's platform pin -- and that it "applies its own before every node".
 That was false in a way worth recording rather than quietly deleting, because it
 was also the justification checked into `scripts/class_budget.py`: this package
 **cannot** touch backend configuration, since `check_dependencies` gives `runtime`
-only `{planning, operations, representations}` and there is no `solvers` import
+only `{planning, operations, representations}` and there is no `backends` import
 here. The ordering safety is real and is owned where it belongs:
-`solvers.optiland.configure_execution` sets all three on **every call** and never
+`backends.optiland.configure_execution` sets all three on **every call** and never
 inherits what a previous call left behind, which its own docstring states. So two
 executors are safe with respect to the backend because the solver operation makes
 them safe, not because this class sequences anything.
@@ -76,9 +91,9 @@ A descriptor carries `requires` and `optional` as parameter *names* and `inputs`
 port *types*, but not which parameter the port is -- CHE-222 recorded that gap and
 left it to this ticket. Rather than widen the schema, `_bind` reads the resolved
 callable's own signature: the parameter whose annotation names a representation is
-the port, and everything else is filled from `request` by name. That is one source
-of truth (the code) rather than two, and a request missing a required argument is
-refused by name before anything runs.
+the port, and everything else is filled from that node's request by name. That is one
+source of truth (the code) rather than two, and a request missing a required
+argument is refused by name before anything runs.
 
 Everything is passed by keyword. The two Optiland entry points take `setup` first
 positionally, so a port-first positional call would bind the wrong argument; every
@@ -95,6 +110,7 @@ import time
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 from operations import CATALOG, OperationDescriptor, resolve
@@ -106,7 +122,26 @@ from runtime.records import (
     stabilize_diagnostics,
 )
 
-__all__ = ["RUNTIME_CODES", "SAMPLE_INTERVAL_S", "Executor", "execute", "memory_snapshot"]
+__all__ = [
+    "RUNTIME_CODES",
+    "SAMPLE_INTERVAL_S",
+    "Executor",
+    "PlanNode",
+    "execute",
+    "memory_snapshot",
+    "normalize_plan",
+]
+
+#: One step of a plan: an operation id, or an id paired with that step's own request.
+#:
+#: A type alias and not a class. An agent generating a plan writes
+#: `["O_FOCAL_PLANE_TRANSFORM", {"focal_length_m": 0.02, "model": {...}}]`, which is
+#: already JSON -- a `PlanNode` dataclass would add a construction step between the
+#: generator and the executor and would buy no invariant that `normalize_plan` does
+#: not check on the way in. `AGENTS.md`'s rule is that a class earns itself by a
+#: shared invariant, a versioned public data model, a resource lifecycle, runtime
+#: polymorphism or a plugin boundary, and a two-element pair is none of them.
+PlanNode = str | tuple[str, Mapping[str, Any]]
 
 #: The diagnostic codes this module can put on a node record, as a closed set.
 #:
@@ -223,6 +258,64 @@ def memory_snapshot() -> dict[str, int | None]:
     }
 
 
+def normalize_plan(
+    plan: Iterable[PlanNode], *, request: Mapping[str, Any] = MappingProxyType({})
+) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    """A plan as `((operation_id, node_request), ...)`, refusing a malformed step.
+
+    The one place the two step forms become one, so nothing downstream has to know
+    which was written. A bare id takes the shared `request`; a `(id, mapping)` pair
+    takes its own mapping and **not** a merge with the shared one -- see
+    `Executor.execute` for why a fallback would reintroduce exactly the silent
+    parameter sharing the pair form exists to end.
+
+    Public because a caller that wants to check or print a plan before running it
+    should not have to reproduce this, and because a plan is the representation an
+    agent generates: a generator can hand its output through here and be told which
+    step is malformed, by index, without a run.
+
+    An id is **validated** as a string rather than coerced with `str()`, which the
+    pre-plan version did: coercion turned a typo of the wrong type into an
+    operation id nobody wrote, and the catalog check then reported the coerced
+    spelling. A pair's request is copied, so a caller's dict cannot change under a
+    run already started; a bare id's request is the shared mapping **by reference**,
+    which is the behaviour this form has always had and is safe because `execute`
+    is synchronous.
+
+    Raises:
+        ValueError: the plan is empty, or a step is neither an id nor an
+            `(id, mapping)` pair. Named by index, because a plan is long enough
+            that "a step is malformed" is not a diagnostic.
+    """
+    steps: list[tuple[str, Mapping[str, Any]]] = []
+    for index, item in enumerate(plan):
+        if isinstance(item, str):
+            steps.append((item, request))
+            continue
+        try:
+            operation_id, node_request = item
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"plan step {index} is {item!r}. A step is either an operation id or a "
+                "two-element (operation_id, request) pair; the pair form is what gives one "
+                "occurrence of a repeated operation its own arguments."
+            ) from None
+        if not isinstance(operation_id, str):
+            raise ValueError(
+                f"plan step {index} names {operation_id!r}, which is not an operation id"
+            )
+        try:
+            steps.append((operation_id, dict(node_request)))
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"plan step {index} ({operation_id}) carries {node_request!r} as its "
+                "request, which is not a mapping of argument names to values"
+            ) from None
+    if not steps:
+        raise ValueError("a plan names at least one operation")
+    return tuple(steps)
+
+
 #: The annotations that name a **representation port**.
 #:
 #: The same two `tests/operations/test_catalog_signatures.py` derives against, and
@@ -332,6 +425,11 @@ class Executor:
     _peak_rss_bytes: int = field(default=0, init=False, repr=False)
     _peak_swap_bytes: int | None = field(default=None, init=False, repr=False)
     _samples: int = field(default=0, init=False, repr=False)
+    #: What the last **completed** run produced, held so `result` can hand it back.
+    #: Cleared on `__enter__` and at the start of every `execute`, and set only once
+    #: the whole route has completed -- see `result` for why that is not "the last
+    #: node that ran".
+    _produced: Any = field(default=None, init=False, repr=False)
     #: Guards the peak/sample updates, which run on both the sampler thread and the
     #: caller's. `+=` and `max(...)` are read-modify-write, so two threads can lose
     #: a sample; the window is tiny and the consequence is a slightly low peak, but
@@ -361,6 +459,7 @@ class Executor:
         self._peak_rss_bytes = 0
         self._peak_swap_bytes = None
         self._samples = 0
+        self._produced = None
         self._environment = environment_fingerprint()
         self._baseline = memory_snapshot()
         self._absorb(self._baseline)
@@ -391,6 +490,11 @@ class Executor:
         if thread is not None:
             thread.join(timeout=5.0)
         self._absorb(memory_snapshot())
+        # The run's output is released here too. It is not a resource in the sense
+        # rule 3 means -- nothing has to be closed -- but a grid-sized array kept
+        # alive by a closed executor is the same shape of leak, and `result` is
+        # scoped to a run rather than to the object. Read it inside the block.
+        self._produced = None
 
     def _sample_until_stopped(self) -> None:  # pragma: no cover - thread body
         while not self._stop.wait(self.sample_interval_s):
@@ -456,21 +560,86 @@ class Executor:
             "baseline": dict(self._baseline or {}),
         }
 
+    # -- what the run produced ----------------------------------------------
+
+    @property
+    def result(self) -> Any:
+        """The physical object the last `execute` finished with, or `None`.
+
+        The **output** of a run, and deliberately not part of its record.
+        `ExecutionRecord` is the serialized provenance model: a `ScalarField` or a
+        `PsfResult` cannot go in it, and a record that carried a summary of one
+        instead would be a second, lossy copy of the physics with nothing to keep
+        it honest. So the record says what ran and this says what came out, and the
+        two are read together.
+
+        This is not a stored result to be handed back instead of running: it is
+        cleared at the start of every `execute` and on `__enter__`, nothing
+        consults it to decide whether to run, and two `execute` calls with equal
+        arguments both execute their physics -- which is the property
+        `tests/integration/test_executor.py::test_two_runs_of_one_plan_both_execute_the_physics`
+        already pins, and the reason the module docstring's argument against
+        keeping results still holds.
+
+        `None` after a run that refused or failed, and that is a decision rather
+        than a consequence: the state of the node *before* a refusal exists and is
+        deliberately not handed back, because a source's field returned for a plan
+        that was meant to measure a PSF is a plausible-looking wrong answer. Also
+        `None` after `execute` *raised* -- on a malformed plan or an uncatalogued
+        id -- and after `__exit__`. So this is the plan's answer or nothing, and
+        every other outcome reads the same way.
+        """
+        return self._produced
+
     # -- the run ------------------------------------------------------------
 
-    def execute(self, plan: Iterable[str], *, request: Mapping[str, Any]) -> ExecutionRecord:
-        """Run a route and return the record. Never a fabricated result.
+    def execute(
+        self, plan: Iterable[PlanNode], *, request: Mapping[str, Any] = MappingProxyType({})
+    ) -> ExecutionRecord:
+        """Run a plan and return the record. Never a fabricated result.
 
-        Each operation is resolved, bound from `request` by parameter name, called,
-        and recorded. The physical state produced by one node is the port argument
-        of the next; the first node's port -- if it has one -- comes from `request`
-        under the port's own parameter name, which is how a route starting mid-graph
-        is given its input.
+        Each operation is resolved, bound **from its own node's request** by
+        parameter name, called, and recorded. The physical state produced by one
+        node is the port argument of the next; the first node's port -- if it has
+        one -- comes from that node's request under the port's own parameter name,
+        which is how a plan starting mid-graph is given its input. What the last
+        node produced is `self.result`, read beside this record rather than in it.
+
+        A plan is an ordered sequence of *node instances*, and a step is either an
+        operation id or `(operation_id, node_request)`. A bare id is bound from the
+        shared `request`, which is the original behaviour and is why every caller
+        that predates per-node requests still runs unchanged. A pair is bound from
+        its own mapping **alone**, with no fallback to the shared one:
+
+            plan = (
+                ("S_SOURCE_PLANE_WAVE", {"shape": ..., "wavelength_m": ...}),
+                ("O_FOCAL_PLANE_TRANSFORM", {"focal_length_m": f1, "model": {...}}),
+                ("O_COMPLEX_TRANSMISSION", {"amplitude": stop}),
+                ("O_FOCAL_PLANE_TRANSFORM", {"focal_length_m": f2, "model": {...}}),
+            )
+
+        **A repeated operation is a first-class case, and this is what it needed.**
+        One flat mapping keyed by parameter name cannot say which occurrence of
+        `O_FOCAL_PLANE_TRANSFORM` an entry called `focal_length_m` belongs to.
+        Measured before the pair form existed: that exact six-node 4f plan bound f1
+        to *both* legs and `amplitude=1.0` to *both* masks, and reported every node
+        `completed` -- a unit relay with an open pupil, recorded as a magnifying
+        relay with a stop, with nothing anywhere saying f2 had never been read. A
+        silently different optical system is the failure mode `AGENTS.md` puts
+        first, so the pair form does not fall back: a node with its own request that
+        omits a required argument is refused by name, which is loud, rather than
+        inheriting a value meant for another node, which is not.
+
+        `planning.routes` cannot enumerate a plan like that one -- no operation may
+        repeat in a route -- and this method deliberately does not require that it
+        could. A plan is *given* to the executor; where it came from, an
+        enumeration or a caller writing it down, is the planner's question and not
+        this one's. What is checked here is only that every step is in the catalog.
 
         A node that refuses or raises stops the run and is recorded with its own
         diagnostics. Nothing downstream of it runs and nothing is invented for it:
-        the record is shorter than the route, and `ExecutionRecord.status` reads
-        `failed` for that reason alone.
+        the record is shorter than the route, `ExecutionRecord.status` reads
+        `failed` for that reason alone, and `result` is `None`.
 
         The resource guard is evaluated at every boundary, including before the
         first node. When it trips, the operation that was about to run is recorded
@@ -479,7 +648,8 @@ class Executor:
 
         Raises:
             RuntimeError: called outside `with`. The guard would not be running.
-            ValueError: the plan names an operation the catalog does not have.
+            ValueError: the plan is empty, malformed, or names an operation the
+                catalog does not have.
         """
         if self._thread is None:
             raise RuntimeError(
@@ -487,21 +657,35 @@ class Executor:
                 "sampler is not running, so the swap-growth stop condition the "
                 "shared-server policy requires would not be evaluated."
             )
-        route = tuple(str(item) for item in plan)
-        if not route:
-            raise ValueError("a plan names at least one operation")
+        # Cleared **before** the plan is validated, not after. Every refusal below
+        # raises, and a caller that catches one and reads `result` would otherwise
+        # get the previous run's object as the answer for a plan that never ran --
+        # the same hazard as handing back a pre-refusal node's state, one level up.
+        self._produced = None
+        # Materialized once: `plan` may be a generator, and it is read twice below
+        # -- for the steps and for whether any step carried its own request.
+        given = tuple(plan)
+        steps = normalize_plan(given, request=request)
+        route = tuple(operation_id for operation_id, _ in steps)
         catalogued = {descriptor.operation_id: descriptor for descriptor in CATALOG}
         unknown = [step for step in route if step not in catalogued]
         if unknown:
             raise ValueError(
-                f"the plan names {unknown}, which the catalog does not have. A plan comes "
-                "from planning.routes, which enumerates the catalog."
+                f"the plan names {unknown}, which the catalog does not have. Every step of "
+                "a plan is a catalogued operation id."
             )
+        # `()` when nothing gave a node its own request, so a record of a
+        # single-request run carries no per-node copy of it to disagree with.
+        per_node = (
+            tuple(node_request for _, node_request in steps)
+            if any(not isinstance(item, str) for item in given)
+            else ()
+        )
 
         started = time.monotonic()
         nodes: list[NodeRecord] = []
         state: Any = None
-        for index, operation_id in enumerate(route):
+        for index, (operation_id, node_request) in enumerate(steps):
             failure = self.resource_failure()
             if failure is not None:
                 nodes.append(
@@ -509,7 +693,10 @@ class Executor:
                 )
                 break
             node, state, stop = self._run_one(
-                catalogued[operation_id], request=request, incoming=state, first=index == 0
+                catalogued[operation_id],
+                request=node_request,
+                incoming=state,
+                first=index == 0,
             )
             nodes.append(node)
             if stop:
@@ -528,9 +715,26 @@ class Executor:
         # caller sees `resource_failure` beside the growth that caused it.
         trailing_failure = self.resource_failure()
 
+        # `result` is the *plan's* answer, so it is set only when the plan ran to
+        # its end. Assigning it per node -- which the first version of this did --
+        # leaves the state of the node before a refusal readable as though it were
+        # what was asked for: a source's field handed back for a plan that was
+        # meant to measure a PSF, with `record.status` reading `refused` beside it.
+        # A caller who reads the result first and the status second would get a
+        # plausible-looking wrong answer, which is the one outcome this module is
+        # written to make impossible.
+        # `tests/integration/test_executor.py::test_a_run_that_did_not_complete_has_no_result`
+        # is the test that caught it.
+        self._produced = (
+            state
+            if len(nodes) == len(route) and all(node.status == "completed" for node in nodes)
+            else None
+        )
+
         return ExecutionRecord(
             route=route,
             request=dict(request),
+            node_requests=per_node,
             nodes=tuple(nodes),
             provenance={
                 **record_provenance(
@@ -692,7 +896,7 @@ def _requested_placement(request: Mapping[str, Any]) -> dict[str, str]:
     Read out of `request["execution"]` and not from top-level `request["device"]`,
     which is where the first version looked and where nothing puts them: every
     landed operation that takes a placement takes it as an `execution` mapping
-    (`S_RAY_OPTILAND`, `S_RAY_OPTILAND_BUNDLE`), so top-level keys were both never
+    (`SO_RAY_LAUNCH_TRACE`, `O_RAY_TRACE`), so top-level keys were both never
     populated *and* silently dropped from the call -- neither port, required nor
     optional -- while still being recorded as "requested". A record claiming a
     request that reached nothing is worse than one claiming nothing.
@@ -737,9 +941,9 @@ def _observed_placement(state: Any, requested: Mapping[str, str]) -> dict[str, s
 
 
 def execute(
-    plan: Iterable[str],
+    plan: Iterable[PlanNode],
     *,
-    request: Mapping[str, Any],
+    request: Mapping[str, Any] = MappingProxyType({}),
     root: Path | None = None,
     sources: Iterable[Path] = (),
 ) -> ExecutionRecord:
@@ -749,6 +953,20 @@ def execute(
     reach for, so the common case -- one run, one record -- does not require
     knowing that a resource lifecycle exists; and a context manager underneath, so
     that when it matters the release is deterministic.
+
+    **Returns the record and not the physical result**, because the executor it
+    opened is closed by the time this returns and the result belongs to that run.
+    A caller who needs what the plan produced opens the context itself, which is
+    also the cheaper shape for many runs -- the environment fingerprint is read
+    once per `__enter__`, at 7.5 ms:
+
+        with Executor() as executor:
+            record = executor.execute(plan)
+            field = executor.result
+
+    Two entry points would be the alternative and it is worse: `execute` is called
+    in 37 places that want a record, and a second function differing only in its
+    return type is the kind of near-duplicate this package has none of.
     """
     # `root=None` means "the Executor's own default", which is the same repository
     # root -- restating the expression here would be a second place to change it.

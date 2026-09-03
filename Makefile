@@ -72,7 +72,7 @@ check-arch:
 #
 # A record measures the code at a commit, so re-run this and commit the regenerated
 # records in the same change as any edit to `sources/`, `operators/` or
-# `solvers/chromatix/`. `tests/benchmarks/test_records.py` is what checks in the
+# `backends/chromatix/`. `tests/benchmarks/test_records.py` is what checks in the
 # default suite that the committed records claim a clean, closed-form-decided run.
 benchmarks:
 	./run.sh python -m benchmarks.systems.b4f_ideal

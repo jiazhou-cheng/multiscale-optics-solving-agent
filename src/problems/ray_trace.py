@@ -291,7 +291,7 @@ class SurfaceSpec:
     **diameter** and halves it, and its `Surface.set_semi_aperture` sets a
     *different* attribute that is used for drawing and does not clip at all. Either
     mistake produces a system that looks configured and behaves as if it were not,
-    with no error. `solvers/optiland/system.py` therefore constructs the aperture
+    with no error. `backends/optiland/system.py` therefore constructs the aperture
     object explicitly rather than passing a scalar, and `UNITS["clear_semi_diameter"]`
     is what a test asserts that against.
 
@@ -606,7 +606,7 @@ class SourceSpec:
     Every ray of one field then leaves that **single point**, which is what makes
     the launch state a common spherical wavefront: the optical path from that
     wavefront to each launch point is identically zero, because the launch point
-    *is* the wavefront. `solvers/optiland/rays.py` states the consequence for the
+    *is* the wavefront. `backends/optiland/rays.py` states the consequence for the
     declared optical path, and the difference from the infinite case is not
     cosmetic -- there the origins spread over a plane and the directions are
     common, here the origin is common and the directions spread.

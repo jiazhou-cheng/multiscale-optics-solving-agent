@@ -64,7 +64,7 @@ sampling error produces a physically plausible image at completely the wrong
 scale.
 
 Importing this module imports no backend. `import_backend` is the only route in,
-it is called from inside functions, and `tests/solvers/test_chromatix_boundary.py`
+it is called from inside functions, and `tests/backends/test_chromatix_boundary.py`
 asserts that against `sys.modules` in a fresh interpreter.
 """
 
@@ -399,7 +399,7 @@ def padded_field_bytes(shape: tuple[int, int], pad_width: int) -> int:
     this and never a fraction of it. Stated as one array because that is the
     number a measured run can confirm exactly -- `padded_field_bytes(shape, p)` is
     the `nbytes` of an uncropped output, which
-    `tests/solvers/test_chromatix_fields.py` checks against a real propagation.
+    `tests/backends/test_chromatix_fields.py` checks against a real propagation.
 
     The point of the function is the `pad_width`: at a 256^2 input and the
     pad width the M1 configuration needed, this is two orders of magnitude above

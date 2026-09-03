@@ -46,9 +46,11 @@ from representations.geometry import (
 )
 from representations.rays import (
     MEASURE_KINDS,
+    RAY_SPLITTINGS,
     UNVERIFIED,
     MeasureKind,
     RayBundle,
+    RaySplitting,
     direction_norm_tolerance,
 )
 from representations.scalar import (
@@ -66,6 +68,7 @@ __all__ = [
     "ORIGIN_RULE",
     "PHASOR",
     "PROPAGATION_AXIS",
+    "RAY_SPLITTINGS",
     "SPATIAL_FACTOR",
     "UNVERIFIED",
     "VALIDITY_FLAGS",
@@ -74,6 +77,7 @@ __all__ = [
     "Frame",
     "MeasureKind",
     "RayBundle",
+    "RaySplitting",
     "ReferenceSurface",
     "ScalarField",
     "ValidityFlag",

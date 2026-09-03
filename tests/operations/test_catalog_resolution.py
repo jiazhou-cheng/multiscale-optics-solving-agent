@@ -56,7 +56,7 @@ def test_the_implementation_string_resolves_to_the_intended_callable(
 
 def test_every_record_is_covered_by_the_parametrization() -> None:
     """The meta-check: a parametrization built from an empty catalog proves nothing."""
-    assert len(CASES) == len(CATALOG) == 14
+    assert len(CASES) == len(CATALOG) == 17
     assert {case[0] for case in CASES} == set(operations.registered_ids())
 
 

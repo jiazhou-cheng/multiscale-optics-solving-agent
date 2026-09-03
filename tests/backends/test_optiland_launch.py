@@ -1,7 +1,7 @@
 """The launch operation: system-bound, captured before the trace, measure declared.
 
 CHE-219 (R05.8). What this file holds is the *contract* of
-`solvers.optiland.launch.launch`, plus the two structural claims the ticket makes
+`backends.optiland.launch.launch`, plus the two structural claims the ticket makes
 about where launch responsibilities may live. The physics it produces is already
 held elsewhere and deliberately not duplicated here:
 
@@ -20,7 +20,7 @@ two that need a real system's aiming behaviour say so and use the fixture where
 it is measurable.
 
 No millimetre and no native ray attribute appears below, so this file is in
-neither exemption set of `tests/solvers/test_optiland_boundary.py`. That is worth
+neither exemption set of `tests/backends/test_optiland_boundary.py`. That is worth
 stating: `launch` returns a *neutral* `RayBundle` in SI, and the only reason its
 second return value is package-facing is the object-space term it carries in
 native units for `rays.declare_optical_path_m` to apply.
@@ -45,30 +45,30 @@ from fixtures.systems import (
     singlet_source,
 )
 
-from problems import SourceSpec
-from representations import ContractError, RayBundle
-from solvers.optiland import trace
-from solvers.optiland.launch import (
+from backends.optiland import trace
+from backends.optiland.launch import (
     AIMING_MODES,
     DEFAULT_AIMING,
     LAUNCH_GEOMETRY_UNVERIFIED,
     LAUNCH_OPL_REFERENCE,
     launch,
 )
-from solvers.optiland.rays import (
+from backends.optiland.rays import (
     LAUNCH_PLANE_WAVEFRONT,
     LAUNCH_POINT_SOURCE,
     hexapolar_area_weight_m2,
     hexapolar_ray_count,
     to_ray_bundle,
 )
-from solvers.optiland.system import build_lens
+from backends.optiland.system import build_lens
+from problems import SourceSpec
+from representations import ContractError, RayBundle
 
 NUM_RINGS = 2
 WAVELENGTH_UM = 0.55
 CPU64 = {"device": "cpu", "precision": "fp64"}
 
-PACKAGE = Path(__file__).resolve().parents[2] / "src" / "solvers" / "optiland"
+PACKAGE = Path(__file__).resolve().parents[2] / "src" / "backends" / "optiland"
 
 
 def _singlet(field_angle_deg: tuple[float, float] = (0.0, 0.0)) -> tuple[object, SourceSpec]:
@@ -560,7 +560,7 @@ def test_the_launch_is_refused_when_its_state_cannot_be_read() -> None:
     the trace continued on axis, which is still what `declare_optical_path_m` does
     with a term it is handed as unavailable.
     """
-    from solvers.optiland.launch import _launch_columns
+    from backends.optiland.launch import _launch_columns
 
     class _State:
         def __init__(self, **columns: object) -> None:
@@ -605,7 +605,7 @@ def test_an_unverified_launch_geometry_is_named_rather_than_called_collimated() 
     the geometry off the term rather than off this name, so the two cannot
     disagree; this pins that the name itself stays honest.
     """
-    from solvers.optiland.launch import _declare_launch_optical_path
+    from backends.optiland.launch import _declare_launch_optical_path
 
     assert LAUNCH_GEOMETRY_UNVERIFIED not in (LAUNCH_PLANE_WAVEFRONT, LAUNCH_POINT_SOURCE)
     assert "undetermined" in LAUNCH_GEOMETRY_UNVERIFIED
@@ -631,7 +631,7 @@ def test_a_fan_that_is_not_the_hexapolar_layout_leaves_the_measure_undeclared() 
     directly, and the alternative is a silently wrong absolute area rather than an
     honest absence -- which R07's kernel would multiply into every reconstruction.
     """
-    from solvers.optiland.launch import _declare_measure
+    from backends.optiland.launch import _declare_measure
 
     lens, _ = _singlet()
     short = hexapolar_ray_count(NUM_RINGS) - 1
@@ -674,7 +674,7 @@ def test_an_unreadable_entrance_pupil_leaves_the_measure_undeclared_not_guessed(
     with a stated reason instead of raising. The aperture area the relative cell
     areas scale to is the one thing the quadrature cannot be derived without.
     """
-    from solvers.optiland.launch import _declare_measure
+    from backends.optiland.launch import _declare_measure
 
     class _NoPupil:
         class paraxial:

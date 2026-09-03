@@ -1,7 +1,7 @@
 """The three ray ensembles R07's tests reconstruct from, and their analytic oracles.
 
 A module rather than fixtures in a `conftest.py`, following
-`tests/solvers/chromatix_support.py`: four test files build the same bundles and a
+`tests/backends/chromatix_support.py`: four test files build the same bundles and a
 conftest would load them for the rest of the suite as well.
 
 Every builder here is **analytic**. None of them calls a backend solver, and --
@@ -259,7 +259,7 @@ def hexapolar_disc(rings: int, radius_m: float) -> tuple[Any, Any, Any]:
     count.
 
     Written out here from the closed form rather than imported from
-    `solvers.optiland.rays`, which produces the same numbers: importing it would
+    `backends.optiland.rays`, which produces the same numbers: importing it would
     pull torch into a coupler test, and would make the solver's implementation the
     oracle for the coupler that consumes it.
     """

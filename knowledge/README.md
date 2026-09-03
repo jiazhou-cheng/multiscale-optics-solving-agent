@@ -49,7 +49,7 @@ Both records are **component-level**, because that is what the probes measured:
 they exercised the packages' device and dtype behaviour, not any one semantic
 operation. An `operations.OperationDescriptor` cites the component id its
 implementation executes within, and several descriptors may cite one record —
-`S_RAY_OPTILAND` and `S_RAY_OPTILAND_BUNDLE` both cite `M_RAY_OPTILAND`.
+`SO_RAY_LAUNCH_TRACE` and `O_RAY_TRACE` both cite `M_RAY_OPTILAND`.
 
 Operation-level records are permitted **when independently measured**, which is why
 `operations.descriptors._COMPONENT_ID` constrains the shape without demanding an

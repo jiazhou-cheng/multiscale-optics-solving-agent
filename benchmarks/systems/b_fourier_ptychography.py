@@ -14,18 +14,33 @@ variable, and the observable is an intensity rather than a field.
 no loss function, no pupil recovery. R06.9 is the differentiable-execution
 question and it is deliberately separate.
 
-The physical graph
-------------------
+The physical graph, as a plan
+-----------------------------
 ::
 
-    tilted coherent illumination, k_j    [sources.plane_wave]
-      -> complex object transmission     [operators.complex_transmission]
-      -> focal-plane transform, f1       [solvers.chromatix.focal_plane_transform]
-      -> finite-NA pupil                 [operators.complex_transmission]   at the Fourier plane
-      -> focal-plane transform, f2       [solvers.chromatix.focal_plane_transform]
-      -> intensity                       [measurements.psf, normalization='raw']
+    S_SOURCE_PLANE_WAVE         tilted coherent illumination, k_j
+      -> O_COMPLEX_TRANSMISSION    complex object transmission
+      -> O_FOCAL_PLANE_TRANSFORM   focal-plane transform, f1
+      -> O_COMPLEX_TRANSMISSION    finite-NA pupil, at the Fourier plane
+      -> O_FOCAL_PLANE_TRANSFORM   focal-plane transform, f2
+      -> M_PSF                     intensity, normalization='raw'
 
 repeated over a set of illumination wavevectors.
+
+Those six ids are the plan this module hands to `runtime.Executor`, one node per
+step, each with its own request -- and the sweep is a **plan parameter**, not a
+different code path: an illumination angle is one number in step 0's request, and
+the seven swept angles are seven runs of one plan. The benchmark imports no
+operation; the ids are resolved through `operations.CATALOG` inside the executor.
+
+`planning.routes` cannot enumerate this plan, because an operation may not repeat
+in a route and this one transforms twice and masks twice. So the plan is written
+down here and each consecutive edge is checked against
+`planning.capability_graph()` before anything runs -- see `_semantic_chain`. The
+two focal lengths and the two masks live in their own nodes' requests, which is
+what the per-node request form is for: bound from one flat mapping keyed by
+parameter name, this plan ran f1 on both legs and no pupil at all, and reported
+every node `completed`.
 
 Two structural points, neither assumed
 ---------------------------------------
@@ -102,7 +117,12 @@ form. It shares no code with the Chromatix path, so its agreement is real
 evidence -- and it is still repository numerical code, so it decides nothing. Its
 residual is reported with `oracle_kind='diagnostic'`.
 
-Cost: CPU, 3.1 s for both configurations (2 x 7 swept angles, 96 x 512). No GPU.
+Cost: CPU, 3.1 s of physics for both configurations (2 x 7 swept angles,
+96 x 512). No GPU. Each measurement now runs two plans rather than one -- the
+prefix to the Fourier plane, whose pitch sizes the pupil mask, and then the whole
+graph -- so the wall time is roughly double that, plus 3.1 ms of executor overhead
+per run. One `Executor` per configuration, because the environment fingerprint is
+read once per `__enter__` at 7.5 ms.
 """
 
 from __future__ import annotations
@@ -110,21 +130,19 @@ from __future__ import annotations
 import cmath
 import math
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from benchmarks.record import control, gate, write_record
-from measurements import psf
-from operators import (
-    circular_aperture_amplitude,
-    complex_transmission,
-    numerical_aperture_radius_m,
-)
+from backends.chromatix import fourier_plane_pitch_m
+from benchmarks.record import control, describe_plan, gate, write_record
+from operations import CATALOG
+from operators import circular_aperture_amplitude, numerical_aperture_radius_m
+from planning import ENTRY, capability_graph
 from representations import ReferenceSurface, ScalarField
-from solvers.chromatix import focal_plane_transform, fourier_plane_pitch_m
-from sources import plane_wave
+from runtime import Executor, PlanNode, normalize_plan
 
 BENCHMARK_ID = "B-FP-FORWARD"
 RECORDS = Path(__file__).resolve().parent / "records"
@@ -198,20 +216,23 @@ CONFIGURATIONS: tuple[dict[str, Any], ...] = (
 # ---------------------------------------------------------------------------
 
 
-def _raw_intensity(field: ScalarField) -> np.ndarray[Any, np.dtype[Any]]:
-    """`measurements.psf(..., 'raw').intensity`, widened to host float64.
+def _raw_intensity(measured: Any) -> np.ndarray[Any, np.dtype[Any]]:
+    """An `M_PSF` node's result, widened to host float64.
 
     The widening is the one thing this wrapper adds and it is deliberate: the
     measurement keeps `|u|^2` in the field's own precision, which is complex64
     here, and the harmonic readings below sum over a large grid where float32
     accumulation loses digits they need. Squaring stays where the measurement puts
-    it -- in the field's precision -- so nothing is recomputed on the host.
+    it -- inside `measurements.psf`, in the field's precision -- so nothing is
+    recomputed on the host.
 
-    This is not a second intensity path. `benchmarks/observables.py` was one, and
-    R11.1 landing `measurements/` is the condition under which its own docstring
-    said it would be deleted; it was, in the same change as this line.
+    This is not a second intensity path, and it no longer even names one: `|U|^2`
+    is computed by the `M_PSF` node of the plan, which the executor resolves to
+    `measurements.psf`. `benchmarks/observables.py` was a second path, and R11.1
+    landing `measurements/` is the condition under which its own docstring said it
+    would be deleted; it was.
     """
-    return np.asarray(psf(field, normalization="raw").intensity, dtype=np.float64)
+    return np.asarray(measured.intensity, dtype=np.float64)
 
 
 def object_coefficients() -> dict[int, complex]:
@@ -261,14 +282,133 @@ def _surface(name: str) -> ReferenceSurface:
     return ReferenceSurface(name=name, z_m=0.0, medium_index=MEDIUM_INDEX)
 
 
-def _illumination(transverse_wavevector: tuple[float, float]) -> ScalarField:
-    return plane_wave(
-        SHAPE,
-        sample_pitch_m=PITCH_M,
-        wavelength_m=WAVELENGTH_M,
-        reference_surface=_surface("front_focal"),
-        transverse_wavevector_rad_per_m=transverse_wavevector,
+# ---------------------------------------------------------------------------
+# The plan: node builders, the edge check, and the one call that executes
+# ---------------------------------------------------------------------------
+#
+# Every node is `(operation_id, request)` and nothing here calls an operation. The
+# `operators` names this module imports -- `circular_aperture_amplitude` and
+# `numerical_aperture_radius_m` -- are mask builders rather than operations, which
+# is what `operators/__init__.py` says where it declares `OPERATIONS`, and so is
+# `fourier_plane_pitch_m`.
+
+
+def _source_node(transverse_wavevector: tuple[float, float]) -> PlanNode:
+    return (
+        "S_SOURCE_PLANE_WAVE",
+        {
+            "shape": SHAPE,
+            "sample_pitch_m": PITCH_M,
+            "wavelength_m": WAVELENGTH_M,
+            "reference_surface": _surface("front_focal"),
+            "transverse_wavevector_rad_per_m": transverse_wavevector,
+        },
     )
+
+
+def _element_node(
+    *, amplitude: Any = None, phase_rad: Any = None, target_surface: str | None = None
+) -> PlanNode:
+    """One thin element. Only the arguments actually given reach the request.
+
+    `O_COMPLEX_TRANSMISSION` declares every argument optional, so an omitted
+    `phase_rad` must be *absent* rather than present as `None`: the executor binds
+    every optional argument it finds by name, and `phase_rad=None` would be handed
+    to an operator whose own default is not `None`.
+    """
+    request: dict[str, Any] = {}
+    if amplitude is not None:
+        request["amplitude"] = amplitude
+    if phase_rad is not None:
+        request["phase_rad"] = phase_rad
+    if target_surface is not None:
+        request["target_surface"] = target_surface
+    return ("O_COMPLEX_TRANSMISSION", request)
+
+
+def _leg_node(focal_length_m: float, target: str, *, direction: str = "forward") -> PlanNode:
+    return (
+        "O_FOCAL_PLANE_TRANSFORM",
+        {
+            "focal_length_m": focal_length_m,
+            "model": {"target_surface": target, "direction": direction},
+        },
+    )
+
+
+def _measure_node() -> PlanNode:
+    """The one intensity in the project, as the last node of the plan.
+
+    `normalization='raw'` is in the request and not a default anywhere: the
+    executor refuses a plan whose `M_PSF` node does not name one, which is the rule
+    `tests/integration/test_executor.py` pins -- a runtime does not choose a
+    physical parameter for a caller, and peak normalization is blind to exactly the
+    global scale error every comparison here is absolute in order to catch.
+    """
+    return ("M_PSF", {"normalization": "raw"})
+
+
+def _semantic_chain(plan: Sequence[PlanNode]) -> tuple[str, ...]:
+    """The semantic types the plan passes through, refusing a step that cannot run.
+
+    The part of `planning/` that answers a question about a hardcoded plan: each
+    step must be in `capability_graph()[state]`, the operations that consume what
+    the previous step produced, and the first must be a graph entry, which `ENTRY`
+    (`None`) keys. Not `planning.routes`, which will not enumerate a plan that
+    repeats an operation -- and this one repeats two.
+
+    Raises:
+        ValueError: a step does not consume what the step before it produced.
+    """
+    graph = capability_graph()
+    produces = {descriptor.operation_id: descriptor.primary_output for descriptor in CATALOG}
+    chain: list[str] = []
+    state: str | None = ENTRY
+    for index, (operation_id, _) in enumerate(normalize_plan(plan)):
+        if operation_id not in graph.get(state, ()):
+            raise ValueError(
+                f"plan step {index} is {operation_id}, which does not consume "
+                f"{state!r}. The operations that do are {list(graph.get(state, ()))}."
+            )
+        state = produces[operation_id]
+        chain.append(state)
+    return tuple(chain)
+
+
+def _run(plan: Sequence[PlanNode], *, executor: Executor) -> Any:
+    """Execute one plan and return what it produced. The whole physics path.
+
+    Refuses to hand back the result of a run that did not complete, and names the
+    node that stopped it: a refused node leaves `executor.result` at `None`, and a
+    `None` read as an intensity is the fabricated result this project's rules are
+    about.
+
+    Raises:
+        RuntimeError: the run refused or failed at some node.
+    """
+    record = executor.execute(plan)
+    if record.status != "completed":
+        stopped = [
+            (node.operation_id, node.status, node.diagnostics)
+            for node in record.nodes
+            if node.status != "completed"
+        ]
+        raise RuntimeError(
+            f"the plan {list(record.route)} did not complete ({record.status}): {stopped}"
+        )
+    return executor.result
+
+
+def _grid_axes(executor: Executor) -> tuple[Array, Array]:
+    """`(y, x)` of the source grid, read off a field the source plan produced.
+
+    A one-node plan rather than a coordinate formula written here: the `n // 2`
+    origin is `representations.ORIGIN_RULE`'s declaration, and a second copy of it
+    in a benchmark is the kind of restatement that silently disagrees.
+    """
+    field = _run((_source_node((0.0, 0.0)),), executor=executor)
+    y, x = field.coordinates()
+    return np.asarray(y, dtype=np.float64), np.asarray(x, dtype=np.float64)
 
 
 def _wavevector_for_bin(bin_index: float) -> float:
@@ -289,36 +429,42 @@ def _object_profile(coefficients: dict[int, complex], x_m: Array) -> Array:
     return profile
 
 
-def _illuminated_object(
-    bin_index: float, coefficients: dict[int, complex], *, transpose: bool = False
-) -> ScalarField:
-    """The tilted illumination behind the object, through the two public calls."""
-    wavevector = _wavevector_for_bin(bin_index)
-    field = _illumination((wavevector, 0.0) if transpose else (0.0, wavevector))
-    _, x = field.coordinates()
-    profile = _object_profile(coefficients, np.asarray(x, dtype=np.float64))
+def _object_node(coefficients: dict[int, complex], axes: tuple[Array, Array]) -> PlanNode:
+    """The three-line object, as one thin-element node.
+
+    The mask is sampled on `axes`, the source grid's own coordinates. Which
+    illumination it modulates is the plan's business and not this node's -- the
+    tilt lives in the source node's request -- and that separation is what makes an
+    illumination sweep a sweep over one plan parameter.
+    """
+    _, x = axes
+    profile = _object_profile(coefficients, x)
     grid = np.broadcast_to(profile[None, :], SHAPE)
-    return complex_transmission(
-        field,
+    return _element_node(
         amplitude=np.abs(grid).copy(),
         phase_rad=np.angle(grid).copy(),
         target_surface="object",
     )
 
 
+def _illumination_nodes(
+    bin_index: float,
+    coefficients: dict[int, complex],
+    axes: tuple[Array, Array],
+    *,
+    transpose: bool = False,
+) -> tuple[PlanNode, PlanNode]:
+    """The first two steps: the tilted plane wave, and the object behind it."""
+    wavevector = _wavevector_for_bin(bin_index)
+    return (
+        _source_node((wavevector, 0.0) if transpose else (0.0, wavevector)),
+        _object_node(coefficients, axes),
+    )
+
+
 # ---------------------------------------------------------------------------
 # The measurement path
 # ---------------------------------------------------------------------------
-
-
-def _leg(
-    field: ScalarField, focal_length_m: float, target: str, *, direction: str = "forward"
-) -> ScalarField:
-    return focal_plane_transform(
-        field,
-        focal_length_m=focal_length_m,
-        model={"target_surface": target, "direction": direction},
-    )
 
 
 def _stop(pitch_m: tuple[float, float], radius_m: float) -> Array:
@@ -331,6 +477,8 @@ def _measure(
     bin_index: float,
     coefficients: dict[int, complex],
     *,
+    executor: Executor,
+    axes: tuple[Array, Array],
     f1: float,
     f2: float,
     radius_m: float,
@@ -338,22 +486,50 @@ def _measure(
     transpose: bool = False,
     second_leg: str = "forward",
 ) -> tuple[Array, ScalarField]:
-    """One illumination: the whole graph, returning `(intensity, image_field)`."""
-    source = _illuminated_object(bin_index, coefficients, transpose=transpose)
-    fourier = _leg(source, f1, "fourier")
+    """One illumination: the whole plan, returning `(intensity, image_field)`.
+
+    Two plans are run, and the split is physical rather than mechanical: the pupil
+    mask is sized in the **Fourier plane's own pitch**, and a radius in metres
+    means nothing until the plane it sits in has a scale. So the prefix to the
+    Fourier plane runs first, its pitch sizes the stop, the stop becomes step 3,
+    and then the graph runs to the image and to the intensity. The image field is
+    the plan without its `M_PSF` node; the intensity is the plan with it.
+
+    `stop_at_the_image_plane` moves the mask from between the legs to after the
+    second one, and note what that is: **the same nodes in a different order**. A
+    negative control here is a reordered plan, not a second code path, so it cannot
+    pass by quietly bypassing the composition the gate measured.
+    """
+    prefix: tuple[PlanNode, ...] = (
+        *_illumination_nodes(bin_index, coefficients, axes, transpose=transpose),
+        _leg_node(f1, "fourier"),
+    )
+    fourier = _run(prefix, executor=executor)
     if stop_at_the_image_plane:
-        image = _leg(complex_transmission(fourier, amplitude=1.0), f2, "image",
-                     direction=second_leg)
-        image = complex_transmission(
-            image, amplitude=_stop(image.sample_pitch_m, radius_m), target_surface="image"
+        upto_image: tuple[PlanNode, ...] = (
+            *prefix,
+            _element_node(amplitude=1.0),
+            _leg_node(f2, "image", direction=second_leg),
         )
+        image = _run(upto_image, executor=executor)
+        plan = (
+            *upto_image,
+            _element_node(
+                amplitude=_stop(image.sample_pitch_m, radius_m), target_surface="image"
+            ),
+        )
+        image = _run(plan, executor=executor)
     else:
-        stopped = complex_transmission(
-            fourier, amplitude=_stop(fourier.sample_pitch_m, radius_m),
-            target_surface="pupil",
+        plan = (
+            *prefix,
+            _element_node(
+                amplitude=_stop(fourier.sample_pitch_m, radius_m), target_surface="pupil"
+            ),
+            _leg_node(f2, "image", direction=second_leg),
         )
-        image = _leg(stopped, f2, "image", direction=second_leg)
-    return _raw_intensity(image), image
+        image = _run(plan, executor=executor)
+    measured = _run((*plan, _measure_node()), executor=executor)
+    return _raw_intensity(measured), image
 
 
 def _harmonics(measured: Array) -> dict[int, complex]:
@@ -417,15 +593,20 @@ def _analytic_harmonics(
 
 
 def _sweep(
-    coefficients: dict[int, complex], *, f1: float, f2: float, radius_m: float,
-    cutoff_bin: float,
+    coefficients: dict[int, complex], *, executor: Executor, axes: tuple[Array, Array],
+    f1: float, f2: float, radius_m: float, cutoff_bin: float,
 ) -> dict[float, dict[str, Any]]:
-    """Every on-grid angle: measured harmonics beside their analytic values."""
+    """Every on-grid angle: measured harmonics beside their analytic values.
+
+    Seven runs of one plan, differing in one number in step 0's request. That is
+    what makes this a *parameterized family* rather than seven systems.
+    """
     scale = (f1 / f2) ** 2
     results: dict[float, dict[str, Any]] = {}
     for bin_index in ON_GRID_BINS:
         measured, image = _measure(
-            bin_index, coefficients, f1=f1, f2=f2, radius_m=radius_m
+            bin_index, coefficients, executor=executor, axes=axes,
+            f1=f1, f2=f2, radius_m=radius_m,
         )
         harmonics = _harmonics(measured)
         surviving = _surviving_orders(bin_index, cutoff_bin=cutoff_bin)
@@ -551,15 +732,23 @@ def _dark_field_gate(sweep: dict[float, dict[str, Any]]) -> dict[str, Any]:
     )
 
 
-def _sampling_chain_gate(*, f1: float, f2: float, radius_m: float) -> dict[str, Any]:
+def _sampling_chain_gate(
+    *, executor: Executor, axes: tuple[Array, Array], f1: float, f2: float, radius_m: float
+) -> dict[str, Any]:
     """Criterion 6: the sampling chain is checked, not assumed, and recorded."""
     coefficients = object_coefficients()
-    source = _illuminated_object(0.0, coefficients)
-    fourier = _leg(source, f1, "fourier")
-    image = _leg(
-        complex_transmission(fourier, amplitude=_stop(fourier.sample_pitch_m, radius_m)),
-        f2,
-        "image",
+    prefix: tuple[PlanNode, ...] = (
+        *_illumination_nodes(0.0, coefficients, axes),
+        _leg_node(f1, "fourier"),
+    )
+    fourier = _run(prefix, executor=executor)
+    image = _run(
+        (
+            *prefix,
+            _element_node(amplitude=_stop(fourier.sample_pitch_m, radius_m)),
+            _leg_node(f2, "image"),
+        ),
+        executor=executor,
     )
     #: Recomputed here from the formula rather than by calling
     #: `fourier_plane_pitch_m` and comparing the result to itself.
@@ -613,8 +802,8 @@ def _sampling_chain_gate(*, f1: float, f2: float, radius_m: float) -> dict[str, 
 
 
 def _off_grid_report(
-    coefficients: dict[int, complex], *, f1: float, f2: float, radius_m: float,
-    cutoff_bin: float,
+    coefficients: dict[int, complex], *, executor: Executor, axes: tuple[Array, Array],
+    f1: float, f2: float, radius_m: float, cutoff_bin: float,
 ) -> dict[str, Any]:
     """Criterion 7, reported and not gated.
 
@@ -632,7 +821,10 @@ def _off_grid_report(
     scale = (f1 / f2) ** 2
     entries: dict[str, Any] = {}
     for bin_index in OFF_GRID_BINS:
-        measured, _ = _measure(bin_index, coefficients, f1=f1, f2=f2, radius_m=radius_m)
+        measured, _ = _measure(
+            bin_index, coefficients, executor=executor, axes=axes,
+            f1=f1, f2=f2, radius_m=radius_m,
+        )
         harmonics = _harmonics(measured)
         # Bracketed by the two on-grid bins the case sits between, not by the
         # nearest one: `round(52.5)` is 52 under banker's rounding, which is a
@@ -678,7 +870,9 @@ def _off_grid_report(
     )
 
 
-def _diagnostic_model(*, f1: float, f2: float, radius_m: float) -> dict[str, Any]:
+def _diagnostic_model(
+    *, executor: Executor, axes: tuple[Array, Array], f1: float, f2: float, radius_m: float
+) -> dict[str, Any]:
     """The secondary Fourier-domain model, on a phantom with no closed form.
 
     `ifft2(P * fft2(u))` in float64 NumPy, with the project's `n // 2` centring
@@ -702,13 +896,13 @@ def _diagnostic_model(*, f1: float, f2: float, radius_m: float) -> dict[str, Any
 
     bin_index = 40.0
     wavevector = _wavevector_for_bin(bin_index)
-    field = _illumination((0.0, wavevector))
     project_intensity, _ = _measure_phantom(
-        field, phantom, f1=f1, f2=f2, radius_m=radius_m
+        phantom, executor=executor, axes=axes, wavevector=wavevector,
+        f1=f1, f2=f2, radius_m=radius_m,
     )
 
-    _, x = field.coordinates()
-    incoming = phantom * np.exp(1j * wavevector * np.asarray(x, dtype=np.float64)[None, :])
+    _, x = axes
+    incoming = phantom * np.exp(1j * wavevector * x[None, :])
     stop = _stop(
         fourier_plane_pitch_m(
             PITCH_M, SHAPE, wavelength_m=WAVELENGTH_M, focal_length_m=f1,
@@ -740,20 +934,35 @@ def _diagnostic_model(*, f1: float, f2: float, radius_m: float) -> dict[str, Any
 
 
 def _measure_phantom(
-    illumination: ScalarField, phantom: Array, *, f1: float, f2: float, radius_m: float
+    phantom: Array,
+    *,
+    executor: Executor,
+    axes: tuple[Array, Array],
+    wavevector: float,
+    f1: float,
+    f2: float,
+    radius_m: float,
 ) -> tuple[Array, ScalarField]:
-    source = complex_transmission(
-        illumination,
-        amplitude=np.abs(phantom).copy(),
-        phase_rad=np.angle(phantom).copy(),
-        target_surface="object",
+    """The same plan as `_measure`, with the phantom in place of the three lines."""
+    prefix: tuple[PlanNode, ...] = (
+        _source_node((0.0, wavevector)),
+        _element_node(
+            amplitude=np.abs(phantom).copy(),
+            phase_rad=np.angle(phantom).copy(),
+            target_surface="object",
+        ),
+        _leg_node(f1, "fourier"),
     )
-    fourier = _leg(source, f1, "fourier")
-    stopped = complex_transmission(
-        fourier, amplitude=_stop(fourier.sample_pitch_m, radius_m), target_surface="pupil"
+    fourier = _run(prefix, executor=executor)
+    plan: tuple[PlanNode, ...] = (
+        *prefix,
+        _element_node(
+            amplitude=_stop(fourier.sample_pitch_m, radius_m), target_surface="pupil"
+        ),
+        _leg_node(f2, "image"),
     )
-    image = _leg(stopped, f2, "image")
-    return _raw_intensity(image), image
+    image = _run(plan, executor=executor)
+    return _raw_intensity(_run((*plan, _measure_node()), executor=executor)), image
 
 
 # ---------------------------------------------------------------------------
@@ -762,8 +971,9 @@ def _measure_phantom(
 
 
 def _controls(
-    coefficients: dict[int, complex], *, f1: float, f2: float, radius_m: float,
-    cutoff_bin: float, sweep: dict[float, dict[str, Any]],
+    coefficients: dict[int, complex], *, executor: Executor, axes: tuple[Array, Array],
+    f1: float, f2: float, radius_m: float, cutoff_bin: float,
+    sweep: dict[float, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     scale = (f1 / f2) ** 2
     controls: list[dict[str, Any]] = []
@@ -783,7 +993,10 @@ def _controls(
     #    with it the first-harmonic amplitude -- changes. This is *only* observable
     #    because the object is complex and asymmetric; for a real object the two
     #    intensities are identical, which is why the object is built the way it is.
-    flipped, _ = _measure(-reference_bin, coefficients, f1=f1, f2=f2, radius_m=radius_m)
+    flipped, _ = _measure(
+        -reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=radius_m,
+    )
     flipped_harmonics = _harmonics(flipped)
     mirrored = _analytic_harmonics(
         _surviving_orders(-reference_bin, cutoff_bin=cutoff_bin), coefficients, scale=scale
@@ -809,8 +1022,8 @@ def _controls(
     #    selects no spatial frequencies at all, so the blocked order survives and
     #    the second harmonic reappears where the analytic set says zero.
     misplaced, _ = _measure(
-        reference_bin, coefficients, f1=f1, f2=f2, radius_m=radius_m,
-        stop_at_the_image_plane=True,
+        reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=radius_m, stop_at_the_image_plane=True,
     )
     controls.append(
         control(
@@ -833,7 +1046,8 @@ def _controls(
         NUMERICAL_APERTURE, focal_length_m=f1, medium_index=1.33
     )
     wrong_index, _ = _measure(
-        52.0, coefficients, f1=f1, f2=f2, radius_m=wrong_index_radius
+        52.0, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=wrong_index_radius,
     )
     correct_at_52 = _analytic_harmonics(
         _surviving_orders(52.0, cutoff_bin=cutoff_bin), coefficients, scale=scale
@@ -858,7 +1072,8 @@ def _controls(
 
     # 3b. ...and off by 2 pi, which opens the pupil so wide that nothing is cut.
     wide, _ = _measure(
-        reference_bin, coefficients, f1=f1, f2=f2, radius_m=2.0 * math.pi * radius_m
+        reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=2.0 * math.pi * radius_m,
     )
     controls.append(
         control(
@@ -876,24 +1091,26 @@ def _controls(
 
     # 4. The illumination angle read as a spatial frequency instead of an angular
     #    wavenumber: 2 pi times too small, so a 65-bin tilt becomes a 10-bin one.
-    as_frequency = _illumination((0.0, _wavevector_for_bin(reference_bin) / (2.0 * math.pi)))
-    _, x = as_frequency.coordinates()
-    profile = _object_profile(coefficients, np.asarray(x, dtype=np.float64))
-    grid = np.broadcast_to(profile[None, :], SHAPE)
-    unconverted = complex_transmission(
-        as_frequency, amplitude=np.abs(grid).copy(), phase_rad=np.angle(grid).copy()
-    )
-    stopped = complex_transmission(
-        _leg(unconverted, f1, "fourier"),
-        amplitude=_stop(
-            fourier_plane_pitch_m(
-                PITCH_M, SHAPE, wavelength_m=WAVELENGTH_M, focal_length_m=f1,
-                medium_index=MEDIUM_INDEX,
-            ),
-            radius_m,
+    #: The same plan with one number in step 0's request divided by 2 pi. The
+    #: object node is `_object_node` rather than `_illumination_nodes`, because the
+    #: tilt here is deliberately *not* `_wavevector_for_bin`'s output.
+    unconverted_plan: tuple[PlanNode, ...] = (
+        _source_node((0.0, _wavevector_for_bin(reference_bin) / (2.0 * math.pi))),
+        _object_node(coefficients, axes),
+        _leg_node(f1, "fourier"),
+        _element_node(
+            amplitude=_stop(
+                fourier_plane_pitch_m(
+                    PITCH_M, SHAPE, wavelength_m=WAVELENGTH_M, focal_length_m=f1,
+                    medium_index=MEDIUM_INDEX,
+                ),
+                radius_m,
+            )
         ),
+        _leg_node(f2, "image"),
+        _measure_node(),
     )
-    unconverted_intensity = _raw_intensity(_leg(stopped, f2, "image"))
+    unconverted_intensity = _raw_intensity(_run(unconverted_plan, executor=executor))
     controls.append(
         control(
             "illumination_angle_read_as_spatial_frequency",
@@ -920,7 +1137,8 @@ def _controls(
     #    a three-beam measurement against a two-beam analytic, and the carrier is
     #    also 0.625 bins off the `y` DFT grid so a few percent is clipped.
     transposed, _ = _measure(
-        reference_bin, coefficients, f1=f1, f2=f2, radius_m=radius_m, transpose=True
+        reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=radius_m, transpose=True,
     )
     fourier_pitch = fourier_plane_pitch_m(
         PITCH_M, SHAPE, wavelength_m=WAVELENGTH_M, focal_length_m=f1,
@@ -978,9 +1196,13 @@ def _controls(
     #    reading is blind to the mirroring -- so what it breaks is the *sampling and
     #    composition* claim, which is recorded rather than glossed.
     upright_intensity, upright_image = _measure(
-        reference_bin, coefficients, f1=f1, f2=f2, radius_m=radius_m, second_leg="inverse"
+        reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=radius_m, second_leg="inverse",
     )
-    _, forward_image = _measure(reference_bin, coefficients, f1=f1, f2=f2, radius_m=radius_m)
+    _, forward_image = _measure(
+        reference_bin, coefficients, executor=executor, axes=axes,
+        f1=f1, f2=f2, radius_m=radius_m,
+    )
     difference = float(
         np.max(np.abs(np.asarray(upright_image.u) - np.asarray(forward_image.u)))
         / np.max(np.abs(np.asarray(forward_image.u)))
@@ -1000,6 +1222,65 @@ def _controls(
         )
     )
     return controls
+
+
+# ---------------------------------------------------------------------------
+# What was executed, as a record
+# ---------------------------------------------------------------------------
+
+
+def _plan_record(plan: Sequence[PlanNode], *, executor: Executor) -> dict[str, Any]:
+    """The full forward plan, its edge check, and the execution record of one run.
+
+    Described from the `ExecutionRecord`'s own `node_requests` rather than from the
+    plan this module wrote down, and the difference is the point: those are the
+    arguments the **executor bound**, so a record showing f1 on one leg and f2 on
+    the other, and different mask digests on the two elements, is evidence that the
+    repeated operations really were independent nodes. That is the claim a single
+    flat request could not support.
+    """
+    chain = _semantic_chain(plan)
+    record = executor.execute(plan)
+    if record.status != "completed":
+        #: Refused here rather than written into the record, for the reason
+        #: `b4f_ideal._plan_record` gives: `main()` counts failed gates and unbroken
+        #: controls and would not notice a `plan.execution` block reading `failed`,
+        #: so a resource trip on this run would produce a committed record claiming
+        #: a failed run beside a printed "OK" and an exit code of 0.
+        raise RuntimeError(
+            f"the recorded plan {list(record.route)} did not complete ({record.status}): "
+            f"{[(node.operation_id, node.status, node.diagnostics) for node in record.nodes]}"
+        )
+    steps = list(zip(record.route, record.node_requests, strict=True))
+    legs = [
+        entry["focal_length_m"]
+        for identifier, entry in steps
+        if identifier == "O_FOCAL_PLANE_TRANSFORM"
+    ]
+    return {
+        "steps": describe_plan(steps, chain=chain),
+        "semantic_chain": list(chain),
+        "enumerable_by_planning_routes": False,
+        "why_not_enumerable": (
+            "planning.routes admits no repeated operation in a route, and this plan repeats "
+            "O_FOCAL_PLANE_TRANSFORM and O_COMPLEX_TRANSMISSION. planning/graph.py records "
+            "that as an open decision rather than an oversight; the edge check above is the "
+            "part of planning that does apply to a plan a caller wrote down"
+        ),
+        "swept_parameter": (
+            "transverse_wavevector_rad_per_m in step 0's request. The seven on-grid angles "
+            "are seven runs of this one plan, which is what makes the sweep a parameterized "
+            "family rather than seven systems"
+        ),
+        "execution": {
+            "status": record.status,
+            "route": list(record.route),
+            "node_statuses": [node.status for node in record.nodes],
+            "per_node_requests_recorded": len(record.node_requests),
+            "per_node_focal_lengths_m": legs,
+            "resource_failure": record.provenance["resources"]["resource_failure"],
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1026,11 +1307,43 @@ def run(configuration: dict[str, Any]) -> dict[str, Any]:
     cutoff_bin = radius_m / fourier_pitch[1]
     cutoff_from_frequency = (NUMERICAL_APERTURE / WAVELENGTH_M) * SHAPE[1] * PITCH_M[1]
 
-    sweep = _sweep(
-        coefficients, f1=f1, f2=f2, radius_m=radius_m, cutoff_bin=cutoff_bin
-    )
+    with Executor() as executor:
+        axes = _grid_axes(executor)
+        sweep = _sweep(
+            coefficients, executor=executor, axes=axes, f1=f1, f2=f2,
+            radius_m=radius_m, cutoff_bin=cutoff_bin,
+        )
+        sampling = _sampling_chain_gate(
+            executor=executor, axes=axes, f1=f1, f2=f2, radius_m=radius_m
+        )
+        off_grid = _off_grid_report(
+            coefficients, executor=executor, axes=axes, f1=f1, f2=f2,
+            radius_m=radius_m, cutoff_bin=cutoff_bin,
+        )
+        diagnostic = _diagnostic_model(
+            executor=executor, axes=axes, f1=f1, f2=f2, radius_m=radius_m
+        )
+        controls = _controls(
+            coefficients, executor=executor, axes=axes, f1=f1, f2=f2,
+            radius_m=radius_m, cutoff_bin=cutoff_bin, sweep=sweep,
+        )
+        #: The plan the whole benchmark is a family of, run once more so the record
+        #: carries an `ExecutionRecord` of the canonical on-axis case.
+        plan_record = _plan_record(
+            (
+                *_illumination_nodes(0.0, coefficients, axes),
+                _leg_node(f1, "fourier"),
+                _element_node(
+                    amplitude=_stop(fourier_pitch, radius_m), target_surface="pupil"
+                ),
+                _leg_node(f2, "image"),
+                _measure_node(),
+            ),
+            executor=executor,
+        )
+
     gates = [
-        _sampling_chain_gate(f1=f1, f2=f2, radius_m=radius_m),
+        sampling,
         _pass_band_gate(sweep),
         _cutoff_step_gate(sweep, coefficients, f1=f1, f2=f2, cutoff_bin=cutoff_bin),
         _dark_field_gate(sweep),
@@ -1046,14 +1359,9 @@ def run(configuration: dict[str, Any]) -> dict[str, Any]:
             "is why the same stop realizes the same NA at any wavelength",
             passed=abs(cutoff_bin / cutoff_from_frequency - 1.0) < 1e-12,
         ),
-        _off_grid_report(
-            coefficients, f1=f1, f2=f2, radius_m=radius_m, cutoff_bin=cutoff_bin
-        ),
-        _diagnostic_model(f1=f1, f2=f2, radius_m=radius_m),
+        off_grid,
+        diagnostic,
     ]
-    controls = _controls(
-        coefficients, f1=f1, f2=f2, radius_m=radius_m, cutoff_bin=cutoff_bin, sweep=sweep
-    )
 
     return {
         "benchmark": BENCHMARK_ID,
@@ -1061,14 +1369,24 @@ def run(configuration: dict[str, Any]) -> dict[str, Any]:
         "configuration": configuration["name"],
         "produced_by": "benchmarks/systems/b_fourier_ptychography.py",
         "composition": [
-            "sources.plane_wave",
-            "operators.complex_transmission",
-            "solvers.chromatix.focal_plane_transform",
-            "operators.complex_transmission",
-            "solvers.chromatix.focal_plane_transform",
-            "measurements.psf",
+            "S_SOURCE_PLANE_WAVE",
+            "O_COMPLEX_TRANSMISSION",
+            "O_FOCAL_PLANE_TRANSFORM",
+            "O_COMPLEX_TRANSMISSION",
+            "O_FOCAL_PLANE_TRANSFORM",
+            "M_PSF",
         ],
+        "execution_path": (
+            "runtime.Executor.execute(plan) over a hardcoded plan of per-node requests, "
+            "with the result read from Executor.result. The benchmark imports no operation: "
+            "every step above is a catalog id resolved by operations.resolve inside the "
+            "executor. planning.routes cannot enumerate this plan -- an operation may not "
+            "repeat in a route and this one repeats two -- so the plan is written down here "
+            "and every consecutive edge is checked against planning.capability_graph()"
+        ),
+        "plan": plan_record,
         "intensity_path": (
+            "the M_PSF node of the plan, which the executor resolves to "
             "measurements.psf(field, normalization='raw').intensity -- the project's "
             "only |U|^2. R11.1 (CHE-197) landed measurements/ and this benchmark's own "
             "local implementation was deleted in the same change that pointed it here, "

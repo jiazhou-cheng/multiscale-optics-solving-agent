@@ -258,10 +258,17 @@ def test_a_source_reaches_a_psf_from_no_upstream_state() -> None:
     """
     found = routes(frm=ENTRY, to="psf")
     assert ("S_SOURCE_PLANE_WAVE", "M_PSF") in found
+    # Every route from ENTRY starts at an operation that consumes no upstream
+    # representation. Checked against the catalog rather than against the id
+    # spelling: `route[0].startswith("S_")` was the old form and it broke on
+    # CHE-225's `SO_RAY_LAUNCH_TRACE`, which is a graph entry whose prefix is a
+    # composition rather than a primitive kind. The id was never the property under
+    # test.
+    entries = {r.operation_id for r in CATALOG if r.is_graph_entry}
     for route in found:
-        assert route[0].startswith("S_"), route
-    # The ray solver is the other entry, and it enters at `ray_bundle`.
-    assert routes(frm=ENTRY, to="ray_bundle", max_steps=1) == (("S_RAY_OPTILAND",),)
+        assert route[0] in entries, route
+    # The fused launch-and-trace is the other entry, and it enters at `ray_bundle`.
+    assert routes(frm=ENTRY, to="ray_bundle", max_steps=1) == (("SO_RAY_LAUNCH_TRACE",),)
 
 
 def test_a_state_with_nothing_composing_to_it_returns_no_route() -> None:
@@ -289,6 +296,21 @@ def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> Non
     come from `max_steps` -- it comes from the no-repeat rule, which bounds a route
     by the catalog size. Asserted because `routes` now defaults to no bound on the
     strength of exactly that argument.
+
+    **The scalar count was four until CHE-224 (R15.1), and losing one is the point
+    rather than a regression.** The fourth was `S_WAVE_CHROMATIX`, which resolved to
+    the same callable as `O_ASM_PROPAGATE` and existed only because `kind` was being
+    asked both "which library runs this" and "what happens to the state". A planner
+    enumerating this graph therefore saw two distinguishable-looking candidates for
+    one function, differing in no field it could route on. `backend` answers the
+    first question as a field, the pair is merged, and the graph now has one edge
+    per thing the tree can actually do.
+
+    **And it is four again since CHE-228 (R06.11), for the opposite reason.** The
+    new fourth is `O_FRESNEL_PROPAGATE`, which is a distinct callable running a
+    distinct kernel, so it is exactly the edge the merged pair was not: two things
+    the tree can do, not one thing named twice. The count returning to its old value
+    is a coincidence worth stating, because the two fours mean opposite things.
     """
     graph = capability_graph()
     catalogued = {descriptor.operation_id: descriptor for descriptor in CATALOG}
@@ -314,14 +336,14 @@ def test_the_unbounded_default_keeps_the_canonical_multi_scale_route() -> None:
     """Why there is no default bound, stated as the route a bound would have lost.
 
     `max_steps=4` was the first default here, and it silently omitted
-    `S_RAY_OPTILAND -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE ->
+    `SO_RAY_LAUNCH_TRACE -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE ->
     M_PSF`: trace the system, advance the rays, cross to the wave model, propagate
     the field, measure. That is the project's whole reason for existing, and a
     default that dropped it while its own comment claimed headroom was worse than
     verbose output.
     """
     canonical = (
-        "S_RAY_OPTILAND",
+        "SO_RAY_LAUNCH_TRACE",
         "O_PROPAGATE_RAYS",
         "C_RAY_TO_SCALAR",
         "O_ASM_PROPAGATE",
@@ -397,7 +419,7 @@ def test_routing_over_a_synthetic_catalog_needs_no_monkeypatching() -> None:
         )
 
     synthetic = (
-        descriptor("X_ENTRY", (), ("ray_bundle",), OperationKind.SOLVER),
+        descriptor("X_ENTRY", (), ("ray_bundle",), OperationKind.SOURCE),
         descriptor("X_CROSS", ("ray_bundle",), ("scalar_field",), OperationKind.COUPLER),
         descriptor("X_OBSERVE", ("scalar_field",), ("psf",), OperationKind.MEASUREMENT),
     )
@@ -567,7 +589,7 @@ def test_the_package_reasons_over_metadata_and_imports_no_representation() -> No
     route from quietly becoming something that holds a `RayBundle`.
     """
     code = _code_of(PACKAGE / "graph.py") + _code_of(PACKAGE / "__init__.py")
-    for forbidden in ("representations", "RayBundle", "ScalarField", "numerics", "solvers"):
+    for forbidden in ("representations", "RayBundle", "ScalarField", "numerics", "backends"):
         assert forbidden not in code, f"planning/ imports or names {forbidden!r}"
 
 

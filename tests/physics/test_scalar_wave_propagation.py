@@ -56,8 +56,8 @@ import math
 import numpy as np
 import pytest
 
+from backends.chromatix import propagate
 from representations import ReferenceSurface, ScalarField
-from solvers.chromatix import propagate
 
 WAVELENGTH_M = 0.532e-6
 K = 2.0 * math.pi / WAVELENGTH_M
@@ -385,7 +385,7 @@ def test_the_round_trip_declares_what_it_cannot_see() -> None:
     `|U|^2` cannot see at all. The residual is predicted from the removed carrier
     alone and matched to it, so what fires is the piston and not noise.
     """
-    from solvers.chromatix import carrier_phase_rad
+    from backends.chromatix import carrier_phase_rad
 
     hard = _aperture(hard=True)
     hard_returned = _asm(_asm(hard, ROUND_TRIP_DISTANCE_M), -ROUND_TRIP_DISTANCE_M)

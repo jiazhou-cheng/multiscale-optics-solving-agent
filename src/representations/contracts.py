@@ -86,6 +86,16 @@ __all__ = [
 #: reason -- so no representation can enforce non-negativity. The measurement
 #: that derives the observable is where the invariant lives, and it is one of the
 #: two the retired `C_FIELD_TO_PSF` coupler entry declared.
+#:
+#: The three splitting codes are CHE-226 (R16), and they are three for a reason.
+#: `UNKNOWN_RAY_SPLITTING` is `RayBundle.__post_init__` refusing a value outside
+#: `RAY_SPLITTINGS`, exactly as `UNKNOWN_MEASURE_KIND` does. The other two belong to
+#: `measurements.spot_diagram`, and a consumer needs to tell them apart without
+#: parsing prose: `SPLIT_RAYS_NOT_MEASURABLE` says the population *is* unmeasurable
+#: by that measurement, so a different analysis is needed, while
+#: `RAY_SPLITTING_UNDECLARED` says nobody stated the provenance -- which the
+#: *producer* can fix. One code for both would make "declare it upstream" and "this
+#: is the wrong measurement" the same diagnostic.
 CONTRACT_CODES: tuple[str, ...] = (
     "MISSING_DECLARATION",
     "UNIT_NOT_SI",
@@ -101,6 +111,9 @@ CONTRACT_CODES: tuple[str, ...] = (
     "OPL_REFERENCE_UNVERIFIED",
     "MEASURE_UNDECLARED",
     "UNKNOWN_MEASURE_KIND",
+    "UNKNOWN_RAY_SPLITTING",
+    "RAY_SPLITTING_UNDECLARED",
+    "SPLIT_RAYS_NOT_MEASURABLE",
     "UNKNOWN_VALIDITY_FLAG",
     "PAD_STATE_UNKNOWN",
     "GRAZING_PHASE_UNREPRESENTABLE",

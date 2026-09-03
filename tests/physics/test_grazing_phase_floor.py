@@ -609,7 +609,7 @@ def test_the_bound_reads_the_epsilon_of_the_dtype_each_term_was_stored_in() -> N
     """A mixed-dtype bundle is legitimate, and the bound has to see the coarser half.
 
     `RayBundle` deliberately does not unify dtype across an artifact, and
-    `solvers.optiland` emits exactly this shape: it preserves the trace dtype for
+    `backends.optiland` emits exactly this shape: it preserves the trace dtype for
     the geometry while `declare_optical_path_m` returns float64. `_compute_precision`
     takes the *max*, so such a bundle computes in FP64 -- and a bound taken from the
     compute precision would be eight orders of magnitude too small for the float32

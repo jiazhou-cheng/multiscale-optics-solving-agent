@@ -16,7 +16,7 @@ Two modules:
   lifecycle. The resource is **a memory sampling thread**, started on `__enter__`
   and joined on `__exit__`, and the shared-server policy's swap-growth stop
   condition is what it exists for. It does *not* own backend configuration: this
-  package cannot import `solvers/`, and `configure_execution` sets device and
+  package cannot import `backends/`, and `configure_execution` sets device and
   precision on every call rather than inheriting -- `executor.py` records that
   correction, because an earlier version of this note claimed otherwise.
 
@@ -36,7 +36,14 @@ namespace root a top-level `io` package shadows the standard library's.
 Serialization is `records.to_json` / `records.from_json`.
 """
 
-from runtime.executor import SAMPLE_INTERVAL_S, Executor, execute, memory_snapshot
+from runtime.executor import (
+    SAMPLE_INTERVAL_S,
+    Executor,
+    PlanNode,
+    execute,
+    memory_snapshot,
+    normalize_plan,
+)
 from runtime.records import (
     FINGERPRINTED_PACKAGES,
     NODE_STATUSES,
@@ -62,10 +69,12 @@ __all__ = [
     "ExecutionRecord",
     "Executor",
     "NodeRecord",
+    "PlanNode",
     "environment_fingerprint",
     "execute",
     "from_json",
     "memory_snapshot",
+    "normalize_plan",
     "record_provenance",
     "require_stable_payload",
     "source_fingerprint",
