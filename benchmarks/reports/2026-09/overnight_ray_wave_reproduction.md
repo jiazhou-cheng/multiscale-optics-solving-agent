@@ -1370,7 +1370,17 @@ Workstream C used **GPU 6** and nothing else. Peak JAX in-use 11.52 GB with a
 ~38 GB client reservation (§7.9); GPU 6 idle at 2 MiB before and after each run.
 No stop condition fired at any point.
 
-### 9.4 What did not run, across the whole night
+### 9.4 The temporary worktree, removed
+
+Workstreams C and D reached the `che-140` tree through
+`git worktree add --detach <scratch> origin/chengjiazhou4802/che-140-…`. That
+registration was repo state this run created, so it was removed with
+`git worktree remove --force` and `git worktree prune` once the records were
+copied out. `git worktree list` is back to the two pre-existing entries, no branch
+was created, and the working branch never moved off
+`chengjiazhou4802/che-152-greenfield-rewrite`.
+
+### 9.5 What did not run, across the whole night
 
 * The sampling-bound refusal (§6.4) — declared in the catalog, enforced nowhere,
   so there is nothing to test.
