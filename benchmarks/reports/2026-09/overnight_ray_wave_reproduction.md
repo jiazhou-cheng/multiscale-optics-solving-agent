@@ -11,15 +11,56 @@ actually executed. A section that says a check was not run means it was not run.
 
 ## 1. Executive summary
 
-*(Filled in after the last workstream. Until then the per-workstream sections
-below are the report.)*
+All four workstreams ran. **No production code changed** — `src/` is untouched, and
+every discrepancy found is recorded rather than fixed, because CHE-238's
+code-change policy makes that the default and each of them changes a physical
+claim or a frozen number.
+
+**Three findings, in descending order of consequence.**
+
+1. **`SOM_SPOT_DIAGRAM` analyses at the wrong wavelength** (§5.3). It builds its
+   lens with `build_lens`, which declares exactly one wavelength —
+   `setup.reference_wavelength_um` — then asks the solver for `wavelengths="all"`.
+   The source wavelength never reaches the analysis, while the returned record
+   labels the result with it. Confirmed, minimally reproduced, and invisible to the
+   current suite because every existing test sets source = reference. This is a
+   defect in a landed operation and a fabricated provenance field, not a
+   characterization gap.
+2. **A recorded "exactly 0.0" is overstated** (§6.2). Substituting one factor in
+   `_carrier_removed_propagator` is claimed to reproduce the Fresnel kernel with
+   maximum difference exactly zero; measured on the propagator arrays it is
+   6.1e-5. The claim's substance holds — the substitution is algebraically exact
+   and lands below the float32 floor — but the wording does not.
+3. **A committed probe script is 40 626 NUL bytes** (§8.6).
+   `demo3_enumerated_reference.py` on `che-140` has never contained code in git
+   history; it was all-zero at its only content commit. That blocks one of
+   workstream D's six evidence items outright.
+
+**What holds.** All six native PSF analyses agree with Optiland bit-exactly on the
+full intensity grid. All 13 expressible tutorials round-trip their surface table
+and paraxial characterization exactly and trace to 0.0 against the tutorial's own
+lens. Five of seven wave kernel checks reproduce, including all three paraxial-bound
+cosines against a closed form. Demo2's RW-F exactness anchor holds to float64
+round-off and RW-P converges to it monotonically across 4.2 decades of ray budget.
+Demo3's estimator-variance model reproduces to under 1% in both its fitted terms;
+its budget optimum moves with the timing constants (`S*` 1.92e4 against 2.15e4) and
+still brackets the shipped `S = 20 000`.
+
+**What the numbers cannot say.** Demo3's routes disagree at NCC 0.014 at a budget
+where each route's own seed-to-seed NCC is 0.004–0.046, so the reconstruction is
+noise-dominated and a bare cross-route NCC has no resolution on the optical model
+(§8.1–8.2). The probe's own noise-limited-agreement statistic predicts 0.0158
+against the measured 0.0143, a ratio of 0.91 — consistent with two noise-limited
+estimates of the *same* signal, which is the strongest statement available without
+converging either. The committed baseline shows the same picture, so this is the
+existing state rather than a regression.
 
 | Workstream | Status | Section |
 | --- | --- | --- |
 | A — ray tutorial / system regression | **run** — 38 Tier-1 rows, 96 Tier-2 rows; one confirmed defect | §5 |
 | B — wave kernel sweep | **run** — 24 rows; a second overstated record found | §6 |
 | C — Demo2 reproduction | **run, `PASS-native`** — Option B not needed | §7 |
-| D — Demo3 characterization | not yet run | §8 |
+| D — Demo3 characterization | **run, `PASS-native`** — 5 of 6 items; item 5 `BLOCKED` on a corrupt file | §8 |
 
 ---
 
@@ -932,19 +973,350 @@ one:
 
 ## 8. Workstream D — Demo3 characterization (CHE-242)
 
-*Not yet run.*
+**Status: `PASS-native`** for five of the six evidence items. **Item 5
+(enumerated reference) is `BLOCKED`**, and the reason is not a resource limit —
+see §8.6.
+
+Same detached `che-140` worktree at `eb3d792` as workstream C, same record-schema
+caveat (§7.1). Six records at
+`outputs/che-238-overnight/workstream-d/che238_demo3_*.json`.
+
+**Demo3 is characterization, not validation, and no golden was invented.** The
+probes say so themselves in a top-level `status_of_this_evidence` field: *"demo3
+has no conventional reference; every number here is a property of the estimator,
+measured against itself across seeds or against another arm of the same probe."*
+Nothing below is scored against an oracle.
+
+### 8.0 Preflight and the option decision
+
+Item 2 of §2 resolves exactly as it did for workstream C: `demo3_hologram_lens.py`
+offers `--backend {numpy, jax}` and no torch option. The smoke succeeded on CPU in
+7.2 s, so **Option A**, and Option B was not run.
+
+**But Optiland itself runs on torch here, and on CUDA.** The records carry
+`optiland_execution.observed = {backend: "torch", device: "cuda", precision:
+"float32", grad_enabled: false}` with `torch 2.13.0+cu126` on an RTX A6000. So the
+one thing the amendment worried about — a torch path — is present, is exercised,
+and belongs to the *ray engine* rather than to the estimator. Item 6 is therefore
+`PASS-native` on its own terms and never needed transcribing, which is what §7 of
+the ticket requires of it.
+
+| run | device | wall clock |
+| --- | --- | --- |
+| `demo3_hologram_lens --preset smoke --backend numpy` | CPU | 7.2 s |
+| `--preset characterization --seeds 20260822` | GPU 6 | 1 m 44 s |
+| `--preset characterization --seeds 20260822,7,101` | GPU 6 | 4 m 51 s |
+| `demo3_reconstruction_equivalence --preset characterization` | GPU 6 | 2 m 20 s |
+| `demo3_variance --stage decomposition` | GPU 6 | 2 m 09 s |
+| `demo3_variance --stage allocation` | GPU 6 | 4 m 10 s |
+
+Configuration for every characterization run: 420² sensor at 4.2 µm, patch 101²,
+3 000 patches × 20 000 secondary = **6e7 rays per route per seed**, fp32 /
+`complex64`, 60 patch groups × 5 secondary chunks = 300 chunks.
+
+### 8.1 Item 1 — RW-F against RW-P
+
+**NCC 0.014333**, intensity MSE 6.454e-11, at 6e7 rays per route.
+
+That is not agreement, and the probe's own note says why it should not be read as
+disagreement about the *optics*: *"the only cross-check this system has — there is
+no external reference — so it is reported as agreement between two of our own
+routes, not as a validation of either."*
+
+CHE-242 asks that a disagreement be attributed among estimator variance,
+reconstruction error, ray clipping, patch coverage and optical-model disagreement
+before concluding. The other five items do exactly that, and the attribution is
+unambiguous:
+
+| candidate cause | measured | verdict |
+| --- | --- | --- |
+| **estimator variance** | seed-to-seed NCC **0.0037–0.046** *within* each route (§8.2) | **dominant** |
+| reconstruction error | **not in this comparison at all** — both routes ran `ramp_sum`, the exact O(rays × pixels) path, with `kspace_oversample: null` | excluded by construction |
+| ray clipping | **0 rays clipped with power**; energy conserved to ≤8.7e-9 (§8.5) | not it |
+| patch coverage | 8.88× draw coverage, `A_draw/A_patch` correction applied; ~10% sensor capture, by design | not it |
+| optical-model disagreement | see the agreement statistic below | **not separable, but not excluded** |
+| transcription error | not applicable — Option A | n/a |
+
+**The right statistic is one the probe already ships, and it changes the reading.**
+`demo3_hologram_lens.py::_noise_limited_agreement` exists for exactly this
+question, and its docstring says a bare cross-route NCC "on its own says nothing":
+if two routes estimate the *same* signal under independent noise, then
+
+    NCC(A, B) ~= sqrt( NCC(A, A') * NCC(B, B') )
+
+Computed from §8.2's own numbers — mean pairwise 0.0056150 (rw_f) and 0.0442990
+(rw_p):
+
+| | value |
+| --- | --- |
+| predicted `sqrt(0.0056150 × 0.0442990)` | **0.015771** |
+| measured route-to-route NCC | **0.014333** |
+| ratio | **0.909** |
+
+By the probe's own reading that is *evidence of agreement* — the two routes are as
+correlated as two noise-limited estimates of the same signal should be — and it is
+the strongest statement available without converging either. **The uncertainty on
+that ratio is not quantified here**, so it is reported as a consistency check and
+not as a measured agreement.
+
+One claim an earlier draft of this section made is **false and is withdrawn**: that
+"each route disagrees with itself across seeds by more than the two routes disagree
+with each other". That holds for rw_f (worst pairwise 0.0037 against 0.0143) and
+**not** for rw_p, whose pairwise NCCs are 0.0416–0.0460, all *above* the
+route-to-route figure. The correct statement is narrower: at 6e7 rays the
+reconstruction is noise-dominated, a bare cross-route NCC has no resolution on the
+optical model, and the geometric-mean statistic is what carries what little signal
+there is.
+
+### 8.2 Item 2 — seed-to-seed convergence, three realizations
+
+Seeds 20260822, 7, 101. `meets_ac4_minimum_of_three: true` on both routes.
+
+| route | pairwise NCC | worst | mean per-pixel relative spread | bright pixels |
+| --- | --- | --- | --- | --- |
+| **rw_f** | 0.005413, 0.007775, 0.003657 | **0.003657** | **0.6507** | 164 741 |
+| **rw_p** | 0.045954, 0.045364, 0.041579 | **0.041579** | **0.6463** | 149 601 |
+
+The noise floor declared by the sibling `demo3_variance` records — `3/sqrt(N_px)`,
+identical here because both use a 420² sensor — is **0.007143**, so rw_f's
+pairwise NCCs straddle it: *two of the three are at or below the floor and are
+zero with an error bar.*
+
+**So the answer to "is speckle reproducible enough to support the existing
+characterization" is no.** Per-pixel intensity varies by 65% of its own mean
+between seeds, and two of rw_f's three pairwise NCCs are at or below the floor.
+
+What establishes that this is the *existing* state rather than a regression is the
+committed record, not the source comment. `demo3_characterization_rw_f.json`
+reports worst pairwise NCC **0.001849** and `mean_relative_spread` **0.6511**,
+against this run's 0.003657 and 0.6507 — the same picture. (An earlier draft cited
+the preset's own source comment about "two independent noise fields ... SI Figure
+S4's undersampling artifact reproduced exactly". That comment is about the
+**rejected** 1680² sensor at 8e6 rays, and its very next line says "420^2 at 3e7
+rays is 341 rays per pixel and shows structure" — i.e. it asserts the opposite
+about the preset actually run. The citation was wrong; the committed record is the
+right support and says what the draft claimed.)
+
+No per-pixel claim can rest on a single seed here.
+
+Against the committed baselines (seeds 20260822, 7, 131 — two of three shared):
+
+| quantity | committed | this run | agreement |
+| --- | --- | --- | --- |
+| rw_f pairwise NCC, seeds (20260822, 7) | 0.005412906224785008 | 0.005412944928383165 | 7e-6 relative |
+| rw_f captured fraction, seed 20260822 | 0.10101172987776913 | 0.10101173096943086 | 1e-8 relative |
+| rw_f captured fraction, seed 7 | 0.10009195604296937 | 0.100092 | agrees |
+| rw_p captured fraction, seed 20260822 | 0.0989791657901167 | 0.09903421954874955 | **5.6e-4 relative** |
+
+The rw_f numbers reproduce to float32 GPU nondeterminism. The rw_p captured
+fraction differs in the fourth digit — 0.056% — for the *same* seed, and it is
+**an open minor discrepancy with no mechanism offered**.
+
+An earlier draft blamed the RNG stream moving under a different chunking. The
+records refute that: the empty-draw counts are **bit-identical** to the committed
+baseline on both shared seeds (5 920 000 at 20260822, 5 660 000 at 7), so the
+patch-centre stream demonstrably did not move; and rw_f underwent the same
+chunking change and reproduced to 1e-8. The one configuration difference that is
+known: the baseline ran `--rays-per-chunk 1e6` where this run took the probe
+default of 2e5, giving 300 chunks against 60. Why that would move an rw_p power
+sum by 0.056% and leave rw_f at 1e-8 is not established here. It is 0.056% on a
+coverage bookkeeping figure and moves no conclusion, so it is recorded rather than
+chased.
+
+Wall clock is where the two runs genuinely differ: 37.9–55.3 s per route-seed here
+against 124.9–150.1 s committed. A ~3× speedup on a different A6000, no numerical
+consequence.
+
+### 8.3 Item 3 — estimator variance, `V(P,S) = A/P + B/(P·S)`
+
+`P·V = A + B/S` is linear in `1/S`, so a sweep in `S` at fixed `P = 1000`
+separates the terms by a straight-line fit rather than by an argument:
+
+| S | V (field variance sum) | jackknife | P·V |
+| --- | --- | --- | --- |
+| 2 500 | 9 228.58 | ±0.84% | 9.2286e6 |
+| 5 000 | 4 813.66 | ±0.71% | 4.8137e6 |
+| 10 000 | 2 590.45 | ±0.88% | 2.5904e6 |
+| 20 000 | 1 474.16 | ±0.77% | 1.4742e6 |
+
+**The two-term form holds**: relative RMS residual of the linear fit **0.147%**.
+
+Fitted terms, against `benchmarks/reports/2026-08/demo3_estimator_variance.md`:
+
+| | existing report | this run | difference |
+| --- | --- | --- | --- |
+| `A` (falls with `P`) | 3.751e5 | **3.7398e5** | 0.3% |
+| `B` (falls with `P·S`) | 2.202e10 | **2.2148e10** | 0.6% |
+| fit residual | 0.14% | 0.147% | — |
+| direction share at shipped `S` | 74.6% | **74.75%** | 0.2% |
+
+**Budget allocation stays consistent.** Cost model `c(P,S) = P(a + bS)` refitted:
+`a = 1.6514e-3` s/patch (report: 2.039e-3), `b = 2.6635e-7` s/ray (report:
+2.586e-7), residual 6.24% (report: 6.4%). Then
+
+    S* = sqrt(a·B / (b·A)) = 1.92e4      (existing report: 2.15e4)
+
+against a shipped `S = 20 000` — the two independent fits **bracket the shipped
+value from below and above**, so the existing report's conclusion that the shipped
+split was already optimal is reproduced rather than merely repeated.
+
+Measured `V × cost` over four cells at fixed `P·S = 2e7`:
+
+| P × S | V | modelled cost | V × cost, this run | V × cost, report |
+| --- | --- | --- | --- | --- |
+| 400 × 50 000 | 2 037.4 | 5.99 s | 1.22e4 | 13 897 |
+| **1 000 × 20 000** (shipped) | 1 474.2 | 6.98 s | **1.029e4** | **9 610** |
+| 2 500 × 8 000 | 1 244.7 | 9.46 s | 1.18e4 | 12 144 |
+| 5 000 × 4 000 | 1 171.7 | 13.58 s | 1.59e4 | 18 365 |
+
+**The shipped cell is the measured minimum in both runs.** Note that `V` alone
+falls monotonically with `P` at fixed ray count — 2 037 → 1 172 — so a sweep that
+ignored cost would have concluded the opposite; fixed `P·S` is not fixed cost, and
+that is the whole reason the allocation question is not answered by the ray count.
+
+Only the timing constants moved, `a` by 19%, which is the axis a different GPU is
+expected to move. `A` and `B` are properties of the estimator and reproduce under
+1%.
+
+### 8.4 Item 4 — reconstruction equivalence, fast against exact
+
+`ramp_sum` (exact, O(rays × pixels)) against `kspace_splat` (fast) at five
+oversampling factors, 6e7 rays, 420² sensor:
+
+Route `rw_p` only.
+
+| oversample | NCC | relative L2 | **power ratio to exact** | wall clock | speedup | dropped |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | 0.741464 | 4.954e-1 | **0.4491** | 20.68 s | 1.67× | 0 |
+| **1.5** (shipped default) | 0.915061 | 2.626e-1 | **0.6488** | 19.11 s | 1.81× | 0 |
+| 2.0 | 0.969531 | 1.567e-1 | **0.7734** | 19.06 s | 1.82× | 0 |
+| 3.0 | 0.993508 | 7.322e-2 | **0.8884** | 19.22 s | 1.80× | 0 |
+| **4.0** | **0.997901** | **4.197e-2** | **0.9349** | 19.94 s | 1.74× | 0 |
+
+Exact route: 34.63 s. Monotone in oversample and **no rays dropped at any factor**.
+
+**The power ratio is the column that matters most and NCC hides it.** NCC is
+normalization-blind, so "the same field to NCC 0.998" is true at oversample 4 and
+the fast path still carries **6.5% less total power** than the exact route there —
+and **35% less** at the shipped default of 1.5, where NCC reads 0.915. A consumer
+comparing intensities rather than correlations gets a different answer from the two
+paths at every factor measured. Reported because an equivalence check that quotes
+only NCC would have called this equivalent.
+
+**The probe's tolerance was not changed.** `--oversamples` was left at its default
+`1.0,1.5,2.0,3.0,4.0` and the shipped default oversample is 1.5, which scores
+0.915 — so this run says what the fast path costs at its shipped setting rather
+than only at its best. Nothing here is reported as a met tolerance.
+
+### 8.5 Item 6 — Optiland clipping and energy accounting (`PASS-native`)
+
+The only item in this workstream where Optiland genuinely enters, and it ran on
+its **torch/CUDA** backend at float32 with gradients off.
+
+| | rw_f | rw_p |
+| --- | --- | --- |
+| rays launched | 6e7 | 6e7 |
+| `launched_sum_abs_amplitude_squared` | 1.884686800968e12 | 1.161869021786e13 |
+| `survived_sum_abs_amplitude_squared` | 1.884686796800e12 | 1.161869026099e13 |
+| relative energy change (seed 20260822) | **−2.2e-9** | **+3.7e-9** |
+| worst over the three seeds | −8.7e-9 | −4.7e-9 |
+| **`clipped_with_power`** | **0** | **0** |
+| `clipped_with_power_fraction` | 0.0 | 0.0 |
+| `invalidated_rays` | 0 | 5 920 000 |
+| `launched_with_zero_amplitude` | 0 | 5 920 000 |
+| `captured_by_sensor_fraction` | 0.1010 | 0.0990 |
+
+**No anomalous clipping: not one ray carrying power was clipped by the refractive
+singlet**, and energy is conserved through the trace to float32 round-off. The
+rw_p `survived` sum is very slightly *larger* than `launched`, by 3.7e-9 relative
+— that is accumulation round-off in fp32, not created energy, and it is the right
+size for a 6e7-term sum.
+
+The 5.92e6 invalidated rays in rw_p are **not** a clip and the record insists on
+the distinction: patch centres are drawn over the aperture dilated by half a
+patch, so a centre near the rim yields a patch partly outside the DOE, and those
+rays carry zero amplitude *by construction*. The `A_draw/A_patch` coverage factor
+(8.88×) is exactly their correction. They are counted separately because
+Optiland's `intensity > 0` test cannot tell them from a clip, and folding them in
+would invent an energy loss. Across the three seeds the count is 5.66e6–5.94e6,
+consistent with a random draw.
+
+`captured_by_sensor_fraction ≈ 0.10` is the deliberate coverage cost of this
+preset, not a loss: the 420² sensor spans ±0.882 mm of a ±2.8 mm image. Stated
+because 10% capture would otherwise look like an anomaly.
+
+### 8.6 Item 5 — `BLOCKED`: the probe script is 40 626 NUL bytes
+
+`benchmarks/probes/ray_wave/demo3_enumerated_reference.py` **exists as a path and
+contains no code.** It is 40 626 bytes, every one of them `0x00`.
+
+The corruption is in `che-140`'s history, not in this checkout:
+
+* `git cat-file -p HEAD:...demo3_enumerated_reference.py` returns 40 626 NULs;
+* `git cat-file -s` agrees on the size;
+* `git status` reports the worktree file as unmodified, so checkout and blob match;
+* the file has exactly one content commit, **`7625556` (CHE-101, 2026-08-24,
+  "enumerate the modes, and shard the estimator that no longer fits")**, and the
+  blob is all-NUL *there*. It was never good in git.
+* Its eight sibling probes in the same directory contain zero NUL bytes.
+
+So item 5 cannot run, and the reason is data corruption in the source branch
+rather than the resource limit CHE-242 §7 anticipated ("enumerated-reference
+evidence where resources permit"). Resources were not the constraint: GPU 6 was
+idle throughout.
+
+What does still exist is that probe's **output**:
+`demo3_enumerated_reference_rwf_kspace.json`, `..._rwf_ramp.json`,
+`demo3_enumerated_positions.npz` and several `demo3_enum_*` records, evidently
+written before the commit that corrupted the script. Those records were **not**
+used as a substitute: a record whose generator cannot be read or re-run is not
+evidence this run can stand behind, and quoting its numbers as a reproduction
+would be the opposite of what this ticket is for.
+
+Not repaired. Reconstructing the script would be writing a *new* probe, which is
+out of scope and would not be the probe the ticket names. Follow-up in §10.
+
+### 8.7 Nothing promoted, nothing invented
+
+* No golden was invented for Demo3. Every comparison is route-against-route,
+  seed-against-seed, or arm-against-arm of the same probe.
+* No probe tolerance was changed. `--oversamples`, `--replicates`, `--patches`,
+  `--secondary-count`, `--ladder-patches` and `--target-ncc` all ran at their
+  defaults.
+* No historical record was written to. `git status` in the worktree shows only
+  untracked `che238_*` additions and **no modifications**, verified after every
+  run. `benchmarks/perf/records/` was never touched.
+* Two variance stages were not run — `candidates` (whether the variance can be
+  *reduced*, by importance density) and `ladder`/`ladderfit`/`l1map`. CHE-242 item
+  3 asks for the model check and budget-allocation consistency, which are
+  `decomposition` and `allocation`; the reduction question belongs to CHE-120 and
+  is not this ticket's.
+
+### 8.8 Resources
+
+Swap **0 B** throughout, re-checked after every run. GPU 6 only, one job at a
+time, nothing detached; peak JAX in-use 2.38 GB (characterization) and 0.29 GB
+(variance) against the same ~38 GB client reservation §7.9 describes. GPU 6 idle
+at 2 MiB after each run. No stop condition fired.
 
 ## 9. Code changes, verification gates, and what was not run
 
 *Accumulated as the night proceeds.*
 
-### 9.1 Code changes so far
+### 9.1 Code changes
 
-**No production code changed.** `src/` is untouched. What landed is the
-verification harness under `benchmarks/verification/` (five modules) and this
-report. The one defect found (§5.3) is recorded and left unfixed on purpose.
+**No production code changed. `src/` is untouched.** What landed is the
+verification harness under `benchmarks/verification/` (six modules) and this
+report, plus one test constant: `tests/unit/test_documentation_references.py`'s
+`benchmarks/` file count moved 10 → 17, which is the growth that gate's own
+docstring sanctions.
 
-### 9.2 Gates run so far
+All three findings (§5.3, §6.2, §8.6) are recorded and deliberately unfixed. Each
+would change a physical claim, a frozen number or another branch's history, and
+CHE-238's code-change policy puts all three behind their own ticket and independent
+review.
+
+### 9.2 Gates run
 
 | gate | when | result |
 | --- | --- | --- |
@@ -954,9 +1326,33 @@ report. The one defect found (§5.3) is recorded and left unfixed on purpose.
 | `make test` | after CHE-239 | 1745 passed, 7 skipped, 12 deselected |
 | `./run.sh ruff check .` | after CHE-240 | all checks passed |
 | `make test` | after CHE-240 | 1745 passed, 7 skipped, 12 deselected |
-| worktree cleanliness | after CHE-241 | `git status` in the `che-140` worktree shows only the four untracked `che238_*` records; every historical record untouched |
+| worktree cleanliness | after CHE-241 | `git status` in the `che-140` worktree shows only untracked `che238_*` records; every historical record untouched |
+| `make test` | after CHE-242 | 1745 passed, 7 skipped, 12 deselected |
+| `./run.sh ruff check .` | after CHE-242 | all checks passed |
+| worktree cleanliness | after CHE-242 | re-verified after every run: only untracked additions, **no modifications** |
 
-### 9.3 Resource incidents so far
+| `make test-slow` | after CHE-242 | **12 passed**, 1752 deselected, 102 s |
+| `MOA_GPUS=device=6 make test-gpu` | after CHE-242 | **7 passed**, 1757 deselected, 7 s |
+
+**A correction, because the first draft of this section got it backwards.** It said
+`make test-slow` and `make test-gpu` "select nothing in this tree" and that "the GPU
+tests went with the old tree, and the conftest gating hook with them". Both claims
+are false. `-m slow` collects **12** tests — including
+`test_the_estimator_converges_at_the_monte_carlo_rate` and three
+`test_psf_verification` cases — and `-m gpu` collects **7**;
+`tests/conftest.py`'s opening line is *"CHE-173 (R02.1) restores the `gpu`-marker
+gating that the greenfield deletion removed"*, and it is what produces the 7 skips
+`make test`'s own line reports. The arithmetic was visible on the same line all
+along: 1745 + 7 + 12 = 1764 = the whole suite.
+
+The claim came from the stale comments at `Makefile:28-31` and `Makefile:46-49`,
+copied rather than checked. Both gates have now been run and both pass. The Makefile
+comments are a follow-up (§10).
+
+**Genuinely not run:** the `che-140` branch's own test suite, which this run never
+invoked because it changed no code there.
+
+### 9.3 Resource incidents
 
 One, and it was contained. The Tier-2 sweep aborted mid-run when a tutorial cell
 called `Optic.draw3D`: VTK failed to reach an X server, EGL and OSMesa in turn and
@@ -973,6 +1369,20 @@ throughout. Peak host RSS across the night so far: 1.0 GiB (workstream A's Tier 
 Workstream C used **GPU 6** and nothing else. Peak JAX in-use 11.52 GB with a
 ~38 GB client reservation (§7.9); GPU 6 idle at 2 MiB before and after each run.
 No stop condition fired at any point.
+
+### 9.4 What did not run, across the whole night
+
+* The sampling-bound refusal (§6.4) — declared in the catalog, enforced nowhere,
+  so there is nothing to test.
+* Item 5 of workstream D (§8.6) — blocked on a corrupt script, not on resources.
+* No surface aperture is exercised anywhere in workstream A, so `to_ray_bundle`'s
+  clipping path is untested by it (§5.6). Workstream D exercises clipping
+  bookkeeping instead and finds zero clipped rays with power (§8.5).
+* The 139 remaining gallery notebooks, the Chromatix gallery, and the four
+  tutorials blocked on container dependencies.
+* Demo3's `candidates` / `ladder` / `l1map` variance stages, which belong to
+  CHE-120 rather than to this ticket (§8.7).
+* No gradient was claimed anywhere. Every descriptor touched is `forward_only`.
 
 ## 10. Follow-up tickets recommended
 
@@ -1019,6 +1429,18 @@ Also worth tickets:
   aperture, so `to_ray_bundle`'s filtering is untested by this run (§5.6 item 3).
 * Add `tqdm`, `scikit-learn` and `gymnasium` to the `agent_solver` image if
   tutorial coverage past 9a/9b/9d/9f is wanted (§5.5).
+* **Restore or delete `demo3_enumerated_reference.py`** on `che-140` (§8.6). Its
+  only content commit stored 40 626 NUL bytes, so no readable version exists in git
+  history and its committed *records* have no readable generator. A scan of all 860
+  tracked files at that HEAD found exactly one all-NUL file, so this is isolated —
+  the only other NUL-bearing files are legitimate binaries. Whoever owns CHE-101 is
+  the one who can say whether a working copy survives outside git.
+* **`kspace_splat` loses power that NCC does not show** (§8.4): 6.5% at oversample
+  4 and 35% at the shipped default of 1.5. Either the fast path needs a
+  normalization fix or its record needs to state the power deficit beside the NCC.
+* **`Makefile`'s comments on `test-slow` and `test-gpu` are stale** and say both
+  targets select nothing. They select 12 and 7 tests respectively (§9.2). The
+  comments sent this run's first draft to a false claim.
 * Attach `optiland_notebook_link_index.csv` to CHE-239, or drop the reference —
   see §2.2.
 * CHE-238's own text says the catalog has 15 descriptors; it has 17. Cosmetic,
