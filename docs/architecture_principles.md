@@ -34,9 +34,11 @@ consume and produce representations, problems, or measurements — with one
 asymmetric case: a **source** produces a representation without consuming one,
 because it *initializes* physical state rather than transforming it (§2).
 
-There are four operation kinds — `source`, `coupler`, `physical_operator`, and
-`measurement` — and they are **descriptor metadata, not four class hierarchies**.
-The kind is a field on one operation descriptor.
+There are four *primitive* operation kinds — `source`, `coupler`,
+`physical_operator`, and `measurement` — and they are **descriptor metadata, not
+four class hierarchies**. The kind is a field on one operation descriptor. That
+field has a fifth value, `composed`, which is not a primitive: it says the
+callable fuses several of the four (§2 *composite operation*).
 
 A **backend** is not among them. Which third-party library executes an operation
 is a separate axis from what the operation does to physical state, and it is a
@@ -44,10 +46,12 @@ separate field: `OperationDescriptor.backend`. CHE-224 (R15.1) separated the two
 see the `backend` term in §2.
 
 The four are **primitive**. One callable may fuse several of them, and it says so
-in `OperationDescriptor.composes` with `kind` naming the terminal stage — see
-*composite operation* in §2. A composition is not a fifth kind and not a pipeline
-language: it exists because one landed operation initializes state *and* evolves
-it, so any single word for it is a false claim.
+by carrying `kind=composed` and declaring the ordered stages in
+`OperationDescriptor.composes` — see *composite operation* in §2. CHE-237 (R03.7)
+made `kind` name the composition; it used to name the terminal stage, which is now
+the `terminal_stage` property. A composition is not a pipeline language: it exists
+because some landed operations initialize state *and* evolve it, so any single
+primitive word for them is a false claim.
 
 The previous implementation expressed these kinds as families of base classes,
 request/result envelopes, and per-family diagnostics. The clean rewrite must not
@@ -98,9 +102,10 @@ imports belong in `backends/<backend>/`.
 answers **what happens to physical state**. Every operation has exactly one of
 each, and they are two fields — `backend` and `kind` — not one. A backend does not
 appear in `OperationKind` at all: `backends/optiland/` provides one
-`physical_operator` (`O_RAY_TRACE`) and one **composite** whose terminal stage is a
-physical operator (`SO_RAY_LAUNCH_TRACE`, §2 *composite operation*), and a
-backend-provided `measurement` would live there too. The package a callable lives
+`physical_operator` (`O_RAY_TRACE`) and three **composites** — one whose terminal
+stage is a physical operator (`SO_RAY_LAUNCH_TRACE`) and two whose terminal stage
+is a measurement (`SOM_SPOT_DIAGRAM`, `SOM_PSF`), all three `composed`-kind; see §2
+*composite operation*. A backend-provided `measurement` lives there too. The package a callable lives
 in follows its **provider**; its kind is declared in the catalog.
 
 **Boundary against *coupler*:** a backend adapter is where an external solver
@@ -275,16 +280,35 @@ are measurements.
 ### composite operation
 
 One callable that **fuses more than one primitive stage**, declaring the ordered
-stages it fuses. `OperationDescriptor.composes` carries them; `kind` names the
-**terminal** stage — where the operation leaves the state, and therefore which
-boundary its output sits at. `()` is the default and means "this record is exactly
-its `kind`", which is twelve of the thirteen landed records.
+stages it fuses. `OperationDescriptor.composes` carries them and `kind` is
+`composed`. Where the operation *leaves* the state — and therefore which boundary
+its output sits at — is `composes[-1]`, exposed as the `terminal_stage` property.
+`composes` is `None` for a primitive, which is 14 of the 17 landed records.
 
-**A composite is not a fifth kind.** Every stage is a primitive from the four, and
-the id prefix spells the composition rather than naming a new category: `SO_` is
-source-then-operator. There is exactly one today, `SO_RAY_LAUNCH_TRACE`
-(`backends.optiland.solver:trace`), which materializes and declares its rays and
-then refracts them through every surface.
+**`composed` is a fifth value of the kind field and is not a fifth primitive** —
+CHE-237 (R03.7). Until then `kind` named the terminal stage, so a composite
+borrowed the kind of its last stage and was indistinguishable from a primitive by
+that field alone; `composes` was the only thing that said otherwise, and it was
+possible to set the two inconsistently. The owner's decision was to make `kind`
+name the composition, so the two fields are now derived from each other in both
+directions: `composes` is non-`None` **if and only if** `kind is composed`.
+
+Every *stage* is still a primitive from the four — a `composed` stage inside
+`composes` is refused — and the id prefix still spells the composition rather than
+naming a new category: `SO_` is source-then-operator, `SOM_`
+source-then-operator-then-measurement. There are three today:
+`SO_RAY_LAUNCH_TRACE` (`backends.optiland.solver:trace`), which materializes and
+declares its rays and then refracts them through every surface, and
+`SOM_SPOT_DIAGRAM` and `SOM_PSF`, which do that and then reduce the result to an
+observable.
+
+**The rules that ask "where does this leave the state" ask `terminal_stage`, not
+`kind`.** Two do: only a `measurement` may produce an observable (so `SOM_PSF`,
+which returns a `psf`, is admitted on its last stage), and `find(kind=…)` matches
+either the record's `kind` or its terminal stage, so `find(kind=measurement)`
+still returns the composites that end in one while `find(kind=composed)` selects
+the three as a set. Graph entry is keyed on `composes[0]` — the `entry_stage`
+property — and was already, since CHE-225.
 
 **Boundary against *the primitive kinds*:** a primitive record answers "what
 happens to physical state" with one word. A composite exists only when one word is
@@ -304,8 +328,10 @@ blocked by measured numerical facts rather than by taxonomy: an object at infini
 launches at `z = -EPD`, which is not the surface the trace starts from, and
 `to_traced_ray_bundle` composes the optical path under a different declared
 reference. Unifying moves frozen ray numbers, so it needs its own evidence and its
-own ticket. A fifth primitive kind was rejected because the operation is two known
-primitives fused, not a new category.
+own ticket. A fifth *primitive* kind was rejected then and still is: the operation
+is two known primitives fused, not a new category of physical effect. `composed`
+is not that — it is a statement that a fusion happened, on a different axis from
+the four.
 
 **The deeper reason a single `kind` could not express it** is that this schema has
 no notion of *which reference surface* a returned representation sits at. A source
@@ -321,10 +347,13 @@ boundary, so its net primitive kind is the whole truth about it *at the ports*.
 Whether it should nonetheless expose that structure is an open design question to
 revisit once the composition model settles — recorded, not decided.
 
-*[LANDING GATE]* A composition is well-formed: at least two stages, every stage a
-primitive kind, and `composes[-1] == kind`. A record whose `kind` disagrees with
-its own last stage is refused at construction, which is what stops `kind` being a
-free choice between stages — the shape that produced CHE-224's false claim.
+*[LANDING GATE]* A composition is well-formed: `kind is composed`, at least two
+stages, and every stage a primitive kind. The biconditional is enforced from both
+sides at construction — stages on a primitive kind is refused, a `composed` record
+with no stages is refused, and `composes=()` is refused rather than accepted as a
+falsy spelling of "fuses nothing". That is what stops `kind` being a free choice
+between stages, the shape that produced CHE-224's false claim, and what stops the
+two fields disagreeing about whether a fusion happened at all.
 
 ### operation descriptor
 

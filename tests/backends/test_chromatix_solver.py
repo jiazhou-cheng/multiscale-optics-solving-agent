@@ -481,7 +481,7 @@ def test_the_fresnel_propagation_registers_as_its_own_record() -> None:
     record = catalogued["O_FRESNEL_PROPAGATE"]
 
     assert record.kind is OperationKind.PHYSICAL_OPERATOR
-    assert record.composes == ()
+    assert record.composes is None
     assert record.backend == "chromatix"
     assert record.capabilities == CAPABILITIES
     assert record.derivative == DERIVATIVE

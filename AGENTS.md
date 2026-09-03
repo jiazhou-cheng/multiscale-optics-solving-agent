@@ -63,22 +63,28 @@ Two concepts: **representations** are physical state at a declared boundary;
 **operations** consume and produce representations, problems, or measurements —
 except a **source**, which produces one without consuming any.
 
-There are four operation kinds — `source`, `coupler`, `physical_operator`, and
-`measurement` — represented as **descriptor metadata, not four class
-hierarchies**. A **backend is not one of them**: which third-party library
+There are four *primitive* operation kinds — `source`, `coupler`,
+`physical_operator`, and `measurement` — represented as **descriptor metadata, not
+four class hierarchies**. The `kind` field has a fifth value, `composed`, which is
+not a primitive and names a fusion of them. A **backend is not one of them**: which third-party library
 executes an operation is a separate axis from what the operation does to physical
 state, and it is a separate descriptor field (`backend`). CHE-224 (R15.1)
 separated the two, replacing a `solver` kind with `source`; see
 `docs/architecture_principles.md` §2.
 
-The four are **primitive**. One callable may fuse several of them and declares the
-ordered stages in `OperationDescriptor.composes`, with `kind` naming the
-**terminal** stage — where it leaves the state. `SO_` is a composite id prefix, not
-a fifth kind. There is exactly one composite today: `SO_RAY_LAUNCH_TRACE`
-initializes rays and then refracts them through every surface, so neither `source`
-nor `physical_operator` alone is a true claim about it. CHE-225 (R15.2) landed
-this; a composition is **not** a pipeline description and nothing can execute a
-stage of one.
+The four are **primitive**. One callable may fuse several of them; it carries
+`kind=composed` and declares the ordered stages in `OperationDescriptor.composes`.
+Where it *leaves* the state is `composes[-1]`, read off the `terminal_stage`
+property. CHE-237 (R03.7) decided this and reversed CHE-225 (R15.2), under which
+`kind` named the terminal stage and a composite therefore borrowed the kind of its
+last stage. `composes` is non-`None` **if and only if** `kind is composed`, so the
+two cannot disagree; every stage is still primitive, and `SO_`/`SOM_` remain id
+prefixes rather than kinds. There are three composites today —
+`SO_RAY_LAUNCH_TRACE`, which initializes rays and then refracts them through every
+surface so neither `source` nor `physical_operator` alone is a true claim about it,
+plus `SOM_SPOT_DIAGRAM` and `SOM_PSF`, which then reduce the result to an
+observable. A composition is **not** a pipeline description and nothing can execute
+a stage of one.
 
 - **representation** — physical state with explicit conventions. The initial public target is one ray representation and one scalar-field representation. PSF is a measurement, not a representation. Coherence is a stronger contract by default, not a subtype.
 - **backend** — an adapter package that **provides** operations of the other kinds and is not itself an operation kind. It owns external-library API, compatibility, and version-specific behavior, and `backends/<backend>/` is the only place permitted to import that library. A backend answers *who executes*; a kind answers *what happens to physical state*, and an operation has exactly one of each. Package location follows the provider; kind is declared in the catalog — so a backend-provided measurement lives in `backends/<backend>/` and needs no `measurements/ -> backends/` edge.
@@ -86,7 +92,7 @@ stage of one.
 - **coupler** — changes *representation* while preserving the same physical state at the same boundary. Heavy numerics do not make it an operator.
 - **physical operator** — changes physical state. Propagation and surface interactions are operators, not couplers.
 - **measurement** — derives an observable from state.
-- **composite operation** — one callable that fuses more than one primitive stage, declaring them in order. `kind` is the terminal stage; `composes` is `()` for everything that fuses nothing. A composite exists only where a single kind would be a *false* claim, not merely a simplification — and it is not a route, a plan or a pipeline description. `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler and deliberately declares no composition, because its representation types do not change at its ports; whether it should is an open question, not a defect.
+- **composite operation** — one callable that fuses more than one primitive stage, declaring them in order. `kind` is `composed` and `terminal_stage` is where the state ends up; `composes` is `None` — not `()` — for everything that fuses nothing. The two rules that ask where an operation leaves the state, the observable-producer check and the `kind` query in `find`, read `terminal_stage`. A composite exists only where a single primitive kind would be a *false* claim, not merely a simplification — and it is not a route, a plan or a pipeline description. `O_DIFFRACTIVE_SURFACE` is internally coupler → operator → coupler and deliberately declares no composition, because its representation types do not change at its ports; whether it should is an open question, not a defect.
 - **operation descriptor** — lightweight discovery/execution metadata; the target design resolves implementation paths lazily.
 
 The target dependency allowlist, **for packages that exist**, is:

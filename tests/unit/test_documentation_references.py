@@ -228,13 +228,13 @@ def test_the_archive_index_is_exempt_and_still_cites_the_deleted_tree() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_surviving_pack_uses_the_four_operation_kinds() -> None:
+def test_the_surviving_pack_uses_the_declared_operation_kinds() -> None:
     """Acceptance criterion 2. A pack describing an operator may not call it a coupler.
 
     The ticket's concern was that "three of the five coupler packs describe what are
     now **physical operators**, not couplers". Those five packs are gone, so what is
     left to check is that the surviving prose does not reintroduce the old taxonomy:
-    `knowledge/README.md` may use the words, and where it does they must be the four
+    `knowledge/README.md` may use the words, and where it does they must be the
     declared kinds used correctly -- it describes the five reference rows as
     "couplers and operators whose capability nobody had measured", which is the
     distinction, not a conflation.
@@ -243,7 +243,10 @@ def test_the_surviving_pack_uses_the_four_operation_kinds() -> None:
 
     text = (ROOT / "knowledge" / "README.md").read_text(encoding="utf-8")
     kinds = {kind.value for kind in OperationKind}
-    assert kinds == {"source", "coupler", "physical_operator", "measurement"}
+    # The four PRIMITIVE kinds, which are the taxonomy a pack's prose can get
+    # wrong. `composed` joined the enum on CHE-237 (R03.7) and is not one of them:
+    # it names a fusion of primitives rather than a category of physical effect.
+    assert kinds - {"composed"} == {"source", "coupler", "physical_operator", "measurement"}
     # No pack card in the surviving tree, so no card can miscategorize one.
     cards = list((ROOT / "knowledge").rglob("card.yaml"))
     assert cards == [], f"a pack card is back without a taxonomy review: {cards}"

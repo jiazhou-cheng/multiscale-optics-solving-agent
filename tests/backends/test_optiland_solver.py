@@ -456,13 +456,16 @@ def test_the_descriptor_says_forward_only() -> None:
     # A COMPOSITE since CHE-225 (R15.2), and the history is worth carrying: this
     # record was `SOLVER`-kind, then CHE-224 made it `SOURCE`, which was a false
     # claim -- `trace` materializes its rays and then refracts them through every
-    # surface. `kind` is the terminal stage and `composes` carries the fusion.
-    assert descriptor.kind is OperationKind.PHYSICAL_OPERATOR
+    # surface. CHE-225 made `kind` the terminal stage; CHE-237 (R03.7) made it
+    # `COMPOSED`, so the fusion is what `kind` names and `terminal_stage` is where
+    # the state ends up.
+    assert descriptor.kind is OperationKind.COMPOSED
     assert descriptor.composes == (
         OperationKind.SOURCE,
         OperationKind.PHYSICAL_OPERATOR,
     )
     assert descriptor.entry_stage is OperationKind.SOURCE
+    assert descriptor.terminal_stage is OperationKind.PHYSICAL_OPERATOR
     assert descriptor.is_graph_entry, "it still consumes no upstream representation"
     assert descriptor.backend == "optiland"
     assert descriptor.implementation == "backends.optiland.solver:trace"

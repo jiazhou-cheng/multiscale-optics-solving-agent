@@ -1,7 +1,9 @@
-"""One record per executable operation, with the four kinds as metadata.
+"""One record per executable operation, with the operation kind as metadata.
 
-Four *primitive* kinds. A record that fuses more than one declares the fusion in
-`composes`; `SO_` is a composite id prefix and not a fifth kind.
+Four *primitive* kinds plus `COMPOSED`. A record that fuses more than one
+primitive declares the fusion in `composes` and carries `kind=COMPOSED`; the
+`SO_`/`SOM_` id prefixes still name the fused stages, but the kind no longer
+borrows one of them. CHE-237 (R03.7).
 
 CHE-177 (R03.1). The reference implementation described the same information
 with 23 pydantic classes in `core/specs.py` plus 45 KB of YAML mirroring a
@@ -158,11 +160,28 @@ __all__ = [
 
 
 class OperationKind(StrEnum):
-    """The four kinds, as metadata on one record.
+    """The four primitive kinds plus `COMPOSED`, as metadata on one record.
 
-    Exactly four members, and the set is closed: these are the four operation
-    kinds `docs/architecture_principles.md` defines. A fifth kind is an
-    architecture change, not a registry entry.
+    Four of the five are the primitive operation kinds
+    `docs/architecture_principles.md` defines. The fifth, `COMPOSED`, is not a
+    primitive and is not on the same axis as the others: it says "this callable
+    fuses more than one primitive, and the fused stages are in `composes`".
+
+    **`COMPOSED` landed on CHE-237 (R03.7)** and reverses the CHE-225 (R15.2)
+    reading of this field, which was "the terminal stage". Under that reading a
+    composite borrowed the kind of its last stage -- `SO_RAY_LAUNCH_TRACE` was
+    `physical_operator`, `SOM_PSF` and `SOM_SPOT_DIAGRAM` were `measurement` --
+    so a composite was indistinguishable from a primitive by this field alone and
+    `composes` was the only thing that said otherwise. The owner decided the kind
+    should name the composition instead. `terminal_stage` is now the property that
+    answers "where does this leave the state", and the rules that need that
+    question -- the observable-producer check and `matches` -- ask it there rather
+    than of `kind`.
+
+    The invariant that makes the pair well defined runs in one direction now:
+    `composes` is non-`None` **if and only if** `kind is COMPOSED`, and its stages
+    are all primitive. A composite cannot hide as a primitive and a primitive
+    cannot carry stages.
 
     **`SOLVER` became `SOURCE` on CHE-224 (R15.1)**, and the count did not change.
     `solver` was never answering the question this field asks. It described *who
@@ -181,6 +200,10 @@ class OperationKind(StrEnum):
     COUPLER = "coupler"
     PHYSICAL_OPERATOR = "physical_operator"
     MEASUREMENT = "measurement"
+    #: Not a primitive. CHE-237 first specified the value as `"Composed"`; it was
+    #: lowercased in the same ticket, so all five values are one spelling
+    #: convention and nothing has to remember which member is the exception.
+    COMPOSED = "composed"
 
 
 #: The semantic types an operation may consume or produce, as plain strings.
@@ -331,21 +354,32 @@ class OperationDescriptor:
         Stable identity. What `resolve` takes and what a plan records, and the
         **planning** identity: two records may share an `implementation`.
     `kind`
-        One of the four, as a **scalar**. Accepts the string form for convenience
+        One of the five, as a **scalar**. Accepts the string form for convenience
         and normalizes.
 
-        **The terminal stage** -- CHE-225 (R15.2) narrowed this from "what this
-        operation is" to "where this operation leaves the state". For a record that
-        fuses nothing the two readings coincide, which is twelve of thirteen. For a
-        composite it is `composes[-1]`, and `__post_init__` enforces the agreement,
-        so the scalar is well defined rather than a free choice between stages.
+        **`COMPOSED` when and only when this callable fuses more than one
+        primitive** -- CHE-237 (R03.7). It replaces the CHE-225 (R15.2) "terminal
+        stage" reading, under which a composite borrowed the kind of its last stage
+        and so was indistinguishable from a primitive by this field alone. Where
+        "leaves the state" is the question actually being asked -- the
+        observable-producer rule below, and `matches` -- the code reads
+        `terminal_stage`, which is `composes[-1]` for a composite and `kind` for a
+        primitive.
     `composes`
         The ordered primitive stages this one callable fuses, when it fuses more
-        than one. `()` means "this record is exactly its `kind`" and is the default
-        and the common case.
+        than one, and `None` otherwise -- which is the default and the common case,
+        14 of the 17 records.
 
-        Question 10, and it exists because one landed record needs it rather than
-        because composition is an interesting shape. `SO_RAY_LAUNCH_TRACE` is
+        **Strictly derived from `kind`, in both directions** (CHE-237): non-`None`
+        if and only if `kind is COMPOSED`, so the two fields cannot disagree about
+        whether a fusion happened. `None` and not `()`: an empty tuple was the old
+        spelling of "fuses nothing", and keeping a falsy-but-present value next to
+        a `kind` that already answers the question is what let the two drift apart
+        in the first place. Every stage is a *primitive* kind -- `COMPOSED` inside
+        `composes` is refused, because a composition of compositions is not
+        something this schema can execute, plan or flatten.
+
+        Question 10. `SO_RAY_LAUNCH_TRACE` is
         `(SOURCE, PHYSICAL_OPERATOR)`: `backends.optiland.solver:trace`
         materializes and declares the rays and *then* refracts them through every
         surface, so it initializes state and evolves it in one call. Declaring only
@@ -355,7 +389,7 @@ class OperationDescriptor:
         **Ordered, and the order is physical.** Initialize-then-evolve is the
         operation; the reverse is meaningless. `composes[0]` is what decides
         whether the record may be a graph entry (see `ENTRY_KINDS`) and
-        `composes[-1]` is what `kind` must equal.
+        `composes[-1]` is the `terminal_stage`.
 
         This is **not** the schema becoming a pipeline language. It records that a
         fusion happened and which primitives it fused -- not the arguments each
@@ -365,7 +399,7 @@ class OperationDescriptor:
         records and this field goes back to being empty everywhere.
 
         `O_DIFFRACTIVE_SURFACE` is internally coupler -> operator -> coupler and
-        deliberately keeps `composes=()`. Its input and output representation types
+        deliberately keeps `composes=None`. Its input and output representation types
         do not change and it presents a single operator-like transformation at its
         boundary, so its net primitive kind is the whole truth about it at the
         ports. Whether it should nonetheless expose that structure is a recorded
@@ -482,9 +516,10 @@ class OperationDescriptor:
     #: be made by omission: a record that drives a backend and forgets to say so
     #: fails G1 against its own `implementation` path.
     backend: str | None = None
-    #: The ordered primitive stages one callable fuses, or `()` for "exactly its
-    #: `kind`" -- twelve of the thirteen records. See the class docstring.
-    composes: tuple[OperationKind, ...] = ()
+    #: The ordered primitive stages one callable fuses, or `None` for a primitive
+    #: -- 14 of the 17 records. Non-`None` if and only if `kind is COMPOSED`; see
+    #: the class docstring.
+    composes: tuple[OperationKind, ...] | None = None
     capabilities: str | None = None
     cost: str | None = None
     derivative: str = "forward_only"
@@ -511,7 +546,6 @@ class OperationDescriptor:
             "requires",
             "optional",
             "validity",
-            "composes",
         ):
             object.__setattr__(self, name, tuple(getattr(self, name)))
 
@@ -542,37 +576,61 @@ class OperationDescriptor:
                     "physical state and the state it was derived from is still upstream."
                 )
 
-        # G5 -- `composes` is well formed and `kind` is its terminal stage. Checked
-        # before the entry rule below, which reads `composes[0]`. A one-stage
-        # composition is refused because it is not a composition: `()` already says
-        # "exactly its kind", so `(SOURCE,)` on a source is a second spelling of one
-        # fact, which is the two-source arrangement this record exists to avoid.
-        stages: list[OperationKind] = []
-        for index, stage in enumerate(self.composes):
-            try:
-                stages.append(OperationKind(stage))
-            except ValueError:
+        # G5 -- `composes` is well formed and is derived from `kind` in both
+        # directions. CHE-237 (R03.7) replaced the CHE-225 terminal-stage agreement
+        # with a biconditional: `composes` is non-`None` iff `kind is COMPOSED`.
+        # That is what makes the pair impossible to disagree about, rather than
+        # merely conventional. Checked before the entry rule below, which reads
+        # `composes[0]`.
+        #
+        # A one-stage composition is still refused because it is not a composition:
+        # a `COMPOSED` record fusing `(SOURCE,)` is a source with a second spelling,
+        # which is the two-source arrangement this field exists to avoid. And a
+        # `COMPOSED` stage inside `composes` is refused because a composition of
+        # compositions is not a thing this schema can execute, plan or flatten.
+        primitive_kinds = [k for k in OperationKind if k is not OperationKind.COMPOSED]
+        is_composed = self.kind is OperationKind.COMPOSED
+        if self.composes is None:
+            if is_composed:
                 problems.append(
-                    f"`composes[{index}]` is {stage!r}; the stages of a composition are "
-                    f"primitive kinds from {[k.value for k in OperationKind]}. A "
-                    "composition fuses declared primitives; it cannot introduce one."
+                    "`kind` is 'composed' but `composes` is None. A composite has to say "
+                    "which primitives it fuses; the kind alone names no stages."
                 )
-        if len(stages) == len(self.composes):
-            object.__setattr__(self, "composes", tuple(stages))
-        if self.composes:
-            if len(self.composes) < 2:
-                problems.append(
-                    f"`composes` is {[k.value for k in self.composes]}, a single stage. "
-                    "`()` already means 'this record is exactly its kind'; a one-stage "
-                    "composition states the same fact twice."
-                )
-            elif not problems and self.composes[-1] != self.kind:
-                problems.append(
-                    f"`composes` ends in {self.composes[-1].value!r} but `kind` is "
-                    f"{getattr(self.kind, 'value', self.kind)!r}. `kind` is the TERMINAL "
-                    "stage -- where the operation leaves the state -- so it must equal "
-                    "the last stage it fuses."
-                )
+        elif not is_composed:
+            problems.append(
+                f"`composes` is {list(self.composes)!r} but `kind` is "
+                f"{getattr(self.kind, 'value', self.kind)!r}. `composes` is set if and "
+                "only if `kind` is 'composed'; a primitive fuses nothing, and `None` -- "
+                "not `()` -- is how a primitive says so."
+            )
+        else:
+            stages: list[OperationKind] = []
+            for index, stage in enumerate(self.composes):
+                try:
+                    parsed = OperationKind(stage)
+                except ValueError:
+                    problems.append(
+                        f"`composes[{index}]` is {stage!r}; the stages of a composition are "
+                        f"primitive kinds from {[k.value for k in primitive_kinds]}. A "
+                        "composition fuses declared primitives; it cannot introduce one."
+                    )
+                    continue
+                if parsed is OperationKind.COMPOSED:
+                    problems.append(
+                        f"`composes[{index}]` is {parsed.value!r}, which is not a primitive. "
+                        "A composition fuses primitives; nothing here can execute, plan or "
+                        "flatten a composition of compositions."
+                    )
+                    continue
+                stages.append(parsed)
+            if len(stages) == len(self.composes):
+                object.__setattr__(self, "composes", tuple(stages))
+                if len(stages) < 2:
+                    problems.append(
+                        f"`composes` is {[k.value for k in stages]}, a single stage. A "
+                        "one-stage composition is a primitive with a second spelling; drop "
+                        "`composes` and declare that primitive as `kind`."
+                    )
 
         # A graph entry, and the three kinds that cannot be one. `inputs=()` became
         # expressible in CHE-222, which is what makes this refusal necessary: a
@@ -612,10 +670,18 @@ class OperationDescriptor:
                     f"{list(SEMANTIC_TYPES)}. The primary result is what the next operation "
                     "consumes, so it has to be a declared boundary."
                 )
-            if primary in OBSERVABLE_TYPES and self.kind is not OperationKind.MEASUREMENT:
+            # Asked of the TERMINAL STAGE and not of `kind` since CHE-237 (R03.7):
+            # `SOM_PSF` and `SOM_SPOT_DIAGRAM` both produce an observable and both
+            # carry `kind=COMPOSED`, so reading `kind` here would refuse the two
+            # records whose last stage is exactly the measurement this rule wants.
+            # Skipped when a problem is already recorded, because a `composes` that
+            # failed to parse has no trustworthy last stage.
+            terminal = self.composes[-1] if self.composes else self.kind
+            mis_produces = terminal is not OperationKind.MEASUREMENT
+            if primary in OBSERVABLE_TYPES and not problems and mis_produces:
                 problems.append(
-                    f"`returns[0]` is the observable {primary!r} but `kind` is "
-                    f"{getattr(self.kind, 'value', self.kind)!r}. Only a measurement produces "
+                    f"`returns[0]` is the observable {primary!r} but the terminal stage is "
+                    f"{getattr(terminal, 'value', terminal)!r}. Only a measurement produces "
                     "an observable. A coupler that produced one would be C_FIELD_TO_PSF, "
                     "which changes no representation and consults no convention it does not "
                     "already hold -- CHE-36 removed it, and R11 criterion 3 keeps it out."
@@ -712,14 +778,27 @@ class OperationDescriptor:
     def entry_stage(self) -> OperationKind:
         """The primitive kind this operation *begins* with. Question 10.
 
-        `composes[0]` for a composite, `kind` otherwise -- and for the twelve
-        records that fuse nothing those are the same value, which is why this is a
-        property rather than a second field. `ENTRY_KINDS` is checked against this
-        and not against `kind`, so a fused launch-and-trace is admitted as a graph
-        entry on its source stage while `kind` keeps naming where it leaves the
-        state.
+        `composes[0]` for a composite, `kind` otherwise -- and for the 14 records
+        that fuse nothing those are the same value, which is why this is a property
+        rather than a second field. `ENTRY_KINDS` is checked against this and not
+        against `kind`, so a fused launch-and-trace is admitted as a graph entry on
+        its source stage. Since CHE-237 (R03.7) a composite's `kind` is `COMPOSED`
+        and names no stage at all, which makes reading this property rather than
+        `kind` mandatory here rather than merely more accurate.
         """
         return self.composes[0] if self.composes else self.kind
+
+    @property
+    def terminal_stage(self) -> OperationKind:
+        """The primitive kind this operation *ends* with -- where it leaves the state.
+
+        `composes[-1]` for a composite, `kind` otherwise. CHE-237 (R03.7) added this
+        when `kind` stopped naming the terminal stage and started naming the
+        composition: the question "where does this leave the state" is still asked by
+        the observable-producer rule and by `matches`, and this is where they ask it.
+        Never `COMPOSED`, since a composition's stages are all primitive.
+        """
+        return self.composes[-1] if self.composes else self.kind
 
     @property
     def primary_output(self) -> str:
@@ -761,10 +840,18 @@ class OperationDescriptor:
         worse than the fake input CHE-222 removed. So graph entry is its own
         tri-state: `None` does not filter, `True` selects entries, `False` selects
         everything that needs an upstream edge.
+
+        `kind` matches **either** this record's `kind` **or** its `terminal_stage`
+        -- CHE-237 (R03.7). For the 14 primitives those are one value and nothing
+        changed. For a composite it means `find(kind=MEASUREMENT)` still returns
+        `SOM_PSF`, which is the answer a planner looking for something that yields
+        an observable needs, while `find(kind=COMPOSED)` selects the three
+        composites as a set. Reading `kind` alone here would have made every
+        composite invisible to every kind query except one nothing asks yet.
         """
         return (
             (input is None or input in self.inputs)
             and (output is None or self.primary_output == output)
-            and (kind is None or self.kind == kind)
+            and (kind is None or self.kind == kind or self.terminal_stage == kind)
             and (entry is None or self.is_graph_entry is entry)
         )

@@ -140,12 +140,14 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # every surface) -> `to_ray_bundle`, so it initializes state AND evolves it.
     # CHE-224 declared it `SOURCE` and that was a false claim, contradicted by this
     # record's own `approximation` below: "a surface interaction is refraction at a
-    # real interface". `kind` is the TERMINAL stage and `composes` carries the
-    # fusion; `operations/descriptors.py` holds the retraction and the reason the
-    # honest decomposition is blocked on numbers rather than on taxonomy.
+    # real interface". CHE-225 then made `kind` the TERMINAL stage, and CHE-237
+    # (R03.7) made it `COMPOSED`: the fusion itself is what this field now names,
+    # and `terminal_stage` is the property that says where the state ends up.
+    # `operations/descriptors.py` holds the retraction and the reason the honest
+    # decomposition is blocked on numbers rather than on taxonomy.
     OperationDescriptor(
         operation_id="SO_RAY_LAUNCH_TRACE",
-        kind=OperationKind.PHYSICAL_OPERATOR,
+        kind=OperationKind.COMPOSED,
         composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
         inputs=(),
         returns=("ray_bundle",),
@@ -199,15 +201,17 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # pinned solver's own spot analysis: `build_lens` -> Optiland generates its own
     # pupil fan from the declared field -> it refracts them through every surface ->
     # it reduces the intersections to a spot. So the record initializes state,
-    # evolves it AND observes it, and `kind` is the terminal stage as CHE-225 defines
-    # it. `inputs=()` with a bare `measurement` kind is refused by
+    # evolves it AND observes it, and the terminal stage is the measurement as
+    # CHE-225 defined it -- `kind` was `MEASUREMENT` until CHE-237 (R03.7) moved the
+    # terminal stage to `terminal_stage` and made `kind` name the composition.
+    # `inputs=()` with a bare `measurement` kind is refused by
     # `OperationDescriptor.__post_init__` -- only a source may begin a graph entry --
     # and that refusal is right: this operation consumes no upstream representation
     # because it makes its own rays. `M_SPOT_DIAGRAM` below is the *other* path, and
     # the pair is the point: one generates rays, one consumes them as supplied.
     OperationDescriptor(
         operation_id="SOM_SPOT_DIAGRAM",
-        kind=OperationKind.MEASUREMENT,
+        kind=OperationKind.COMPOSED,
         composes=(
             OperationKind.SOURCE,
             OperationKind.PHYSICAL_OPERATOR,
@@ -256,7 +260,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
     # would be the false claim.
     OperationDescriptor(
         operation_id="SOM_PSF",
-        kind=OperationKind.MEASUREMENT,
+        kind=OperationKind.COMPOSED,
         composes=(
             OperationKind.SOURCE,
             OperationKind.PHYSICAL_OPERATOR,

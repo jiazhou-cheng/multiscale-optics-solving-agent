@@ -580,8 +580,8 @@ def test_question_1_is_an_upstream_representation_edge_required() -> None:
     assert len(CATALOG) - len(entries) == 11
     # Every entry BEGINS with a source, which is what `ENTRY_KINDS` enforces. Read
     # off `entry_stage` and not `kind` since CHE-225 (R15.2): `SO_RAY_LAUNCH_TRACE`
-    # is `physical_operator`-kind because that is where it leaves the state, and it
-    # is still an entry because its first stage is a source.
+    # is `COMPOSED`-kind since CHE-237 (R03.7) and so names no stage at all in that
+    # field, and it is still an entry because its first stage is a source.
     for record in CATALOG:
         if record.is_graph_entry:
             assert record.entry_stage is OperationKind.SOURCE, record.operation_id
@@ -783,9 +783,10 @@ def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
     }
     #: Composite prefixes, spelled as the stages they fuse. CHE-225 (R15.2) added
     #: `SO_`, source-then-operator; CHE-226 (R16) adds `SOM_`, the native spot
-    #: analysis, which generates rays, traces them and reduces them in one call. A
-    #: composite prefix is NOT a fifth kind -- every stage is a primitive from the
-    #: enum, and the prefix is the stages spelled in order.
+    #: analysis, which generates rays, traces them and reduces them in one call.
+    #: Every *stage* is a primitive from the enum and the prefix is the stages
+    #: spelled in order; the record's `kind` is `COMPOSED` since CHE-237 (R03.7),
+    #: so the prefix and the kind now say the same thing from two directions.
     composite = {
         "SO_": (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
         "SOM_": (
@@ -802,6 +803,10 @@ def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
         # long, and `SOM_RAY...` would have read as the primitive prefix `SO`.
         stage_prefix = record.operation_id.split("_", 1)[0] + "_"
         if stage_prefix in composite:
+            assert record.kind is OperationKind.COMPOSED, (
+                f"{record.operation_id} has the composite prefix {stage_prefix!r} but its "
+                f"kind is {record.kind.value}; a record that fuses stages is COMPOSED"
+            )
             assert record.composes == composite[stage_prefix], (
                 f"{record.operation_id} has the composite prefix {stage_prefix!r}, which "
                 f"means {[k.value for k in composite[stage_prefix]]}, but declares "
@@ -818,12 +823,12 @@ def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
             f"{record.operation_id} is {record.kind.value} but its {prefix!r} prefix "
             f"says {primitive[prefix].value}"
         )
-        assert record.composes == (), (
+        assert record.composes is None, (
             f"{record.operation_id} declares a composition "
-            f"{[k.value for k in record.composes]} under the single-primitive prefix "
+            f"{list(record.composes or ())!r} under the single-primitive prefix "
             f"{prefix!r}. A record that fuses stages says so in its prefix."
         )
-    # Every kind is actually exercised, so the loop is not passing on three of four.
+    # Every kind is actually exercised, so the loop is not passing on four of five.
     assert {r.kind for r in CATALOG} == set(OperationKind)
 
 
@@ -854,7 +859,7 @@ def test_g3_every_entry_begins_with_a_source_and_every_source_start_is_an_entry(
     # And the composite is genuinely one of them, so this is not four plain sources.
     index = {r.operation_id: r for r in CATALOG}
     fused = index["SO_RAY_LAUNCH_TRACE"]
-    assert fused.is_graph_entry and fused.kind is OperationKind.PHYSICAL_OPERATOR
+    assert fused.is_graph_entry and fused.terminal_stage is OperationKind.PHYSICAL_OPERATOR
 
 
 def test_the_backend_field_and_the_capability_citation_are_different_questions() -> None:
@@ -904,53 +909,78 @@ def test_no_record_and_no_id_says_solver_any_more() -> None:
 # because composition is an interesting shape to model.
 
 
-def test_g5_a_composition_is_well_formed_and_kind_is_its_terminal_stage() -> None:
-    """The invariant that makes the scalar `kind` mean something on a composite.
+def test_g5_composes_is_derived_from_kind_in_both_directions() -> None:
+    """The invariant that makes the two fields impossible to disagree about.
 
-    Without it, `kind` on a fused record would be a free choice between its stages,
-    and CHE-224's mistake -- picking the first stage and calling the record a source
-    -- would be expressible again. `kind` is the TERMINAL stage: where the operation
-    leaves the state, and therefore which boundary the output sits at.
+    Without it, `kind` on a fused record would be a free choice -- CHE-224's mistake,
+    picking the first stage and calling the record a source, was exactly that.
+    CHE-225 (R15.2) closed it by making `kind` the terminal stage; CHE-237 (R03.7)
+    closed it the other way, by making `kind` name the *composition* and `composes`
+    non-`None` if and only if it does. `terminal_stage` is what now answers "where
+    does this leave the state".
 
     Enforced at construction as well, so this is the catalog-wide half.
     """
+    primitives = {k for k in OperationKind if k is not OperationKind.COMPOSED}
     for record in CATALOG:
-        if not record.composes:
+        composed = record.kind is OperationKind.COMPOSED
+        assert (record.composes is not None) is composed, (
+            f"{record.operation_id} has kind {record.kind.value} and composes "
+            f"{record.composes!r}; composes is set iff kind is COMPOSED"
+        )
+        if not composed:
+            # A primitive says "I fuse nothing" with None, and its terminal stage is
+            # itself. Not `()` -- CHE-237 removed the falsy-but-present spelling.
+            assert record.composes is None, record.operation_id
+            assert record.terminal_stage is record.kind, record.operation_id
             continue
         assert len(record.composes) >= 2, (
-            f"{record.operation_id} declares a one-stage composition; `()` already "
-            "means 'exactly its kind'"
+            f"{record.operation_id} declares a one-stage composition, which is a "
+            "primitive with a second spelling"
         )
-        assert record.composes[-1] is record.kind, (
-            f"{record.operation_id} fuses {[k.value for k in record.composes]} but its "
-            f"kind is {record.kind.value}; kind is the terminal stage"
-        )
-        assert all(stage in set(OperationKind) for stage in record.composes), (
+        assert all(stage in primitives for stage in record.composes), (
             f"{record.operation_id} fuses something that is not a primitive kind"
+        )
+        assert record.terminal_stage is record.composes[-1], (
+            f"{record.operation_id} fuses {[k.value for k in record.composes]} but its "
+            f"terminal stage reads {record.terminal_stage.value}"
         )
 
 
 def test_g5_the_construction_checks_actually_refuse_a_malformed_composition() -> None:
     """The detection half, since every assertion above is over a catalog that passes.
 
-    Three ways a composition can be a false claim, each refused at construction.
+    Five ways the pair can be a false claim, each refused at construction.
     Built as data rather than by editing a real record.
     """
     from tests.operations.test_descriptors import a_descriptor
 
-    # `kind` disagreeing with the last stage -- CHE-224's mistake, made expressible.
-    with pytest.raises(ValueError, match="TERMINAL stage"):
+    # Stages on a primitive kind -- CHE-224's mistake, and the drift CHE-237 closes.
+    with pytest.raises(ValueError, match="if and only if"):
         a_descriptor(
             kind=OperationKind.SOURCE,
             inputs=(),
             composes=(OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
         )
+    # The same refusal from the other side: COMPOSED naming no stages.
+    with pytest.raises(ValueError, match="`composes` is None"):
+        a_descriptor(kind=OperationKind.COMPOSED, composes=None)
+    # `()` is no longer a spelling of "fuses nothing"; it is a COMPOSED record
+    # that names nothing, and it must not pass as a primitive by being falsy.
+    with pytest.raises(ValueError, match="if and only if"):
+        a_descriptor(kind=OperationKind.COUPLER, composes=())
     # A one-stage "composition", which states one fact twice.
     with pytest.raises(ValueError, match="single stage"):
-        a_descriptor(kind=OperationKind.COUPLER, composes=(OperationKind.COUPLER,))
+        a_descriptor(kind=OperationKind.COMPOSED, composes=(OperationKind.COUPLER,))
     # A stage that is not a primitive kind.
     with pytest.raises(ValueError, match="primitive kinds"):
-        a_descriptor(kind=OperationKind.COUPLER, composes=("source", "solver"))
+        a_descriptor(kind=OperationKind.COMPOSED, composes=("source", "solver"))
+    # A composition of compositions, which nothing can execute, plan or flatten.
+    with pytest.raises(ValueError, match="not a primitive"):
+        a_descriptor(
+            kind=OperationKind.COMPOSED,
+            composes=(OperationKind.SOURCE, OperationKind.COMPOSED),
+        )
 
 
 def test_g6_only_the_pinned_records_declare_a_composition() -> None:
@@ -982,11 +1012,12 @@ def test_g6_only_the_pinned_records_declare_a_composition() -> None:
     """
     composites = {r.operation_id for r in CATALOG if r.composes}
     assert composites == {"SO_RAY_LAUNCH_TRACE", "SOM_SPOT_DIAGRAM", "SOM_PSF"}, composites
+    assert composites == {r.operation_id for r in CATALOG if r.kind is OperationKind.COMPOSED}
     index = {r.operation_id: r for r in CATALOG}
-    assert index["O_DIFFRACTIVE_SURFACE"].composes == ()
-    assert index["M_SPOT_DIAGRAM"].composes == ()
-    # And the other thirteen fuse nothing.
-    assert len([r for r in CATALOG if not r.composes]) == 14
+    assert index["O_DIFFRACTIVE_SURFACE"].composes is None
+    assert index["M_SPOT_DIAGRAM"].composes is None
+    # And the other fourteen fuse nothing.
+    assert len([r for r in CATALOG if r.composes is None]) == 14
 
 
 def test_the_fused_record_says_what_it_fuses_and_why_that_is_not_a_source() -> None:
@@ -1004,8 +1035,9 @@ def test_the_fused_record_says_what_it_fuses_and_why_that_is_not_a_source() -> N
     )
     fused = index["SO_RAY_LAUNCH_TRACE"]
     assert fused.composes == (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR)
-    assert fused.kind is OperationKind.PHYSICAL_OPERATOR
+    assert fused.kind is OperationKind.COMPOSED
     assert fused.entry_stage is OperationKind.SOURCE
+    assert fused.terminal_stage is OperationKind.PHYSICAL_OPERATOR
     assert fused.implementation == "backends.optiland.solver:trace"
     assert fused.backend == "optiland"
     assert fused.capabilities == "M_RAY_OPTILAND"

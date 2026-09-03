@@ -527,7 +527,11 @@ def test_no_catalogued_operation_consumes_or_mis_produces_the_observable() -> No
     for record in CATALOG:
         assert "psf" not in record.inputs, record.operation_id
         if record.primary_output == "psf":
-            assert record.kind is OperationKind.MEASUREMENT, record.operation_id
+            # The TERMINAL stage since CHE-237 (R03.7): `SOM_PSF` carries
+            # `kind=COMPOSED` and its last fused stage is the measurement, which is
+            # the claim this rule is about. `kind` here would refuse a composite for
+            # not being a primitive it never claimed to be.
+            assert record.terminal_stage is OperationKind.MEASUREMENT, record.operation_id
 
 
 # The two construction-error tests that used to sit here -- "only a measurement may
