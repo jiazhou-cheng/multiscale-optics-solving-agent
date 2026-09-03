@@ -377,6 +377,22 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
     `benchmarks/` is a driver plus its records. A tree that quietly reacquired forty
     files would be the pack coming back without the taxonomy review criterion 2 asks
     for.
+
+    `benchmarks/` moved 10 -> 16 for CHE-238/CHE-239, and the growth is the kind the
+    docstring above sanctions rather than the kind it guards against. What arrived is
+    one report (`reports/2026-09/`) and one verification harness
+    (`verification/`, five modules) for the overnight ray/wave verification run --
+    executable evidence and the document it writes into, not prose restating what a
+    module already says. The distinction the count exists to catch is a *prose pack*
+    reappearing; this is the opposite kind of file.
+
+    `verification/` is deliberately not `systems/`. A benchmark there composes this
+    project's public primitives and gates itself on closed-form optics, and
+    `tests/benchmarks/test_records.py` enforces that for `systems/*.py` only. A
+    verification harness reads a third-party prescription, runs the same
+    configuration through this project's catalogued operations, and reports the
+    difference -- which needs a direct `optiland` import and has no closed form to
+    gate on. Two kinds of thing, two directories.
     """
     tracked = subprocess.run(
         ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
@@ -385,4 +401,4 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
         tree: len([path for path in tracked if path.startswith(f"{tree}/")])
         for tree in ("knowledge", "benchmarks", "docs")
     }
-    assert counts == {"knowledge": 3, "benchmarks": 10, "docs": 2}, counts
+    assert counts == {"knowledge": 3, "benchmarks": 16, "docs": 2}, counts
