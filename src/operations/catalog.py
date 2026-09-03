@@ -247,6 +247,70 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
+    # The second native analysis on the same path -- CHE-236 (R16.1), which R16
+    # said would be additive: "a second analysis here is a second function and a
+    # second record". `method` is an `optional` argument and NOT a dispatcher: all
+    # three of the pinned solver's scalar PSF implementations return one intensity
+    # map under one normalization, so the return type does not vary with it and one
+    # record describes the callable. Three records for one physical measurement
+    # would be the false claim.
+    OperationDescriptor(
+        operation_id="SOM_PSF",
+        kind=OperationKind.MEASUREMENT,
+        composes=(
+            OperationKind.SOURCE,
+            OperationKind.PHYSICAL_OPERATOR,
+            OperationKind.MEASUREMENT,
+        ),
+        inputs=(),
+        returns=("psf",),
+        implementation="backends.optiland.analysis:psf",
+        backend="optiland",
+        requires=("setup", "source", "method", "num_rays", "execution"),
+        optional=("strategy", "remove_tilt", "grid_size", "image_size", "pixel_pitch_m"),
+        approximation=(
+            "scalar diffraction from a geometrically traced wavefront: the pinned solver "
+            "samples the pupil, refracts the rays through every surface to the image "
+            "surface, builds a reference sphere by the selected strategy, extends each "
+            "ray's final direction BACKWARD in the image-space medium to that sphere -- a "
+            "geometric image-space retrace only, not a retrace through the surfaces -- and "
+            "turns the accumulated optical path into an OPD in waves relative to the "
+            "reference ray. Diffraction enters only in the propagation of that pupil, so "
+            "the aberration content is entirely geometric and no ray in the pupil is "
+            "diffracted by an aperture edge. Which propagation is the `method` argument: "
+            "'fft' is zero-padded FFT of sqrt(I) exp(-2i pi W) on the circular normalized "
+            "pupil mask, with Zemax-compatible grid sampling; 'mmdft' is the same pupil "
+            "through a matrix DFT with explicitly controlled output sampling; 'huygens' is "
+            "a coherent sum over the physical 3-D reference-sphere intersections to the "
+            "actual image-surface geometry, with the 1/R and obliquity factors. THE THREE "
+            "ARE NOT INTERCHANGEABLE AT COARSE SAMPLING -- measured on the R05 singlet at "
+            "num_rays=32, fft peaks at 99.91 and huygens at 32x32 peaks at 82.70"
+        ),
+        validity=(
+            "scalar and monochromatic: one field, one wavelength, no polarization. The "
+            "vectorial classes the backend also ships are not reachable from here",
+            "infinite-conjugate angular sources only, for the reason SOM_SPOT_DIAGRAM is: "
+            "at a finite object distance a field angle is a position",
+            "exactly one field and one wavelength, because build_lens declares one of each",
+            "the normalization is Optiland's Strehl-percent convention and NOT this "
+            "project's PsfNormalization vocabulary; 100.0 is the unaberrated peak of the "
+            "same aperture, so the number is a Strehl ratio times 100 and is blind to any "
+            "constant multiplicative error in the same way peak normalization is",
+            "no complex pupil, no ScalarField and no wavefront crosses this boundary -- "
+            "only an intensity map -- so the phasor sign the backend uses internally "
+            "(exp(-2i pi W)) never has to be reconciled with this project's convention",
+            "the sampled window only, as M_PSF: energy outside the returned grid was not "
+            "measured, and unless grid_size is given the fft path's grid is DERIVED from "
+            "num_rays rather than chosen -- and num_rays is reduced in the same step, so "
+            "the record reports the pupil sampling that ran and not the one requested",
+        ),
+        evidence=(
+            "tests/backends/test_optiland_psf.py",
+            "tests/physics/test_native_psf_airy.py",
+        ),
+        capabilities="M_RAY_OPTILAND",
+        derivative="forward_only",
+    ),
     # --- backends/chromatix --------------------------------------------------
     #
     # One record over `propagate`, not two. `S_WAVE_CHROMATIX` was the second, and

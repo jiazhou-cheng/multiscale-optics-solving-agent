@@ -510,7 +510,7 @@ def test_psf_registers_as_a_measurement_and_never_as_a_coupler() -> None:
     # consuming a supplied bundle, one having the pinned solver generate its own.
     # A fourth measurement has to come past this list.
     measurements = {record.operation_id for record in registry.find(kind=OperationKind.MEASUREMENT)}
-    assert measurements == {"M_PSF", "M_SPOT_DIAGRAM", "SOM_SPOT_DIAGRAM"}
+    assert measurements == {"M_PSF", "M_SPOT_DIAGRAM", "SOM_SPOT_DIAGRAM", "SOM_PSF"}
     assert descriptor in registry.find(kind=OperationKind.MEASUREMENT)
     assert registry.find(kind=OperationKind.MEASUREMENT, input="scalar_field") == (descriptor,)
     assert resolve("M_PSF") is psf

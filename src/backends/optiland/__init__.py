@@ -1,13 +1,14 @@
 """Optiland sequential ray tracing, behind an anti-corruption boundary.
 
 CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3), CHE-217 (R05.6),
-CHE-219 (R05.8) and CHE-226 (R16). The public surface is three functions -- two
-traces, one per kind of input, and one delegated analysis:
+CHE-219 (R05.8), CHE-226 (R16) and CHE-236 (R16.1). The public surface is four
+functions -- two traces, one per kind of input, and two delegated analyses:
 
 ```python
 backends.optiland.trace(setup, source, sampling=..., execution=..., aiming=...) -> RayBundle
 backends.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
 backends.optiland.spot_diagram(setup, source, num_rings=..., execution=...) -> NativeSpotAnalysis
+backends.optiland.psf(setup, source, method=..., num_rays=..., execution=...) -> NativePsfAnalysis
 ```
 
 `trace` launches its rays into the constructed system from a field angle and a
@@ -27,6 +28,13 @@ Nothing else about Optiland crosses this line: no `RealRays`, no `.i`, no `.opd`
 no `opd_native`, no millimetre.
 `tests/backends/test_optiland_boundary.py` asserts that with an AST walk over every
 module outside this package and a `sys.modules` check in a fresh interpreter.
+
+`psf` is the pinned solver's own diffraction PSF of a ray-traced prescription,
+delegated the same way, with `method` selecting one of three propagations --
+FFT, matrix DFT or Huygens-Fresnel -- of one shared pupil pipeline. It is not
+`measurements.psf`, which reduces a `ScalarField` this project already holds and
+has no lens; the two carry numbers under different declared normalizations and
+neither can produce the other's input.
 
 `spot_diagram` is the pinned solver's **own** spot analysis, delegated: it
 generates its own rays inside Optiland from the declared field and pupil, so no
@@ -63,12 +71,15 @@ Five modules, and the order is the dependency order:
   moved here from `solver` for the same reason.
 * `solver` -- CHE-181, CHE-217, CHE-219. The two trace entry points, plus the
   process-global backend, device and precision made explicit and idempotent.
-* `analysis` -- CHE-226. `spot_diagram(setup, source, num_rings=..., execution=...)`,
-  the one delegated native analysis: `build_lens` and then
-  `optiland.analysis.SpotDiagram`, with the intersections and the three metrics
-  translated to metres and the pinned version recorded on the result. Restricted
+* `analysis` -- CHE-226, CHE-236. The two delegated native analyses:
+  `build_lens` and then the solver's own `SpotDiagram` or one of its three scalar
+  PSF classes, with the numbers that come back translated to metres (and waves,
+  for an OPD) and the pinned version recorded on each result. Both are restricted
   to infinite-conjugate angular sources -- a finite `object_distance_mm` is refused
-  rather than reinterpreted -- and it calls no `view()`.
+  rather than reinterpreted -- and neither calls `view()`. The PSF half adds one
+  argument the boundary has to own: `pixel_pitch_m` is metres, because the pinned
+  classes disagree with each other about whether their own `pixel_pitch` is
+  micrometres or millimetres.
 
 Importing this package imports **no solver**. `optiland` and `torch` are imported
 inside the functions that need them, so reading the module -- or the capability
@@ -78,15 +89,21 @@ row it cites -- costs neither.
 this package's physics to the frozen records, and `launch` additionally for a
 caller that wants a launch bundle without a trace -- it takes native solver state
 (the constructed `Optic`) and so is package-facing by construction. `trace` and
-`trace_rays` are the API. A consumer outside
-`backends/` uses one of those two, and the rest of this package is native-facing by
-construction.
+`trace_rays` are the API for rays and `spot_diagram` and `psf` for a native
+analysis. A consumer outside `backends/` uses one of those four, and the rest of
+this package is native-facing by construction.
 """
 
 from backends.optiland.analysis import (
     NATIVE_ANALYSIS,
+    NATIVE_PSF_ANALYSES,
+    NATIVE_PSF_METHOD_DEFINITIONS,
+    NATIVE_PSF_NORMALIZATION,
     NATIVE_SPOT_METRIC_DEFINITIONS,
+    NativePsfAnalysis,
     NativeSpotAnalysis,
+    PsfMethod,
+    psf,
     spot_diagram,
 )
 from backends.optiland.solver import (
@@ -121,18 +138,24 @@ from backends.optiland.solver import (
 #: directions checked are catalog-against-this-tuple, not this-tuple-against
 #: reality -- and it is the reason the tuple is one line of strings rather than
 #: something cleverer.
-OPERATIONS: tuple[str, ...] = ("spot_diagram", "trace", "trace_rays")
+OPERATIONS: tuple[str, ...] = ("psf", "spot_diagram", "trace", "trace_rays")
 
 __all__ = [
     "CAPABILITIES",
     "DERIVATIVE",
     "NATIVE_ANALYSIS",
+    "NATIVE_PSF_ANALYSES",
+    "NATIVE_PSF_METHOD_DEFINITIONS",
+    "NATIVE_PSF_NORMALIZATION",
     "NATIVE_SPOT_METRIC_DEFINITIONS",
     "OPERATIONS",
     "Execution",
+    "NativePsfAnalysis",
     "NativeSpotAnalysis",
+    "PsfMethod",
     "Sampling",
     "configure_execution",
+    "psf",
     "spot_diagram",
     "trace",
     "trace_rays",

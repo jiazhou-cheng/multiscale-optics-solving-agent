@@ -547,9 +547,13 @@ def test_the_walk_would_catch_a_violation() -> None:
 # same four tuples from `inspect.signature` and compares, so what is asserted here
 # as metadata is separately known to match the code.
 
-#: The four graph entries: the three analytic sources, and the fused
-#: launch-and-trace. Written out because "four" would pass with the wrong four.
+#: The graph entries: the three analytic sources, the fused launch-and-trace, and
+#: the two native analyses, which begin with a source stage inside the solver.
+#: Written out because a count would pass with the wrong members -- and the count
+#: has moved twice since it was four (CHE-226, CHE-236), which is the argument for
+#: the set.
 GRAPH_ENTRIES = {
+    "SOM_PSF",
     "SOM_SPOT_DIAGRAM",
     "SO_RAY_LAUNCH_TRACE",
     "S_SOURCE_GAUSSIAN_BEAM",
@@ -641,6 +645,11 @@ def test_question_3_every_required_value_is_named() -> None:
         # and is one of the exceptions named below, because a bundle is a complete
         # call for it -- the rays carry their own plane, wavelength and intensity.
         "SOM_SPOT_DIAGRAM",
+        # CHE-236 (R16.1). Five: the same four plus `method`, which selects which
+        # of three propagations runs. It is required rather than defaulted because
+        # the three are not interchangeable at coarse sampling -- measured, and on
+        # the record's own `method_definitions` -- so a runtime must not pick one.
+        "SOM_PSF",
     }
     index = {record.operation_id: record for record in CATALOG}
     assert index["M_PSF"].requires == ("normalization",)
@@ -972,7 +981,7 @@ def test_g6_only_the_pinned_records_declare_a_composition() -> None:
     tolerating.
     """
     composites = {r.operation_id for r in CATALOG if r.composes}
-    assert composites == {"SO_RAY_LAUNCH_TRACE", "SOM_SPOT_DIAGRAM"}, composites
+    assert composites == {"SO_RAY_LAUNCH_TRACE", "SOM_SPOT_DIAGRAM", "SOM_PSF"}, composites
     index = {r.operation_id: r for r in CATALOG}
     assert index["O_DIFFRACTIVE_SURFACE"].composes == ()
     assert index["M_SPOT_DIAGRAM"].composes == ()

@@ -65,6 +65,7 @@ Transcribing real rims for it means finding a source that states them.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 from problems.ray_trace import UNAPERTURED, Material, OpticalSetup, SourceSpec, SurfaceSpec
@@ -89,6 +90,7 @@ __all__ = [
     "finite_conjugate_source",
     "reverse_telephoto_source",
     "singlet_ref",
+    "singlet_ref_stopped_down",
     "singlet_source",
 ]
 
@@ -183,6 +185,35 @@ def singlet_ref() -> OpticalSetup:
         stop_index=0,
         entrance_pupil_diameter_mm=SINGLET_ENTRANCE_PUPIL_DIAMETER_MM,
         reference_wavelength_um=SINGLET_WAVELENGTH_UM,
+    )
+
+
+def singlet_ref_stopped_down(*, aperture_fraction: float) -> OpticalSetup:
+    """M3-SINGLET-REF with its entrance pupil scaled and nothing else changed.
+
+    Added by CHE-236 (R16.1), which needs a *second* near-diffraction-limited
+    configuration of the same prescription: stopping this singlet down removes its
+    spherical aberration -- the pinned solver reports Strehl 1.000000 at a quarter
+    of the pupil -- while moving the Airy scale, so an analytic PSF gate can be
+    asserted at two apertures against one threshold.
+
+    The pupil, and only the pupil. The surfaces keep their declared rims
+    (`SINGLET_CLEAR_SEMI_DIAMETER_MM` is 2.9x the largest radius the frozen
+    protocol fills, so a smaller pupil cannot start clipping), and the image
+    spacing is unchanged because the back focal length does not depend on the
+    aperture. The prescription's millimetre lives here, in the module that owns
+    it, rather than in a test that would then be naming a native unit -- see
+    `tests/backends/test_optiland_boundary.py`.
+    """
+    if not 0.0 < aperture_fraction <= 1.0:
+        raise ValueError(
+            f"aperture_fraction={aperture_fraction!r} must be in (0, 1]; this stops the "
+            "reference singlet DOWN and does not open it beyond the pupil the frozen "
+            "protocol was measured with"
+        )
+    return dataclasses.replace(
+        singlet_ref(),
+        entrance_pupil_diameter_mm=SINGLET_ENTRANCE_PUPIL_DIAMETER_MM * float(aperture_fraction),
     )
 
 

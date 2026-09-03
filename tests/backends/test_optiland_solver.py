@@ -43,6 +43,7 @@ import math
 import subprocess
 import sys
 from pathlib import Path
+from typing import get_origin
 
 import numpy as np
 import pytest
@@ -111,13 +112,26 @@ def test_the_public_entry_points_are_the_kinds_of_input_and_the_one_analysis() -
     metric definitions -- and it is not a facade over one, because no `RayBundle`
     exists in its call path. This assertion stays an exact list for the reason it
     always was.
+
+    **CHE-236 (R16.1) is the fourth**, `psf`, and it is the same argument again: it
+    returns no representation, generates its rays inside the solver, and is not
+    expressible as a trace plus a project-side reduction -- `measurements.psf`
+    reduces a `ScalarField` and has no lens at all. `method` selecting one of three
+    propagations does not make it three names, because the return type does not vary
+    with it.
+
+    `typing.get_origin` is what excludes `PsfMethod`: a `Literal` alias is
+    `callable()` and is not a `type`, so the two filters above admit it, and it is a
+    declaration rather than an entry point.
     """
     callables = sorted(
         name
         for name in optiland.__all__
-        if callable(getattr(optiland, name)) and not isinstance(getattr(optiland, name), type)
+        if callable(getattr(optiland, name))
+        and not isinstance(getattr(optiland, name), type)
+        and get_origin(getattr(optiland, name)) is None
     )
-    assert callables == ["configure_execution", "spot_diagram", "trace", "trace_rays"]
+    assert callables == ["configure_execution", "psf", "spot_diagram", "trace", "trace_rays"]
 
 
 def test_no_adapter_facade_anywhere_in_the_package() -> None:

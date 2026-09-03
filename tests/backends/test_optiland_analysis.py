@@ -283,6 +283,12 @@ def test_the_two_class_names_this_module_did_not_need_are_absent() -> None:
     `AnalysisType` as an enum with a dispatch table -- one callable per analysis is
     what the catalog's per-record signature gate can describe, so the enum would
     have cost a class and bought nothing.
+
+    The module now defines **two** records: CHE-236 (R16.1) added
+    `NativePsfAnalysis` beside this one, on its own budgeted unit, and
+    `tests/backends/test_optiland_psf.py` holds the four class names *that* design
+    did not need. The exact set is asserted here rather than a count, so a third
+    record has to come past both files.
     """
     import backends.optiland.analysis as module
 
@@ -291,7 +297,7 @@ def test_the_two_class_names_this_module_did_not_need_are_absent() -> None:
         for node in ast.walk(ast.parse(Path("src/backends/optiland/analysis.py").read_text()))
         if isinstance(node, ast.ClassDef)
     }
-    assert defined == {"NativeSpotAnalysis"}
+    assert defined == {"NativePsfAnalysis", "NativeSpotAnalysis"}
     assert not hasattr(module, "AnalysisRequest")
     assert not hasattr(module, "AnalysisType")
 

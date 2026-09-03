@@ -1,6 +1,12 @@
 """Optiland's own lens analyses, delegated: `OpticalSetup + SourceSpec -> numbers`.
 
-CHE-226 (R16). The backend-provided half of two deliberately separate paths:
+CHE-226 (R16) and CHE-236 (R16.1). Two delegated analyses -- `spot_diagram` and
+`psf` -- on one path: build the lens, hand it to the pinned solver's own analysis,
+translate the numbers that come back into SI. Nothing here reimplements what it
+wraps.
+
+R16 established the path shape with the geometric half of the story. The
+backend-provided half of two deliberately separate paths:
 
 * **a native analysis generates its own rays** from the source description, inside
   the pinned solver, using that solver's field, pupil, wavelength and conjugate
@@ -51,14 +57,57 @@ here. Multi-field analysis needs a problem-schema change and is future work.
 `SpotData` arrays independently of plotting, and this project has no plotting
 dependency to add.
 
-**One callable per analysis, not one dispatcher.** The obvious alternative was
-`run(setup, source, analysis_type=...)` with an enum. It does not fit the landed
-catalog: `operations/catalog.py` carries one record per callable and
+**One callable per analysis, and `method` is not a dispatcher.** The obvious
+alternative was `run(setup, source, analysis_type=...)` with an enum. It does not
+fit the landed catalog: `operations/catalog.py` carries one record per callable and
 `tests/operations/test_catalog_signatures.py` derives each record's ports and
 result from `inspect.signature`, so a return type that varies with an argument
 cannot be described by one record -- and the alternative, an `operation_id` switch,
 is what `test_catalog.py::test_question_5` forbids. A second analysis here is a
 second function and a second record, which is additive rather than a schema change.
+
+`psf`'s `method` argument is not that dispatcher and the difference is the return
+type: all three of Optiland's scalar PSF implementations produce one intensity map
+under one normalization, so `psf` returns `NativePsfAnalysis` whatever `method`
+says, and one record describes it. `method` is catalog `optional`, exactly as
+`distribution` and `reference` already are here. What would *not* fit is three
+public operations for one physical measurement, or a `method` that changed what
+came back.
+
+The PSF half, and what is delegated
+-----------------------------------
+CHE-236. `psf(setup, source, method=..., num_rays=..., execution=...)` is the
+diffraction PSF of a ray-traced prescription at one field point, which the
+`ScalarField` path (`measurements.psf` / `M_PSF`) cannot produce at all: that one
+reduces a field it is handed to `|u|^2` and has no lens.
+
+All three of the pinned solver's scalar implementations -- `ScalarFFTPSF`,
+`MMDFTPSF`, `ScalarHuygensPSF` -- derive from one `BasePSF(Wavefront)` and share
+one pipeline: sample the pupil, trace to the image surface, build a reference
+sphere by the selected strategy, retrace image-space directions back to that
+sphere, turn the accumulated optical path into an OPD in waves, propagate, and
+normalize. **That pipeline is one cohesive primitive and it is not decomposed
+here.** There is no public `Wavefront` node, no public pupil-field type and no
+per-method public operation, because a `Wavefront`/`PupilField`/kernel/measurement
+decomposition would buy graph flexibility no current consumer wants and cost four
+new public types. The one thing that differs between the three -- how the pupil is
+propagated -- is an argument.
+
+**Optiland parity is definitional on this path, not a test target.** There is no
+second implementation of it here to disagree with, so what
+`tests/backends/test_optiland_psf.py` pins is the wiring, the units and the
+provenance, and the correctness evidence is the *independent* analytic gate in
+`tests/physics/test_native_psf_airy.py` -- the Airy oracle of
+`tests/physics/oracles.py`, which shares no code with this path or with the
+solver. `AGENTS.md` is explicit that agreement between a wrapper and the code it
+wraps is not a correctness gate.
+
+**No `batch_size` knob.** Measured on 0.6.0:
+`ScalarHuygensPSF._create_summation_strategy` hard-codes `TorchSummation()` or
+`NumbaSummation()` with their own defaults, and `__init__` computes `self.psf`
+eagerly, so there is no window in which a caller-supplied batch size could reach
+the summation without poking a private method. Not exposed, and stated on the
+record's method definitions rather than left to be discovered.
 
 Units and precision
 -------------------
@@ -66,16 +115,31 @@ Optiland lengths are millimetres; everything returned from here is metres, via t
 one conversion this package already declares (`rays.NATIVE_LENGTH_M`). Arrays come
 back on the host with the solver's own precision preserved (`rays._host`), so a
 float32 or GPU analysis is not silently widened to look like a float64 host one.
+
+**The PSF path has one unit trap that this boundary exists to fix.** Measured on
+the pinned 0.6.0, `pixel_pitch` means two different things in two of the three
+classes: `MMDFTPSF.pixel_pitch` is **micrometres** (it is computed as
+`wavelength_um * FNO * clear_size / image_size`, and `_get_psf_units` labels
+`shape * pitch` as micrometres with no conversion), while
+`ScalarHuygensPSF.pixel_pitch` is **millimetres** (`_get_psf_units` multiplies it
+by `1e3`, "mm --> um"). The public argument is `pixel_pitch_m`, in metres, for
+both, and the conversion is read out of the pinned implementation rather than
+restated -- see `_native_sample_pitch_um`.
+
+The OPD stays in **waves**, which is Optiland's own unit for it, and no
+metre-valued physical OPD is invented beside it. Every other length on a
+`NativePsfAnalysis` is metres and the wavelength is metres.
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 import numpy as np
 
+from backends.optiland.launch import normalized_field
 from backends.optiland.rays import NATIVE_LENGTH_M, NATIVE_WAVELENGTH_M, _host
 from backends.optiland.solver import (
     Execution,
@@ -88,8 +152,14 @@ from problems import OpticalSetup, SourceSpec
 
 __all__ = [
     "NATIVE_ANALYSIS",
+    "NATIVE_PSF_ANALYSES",
+    "NATIVE_PSF_METHOD_DEFINITIONS",
+    "NATIVE_PSF_NORMALIZATION",
     "NATIVE_SPOT_METRIC_DEFINITIONS",
+    "NativePsfAnalysis",
     "NativeSpotAnalysis",
+    "PsfMethod",
+    "psf",
     "spot_diagram",
 ]
 
@@ -399,5 +469,588 @@ def spot_diagram(
         fields_analyzed=fields_analyzed,
         wavelengths_analyzed=wavelengths_analyzed,
         analysis=NATIVE_ANALYSIS,
+        optiland_version=optiland_version,
+    )
+
+
+# --- the PSF half: CHE-236 (R16.1) -----------------------------------------
+
+#: The three implementations `method` selects, as the dotted names the pinned
+#: solver gives them. On the record as `analysis`, so an artifact says which
+#: propagation produced it and a version bump that renames or moves one of them
+#: fails loudly here rather than silently elsewhere.
+NATIVE_PSF_ANALYSES: dict[str, str] = {
+    "fft": "optiland.psf.ScalarFFTPSF",
+    "mmdft": "optiland.psf.MMDFTPSF",
+    "huygens": "optiland.psf.ScalarHuygensPSF",
+}
+
+#: Which propagation `method` selects. A `Literal` and not a `StrEnum`, for the
+#: reason `PsfNormalization` and `couplers.GrazingPolicy` are: `scripts/class_budget.py`
+#: counts a `StrEnum` as a class and the stricter reading is taken.
+PsfMethod = Literal["fft", "mmdft", "huygens"]
+
+#: What each method's propagation actually *is*, read from the pinned
+#: implementations rather than assumed from their names. Carried on the record for
+#: the reason `NATIVE_SPOT_METRIC_DEFINITIONS` is: a consumer holding two of these
+#: artifacts and comparing their numbers has to know they were not computed the
+#: same way, and the artifact is the only thing that consumer holds.
+#:
+#: **The three are not interchangeable at coarse sampling and it is measured.** On
+#: the R05 reference singlet at `num_rays=32`, `fft` peaks at 99.906 and a
+#: 32x32 `huygens` peaks at 82.696 -- and the cause is grid centring rather than
+#: physics: `ScalarHuygensPSF` lays its samples on
+#: `linspace(-extent, extent, image_size)`, which for an EVEN `image_size` has no
+#: sample at the centre of the pattern, so the reported peak is the largest sample
+#: near the peak and not the peak. At `image_size=33` the same call peaks at
+#: 99.9064, matching `fft` to six digits. `tests/backends/test_optiland_psf.py`
+#: pins both halves.
+NATIVE_PSF_METHOD_DEFINITIONS: dict[str, str] = {
+    "fft": (
+        "zero-padded FFT of sqrt(I) exp(-2i pi W) on the circular normalized pupil "
+        "mask, with Zemax-compatible grid sampling: with no grid_size the pinned "
+        "solver REDUCES num_rays to floor(32 * 2**((log2(num_rays) - 5) / 2)) and "
+        "pads to 2 * num_rays. The sample pitch is not chosen; it is "
+        "lambda * FNO_working * (num_rays - 1) / grid_size"
+    ),
+    "mmdft": (
+        "the same pupil through a matrix triple-product DFT with explicitly "
+        "controlled output sampling: image_size and pixel_pitch_m are honoured as "
+        "requested, and the solver refuses an image_size beyond the pad size its "
+        "own sampling admits"
+    ),
+    "huygens": (
+        "a coherent sum over the physical 3-D reference-sphere intersections to the "
+        "actual image-surface geometry, with the 1/R and obliquity factors -- the "
+        "only method that is not a Fourier transform of a pupil. The summation "
+        "batch size is NOT exposed: _create_summation_strategy hard-codes it and "
+        "__init__ computes the PSF eagerly, so there is no window in which a "
+        "caller-supplied value could be applied"
+    ),
+}
+
+#: The normalization every `NativePsfAnalysis` carries, stated rather than named.
+#:
+#: This is **not** `measurements.PsfNormalization`, whose vocabulary is
+#: `raw`/`peak`/`energy` on `|u|^2`. It is Optiland's own Strehl-percent
+#: convention, and like peak normalization it is blind to any constant
+#: multiplicative error -- which is why the record carries the declaration and not
+#: just a tag.
+NATIVE_PSF_NORMALIZATION = (
+    "strehl_percent: an unaberrated pupil of the same aperture peaks at 100.0, so "
+    "the measured Strehl ratio is peak/100. The normalizer is the peak of an ideal "
+    "pupil computed by the same propagation, so the number is a ratio and carries "
+    "no radiometric scale"
+)
+
+#: Optiland's own defaults for the two arguments this module passes through, and
+#: the `image_size` default of the one class that has one. Pinned here so the
+#: record can state what was used when a caller passed nothing, and so the
+#: Huygens pitch conversion below knows the grid size it has to correct for.
+_DEFAULT_PSF_STRATEGY = "chief_ray"
+_DEFAULT_REMOVE_TILT = False
+#: `ScalarHuygensPSF.__init__`'s own `image_size` default, mirrored here because
+#: `_native_pixel_pitch`'s correction cannot be applied without knowing the grid it
+#: corrects for. A mirror of an upstream default goes stale silently, so
+#: `tests/backends/test_optiland_psf.py` reads it back off the pinned signature.
+_NATIVE_HUYGENS_IMAGE_SIZE = 128
+
+#: Which sampling arguments each method can use. Anything else supplied is
+#: **refused rather than ignored**: silently discarding a sampling argument is the
+#: failure `Sampling.reference_surface` was designed against, and a caller who
+#: asked for a `grid_size` from `huygens` asked for something that does not exist.
+_PSF_SAMPLING_ARGUMENTS: dict[str, frozenset[str]] = {
+    "fft": frozenset({"grid_size"}),
+    "mmdft": frozenset({"image_size", "pixel_pitch_m"}),
+    "huygens": frozenset({"image_size", "pixel_pitch_m"}),
+}
+
+
+@dataclass(frozen=True)
+class NativePsfAnalysis:
+    """One native PSF analysis: the intensity map, its grid, its normalization, its provenance.
+
+    A class on rule 2 -- the public record a consumer reads back, and several of
+    R16.1's acceptance criteria are statements about its fields -- and separate
+    from `measurements.PsfResult` for the same reason `NativeSpotAnalysis` is
+    separate from `measurements.SpotResult`: the two carry numbers under
+    *different declared normalizations*. `PsfResult.normalization` is
+    `raw`/`peak`/`energy` on `|u|^2`; this one is Optiland's Strehl-percent
+    convention (`NATIVE_PSF_NORMALIZATION`). One record spanning both would be two
+    records with a tag, and sharing one would need the `backends -> measurements`
+    edge the dependency allowlist does not have.
+
+    Every field is a plain number, a string, a tuple, a host array or a mapping.
+    No `Optic`, no `Wavefront`, no `WavefrontData`, no millimetre, no micrometre.
+    """
+
+    #: `(ny, nx)` host array of intensity in the normalization declared below --
+    #: non-negative, finite, and **not** an amplitude.
+    intensity: Any
+
+    #: The sample spacing of `intensity`, in metres, equal on both axes. This is
+    #: the spacing between adjacent samples and not any of the three classes'
+    #: internal `pixel_pitch` attributes: two of those are in different units from
+    #: each other, and the Huygens one is off from its own sample spacing (see
+    #: `_native_sample_pitch_um`).
+    pixel_pitch_m: float
+
+    #: `(ny, nx)`, the same shape as `intensity`, carried so a consumer reading
+    #: JSON does not have to re-derive it from a flattened array.
+    image_shape: tuple[int, int]
+
+    wavelength_m: float
+
+    #: The field this analysed, in degrees, as declared by the source. One pair,
+    #: because one field is what the lens carries.
+    field_angle_deg: tuple[float, float]
+
+    #: Which propagation ran, and how the pupil was sampled and referenced.
+    #:
+    #: **`num_rays` is the count the solver actually used**, which for `fft` with
+    #: no `grid_size` is *not* the count requested: the pinned class reduces it to
+    #: `floor(32 * 2**((log2(num_rays) - 5) / 2))` to emulate OpticStudio's
+    #: sampling (measured: 32 -> 32, 128 -> 64, 512 -> 128). Reporting the request
+    #: would name a pupil sampling that never happened.
+    method: str
+    num_rays: int
+    strategy: str
+    remove_tilt: bool
+
+    #: The declared normalization, as a tag and as the sentence the tag stands for.
+    normalization: str
+    normalization_declaration: str
+
+    #: The peak sample, where it is, and the pinned solver's own Strehl ratio.
+    #:
+    #: `strehl_ratio` is **the solver's `strehl_ratio()`**, not `peak/100`, and the
+    #: two are not the same call on all three methods: measured on 0.6.0,
+    #: `BasePSF.strehl_ratio` reads the CENTRE sample `psf[n // 2, n // 2] / 100`
+    #: while `MMDFTPSF` overrides it with `max(psf) / 100`. On a centred pattern
+    #: they agree to float tolerance, which is what
+    #: `tests/backends/test_optiland_psf.py` pins; on a pattern whose peak is not
+    #: the centre sample they do not, and the record carries both rather than
+    #: choosing.
+    peak_intensity: float
+    peak_index: tuple[int, int]
+    strehl_ratio: float
+
+    #: The image-space geometry the propagation was referenced to: the working
+    #: F-number at this field and wavelength (`_get_working_FNO`) and the radius of
+    #: the reference sphere the selected strategy built (`WavefrontData.radius`),
+    #: in metres.
+    working_f_number: float
+    reference_sphere_radius_m: float
+
+    #: How many fields and wavelengths the analysis ran over. Both `1`, always, and
+    #: recorded rather than implied: see the module docstring.
+    fields_analyzed: int
+    wavelengths_analyzed: int
+
+    #: Which implementation produced these numbers, and at which version.
+    analysis: str
+    optiland_version: str
+    mode: str = "native"
+
+    #: `NATIVE_PSF_METHOD_DEFINITIONS`, carried on the artifact because a consumer
+    #: holding only the artifact must be able to tell which propagation produced
+    #: it and what that propagation does differently from the other two.
+    method_definitions: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Refuse a record whose numbers cannot be what they claim to be.
+
+        Thin, deliberately, and for the same reason `NativeSpotAnalysis`'s is: this
+        record carries a delegation's output, and re-deriving the PSF here to check
+        it would be reimplementing the analysis this module exists not to
+        reimplement. What is checked is what a *translation* error looks like -- a
+        negative or non-finite intensity, a map that is not a 2-D grid, a
+        disagreeing declared shape, a pitch or a wavelength that is not positive.
+        """
+        if not self.method_definitions:
+            object.__setattr__(self, "method_definitions", dict(NATIVE_PSF_METHOD_DEFINITIONS))
+
+        intensity = np.asarray(self.intensity)
+        if intensity.ndim != 2:
+            raise ValueError(
+                f"intensity must be one (ny, nx) map, got shape {intensity.shape!r}"
+            )
+        if tuple(int(size) for size in intensity.shape) != tuple(self.image_shape):
+            raise ValueError(
+                f"image_shape={self.image_shape!r} does not describe the intensity map, "
+                f"whose shape is {intensity.shape!r}"
+            )
+        if not np.all(np.isfinite(intensity)):
+            raise ValueError("intensity carries a non-finite sample, so it is not a PSF")
+        if float(np.min(intensity)) < 0.0:
+            raise ValueError(
+                f"intensity has a negative sample ({float(np.min(intensity))!r}); this is "
+                "an intensity map and not an amplitude or a real part"
+            )
+
+        for name in ("pixel_pitch_m", "wavelength_m", "working_f_number"):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError(f"{name}={value!r} is not a positive finite number")
+        if not (self.fields_analyzed == 1 and self.wavelengths_analyzed == 1):
+            raise ValueError(
+                f"this path analyses exactly one field and one wavelength, got "
+                f"{self.fields_analyzed} and {self.wavelengths_analyzed}. A lens carrying "
+                "more than one of either did not come from build_lens"
+            )
+
+    def coordinates(self) -> tuple[Any, Any]:
+        """`(y, x)` sample coordinates in metres, on `representations.Frame`'s origin rule.
+
+        Index `n // 2` is the origin on each axis, which is the same rule the
+        project's own grids and `tests/physics/oracles.py` use.
+
+        **The origin is the pattern's reference point and not the optical axis**,
+        and which reference point that is depends on the method -- measured, because
+        the pinned classes do not agree:
+
+        * `fft` and `mmdft` transform a pupil, so their maps have no absolute image
+          coordinate at all and index `n // 2` *is* the centre of the pattern,
+          referenced to the sphere the selected `strategy` built (the chief ray by
+          default).
+        * `huygens` sums to the real image surface, so its grid has an absolute
+          location -- and that location is **not** the `strategy`'s reference point:
+          `_determine_image_center` traces a 6-ring hexapolar fan and takes the
+          *mean* of the surviving intersections, a centroid, whatever `strategy`
+          says. Off axis with coma the two differ.
+
+        **And for `huygens` the origin sample is exact only when `image_size` is
+        odd.** That class lays its samples on `linspace(centre - extent, centre +
+        extent, image_size)`, so with an even `image_size` -- including the pinned
+        default of 128 -- no sample lands on the centre and index `n // 2` sits half
+        a sample spacing off it in each axis. The consequence is measured and
+        visible: an even 32-sample grid reports a peak of 82.70 where the same
+        configuration at 33 reports 99.91.
+        `tests/backends/test_optiland_psf.py` pins both.
+
+        So off axis these coordinates are offsets from an image point roughly
+        `f tan(theta)` from the axis, this path does not report that absolute
+        location, and `field_angle_deg` is what says which point the offsets are
+        about.
+
+        One-dimensional axes rather than meshgrids, because a caller that wants a
+        grid can broadcast and a caller that wants a profile should not have to pay
+        for two `(ny, nx)` arrays.
+        """
+        ny, nx = self.image_shape
+        y = (np.arange(ny, dtype=np.float64) - ny // 2) * self.pixel_pitch_m
+        x = (np.arange(nx, dtype=np.float64) - nx // 2) * self.pixel_pitch_m
+        return y, x
+
+
+def _import_optiland_psf(method: PsfMethod) -> tuple[Any, str]:
+    """`(the selected PSF class, version)`, imported inside the call that needs it.
+
+    The same deferral every module in this package uses, and the reason `method` is
+    validated before this point: it selects *which class to import*, so an unknown
+    value has to be refused here rather than by the solver.
+
+    **Importing any of the three imports numba**, measured: the package's
+    `__init__` pulls in `huygens_fresnel_strategies`, which does a module-level
+    `from numba import njit, prange`. So numba is a requirement of this operation
+    and not of one method -- see the `Raises:` note on `psf`, and the capability gap
+    recorded in `tests/operations/test_capability_references.py`.
+
+    The vectorial classes the package also ships (`VectorialFFTPSF`,
+    `VectorialHuygensPSF`) are deliberately unreachable: this path is scalar, and
+    the two factory classes `FFTPSF` / `HuygensPSF` dispatch to a vectorial
+    implementation whenever the `Optic` carries a polarization state, which would
+    make the returned record's own `analysis` field a guess. The scalar classes are
+    named directly for that reason.
+    """
+    import optiland
+
+    if method == "fft":
+        from optiland.psf import ScalarFFTPSF as psf_class
+    elif method == "mmdft":
+        from optiland.psf import MMDFTPSF as psf_class
+    else:
+        from optiland.psf import ScalarHuygensPSF as psf_class
+
+    return psf_class, str(optiland.__version__)
+
+
+def _native_sample_pitch_um(native: Any, *, method: PsfMethod) -> float:
+    """The sample spacing of a computed PSF, in micrometres, read from the pinned class.
+
+    `_get_psf_units(image)` is the pinned solver's own answer to "how wide is this
+    map", and it returns micrometres for **all three** classes -- which is exactly
+    what makes it the right thing to read: `MMDFTPSF.pixel_pitch` is micrometres
+    and `ScalarHuygensPSF.pixel_pitch` is millimetres, and reproducing that
+    asymmetry here would be a second source of truth for a unit. Dividing the
+    reported extent by the sample count gives the pitch in one unit whichever class
+    computed it.
+
+    **The Huygens correction is a measured off-by-one and not a preference.** That
+    class lays its samples on `linspace(-extent, extent, image_size)` with
+    `extent = 0.5 * image_size * pixel_pitch`, so the span between the first and
+    last sample is `image_size * pixel_pitch` across `image_size - 1` intervals and
+    the spacing between adjacent samples is `pixel_pitch * image_size /
+    (image_size - 1)` -- 3 % larger than the attribute at `image_size = 32`.
+    Labelling the attribute as the spacing would put `coordinates()` 3 % out and
+    make two records that were asked for the same pitch describe two different
+    grids. Measured: with the correction applied on both sides, a Huygens and an
+    MMDFT run at one requested pitch agree to 2.6e-3 peak-normalized L-infinity;
+    without it, to 2.2e-2.
+    """
+    extent_um, _ = native._get_psf_units(native.psf)
+    samples = int(np.shape(native.psf)[1])
+    pitch_um = float(extent_um) / samples
+    if method == "huygens":
+        pitch_um *= samples / (samples - 1)
+    return pitch_um
+
+
+def _native_pixel_pitch(
+    pixel_pitch_m: float, *, method: PsfMethod, image_size: int | None
+) -> float:
+    """A requested sample spacing in metres, in the unit and convention one class wants.
+
+    The inverse of `_native_sample_pitch_um` for the two methods that accept a
+    pitch, and the only place the micrometre/millimetre asymmetry is written down:
+
+    * `MMDFTPSF.pixel_pitch` is **micrometres**, and it *is* the sample spacing --
+      its kernels sample the image plane at exactly `lambda * FNO * clear_size /
+      pad_size = pixel_pitch`.
+    * `ScalarHuygensPSF.pixel_pitch` is **millimetres**, and it is the spacing
+      divided by `image_size / (image_size - 1)`; see `_native_sample_pitch_um` for
+      the measurement. `image_size=None` means the class's own default, which is
+      pinned as `_NATIVE_HUYGENS_IMAGE_SIZE` rather than left implicit, because the
+      correction cannot be applied without knowing the grid it corrects for.
+    """
+    if method == "mmdft":
+        return pixel_pitch_m / NATIVE_WAVELENGTH_M
+    samples = _NATIVE_HUYGENS_IMAGE_SIZE if image_size is None else int(image_size)
+    return pixel_pitch_m / NATIVE_LENGTH_M * (samples - 1) / samples
+
+
+def psf(
+    setup: OpticalSetup,
+    source: SourceSpec,
+    *,
+    method: PsfMethod,
+    num_rays: int,
+    execution: Execution,
+    strategy: str = _DEFAULT_PSF_STRATEGY,
+    remove_tilt: bool = _DEFAULT_REMOVE_TILT,
+    grid_size: int | None = None,
+    image_size: int | None = None,
+    pixel_pitch_m: float | None = None,
+) -> NativePsfAnalysis:
+    """The diffraction PSF of `setup` under `source`, by the pinned solver's own analysis.
+
+    One call reaches the whole pipeline -- pupil sampling, sequential trace to the
+    image surface, reference sphere, OPD in waves, propagation, normalization -- and
+    `method` selects only the propagation. Nothing about that pipeline is
+    reimplemented here and no `Optic`, `Wavefront` or `WavefrontData` reaches the
+    caller; see the module docstring for why it is one primitive rather than four
+    public nodes.
+
+    `method` is refused here rather than by the solver, because it selects which
+    class to import. `strategy` is passed through **unvalidated**, for the reason
+    `spot_diagram` gives about `reference`: it is the pinned solver's vocabulary
+    (measured: `{"chief_ray", "centroid_sphere", "centroid", "best_fit_sphere",
+    "best_fit"}`), it refuses an unknown value itself, and a whitelist here would be
+    a second source of truth that goes stale at the next version bump.
+
+    A sampling argument that the selected method cannot use is **refused, not
+    ignored**: `grid_size` with `method="huygens"` raises rather than quietly
+    computing a PSF at a sampling nobody asked for.
+
+    Parameters
+    ----------
+    setup
+        The neutral optical configuration. Its `reference_wavelength_um` is what
+        `build_lens` declares as the primary; what is *analysed* is
+        `source.wavelength_um`, passed explicitly (`resolve_wavelength` accepts any
+        float and does not require the wavelength to be declared on the `Optic`).
+    source
+        The neutral illumination. **Must be an infinite-conjugate source**, for the
+        same reason and with the same refusal as `spot_diagram`.
+    method
+        `"fft"`, `"mmdft"` or `"huygens"`. See `NATIVE_PSF_METHOD_DEFINITIONS` for
+        what each propagation actually is; they are **not** interchangeable at
+        coarse sampling.
+    num_rays
+        Pupil samples across one dimension of the uniform grid. Note that `fft`
+        with no `grid_size` reduces this itself, and that the Huygens summation
+        costs `image_size**2 * num_rays**2`.
+    execution
+        Device and precision, through the same capability gate and the same
+        process-global configuration as a trace.
+    strategy
+        Which reference sphere the OPD is measured against. Passed through.
+    remove_tilt
+        Whether the solver removes tilt from the OPD before propagating. The
+        default is the one all three classes declare (`False`), not `BasePSF`'s.
+    grid_size
+        `fft` only: the zero-padded FFT grid. With `None` the pinned class emulates
+        OpticStudio's sampling and requires `num_rays >= 32`.
+    image_size
+        `mmdft` and `huygens` only: output samples across one dimension.
+    pixel_pitch_m
+        `mmdft` and `huygens` only: the requested **sample spacing in metres**.
+        With `None` each class chooses its own, which the record reports back.
+
+    Raises:
+        TypeError: `source` is not a `SourceSpec` -- most likely a `RayBundle`,
+            which this path cannot take at all.
+        NotImplementedError: the source is finite-conjugate, which this path does
+            not support.
+        ValueError: `method` is not one of the three; `num_rays` is below 1; a
+            sampling argument does not apply to `method`; `execution` is misspelled
+            or incomplete; or the pinned solver refuses the sampling it was given.
+        ImportError: optiland is not installed, or its PSF package cannot be
+            imported. Measured: `optiland/psf/__init__.py` imports
+            `huygens_fresnel_strategies`, which does a module-level
+            `from numba import njit, prange`, so an environment without numba fails
+            **all three** methods and not only `huygens`. On the torch backend the
+            Huygens summation additionally needs torch, which the same import path
+            reaches lazily.
+    """
+    if not isinstance(source, SourceSpec):
+        raise TypeError(
+            f"psf takes a SourceSpec as its second argument, got {type(source).__name__}. "
+            "A native analysis GENERATES its rays from a source declaration inside the "
+            "solver; an already-materialized RayBundle cannot be handed to it, and there "
+            "is no measurement on this project's side that turns a bundle into a "
+            "diffraction PSF -- measurements.psf reduces a ScalarField."
+        )
+    if not source.object_at_infinity:
+        raise NotImplementedError(
+            f"this analysis supports only infinite-conjugate angular sources, and the "
+            f"source declares object_distance_mm={source.object_distance_mm!r}. At a finite "
+            "distance a field angle is a POSITION, not a direction (problems.SourceSpec), so "
+            "passing it to the solver's 'angle' field type would analyse a different object "
+            "than the one declared -- silently, with a plausible PSF. Same gate and same "
+            "reason as spot_diagram."
+        )
+    if method not in NATIVE_PSF_ANALYSES:
+        raise ValueError(
+            f"method={method!r} is not one of {sorted(NATIVE_PSF_ANALYSES)}. It selects "
+            "which of the pinned solver's scalar PSF implementations to import, so it is "
+            "refused here rather than passed on."
+        )
+    if num_rays < 1:
+        raise ValueError(
+            f"num_rays={num_rays!r} must be at least 1; it is the number of pupil samples "
+            "across one dimension of the uniform grid the wavefront is built on"
+        )
+
+    supplied = {
+        name: value
+        for name, value in (
+            ("grid_size", grid_size),
+            ("image_size", image_size),
+            ("pixel_pitch_m", pixel_pitch_m),
+        )
+        if value is not None
+    }
+    inapplicable = sorted(set(supplied) - _PSF_SAMPLING_ARGUMENTS[method])
+    if inapplicable:
+        raise ValueError(
+            f"{inapplicable} {'does' if len(inapplicable) == 1 else 'do'} not apply to "
+            f"method={method!r}, which takes "
+            f"{sorted(_PSF_SAMPLING_ARGUMENTS[method])}. Discarding a sampling argument "
+            "silently would compute a PSF at a sampling nobody asked for and report no "
+            "error, so it is refused."
+        )
+    if pixel_pitch_m is not None and (
+        not math.isfinite(pixel_pitch_m) or pixel_pitch_m <= 0.0
+    ):
+        raise ValueError(
+            f"pixel_pitch_m={pixel_pitch_m!r} must be a positive length in METRES; it is "
+            "the requested spacing between adjacent samples of the returned map"
+        )
+    if image_size is not None and image_size < 2:
+        # A one-sample map has no adjacent samples, so it has no spacing to report:
+        # `_native_sample_pitch_um`'s `(n - 1)` would divide by zero *after* the
+        # solver had already computed a PSF. Refused up front rather than crashing
+        # in the translation, and it is a real limit of this record's contract
+        # rather than of the solver's.
+        raise ValueError(
+            f"image_size={image_size!r} must be at least 2. A single-sample map has no "
+            "spacing between adjacent samples, so `pixel_pitch_m` and `coordinates()` "
+            "would have nothing to describe"
+        )
+
+    # The capability gate and the process-global state, before the solver enters the
+    # process -- the same three calls in the same order as a trace and as
+    # `spot_diagram`, so an analysis and a trace of the same setup cannot disagree
+    # about device or precision.
+    _require_keys(execution, name="execution")
+    device, precision, namespace = _resolve_execution(execution)
+    configure_execution(device=device, precision=precision, namespace=namespace)
+
+    lens = build_lens(setup, source)
+    psf_class, optiland_version = _import_optiland_psf(method)
+
+    # `BasePSF` takes the field as a NORMALIZED (Hx, Hy) pair and not a `Field`
+    # (measured: `lens.fields.fields[0]` has no `.coord` and raises), so this is the
+    # same normalization a trace does, through the same function -- CHE-219's
+    # `normalized_field`, which reads `max_field` back off the constructed lens
+    # rather than assuming it. Getting this wrong analyses the axis instead of the
+    # declared field, silently and with a plausible PSF, which is why
+    # `field_angle_deg` is on the record and asserted off axis.
+    field_coordinates = normalized_field(lens, source.field_angle_deg)
+
+    arguments: dict[str, Any] = {
+        "num_rays": int(num_rays),
+        "strategy": strategy,
+        "remove_tilt": bool(remove_tilt),
+    }
+    if method == "fft":
+        arguments["grid_size"] = grid_size
+    else:
+        if image_size is not None:
+            arguments["image_size"] = int(image_size)
+        if pixel_pitch_m is not None:
+            arguments["pixel_pitch"] = _native_pixel_pitch(
+                pixel_pitch_m, method=method, image_size=image_size
+            )
+
+    native = psf_class(
+        lens,
+        field_coordinates,
+        source.wavelength_um,
+        **arguments,
+    )
+
+    intensity = _host(native.psf)
+    shape = (int(intensity.shape[0]), int(intensity.shape[1]))
+    peak_index = np.unravel_index(int(np.argmax(intensity)), shape)
+    # A cached lookup and not a second trace: `Wavefront._generate_data` computed
+    # this in the constructor and `get_data` reads `self.data[(field, wl)]`.
+    wavefront_data = native.get_data(native.fields[0], native.wavelengths[0])
+
+    return NativePsfAnalysis(
+        intensity=intensity,
+        # `NATIVE_WAVELENGTH_M` is this package's micrometre, declared for the
+        # solver's wavelengths; a PSF pitch is the second micrometre-valued quantity
+        # the backend produces and it is deliberately the same constant rather than
+        # a second copy of 1e-6.
+        pixel_pitch_m=_native_sample_pitch_um(native, method=method) * NATIVE_WAVELENGTH_M,
+        image_shape=shape,
+        wavelength_m=source.wavelength_um * NATIVE_WAVELENGTH_M,
+        field_angle_deg=source.field_angle_deg,
+        method=method,
+        num_rays=int(native.num_rays),
+        strategy=strategy,
+        remove_tilt=bool(remove_tilt),
+        normalization="strehl_percent",
+        normalization_declaration=NATIVE_PSF_NORMALIZATION,
+        peak_intensity=float(np.max(intensity)),
+        peak_index=(int(peak_index[0]), int(peak_index[1])),
+        strehl_ratio=float(native.strehl_ratio()),
+        working_f_number=float(_host(native._get_working_FNO())),
+        reference_sphere_radius_m=float(_host(wavefront_data.radius)) * NATIVE_LENGTH_M,
+        fields_analyzed=len(native.fields),
+        wavelengths_analyzed=len(native.wavelengths),
+        analysis=NATIVE_PSF_ANALYSES[method],
         optiland_version=optiland_version,
     )

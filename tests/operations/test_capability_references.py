@@ -34,7 +34,7 @@ CITATIONS = [
 def test_the_catalog_cites_something() -> None:
     """The meta-check: a parametrization over no citations proves nothing."""
     assert CITATIONS, "no catalog record cites a capability, so the tests below are vacuous"
-    assert len(CITATIONS) == 6, [operation for operation, _ in CITATIONS]
+    assert len(CITATIONS) == 7, [operation for operation, _ in CITATIONS]
 
 
 @pytest.mark.parametrize(
@@ -71,6 +71,18 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
         # semantic operation. `M_SPOT_DIAGRAM` cites nothing, correctly -- it drives
         # no backend and has no measured row of its own.
         "SOM_SPOT_DIAGRAM": "M_RAY_OPTILAND",
+        # CHE-236 (R16.1). The native PSF analysis: the same package's sequential
+        # trace with a diffraction propagation on the end, in the same measured
+        # row. **The row does not mention that this operation needs numba at all**,
+        # and it needs it for every method rather than only for Huygens: measured,
+        # `optiland/psf/__init__.py` imports `huygens_fresnel_strategies`, which
+        # does a module-level `from numba import njit, prange`. Probed working on
+        # both namespaces at cpu/fp32 and cpu/fp64 (numba 0.66.0, torch
+        # 2.13.0+cpu, both pinned in docker/requirements.txt), so the row's
+        # device/precision claims are not falsified -- what is missing is a
+        # dependency the pack has no field for. Recorded on the ticket rather than
+        # papered over by widening the pack without a probe.
+        "SOM_PSF": "M_RAY_OPTILAND",
         "O_ASM_PROPAGATE": "M_WAVE_CHROMATIX",
         # CHE-228 (R06.11). The Fresnel kernel runs on the same pinned build, in the
         # same complex64-only storage the row measured, so it cites the same record.
@@ -104,6 +116,7 @@ def test_several_descriptors_may_cite_one_record() -> None:
         per_component.setdefault(component, []).append(operation_id)
     assert sorted(per_component["M_RAY_OPTILAND"]) == [
         "O_RAY_TRACE",
+        "SOM_PSF",
         "SOM_SPOT_DIAGRAM",
         "SO_RAY_LAUNCH_TRACE",
     ]

@@ -261,6 +261,14 @@ SRC = ROOT / "src"
 #: table -- one callable per analysis is what the catalog's per-record signature
 #: gate can describe, so the enum would have bought nothing and cost a class.
 #:
+#: **Raised to 4 by CHE-236 (R16.1)**, which adds `NativePsfAnalysis` to the same
+#: module -- the native PSF path's neutral result, on **rule 2**, and separate from
+#: `measurements.PsfResult` for both of the reasons above with the definitions
+#: replaced by *normalizations*: this record's scale is Optiland's Strehl-percent
+#: convention and `PsfResult`'s is `raw`/`peak`/`energy` on `|u|^2`. See the
+#: `PROJECT_CEILING` note for the four class names the alternative design would
+#: have cost.
+#:
 #: Six class names did **not** land against that +2, and the tests name them:
 #: `OptilandAdapter` (a one-instance facade behind `get_adapter()`),
 #: `OptilandExecutionState`, `TracePlans`, `OptilandRayRequest` /
@@ -351,7 +359,7 @@ SRC = ROOT / "src"
 #: `PositionPlan`, `PatchPlan` and `Ensemble`.
 #:
 BUDGETS: dict[str, int] = {
-    "backends": 3,
+    "backends": 4,
     "couplers": 4,
     "measurements": 2,
     "numerics": 7,
@@ -536,12 +544,36 @@ BUDGETS: dict[str, int] = {
 #: as a class and the stricter reading is taken -- and the two operation records are
 #: entries in an existing tuple.
 #:
+#: **31 -> 32 by CHE-236 (R16.1)**, one class: `NativePsfAnalysis`, on **rule 2**,
+#: the public serialized record the native PSF path returns and that five of
+#: R16.1's acceptance criteria are statements about (which normalization, which
+#: sampling, which field, which method, what the units are). `BUDGETS["backends"]`
+#: goes 3 -> 4 with it.
+#:
+#: Why it is not `measurements.PsfResult` reused, which would have cost nothing:
+#: the two carry numbers under *different declared normalizations* --
+#: `PsfResult.normalization` is `raw`/`peak`/`energy` on `|u|^2`, and this one is
+#: Optiland's Strehl-percent convention where an unaberrated pupil of the same
+#: aperture peaks at 100. One record spanning both is two records with a tag. It is
+#: also the same allowlist argument `NativeSpotAnalysis` rests on: sharing needs a
+#: `backends -> measurements` edge, which is an architecture change and not a
+#: saving. R16.1 adds no other class -- `PsfMethod` is a `Literal` and not a
+#: `StrEnum`, for the reason R08.1 established and R11.1 and R16 repeated, and the
+#: operation record is an entry in an existing tuple.
+#:
+#: **The design this raise is small because of.** The alternative shape for R16.1
+#: was a decomposition of the pinned solver's PSF pipeline into public
+#: `WavefrontNode`, `PupilField`, propagation-kernel and measurement types -- four
+#: classes rather than one, for graph flexibility no current consumer wants.
+#: `tests/backends/test_optiland_psf.py` asserts those four names are absent, the
+#: way R08.1's five and R16's two are.
+#:
 #: Flagged for the owner on CHE-218, because the standing question above is now
 #: two units old: this constant has ratcheted five times without ever being
 #: re-derived from the new tree, and `AGENTS.md` says a class budget introduced
 #: later should be derived from that tree and made a visibility gate. The
 #: per-package equality gates are the half doing real work.
-PROJECT_CEILING = 31
+PROJECT_CEILING = 32
 
 
 @dataclass(frozen=True)

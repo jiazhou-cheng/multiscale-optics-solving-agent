@@ -52,6 +52,10 @@ RESULT_TYPES: dict[str, str] = {
     # separate. Nothing in either annotation states that; this mapping does.
     "SpotResult": "spot",
     "NativeSpotAnalysis": "spot",
+    # CHE-236 (R16.1). The same arrangement for `psf`: `measurements.PsfResult` and
+    # `backends.optiland.NativePsfAnalysis` are both the `psf` observable, computed
+    # by two paths under different declared *normalizations*.
+    "NativePsfAnalysis": "psf",
 }
 
 #: Annotations that name a **representation port** -- the subset an operation can
@@ -237,7 +241,7 @@ def test_the_derivation_is_not_vacuous() -> None:
     thing for every operation would pass all fifty-six. These four facts are what
     say it does not.
     """
-    assert len(CASES) == 16
+    assert len(CASES) == 17
     assert _derive("S_SOURCE_PLANE_WAVE")["inputs"] == ()
     assert _derive("O_PROPAGATE_RAYS")["inputs"] == ("ray_bundle",)
     assert _derive("O_PROPAGATE_RAYS")["return_arity"] == 1
