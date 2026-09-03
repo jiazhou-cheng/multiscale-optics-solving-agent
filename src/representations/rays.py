@@ -42,6 +42,18 @@ The measure lands here rather than in the coupler that consumes it because a
 trusted ray-to-wave conversion has to be able to **refuse** an unknown measure,
 and that refusal is only expressible if the representation can say "mine is
 undeclared". `MEASURE_UNDECLARED` is the default, and it is the useful value.
+
+*Population provenance* -- `ray_splitting`, added by CHE-226 (R16), and the one
+field here that is not a physical quantity. It says how the *population* was
+produced rather than what any ray is: whether it contains ray-splitting
+descendants. It lands on the representation for exactly the reason the measure
+did, and the parallel is deliberate down to the three values and the default: a
+measurement over ray intersections has to be able to **refuse** a population it
+cannot interpret, and a consumer whose only input is a bundle can only be told by
+the bundle. `measurements.spot_diagram` is that consumer and
+`RAY_SPLITTINGS` is the vocabulary; nothing in this module reads the field,
+because whether splitting matters is a property of the consuming measurement and
+not of the rays.
 """
 
 from __future__ import annotations
@@ -64,9 +76,11 @@ from representations.geometry import PHASOR, Frame, ReferenceSurface
 
 __all__ = [
     "MEASURE_KINDS",
+    "RAY_SPLITTINGS",
     "UNVERIFIED",
     "MeasureKind",
     "RayBundle",
+    "RaySplitting",
     "direction_norm_tolerance",
 ]
 
@@ -94,6 +108,48 @@ MeasureKind = Literal["quadrature_area_m2", "importance_weight", "undeclared"]
 MEASURE_KINDS: tuple[MeasureKind, ...] = (
     "quadrature_area_m2",
     "importance_weight",
+    "undeclared",
+)
+
+#: Whether this population contains **ray-splitting descendants**: rays produced by
+#: one incident ray dividing into several, as at a partially reflecting surface or
+#: across the orders of a grating.
+#:
+#: Three values, and the third is again the one that does the work.
+#:
+#: `unsplit`
+#:     Declared to contain no descendants: each row is one ray of one incident
+#:     population, traced along one path. This is what a sequential geometric trace
+#:     produces, and `backends/optiland/` declares it on both of its paths.
+#: `split_descendants`
+#:     Declared to contain them. A geometric measurement over the intersections is
+#:     then measuring a superposition of branches it cannot separate -- N rows are
+#:     not N rays of one population, so an unweighted first or second moment over
+#:     them is a statistic of the branching and not of the spot.
+#: `undeclared`
+#:     Nothing is known. **Not** a synonym for `unsplit`: a measurement that treats
+#:     it as unsplit has assumed the very thing it needed told. The default, so that
+#:     refusing is what happens when nobody thought about it.
+#:
+#: Deliberately **orthogonal to survival**. A ray may be clipped by a surface rim
+#: without having split, and a split descendant may survive to the image surface;
+#: this project encodes survival by zeroing the amplitude on the supplied-ray path
+#: (`backends.optiland.rays.SUPPLIED_RAY_SURVIVAL_RULE`) and by dropping the row on
+#: the generated path, and neither of those is a statement about splitting. Nothing
+#: derives one from the other, in either direction.
+#:
+#: **No producer in this tree declares `split_descendants` today**, and the value
+#: exists anyway rather than the field being a boolean: `O_DIFFRACTIVE_SURFACE`'s
+#: full-field route already re-decomposes a bundle into a different number of rays
+#: (`operators/diffractive_surface.py`), and a multi-order model is the first thing
+#: that would produce descendants. A two-valued field would force that producer to
+#: choose between a false `unsplit` and an `undeclared` that means "nobody said",
+#: which is exactly the collapse `measure_kind` avoids.
+RaySplitting = Literal["unsplit", "split_descendants", "undeclared"]
+
+RAY_SPLITTINGS: tuple[RaySplitting, ...] = (
+    "unsplit",
+    "split_descendants",
     "undeclared",
 )
 
@@ -183,6 +239,11 @@ class RayBundle:
 
     #: The time convention the amplitude and the optical path are written in.
     phasor: str = PHASOR
+
+    #: How this population was produced, in the one respect a geometric measurement
+    #: over the intersections has to know: see `RAY_SPLITTINGS`. Provenance, not
+    #: physical state, and independent of survival.
+    ray_splitting: RaySplitting = "undeclared"
 
     def __post_init__(self) -> None:
         positions = adopt_array(self.positions_m, name="positions_m", complex_=False)
@@ -283,6 +344,14 @@ class RayBundle:
                     f"State the plane or ray it is measured from, or declare it "
                     f"{UNVERIFIED!r} so a consumer refuses to read it as a phase."
                 ),
+            )
+
+        if self.ray_splitting not in RAY_SPLITTINGS:
+            raise ContractError(
+                "UNKNOWN_RAY_SPLITTING",
+                f"ray_splitting must be one of {list(RAY_SPLITTINGS)}, got "
+                f"{self.ray_splitting!r}",
+                declaration="ray_splitting",
             )
 
         if self.measure_kind not in MEASURE_KINDS:

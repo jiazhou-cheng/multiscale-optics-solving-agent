@@ -475,6 +475,11 @@ def launch(
         optical_path_reference=optical_path_reference,
         measure_weight=measure_weight,
         measure_kind=measure_kind,
+        # CHE-226 (R16). Nothing has divided: this is the generated fan itself, one
+        # row per pupil sample. `rays.to_ray_bundle` declares the same of the traced
+        # output for the same reason, and the two agree because the trace the
+        # declaration describes does not split rays either.
+        ray_splitting="unsplit",
     )
 
     declaration: dict[str, Any] = {

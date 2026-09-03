@@ -55,7 +55,7 @@ The four argument tuples are checked against the code, not just written
 ------------------------------------------------------------------------
 `inputs`, `requires`, `optional` and the arity of `returns` are all derivable from
 `inspect.signature`, and `tests/operations/test_catalog_signatures.py` derives them
-for all thirteen records and compares. So this file is a *checked* restatement of
+for all fifteen records and compares. So this file is a *checked* restatement of
 the signatures rather than a hand-maintained one: renaming a parameter, giving one
 a default, removing one or adding a required argument fails that gate.
 
@@ -192,6 +192,58 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "ray survives is refused rather than returned as an all-zero bundle",
         ),
         evidence=("tests/backends/test_optiland_bundle_trace.py",),
+        capabilities="M_RAY_OPTILAND",
+        derivative="forward_only",
+    ),
+    # The second composite -- CHE-226 (R16), and the first three-stage one. The
+    # pinned solver's own spot analysis: `build_lens` -> Optiland generates its own
+    # pupil fan from the declared field -> it refracts them through every surface ->
+    # it reduces the intersections to a spot. So the record initializes state,
+    # evolves it AND observes it, and `kind` is the terminal stage as CHE-225 defines
+    # it. `inputs=()` with a bare `measurement` kind is refused by
+    # `OperationDescriptor.__post_init__` -- only a source may begin a graph entry --
+    # and that refusal is right: this operation consumes no upstream representation
+    # because it makes its own rays. `M_SPOT_DIAGRAM` below is the *other* path, and
+    # the pair is the point: one generates rays, one consumes them as supplied.
+    OperationDescriptor(
+        operation_id="SOM_SPOT_DIAGRAM",
+        kind=OperationKind.MEASUREMENT,
+        composes=(
+            OperationKind.SOURCE,
+            OperationKind.PHYSICAL_OPERATOR,
+            OperationKind.MEASUREMENT,
+        ),
+        inputs=(),
+        returns=("spot",),
+        implementation="backends.optiland.analysis:spot_diagram",
+        backend="optiland",
+        requires=("setup", "source", "num_rings", "execution"),
+        optional=("distribution", "coordinates", "reference"),
+        approximation=(
+            "the same sequential geometric ray trace as SO_RAY_LAUNCH_TRACE, reduced to "
+            "spot statistics by the pinned solver's own analysis rather than by this "
+            "project: intensity selects rays and never weights a moment, the centroid "
+            "is an unweighted mean, and the two radii are unweighted moments about "
+            "the centre the `reference` argument selects -- the CHIEF RAY by the "
+            "solver's default, which off axis is not the centroid the same call "
+            "reports (backends.optiland.analysis.NATIVE_SPOT_METRIC_DEFINITIONS, read "
+            "from the pinned implementation). Diffraction is not modelled, so a "
+            "geometric spot smaller than the Airy radius is a statement about the rays "
+            "and not about the image"
+        ),
+        validity=(
+            "infinite-conjugate angular sources only: a source declaring a finite "
+            "object distance is refused with NotImplementedError rather than having its "
+            "field angle reinterpreted as a direction, because at a finite distance "
+            "that angle is a position",
+            "exactly one field and one wavelength, because build_lens declares exactly "
+            "one of each -- so 'all' means 'the one declared' and a multi-field "
+            "aberration curve is NOT what this returns",
+            "no RayBundle exists anywhere in this call: the rays are generated inside "
+            "the solver and are not observable, which is the whole difference from "
+            "M_SPOT_DIAGRAM",
+        ),
+        evidence=("tests/backends/test_optiland_analysis.py",),
         capabilities="M_RAY_OPTILAND",
         derivative="forward_only",
     ),
@@ -617,6 +669,41 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "border_energy_fraction is the indicator for it",
         ),
         evidence=("tests/physics/test_psf.py",),
+        capabilities=None,
+        derivative="forward_only",
+    ),
+    OperationDescriptor(
+        operation_id="M_SPOT_DIAGRAM",
+        kind=OperationKind.MEASUREMENT,
+        inputs=("ray_bundle",),
+        returns=("spot",),
+        implementation="measurements.spot:spot_diagram",
+        approximation=(
+            "none in the reduction itself: the coordinates are the bundle's own "
+            "positions at its declared reference surface, untransformed, and the three "
+            "metrics are exact moments of them. What the caller must know is which "
+            "moments -- the centroid and the RMS radius are weighted by |a_i|^2 and "
+            "referred to that centroid, the geometric radius is an unweighted maximum "
+            "about it, and the sampling measure is deliberately NOT applied "
+            "(measurements.spot.SPOT_WEIGHTING)"
+        ),
+        validity=(
+            "the bundle must declare ray_splitting='unsplit'. A population containing "
+            "split-ray descendants, and one whose splitting provenance is undeclared, "
+            "are both refused -- with different codes -- because an unweighted moment "
+            "over branches of one incident ray is a statistic of the branching, and "
+            "nothing here infers provenance from the numbers",
+            "the bundle must carry an amplitude: it is where the per-ray intensity and "
+            "the survival of a ray both live, and weighting every row equally instead "
+            "would measure clipped rays as delivered ones",
+            "rays with |a|^2 = 0 are excluded as undelivered, so included_count may be "
+            "below ray_count; a bundle in which no ray survived is refused rather than "
+            "returned as a spot at the origin",
+            "under a non-uniform sampling density this is a sampling-weighted moment of "
+            "the irradiance rather than the irradiance moment; measure_kind is where a "
+            "caller reads which it has",
+        ),
+        evidence=("tests/physics/test_spot_diagram.py",),
         capabilities=None,
         derivative="forward_only",
     ),

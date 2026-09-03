@@ -156,7 +156,7 @@ def test_importing_operations_populates_the_catalog() -> None:
     )
     report = json.loads(completed.stdout)
     assert report["ids"], "importing operations left the index empty"
-    assert len(report["ids"]) == report["catalog"] == 13
+    assert len(report["ids"]) == report["catalog"] == 15
     assert report["ids"] == sorted(report["ids"]), "find() and registered_ids() sort by id"
     assert report["backends"] == [], report["backends"]
 

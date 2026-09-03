@@ -6,7 +6,7 @@ does not accept, "checked … by inspecting the resolved signature, so the check
 against the code and not against a table". The signatures turn out to be fully
 machine-readable, so this module does the stronger thing: it **derives all four
 tuples** -- `inputs`, `requires`, `optional`, and the arity of `returns` -- from
-`inspect.signature` and compares them with the record, for all thirteen.
+`inspect.signature` and compares them with the record, for all fifteen.
 
 That makes the descriptor's argument metadata a *checked* restatement rather than a
 hand-maintained one, which matters because a second source of truth beside a
@@ -45,6 +45,13 @@ RESULT_TYPES: dict[str, str] = {
     "RayBundle": "ray_bundle",
     "ScalarField": "scalar_field",
     "PsfResult": "psf",
+    # CHE-226 (R16). Two record types, one observable, and that is the declared
+    # convention rather than a derivation: `measurements.SpotResult` and
+    # `backends.optiland.NativeSpotAnalysis` carry the same observable computed
+    # under different declared metric definitions, by the two paths R16 keeps
+    # separate. Nothing in either annotation states that; this mapping does.
+    "SpotResult": "spot",
+    "NativeSpotAnalysis": "spot",
 }
 
 #: Annotations that name a **representation port** -- the subset an operation can
@@ -230,7 +237,7 @@ def test_the_derivation_is_not_vacuous() -> None:
     thing for every operation would pass all fifty-six. These four facts are what
     say it does not.
     """
-    assert len(CASES) == 13
+    assert len(CASES) == 15
     assert _derive("S_SOURCE_PLANE_WAVE")["inputs"] == ()
     assert _derive("O_PROPAGATE_RAYS")["inputs"] == ("ray_bundle",)
     assert _derive("O_PROPAGATE_RAYS")["return_arity"] == 1

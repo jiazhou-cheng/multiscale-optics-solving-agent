@@ -26,7 +26,7 @@ listing the registry means the implementations were already loaded. So there is
 no import-time scan, no filename convention and no entry-point discovery.
 
 **The registration site is `operations.catalog`, inside this package.** CHE-221
-put the fourteen landed operations there, and this module builds its by-id index
+put the landed operations there, and this module builds its by-id index
 from `catalog.CATALOG` at import. That needs no dependency edge in either
 direction, because `implementation` is a string: the catalog *names*
 `backends.optiland.solver:trace` without importing it.
@@ -108,7 +108,7 @@ def find(
 
     No argument enumerates the whole catalog, which is what makes "listing
     everything imports no backend" a statement about a real call -- and since
-    CHE-221 it is a statement about thirteen real records naming `optiland` and
+    CHE-221 it is a statement about fifteen real records naming `optiland` and
     `chromatix`, rather than about an empty dict.
 
     An unknown semantic type or kind is an error, not an empty result. A query

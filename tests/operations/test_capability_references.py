@@ -34,7 +34,7 @@ CITATIONS = [
 def test_the_catalog_cites_something() -> None:
     """The meta-check: a parametrization over no citations proves nothing."""
     assert CITATIONS, "no catalog record cites a capability, so the tests below are vacuous"
-    assert len(CITATIONS) == 4, [operation for operation, _ in CITATIONS]
+    assert len(CITATIONS) == 5, [operation for operation, _ in CITATIONS]
 
 
 @pytest.mark.parametrize(
@@ -65,6 +65,12 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
     assert cited == {
         "SO_RAY_LAUNCH_TRACE": "M_RAY_OPTILAND",
         "O_RAY_TRACE": "M_RAY_OPTILAND",
+        # CHE-226 (R16). The native spot analysis executes in the same measured row:
+        # it is the same package's sequential trace with a reduction on the end, and
+        # the probe measured the package's device and dtype behaviour rather than one
+        # semantic operation. `M_SPOT_DIAGRAM` cites nothing, correctly -- it drives
+        # no backend and has no measured row of its own.
+        "SOM_SPOT_DIAGRAM": "M_RAY_OPTILAND",
         "O_ASM_PROPAGATE": "M_WAVE_CHROMATIX",
         "O_FOCAL_PLANE_TRANSFORM": "M_WAVE_CHROMATIX",
     }
@@ -82,15 +88,17 @@ def test_several_descriptors_may_cite_one_record() -> None:
     pack removes, so this is pinned as intended rather than tolerated.
 
     The chromatix count went 3 -> 2 on CHE-224 (R15.1), which merged
-    `S_WAVE_CHROMATIX` into `O_ASM_PROPAGATE`. Note that the *record* is untouched:
-    what changed is how many descriptors cite it, which is exactly the number this
-    test exists to leave free.
+    `S_WAVE_CHROMATIX` into `O_ASM_PROPAGATE`, and the optiland count went 2 -> 3 on
+    CHE-226 (R16) with `SOM_SPOT_DIAGRAM`. Note that the *record* is untouched in
+    both cases: what changed is how many descriptors cite it, which is exactly the
+    number this test exists to leave free.
     """
     per_component: dict[str, list[str]] = {}
     for operation_id, component in CITATIONS:
         per_component.setdefault(component, []).append(operation_id)
     assert sorted(per_component["M_RAY_OPTILAND"]) == [
         "O_RAY_TRACE",
+        "SOM_SPOT_DIAGRAM",
         "SO_RAY_LAUNCH_TRACE",
     ]
     assert len(per_component["M_WAVE_CHROMATIX"]) == 2

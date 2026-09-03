@@ -443,16 +443,22 @@ def test_measurements_imports_only_representations_and_numerics() -> None:
 
 
 def test_the_class_delta_is_one() -> None:
-    """Criterion 6. `PsfResult` is the only class; `PsfNormalization` is a
+    """Criterion 6. `PsfResult` is R11.1's only class; `PsfNormalization` is a
     `Literal`, because `scripts/class_budget.py` counts a `StrEnum` as a class and
-    the stricter of the two readings is the one this tree takes."""
+    the stricter of the two readings is the one this tree takes.
+
+    The package gained `SpotResult` on CHE-226 (R16) -- the second measurement's own
+    record, budgeted on the same rule and narrated in the same script. R11.1's delta
+    is still one, which is what this test asserts: the set is pinned rather than
+    counted, so a third class has to come past here.
+    """
     defined = {
         node.name
         for path in sorted(PACKAGE.rglob("*.py"))
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.ClassDef)
     }
-    assert defined == {"PsfResult"}
+    assert defined == {"PsfResult", "SpotResult"}
     for avoided in ("PSF", "PsfMeasurement", "FraunhoferPsf", "ReferenceSphere",
                     "PupilAberration", "MetricDefinition", "AnalyticOracle"):
         assert avoided not in defined
@@ -497,9 +503,16 @@ def test_psf_registers_as_a_measurement_and_never_as_a_coupler() -> None:
     # descriptor has to say it is required.
     assert descriptor.requires == ("normalization",)
     assert descriptor.optional == ()
-    assert registry.find(kind=OperationKind.MEASUREMENT) == (descriptor,), (
-        "one measurement in the whole catalog, which is R11 criterion 1"
-    )
+    # R11 criterion 1 was "one measurement in the whole catalog", and this used to
+    # assert exactly that. CHE-226 (R16) landed the second and third, so what is
+    # asserted now is the whole set: `psf` is the one measurement over a
+    # `ScalarField`, and both spot records are measurements over rays -- one
+    # consuming a supplied bundle, one having the pinned solver generate its own.
+    # A fourth measurement has to come past this list.
+    measurements = {record.operation_id for record in registry.find(kind=OperationKind.MEASUREMENT)}
+    assert measurements == {"M_PSF", "M_SPOT_DIAGRAM", "SOM_SPOT_DIAGRAM"}
+    assert descriptor in registry.find(kind=OperationKind.MEASUREMENT)
+    assert registry.find(kind=OperationKind.MEASUREMENT, input="scalar_field") == (descriptor,)
     assert resolve("M_PSF") is psf
 
 

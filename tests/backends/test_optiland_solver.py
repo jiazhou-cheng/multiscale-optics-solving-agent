@@ -94,23 +94,30 @@ AVOIDED_NAMES = (
 # ---------------------------------------------------------------------------
 
 
-def test_the_public_entry_points_are_the_two_kinds_of_input() -> None:
-    """`trace` and `trace_rays` are the API; `configure_execution` is the state they own.
+def test_the_public_entry_points_are_the_kinds_of_input_and_the_one_analysis() -> None:
+    """`trace`, `trace_rays` and `spot_diagram`; `configure_execution` is shared state.
 
     Was `test_one_public_entry_point` through CHE-181. CHE-217 (R05.6) added
     `trace_rays`, and the two are not a facade over one implementation: they differ
     in what the rays *are*. `trace` generates them inside the solver from a field
     coordinate and a ring count; `trace_rays` consumes a `RayBundle` the project
-    already holds, with its own amplitude and its own quadrature. This assertion
-    stays an exact list for the reason it always was -- a third name has to be
-    justified rather than accumulated.
+    already holds, with its own amplitude and its own quadrature.
+
+    **CHE-226 (R16) is the third name, and it was justified rather than
+    accumulated.** `spot_diagram` returns no representation at all: it is the pinned
+    solver's own analysis, which generates its rays internally and hands back
+    numbers. It is not expressible as either trace plus a project-side reduction --
+    that combination is `trace` + `measurements.spot_diagram`, a different pair of
+    metric definitions -- and it is not a facade over one, because no `RayBundle`
+    exists in its call path. This assertion stays an exact list for the reason it
+    always was.
     """
     callables = sorted(
         name
         for name in optiland.__all__
         if callable(getattr(optiland, name)) and not isinstance(getattr(optiland, name), type)
     )
-    assert callables == ["configure_execution", "trace", "trace_rays"]
+    assert callables == ["configure_execution", "spot_diagram", "trace", "trace_rays"]
 
 
 def test_no_adapter_facade_anywhere_in_the_package() -> None:

@@ -1,11 +1,13 @@
 """Optiland sequential ray tracing, behind an anti-corruption boundary.
 
-CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3), CHE-217 (R05.6) and
-CHE-219 (R05.8). The public surface is two functions, one per kind of input:
+CHE-179 / CHE-180 / CHE-181 (R05.1 / R05.2 / R05.3), CHE-217 (R05.6),
+CHE-219 (R05.8) and CHE-226 (R16). The public surface is three functions -- two
+traces, one per kind of input, and one delegated analysis:
 
 ```python
 backends.optiland.trace(setup, source, sampling=..., execution=..., aiming=...) -> RayBundle
 backends.optiland.trace_rays(setup, rays, execution=...) -> RayBundle
+backends.optiland.spot_diagram(setup, source, num_rings=..., execution=...) -> NativeSpotAnalysis
 ```
 
 `trace` launches its rays into the constructed system from a field angle and a
@@ -26,7 +28,14 @@ no `opd_native`, no millimetre.
 `tests/backends/test_optiland_boundary.py` asserts that with an AST walk over every
 module outside this package and a `sys.modules` check in a fresh interpreter.
 
-Four modules, and the order is the dependency order:
+`spot_diagram` is the pinned solver's **own** spot analysis, delegated: it
+generates its own rays inside Optiland from the declared field and pupil, so no
+`RayBundle` exists anywhere in that call. A caller that already holds rays wants
+`measurements.spot_diagram`, which consumes them exactly as supplied and takes no
+system at all. The two paths are deliberately separate and neither is implemented
+in terms of the other; `analysis.py` says why at length.
+
+Five modules, and the order is the dependency order:
 
 * `system` -- CHE-179, CHE-218. `build_lens(setup, source)`, the one generic
   construction path. Adding a system means handing it a different setup, never
@@ -54,6 +63,12 @@ Four modules, and the order is the dependency order:
   moved here from `solver` for the same reason.
 * `solver` -- CHE-181, CHE-217, CHE-219. The two trace entry points, plus the
   process-global backend, device and precision made explicit and idempotent.
+* `analysis` -- CHE-226. `spot_diagram(setup, source, num_rings=..., execution=...)`,
+  the one delegated native analysis: `build_lens` and then
+  `optiland.analysis.SpotDiagram`, with the intersections and the three metrics
+  translated to metres and the pinned version recorded on the result. Restricted
+  to infinite-conjugate angular sources -- a finite `object_distance_mm` is refused
+  rather than reinterpreted -- and it calls no `view()`.
 
 Importing this package imports **no solver**. `optiland` and `torch` are imported
 inside the functions that need them, so reading the module -- or the capability
@@ -68,6 +83,12 @@ caller that wants a launch bundle without a trace -- it takes native solver stat
 construction.
 """
 
+from backends.optiland.analysis import (
+    NATIVE_ANALYSIS,
+    NATIVE_SPOT_METRIC_DEFINITIONS,
+    NativeSpotAnalysis,
+    spot_diagram,
+)
 from backends.optiland.solver import (
     CAPABILITIES,
     DERIVATIVE,
@@ -100,15 +121,19 @@ from backends.optiland.solver import (
 #: directions checked are catalog-against-this-tuple, not this-tuple-against
 #: reality -- and it is the reason the tuple is one line of strings rather than
 #: something cleverer.
-OPERATIONS: tuple[str, ...] = ("trace", "trace_rays")
+OPERATIONS: tuple[str, ...] = ("spot_diagram", "trace", "trace_rays")
 
 __all__ = [
     "CAPABILITIES",
     "DERIVATIVE",
+    "NATIVE_ANALYSIS",
+    "NATIVE_SPOT_METRIC_DEFINITIONS",
     "OPERATIONS",
     "Execution",
+    "NativeSpotAnalysis",
     "Sampling",
     "configure_execution",
+    "spot_diagram",
     "trace",
     "trace_rays",
 ]

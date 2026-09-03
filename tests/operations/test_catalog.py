@@ -550,6 +550,7 @@ def test_the_walk_would_catch_a_violation() -> None:
 #: The four graph entries: the three analytic sources, and the fused
 #: launch-and-trace. Written out because "four" would pass with the wrong four.
 GRAPH_ENTRIES = {
+    "SOM_SPOT_DIAGRAM",
     "SO_RAY_LAUNCH_TRACE",
     "S_SOURCE_GAUSSIAN_BEAM",
     "S_SOURCE_PLANE_WAVE",
@@ -572,7 +573,7 @@ def test_question_1_is_an_upstream_representation_edge_required() -> None:
     """
     entries = {record.operation_id for record in CATALOG if record.is_graph_entry}
     assert entries == GRAPH_ENTRIES
-    assert len(CATALOG) - len(entries) == 9
+    assert len(CATALOG) - len(entries) == 10
     # Every entry BEGINS with a source, which is what `ENTRY_KINDS` enforces. Read
     # off `entry_stage` and not `kind` since CHE-225 (R15.2): `SO_RAY_LAUNCH_TRACE`
     # is `physical_operator`-kind because that is where it leaves the state, and it
@@ -632,6 +633,10 @@ def test_question_3_every_required_value_is_named() -> None:
         "S_SOURCE_PLANE_WAVE",
         "S_SOURCE_SPHERICAL_WAVE",
         "C_RAY_TO_SCALAR",
+        # CHE-226 (R16). The native analysis needs four; `M_SPOT_DIAGRAM` needs none
+        # and is one of the exceptions named below, because a bundle is a complete
+        # call for it -- the rays carry their own plane, wavelength and intensity.
+        "SOM_SPOT_DIAGRAM",
     }
     index = {record.operation_id: record for record in CATALOG}
     assert index["M_PSF"].requires == ("normalization",)
@@ -642,6 +647,7 @@ def test_question_3_every_required_value_is_named() -> None:
     # else is a complete call for both.
     assert index["O_COMPLEX_TRANSMISSION"].requires == ()
     assert index["C_SCALAR_TO_RAY"].requires == ()
+    assert index["M_SPOT_DIAGRAM"].requires == ()
 
 
 def test_question_4_the_optional_set_is_names_and_not_values() -> None:
@@ -664,7 +670,7 @@ def test_question_5_the_primary_result_is_one_field_access() -> None:
     """No `operation_id` switch anywhere, for any of the thirteen."""
     for record in CATALOG:
         assert record.primary_output == record.returns[0]
-        assert record.primary_output in ("ray_bundle", "scalar_field", "psf")
+        assert record.primary_output in ("ray_bundle", "scalar_field", "psf", "spot")
 
 
 def test_question_6_auxiliary_returns_are_exactly_the_three_that_have_them() -> None:
@@ -762,21 +768,34 @@ def test_g2_the_id_prefix_agrees_with_the_kind() -> None:
         "C_": OperationKind.COUPLER,
         "M_": OperationKind.MEASUREMENT,
     }
-    #: Composite prefixes, spelled as the stages they fuse. CHE-225 (R15.2) adds
-    #: exactly one: `SO_` is source-then-operator. A composite prefix is NOT a
-    #: fifth kind -- the stages are all primitives from the enum.
-    composite = {"SO_": (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR)}
+    #: Composite prefixes, spelled as the stages they fuse. CHE-225 (R15.2) added
+    #: `SO_`, source-then-operator; CHE-226 (R16) adds `SOM_`, the native spot
+    #: analysis, which generates rays, traces them and reduces them in one call. A
+    #: composite prefix is NOT a fifth kind -- every stage is a primitive from the
+    #: enum, and the prefix is the stages spelled in order.
+    composite = {
+        "SO_": (OperationKind.SOURCE, OperationKind.PHYSICAL_OPERATOR),
+        "SOM_": (
+            OperationKind.SOURCE,
+            OperationKind.PHYSICAL_OPERATOR,
+            OperationKind.MEASUREMENT,
+        ),
+    }
 
     for record in CATALOG:
-        three = record.operation_id[:3]
-        if three in composite:
-            assert record.composes == composite[three], (
-                f"{record.operation_id} has the composite prefix {three!r}, which means "
-                f"{[k.value for k in composite[three]]}, but declares "
+        # The stage prefix is everything up to the first underscore, which is what
+        # makes a two-letter and a three-letter composite prefix the same parse.
+        # Slicing `[:3]` worked only while every composite prefix was two letters
+        # long, and `SOM_RAY...` would have read as the primitive prefix `SO`.
+        stage_prefix = record.operation_id.split("_", 1)[0] + "_"
+        if stage_prefix in composite:
+            assert record.composes == composite[stage_prefix], (
+                f"{record.operation_id} has the composite prefix {stage_prefix!r}, which "
+                f"means {[k.value for k in composite[stage_prefix]]}, but declares "
                 f"{[k.value for k in record.composes]}"
             )
             continue
-        prefix = record.operation_id[:2]
+        prefix = stage_prefix
         assert prefix in primitive, (
             f"{record.operation_id} starts with {prefix!r}, which is not one of "
             f"{sorted(primitive)} and not a declared composite prefix "
@@ -921,12 +940,22 @@ def test_g5_the_construction_checks_actually_refuse_a_malformed_composition() ->
         a_descriptor(kind=OperationKind.COUPLER, composes=("source", "solver"))
 
 
-def test_g6_exactly_one_record_declares_a_composition() -> None:
-    """A second composite is a modelling claim, not something to acquire quietly.
+def test_g6_only_the_pinned_records_declare_a_composition() -> None:
+    """A composite is a modelling claim, not something to acquire quietly.
 
     The same discipline CHE-221 applied to "this is the only callable with two
     records". `composes` is cheap to add to a record and expensive to be wrong
     about, so the set is pinned and a new member has to come past this test.
+
+    **CHE-226 (R16) is the second member, and it came past this test rather than
+    around it.** `SOM_SPOT_DIAGRAM` is `(source, physical_operator, measurement)`:
+    the pinned solver's own spot analysis generates its rays from the declared
+    field, refracts them through every surface and reduces the intersections, all
+    inside one call. A bare `measurement` kind with `inputs=()` is refused at
+    construction -- only a source may begin a graph entry -- so the schema itself
+    rejected the simpler claim. Note what is NOT a composite: `M_SPOT_DIAGRAM`,
+    the other spot path, consumes a `RayBundle` and observes it, which is one
+    primitive stage and the whole truth about it.
 
     `O_DIFFRACTIVE_SURFACE` is the interesting exclusion and it is deliberate: it
     is internally coupler -> operator -> coupler (it imports `couplers` and
@@ -939,11 +968,12 @@ def test_g6_exactly_one_record_declares_a_composition() -> None:
     tolerating.
     """
     composites = {r.operation_id for r in CATALOG if r.composes}
-    assert composites == {"SO_RAY_LAUNCH_TRACE"}, composites
+    assert composites == {"SO_RAY_LAUNCH_TRACE", "SOM_SPOT_DIAGRAM"}, composites
     index = {r.operation_id: r for r in CATALOG}
     assert index["O_DIFFRACTIVE_SURFACE"].composes == ()
-    # And the other twelve are untouched by this ticket.
-    assert len([r for r in CATALOG if not r.composes]) == 12
+    assert index["M_SPOT_DIAGRAM"].composes == ()
+    # And the other thirteen fuse nothing.
+    assert len([r for r in CATALOG if not r.composes]) == 13
 
 
 def test_the_fused_record_says_what_it_fuses_and_why_that_is_not_a_source() -> None:

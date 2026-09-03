@@ -301,7 +301,7 @@ def test_semantic_types_are_the_boundaries_that_landed() -> None:
     exemplar below had to move off `psf` when `measurements/psf.py` landed. That
     is the vocabulary working, not the test being brittle.
     """
-    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf")
+    assert SEMANTIC_TYPES == ("ray_bundle", "scalar_field", "psf", "spot")
 
 
 @pytest.mark.parametrize("field", ["inputs", "returns"])

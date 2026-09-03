@@ -190,11 +190,20 @@ class OperationKind(StrEnum):
 #: physical data model, and importing it here would put the whole representation
 #: layer behind every capability query.
 #:
-#: **Three entries: the two boundaries R02 landed -- `RayBundle` and
-#: `ScalarField` -- and the one measurement result type R11.1 landed, `psf`.**
-#: `psf` is here as the *output port of a measurement*, and it is deliberately not
-#: a representation: `measurements/psf.py` says why. `OBSERVABLE_TYPES` below is
-#: what keeps that distinction from being prose.
+#: **Four entries: the two boundaries R02 landed -- `RayBundle` and
+#: `ScalarField` -- and the two measurement result types, `psf` from R11.1 and
+#: `spot` from CHE-226 (R16).** Both are here as the *output port of a
+#: measurement* and neither is a representation: `measurements/psf.py` and
+#: `measurements/spot.py` say why. `OBSERVABLE_TYPES` below is what keeps that
+#: distinction from being prose.
+#:
+#: `spot` is named for the observable and not for the record, which is what lets
+#: **two** operations declare it: `measurements.spot_diagram` computes it from a
+#: supplied `RayBundle` and `backends.optiland.analysis.spot_diagram` has the
+#: pinned solver generate its own rays and compute it there. They return different
+#: record types under different declared metric definitions and they are the same
+#: observable, which is exactly the distinction `backend` carries and `kind` does
+#: not.
 #:
 #: This is deliberately not the reference
 #: implementation's `ArtifactKind`, which enumerated 26 members of which the tree
@@ -210,6 +219,7 @@ SEMANTIC_TYPES: tuple[str, ...] = (
     "ray_bundle",
     "scalar_field",
     "psf",
+    "spot",
 )
 
 #: The subset of `SEMANTIC_TYPES` that are **observables**, not representations.
@@ -228,7 +238,7 @@ SEMANTIC_TYPES: tuple[str, ...] = (
 #:   a PSF as its input is either a second measurement of a measurement, or a
 #:   physical operation that has mistaken an intensity for a state -- and the
 #:   representation it should have consumed is still sitting upstream.
-OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf"})
+OBSERVABLE_TYPES: frozenset[str] = frozenset({"psf", "spot"})
 
 #: The operation kinds that may be a **graph entry** -- `inputs=()`, no upstream
 #: representation edge.

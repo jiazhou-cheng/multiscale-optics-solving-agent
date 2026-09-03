@@ -238,6 +238,29 @@ SRC = ROOT / "src"
 #:                state whose inheritance was a measured source of
 #:                nondeterminism.
 #:
+#: **Raised to 3 by CHE-226 (R16)**, which adds `NativeSpotAnalysis` to
+#: `backends/optiland/analysis.py` -- the delegated spot analysis's neutral result,
+#: on **rule 2**: a public record whose fields are the ticket's own acceptance
+#: criteria (the intersections in metres, the three metrics, which field and
+#: wavelength were analysed, which implementation at which version produced them).
+#: It is the first non-`TypedDict` class in this package.
+#:
+#: Why it is not `measurements.SpotResult`, since both carry a spot. Two reasons,
+#: and the second is structural rather than aesthetic. The numbers are computed
+#: under **different declared definitions** -- the pinned solver's metrics are
+#: unweighted and this project's centroid and RMS are weighted by `|a|^2`
+#: (`NATIVE_SPOT_METRIC_DEFINITIONS`) -- so one record spanning both would need a
+#: field saying which set applied, i.e. two records with a tag. And
+#: `check_dependencies.ALLOWED` gives `backends` no edge to `measurements`;
+#: importing that record here to save a class would trade a real architectural
+#: property for a budget line.
+#:
+#: Two names did **not** land against that +1, and `tests/backends/test_optiland_analysis.py`
+#: asserts their absence: `AnalysisRequest` (an argument bag over a signature that
+#: already types its four arguments) and `AnalysisType` as an enum with a dispatch
+#: table -- one callable per analysis is what the catalog's per-record signature
+#: gate can describe, so the enum would have bought nothing and cost a class.
+#:
 #: Six class names did **not** land against that +2, and the tests name them:
 #: `OptilandAdapter` (a one-instance facade behind `get_adapter()`),
 #: `OptilandExecutionState`, `TracePlans`, `OptilandRayRequest` /
@@ -328,9 +351,9 @@ SRC = ROOT / "src"
 #: `PositionPlan`, `PatchPlan` and `Ensemble`.
 #:
 BUDGETS: dict[str, int] = {
-    "backends": 2,
+    "backends": 3,
     "couplers": 4,
-    "measurements": 1,
+    "measurements": 2,
     "numerics": 7,
     "operations": 2,
     "operators": 1,
@@ -416,6 +439,16 @@ BUDGETS: dict[str, int] = {
 #: for the reason R08.1 established: this gate counts a `StrEnum` as a class, the
 #: two readings of "+1" differ by one, and the stricter one is taken.
 #:
+#: `measurements` is **raised to 2 by CHE-226 (R16)**, which adds `SpotResult` --
+#: rule 2 again, and the same argument `PsfResult` stands on: it is the public
+#: record a consumer reads back, and five of R16's acceptance criteria are
+#: statements about what it carries (which rays were included, from which
+#: reference, under which weighting, at which plane, under which splitting
+#: provenance). Its three metrics are three fields rather than a `SpotMetric`
+#: registry or three free functions with a shared reference argument, because there
+#: is one declared definition each and a caller that has to re-supply the reference
+#: to two of them can get two numbers about different centres.
+#:
 #: **25 -> 26 for CHE-200 (R13.2), and this is the first raise that does *not*
 #: land in the commit that adds the class.** The class is `Executor`, in
 #: `src/runtime/executor.py`, on rule 3 -- the one genuine mutable resource
@@ -485,12 +518,30 @@ BUDGETS: dict[str, int] = {
 #: spending the unit reserved at 25 -> 26 above, which is what it was reserved
 #: for. Note that this raise lands *with* its classes, unlike that one.
 #:
+#: **29 -> 31 by CHE-226 (R16)**, and this is the second raise of *two*. **Flagged
+#: for the owner** for the same reason CHE-199's was: the ratchet's value is that a
+#: raise is one visible line per class, so a raise of two has to say why it is not
+#: two tickets' worth of authorization being spent at once.
+#:
+#: The two are `measurements.SpotResult` and
+#: `backends.optiland.analysis.NativeSpotAnalysis`, both on **rule 2**, and both
+#: justified in the per-package notes above. Why two and not one: they are the two
+#: paths R16 exists to keep separate, they carry numbers computed under different
+#: declared metric definitions, and the dependency allowlist forbids the import that
+#: would let one record serve both. Collapsing them needs a `backends ->
+#: measurements` edge, which is an architecture change and not a saving.
+#:
+#: R16 adds no other class. `RaySplitting` is a `Literal` and not a `StrEnum`, for
+#: the reason R08.1 established and R11.1 repeated -- this gate counts a `StrEnum`
+#: as a class and the stricter reading is taken -- and the two operation records are
+#: entries in an existing tuple.
+#:
 #: Flagged for the owner on CHE-218, because the standing question above is now
 #: two units old: this constant has ratcheted five times without ever being
 #: re-derived from the new tree, and `AGENTS.md` says a class budget introduced
 #: later should be derived from that tree and made a visibility gate. The
 #: per-package equality gates are the half doing real work.
-PROJECT_CEILING = 29
+PROJECT_CEILING = 31
 
 
 @dataclass(frozen=True)

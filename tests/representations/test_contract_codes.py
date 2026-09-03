@@ -28,7 +28,7 @@ import numpy as np
 import pytest
 
 from couplers import ray_to_scalar
-from measurements import NORMALIZATION_DECLARATIONS, PsfResult
+from measurements import NORMALIZATION_DECLARATIONS, PsfResult, spot_diagram
 from representations import (
     CONTRACT_CODES,
     ContractError,
@@ -144,6 +144,18 @@ TRIGGERS: dict[str, Callable[[], object]] = {
         ),
         grid_shape=(4, 4),
         sample_pitch_m=(0.25e-6, 0.25e-6),
+    ),
+    # `RayBundle.__post_init__` again, the `measure_kind` check's twin (CHE-226).
+    "UNKNOWN_RAY_SPLITTING": lambda: _bundle(ray_splitting="sideways"),
+    # The third and fourth consumer-owned codes (CHE-226), both
+    # `measurements.spot_diagram`'s. They are two codes because the fixes differ:
+    # an undeclared population is the producer's to declare, and a population known
+    # to contain split descendants needs a different measurement entirely. The
+    # bundles here carry no amplitude and it does not matter -- the provenance gate
+    # runs before anything reads a number, which is itself the behaviour under test.
+    "RAY_SPLITTING_UNDECLARED": lambda: spot_diagram(_bundle()),
+    "SPLIT_RAYS_NOT_MEASURABLE": lambda: spot_diagram(
+        _bundle(ray_splitting="split_descendants")
     ),
     # The second consumer-owned code (CHE-197). Intensity is not a representation
     # -- `ScalarField` holds an *amplitude*, and refuses a real array precisely so
