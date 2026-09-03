@@ -283,14 +283,19 @@ def _flag_literals(path: Any) -> set[str]:
     }
 
 
-def test_no_landed_operation_declares_paraxial_yet() -> None:
-    """AC 5. R02.5 lands the vocabulary; R06.11 is what makes it reachable.
+def test_exactly_one_landed_operation_declares_paraxial() -> None:
+    """The other side of R02.5's AC 5, turned over by CHE-228 (R06.11).
 
-    A flag no producer sets is a claim nothing can make, so this asserts the
-    vocabulary arrived *before* its first user rather than beside it -- and it is
-    the assertion R06.11 has to come past and update, which is the point rather
-    than brittleness. `test_semantic_types_are_the_boundaries_that_landed` is the
-    same ratchet on the other closed vocabulary.
+    R02.5 landed the flag with **nothing** setting it, and this test asserted that
+    -- a flag no producer sets is a claim nothing can make, so the vocabulary had to
+    be seen to arrive before its first user rather than beside it. R06.11 is that
+    first user, so the assertion flips from "none" to "exactly this one" rather than
+    being deleted. `test_semantic_types_are_the_boundaries_that_landed` is the same
+    ratchet on the other closed vocabulary, and its docstring says the same thing:
+    the exemplar moving is the vocabulary working, not the test being brittle.
+
+    Exactly one, not at least one: the point is that a second producer is a
+    physical claim someone reviews, not an edit that slips past.
 
     A *literal*, not a mention: `sources/gaussian_beam.py` and
     `operations/catalog.py` both say the word in prose, and one of them says it to
@@ -308,7 +313,7 @@ def test_no_landed_operation_declares_paraxial_yet() -> None:
 
     root = Path(representations.scalar.__file__).resolve().parents[1]
     declared_in = Path(representations.scalar.__file__).resolve()
-    offenders = sorted(
+    declaring = sorted(
         path.relative_to(root).as_posix()
         for path in root.rglob("*.py")
         if "__pycache__" not in str(path)
@@ -316,9 +321,10 @@ def test_no_landed_operation_declares_paraxial_yet() -> None:
         and "ScalarField" in path.read_text(encoding="utf-8")
         and "paraxial" in _flag_literals(path)
     )
-    assert offenders == [], (
-        f"{offenders} declare the 'paraxial' flag, but R02.5 lands the vocabulary "
-        "alone. The ticket that makes a field declare it updates this test."
+    assert declaring == ["backends/chromatix/solver.py"], (
+        f"{declaring} declare the 'paraxial' flag. `fresnel_propagate` is the one "
+        "operation with a paraxial kernel; a second declarer is a physical claim "
+        "that belongs on its own ticket, and this test is where it gets noticed."
     )
 
 

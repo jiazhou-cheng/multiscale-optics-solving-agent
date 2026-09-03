@@ -573,7 +573,7 @@ def test_question_1_is_an_upstream_representation_edge_required() -> None:
     """
     entries = {record.operation_id for record in CATALOG if record.is_graph_entry}
     assert entries == GRAPH_ENTRIES
-    assert len(CATALOG) - len(entries) == 10
+    assert len(CATALOG) - len(entries) == 11
     # Every entry BEGINS with a source, which is what `ENTRY_KINDS` enforces. Read
     # off `entry_stage` and not `kind` since CHE-225 (R15.2): `SO_RAY_LAUNCH_TRACE`
     # is `physical_operator`-kind because that is where it leaves the state, and it
@@ -626,6 +626,10 @@ def test_question_3_every_required_value_is_named() -> None:
         "O_ASM_PROPAGATE",
         "O_DIFFRACTIVE_SURFACE",
         "O_FOCAL_PLANE_TRANSFORM",
+        # CHE-228 (R06.11). `distance_m` and `model`, the same two O_ASM_PROPAGATE
+        # needs -- and its `model` is the shorter one, because there is no `method`
+        # to choose between.
+        "O_FRESNEL_PROPAGATE",
         "O_PROPAGATE_RAYS",
         "O_RAY_TRACE",
         "SO_RAY_LAUNCH_TRACE",
@@ -973,7 +977,7 @@ def test_g6_only_the_pinned_records_declare_a_composition() -> None:
     assert index["O_DIFFRACTIVE_SURFACE"].composes == ()
     assert index["M_SPOT_DIAGRAM"].composes == ()
     # And the other thirteen fuse nothing.
-    assert len([r for r in CATALOG if not r.composes]) == 13
+    assert len([r for r in CATALOG if not r.composes]) == 14
 
 
 def test_the_fused_record_says_what_it_fuses_and_why_that_is_not_a_source() -> None:

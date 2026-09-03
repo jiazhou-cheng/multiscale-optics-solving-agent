@@ -281,6 +281,72 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         capabilities="M_WAVE_CHROMATIX",
         derivative="forward_only",
     ),
+    # The paraxial sibling of O_ASM_PROPAGATE -- CHE-228 (R06.11). A second record
+    # over a second callable rather than a third `method` on `propagate`, for two
+    # reasons. `O_ASM_PROPAGATE`'s `approximation` above says "no Fresnel
+    # approximation and no term dropped", so a paraxial method under that record
+    # would make the record's own prose false and put `O_ASM_` on a run that is not
+    # one; and one record per `implementation` is the rule since CHE-224 (R15.1), so
+    # a second record needs a second callable either way.
+    #
+    # The two kernels are one substitution apart and it is measured, not asserted:
+    # replacing `delay + 1.0` with `2.0` in `_carrier_removed_propagator` -- the
+    # k_z -> n k0 limit -- reproduces the backend's Fresnel phase with a maximum
+    # difference of exactly 0.0 in float32 over a 512^2 grid.
+    OperationDescriptor(
+        operation_id="O_FRESNEL_PROPAGATE",
+        kind=OperationKind.PHYSICAL_OPERATOR,
+        inputs=("scalar_field",),
+        returns=("scalar_field",),
+        implementation="backends.chromatix.solver:fresnel_propagate",
+        backend="chromatix",
+        requires=("distance_m", "model"),
+        approximation=(
+            "the Fresnel (paraxial) transfer function in a homogeneous isotropic "
+            "medium: exp(-i pi (lambda_0/n) z f^2), which is exactly "
+            "O_ASM_PROPAGATE's carrier-removed kernel with the axial ratio "
+            "k_z/(n k0) replaced by 1. One term IS dropped, and that is the whole "
+            "difference from O_ASM_PROPAGATE: the phase error is "
+            "n k0 z (1 - cos theta - sin^2(theta)/2), i.e. n k0 z sin^4(theta)/8 to "
+            "leading order, at each direction cosine sin(theta) = lambda_0 f / n. "
+            "The kernel carries NO exp(i k n z) factor, so unlike the angular "
+            "spectrum there is no absolute-phase variant to choose: the result is "
+            "always relative to a removed piston of carrier_phase_rad(lambda_0, z, "
+            "n), the same constant 'asm_carrier_removed' removes. Sampling is "
+            "preserved, because the transfer method is a convolution; the sampled "
+            "window is periodic, so power that leaves it wraps back in unless the "
+            "grid is padded. Scalar throughout: one complex amplitude per sample, "
+            "no polarization and no vectorial coupling, evaluated in complex64 "
+            "because the backend has no other field storage"
+        ),
+        validity=(
+            "sin(theta_max) <= (lambda_0 / (n z))^(1/4) for the field's own largest "
+            "direction cosine -- the angle at which the leading phase error reaches "
+            "pi/4. On the Chromatix 101 tutorial's own grid (512^2, dx = 0.3 um, "
+            "lambda_0 = 0.532 um, n = 1.33, z = 50 um) that is sin(theta) <= 0.299, "
+            "i.e. 17.4 degrees, while the grid's own per-axis Nyquist is "
+            "sin(theta) = 0.667, where the exact error is 25.5 rad, and its corner "
+            "is 0.943, where it is 175 rad",
+            "the returned field declares 'paraxial', and that flag is the only "
+            "warning a consumer gets: the error is a phase error and |U|^2 does not "
+            "show it. Measured on that same grid, a hard-edged square aperture "
+            "differs from the exact angular spectrum by 2.3e-1 of peak intensity -- "
+            "pad-independent, so it is the approximation and not wraparound -- while "
+            "a soft-edged field on the identical grid differs by 4.9e-6",
+            "z <= N pitch^2 / lambda, the transfer function's own sampling bound, "
+            "the same one O_ASM_PROPAGATE carries",
+            "carrier_removed_phase: the phase is relative to a removed piston, and "
+            "two fields with different removed pistons may not be interfered "
+            "directly. This one removes the same constant asm_carrier_removed does",
+            "a tilted beam lands at z sin(theta), not z tan(theta): the kernel's "
+            "group delay is lambda_0 z f / n, linear in spatial frequency. That is a "
+            "property of the model rather than a defect in it, and it is the same "
+            "sine-condition content O_FOCAL_PLANE_TRANSFORM's f sin(theta) records",
+        ),
+        evidence=("tests/physics/test_fresnel_propagation.py",),
+        capabilities="M_WAVE_CHROMATIX",
+        derivative="forward_only",
+    ),
     OperationDescriptor(
         operation_id="O_FOCAL_PLANE_TRANSFORM",
         kind=OperationKind.PHYSICAL_OPERATOR,

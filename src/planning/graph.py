@@ -163,9 +163,22 @@ def routes(
 
         `None` is the default because the search terminates without one: no
         operation may appear twice in a route, so a route is at most as long as the
-        catalog. Measured on the fourteen landed operations, the widest query --
+        catalog. Measured on the sixteen landed operations, the widest query --
         `ENTRY` to `psf` -- has 13763 routes, the longest 11 operations, and takes
-        25 ms; every ordered pair of states together is 48648 routes in 106 ms. So
+        26 ms; every ordered pair of states together is 59211 routes in 144 ms.
+
+        **Re-measured on CHE-228 (R06.11), and the way it moved is worth keeping.**
+        These numbers were taken at fourteen operations and then went stale twice
+        without anyone noticing, because nothing reads them: CHE-224 (R15.1) deleted
+        `S_WAVE_CHROMATIX`, a fourth `scalar_field -> scalar_field` edge, which took
+        `ENTRY -> psf` down to 2656 routes in 5 ms; R06.11's `O_FRESNEL_PROPAGATE`
+        restores a fourth self-loop and takes it back to 13763 -- *exactly* the old
+        figure, which is what one self-loop is worth on this graph and is a
+        coincidence only in the last digit. The all-pairs total does not return,
+        because CHE-226 (R16) added a semantic type and two records in between. Each
+        further `scalar_field` self-loop multiplies the enumeration by about five: a
+        fifth would be 84482 routes and 872 ms of all-pairs. Affordable, and worth
+        knowing before adding one. So
         the complete answer is affordable, and a default that truncated it would be
         the worse failure: at `max_steps=4` this function silently omits
         `SO_RAY_LAUNCH_TRACE -> O_PROPAGATE_RAYS -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE

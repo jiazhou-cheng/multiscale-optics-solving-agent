@@ -18,9 +18,13 @@ Two modules, in dependency order:
   request is refused, not downcast), padding and crop state, the pitch check, the
   padded-shape memory estimate, and `edge_energy_fraction` as the wraparound
   diagnostic.
-* `solver` -- CHE-184. The propagation itself, and the carrier-phase answer: a
-  returned field states in its typed `validity` whether its phase is absolute or
-  carrier-removed, because the two differ by a constant that `|U|^2` cannot see.
+* `solver` -- CHE-184, CHE-228. The propagations themselves, and the
+  carrier-phase answer: a returned field states in its typed `validity` whether
+  its phase is absolute or carrier-removed, because the two differ by a constant
+  that `|U|^2` cannot see. R06.11 added `fresnel_propagate` beside `propagate` --
+  the paraxial kernel, which is a second callable and a second record rather than
+  a third `method`, because `O_ASM_PROPAGATE` claims that no term is dropped and a
+  paraxial method under it would make that false.
 * `focal_plane` -- CHE-209. The ideal lens as the transformation between its two
   focal planes: the one operation here that legitimately *changes* the sample
   pitch, which it declares in float64 and the boundary then checks the backend
@@ -48,6 +52,7 @@ from backends.chromatix.solver import (
     DERIVATIVE,
     MODELS,
     carrier_phase_rad,
+    fresnel_propagate,
     propagate,
 )
 
@@ -74,7 +79,7 @@ from backends.chromatix.solver import (
 #: directions checked are catalog-against-this-tuple, not this-tuple-against
 #: reality -- and it is the reason the tuple is one line of strings rather than
 #: something cleverer.
-OPERATIONS: tuple[str, ...] = ("focal_plane_transform", "propagate")
+OPERATIONS: tuple[str, ...] = ("focal_plane_transform", "fresnel_propagate", "propagate")
 
 __all__ = [
     "CAPABILITIES",
@@ -87,6 +92,7 @@ __all__ = [
     "edge_energy_fraction",
     "focal_plane_transform",
     "fourier_plane_pitch_m",
+    "fresnel_propagate",
     "padded_field_bytes",
     "padded_shape",
     "propagate",

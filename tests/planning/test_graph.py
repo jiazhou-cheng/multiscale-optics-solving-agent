@@ -291,7 +291,7 @@ def test_a_state_with_nothing_composing_to_it_returns_no_route() -> None:
 def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> None:
     """Both cycles, and the fact that makes an unbounded default safe.
 
-    `scalar_field -> scalar_field` through three operations and
+    `scalar_field -> scalar_field` through four operations and
     `ray_bundle -> ray_bundle` through three. Termination therefore does **not**
     come from `max_steps` -- it comes from the no-repeat rule, which bounds a route
     by the catalog size. Asserted because `routes` now defaults to no bound on the
@@ -305,6 +305,12 @@ def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> Non
     one function, differing in no field it could route on. `backend` answers the
     first question as a field, the pair is merged, and the graph now has one edge
     per thing the tree can actually do.
+
+    **And it is four again since CHE-228 (R06.11), for the opposite reason.** The
+    new fourth is `O_FRESNEL_PROPAGATE`, which is a distinct callable running a
+    distinct kernel, so it is exactly the edge the merged pair was not: two things
+    the tree can do, not one thing named twice. The count returning to its old value
+    is a coincidence worth stating, because the two fours mean opposite things.
     """
     graph = capability_graph()
     catalogued = {descriptor.operation_id: descriptor for descriptor in CATALOG}
@@ -317,7 +323,7 @@ def test_the_graph_has_cycles_and_the_no_repeat_rule_is_what_terminates() -> Non
         for state, ids in graph.items()
         if state is not None
     }
-    assert len(cycles["scalar_field"]) == 3, cycles["scalar_field"]
+    assert len(cycles["scalar_field"]) == 4, cycles["scalar_field"]
     assert len(cycles["ray_bundle"]) == 3, cycles["ray_bundle"]
 
     # And the unbounded search returns: finite, and bounded by the catalog size.

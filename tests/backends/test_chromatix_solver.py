@@ -24,7 +24,14 @@ import pytest
 from chromatix_support import WAVELENGTH_M, a_scalar_field
 
 from backends import chromatix
-from backends.chromatix import CAPABILITIES, DERIVATIVE, MODELS, carrier_phase_rad, propagate
+from backends.chromatix import (
+    CAPABILITIES,
+    DERIVATIVE,
+    MODELS,
+    carrier_phase_rad,
+    fresnel_propagate,
+    propagate,
+)
 from operations import CATALOG, OperationKind, registry, resolve
 from representations import ContractError, ScalarField
 
@@ -42,13 +49,20 @@ def a_model(**overrides: object) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def test_the_public_entry_points_are_the_two_operations() -> None:
-    """Two operations, and everything else exported is a declaration or a diagnostic.
+def test_the_public_entry_points_are_the_three_operations() -> None:
+    """Three operations, and everything else exported is a declaration or a diagnostic.
 
     `propagate` (CHE-184) is free-space evolution by a distance; CHE-209 added
     `focal_plane_transform`, the ideal lens between its two focal planes. They are
     separate entry points because they are separate physics -- one preserves the
     sampling and the other must change it -- and neither is a mode of the other.
+
+    CHE-228 (R06.11) added `fresnel_propagate`, and it is the case where that rule
+    was hardest to apply: it *does* preserve the sampling, so it is not separate
+    from `propagate` the way the lens is. What makes it a third entry point rather
+    than a third `method` is the claim, not the plumbing -- `O_ASM_PROPAGATE`'s
+    `approximation` says no term is dropped, the Fresnel kernel drops one, and one
+    record per implementation means a second claim needs a second callable.
     """
     callables = {
         name
@@ -57,6 +71,7 @@ def test_the_public_entry_points_are_the_two_operations() -> None:
     }
     assert callables == {
         "propagate",
+        "fresnel_propagate",
         "focal_plane_transform",
         "carrier_phase_rad",
         "edge_energy_fraction",
@@ -65,6 +80,12 @@ def test_the_public_entry_points_are_the_two_operations() -> None:
         "padded_shape",
     }
     assert inspect.signature(propagate).parameters.keys() == {"field", "distance_m", "model"}
+    # Deliberately the same signature: the two differ in their `model=` vocabulary
+    # and in what they approximate, not in what a caller has to supply.
+    assert (
+        inspect.signature(fresnel_propagate).parameters.keys()
+        == {"field", "distance_m", "model"}
+    )
 
 
 @pytest.mark.parametrize(
@@ -302,3 +323,192 @@ def test_no_gradient_is_claimed() -> None:
     assert MODELS == ("asm", "asm_carrier_removed")
     parameters = inspect.signature(propagate).parameters
     assert not any("grad" in name or "differen" in name for name in parameters)
+
+
+# ---------------------------------------------------------------------------
+# 5. `fresnel_propagate` -- CHE-228 (R06.11)
+# ---------------------------------------------------------------------------
+#
+# The physics is `tests/physics/test_fresnel_propagation.py`. What is here is the
+# contract: which `model=` keys it takes, what it refuses, what pitch it declares,
+# and what its returned field says about itself.
+
+
+def a_fresnel_model(**overrides: object) -> dict[str, object]:
+    model: dict[str, object] = {"pad_width": 8, "target_surface": "focus"}
+    model.update(overrides)
+    return model
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        ({"pad_width": 8}, "target_surface"),
+        ({"target_surface": "f"}, "pad_width"),
+        ({"pad_width": 8, "target_surface": "f", "pad_witdh": 4}, "pad_witdh"),
+    ],
+)
+def test_the_fresnel_model_refuses_a_missing_or_misspelled_key(
+    model: dict[str, object], expected: str
+) -> None:
+    with pytest.raises(ValueError, match=expected):
+        fresnel_propagate(a_scalar_field(), distance_m=DISTANCE_M, model=model)
+
+
+def test_the_fresnel_model_refuses_method_with_its_own_reason() -> None:
+    """Not as an unrecognized spelling: as the wrong belief it actually is.
+
+    A caller who writes `method=` here thinks this function offers the
+    absolute/carrier-removed choice `propagate` does. It does not, and it cannot:
+    the backend's Fresnel kernel carries no `exp(i k n z)` factor at all, so there
+    is no absolute variant to select. The generic "does not take ['method']"
+    message would leave that belief in place.
+    """
+    with pytest.raises(ValueError, match="no absolute-phase variant"):
+        fresnel_propagate(
+            a_scalar_field(),
+            distance_m=DISTANCE_M,
+            model=a_fresnel_model(method="fresnel"),
+        )
+
+
+def test_the_fresnel_path_refuses_a_negative_pad_width_and_a_non_finite_distance() -> None:
+    with pytest.raises(ValueError, match="pad_width"):
+        fresnel_propagate(
+            a_scalar_field(), distance_m=DISTANCE_M, model=a_fresnel_model(pad_width=-1)
+        )
+    with pytest.raises(ValueError, match="finite"):
+        fresnel_propagate(a_scalar_field(), distance_m=math.inf, model=a_fresnel_model())
+
+
+def test_a_surface_only_field_is_refused_by_the_fresnel_path_too() -> None:
+    """The same claim `propagate` refuses, and it is not weaker for being paraxial."""
+    source = a_scalar_field()
+    pinned = ScalarField(
+        u=source.u,
+        sample_pitch_m=source.sample_pitch_m,
+        wavelength_m=source.wavelength_m,
+        reference_surface=source.reference_surface,
+        validity=frozenset({"surface_only"}),
+    )
+    with pytest.raises(ContractError) as caught:
+        fresnel_propagate(pinned, distance_m=DISTANCE_M, model=a_fresnel_model())
+    assert caught.value.code == "REPRESENTATION_INCONSISTENT"
+
+
+def test_a_complex128_field_is_refused_before_jax_is_asked() -> None:
+    """The capability row, reached on this path as well as on `propagate`'s.
+
+    The refusal is `native_state`'s and is shared, so this is a check that the new
+    entry point actually goes through the boundary rather than around it.
+    """
+    with pytest.raises(ValueError) as caught:
+        fresnel_propagate(
+            a_scalar_field(dtype="complex128"),
+            distance_m=DISTANCE_M,
+            model=a_fresnel_model(),
+        )
+    assert getattr(caught.value, "code", None) == "LOSSY_DOWNCAST_REQUIRED"
+
+
+@pytest.mark.parametrize("pad_width", [0, 64])
+def test_the_fresnel_path_preserves_the_sampling_it_declares(pad_width: int) -> None:
+    """Criterion 4. The transfer method is a convolution, so the pitch is the input's.
+
+    `from_native` checks the declaration against what the backend returned and
+    refuses a regrid the caller did not predict, so this passing at two pad widths
+    is the statement that padding changes the wraparound and nothing else -- unlike
+    the single-FFT Fresnel method, whose output pitch is
+    `lambda |z| / (n (N + 2 pad_width) dx)` and which is deliberately not here.
+    """
+    source = a_scalar_field()
+    out = fresnel_propagate(
+        source, distance_m=DISTANCE_M, model=a_fresnel_model(pad_width=pad_width)
+    )
+    assert out.sample_pitch_m == source.sample_pitch_m
+    assert out.shape == source.shape
+
+
+def test_the_fresnel_result_declares_both_paraxial_and_carrier_removed() -> None:
+    """Criterion 5. Both, always, and neither is conditional on an argument.
+
+    `paraxial` because the kernel drops a term whose error `|U|^2` cannot show, and
+    `carrier_removed_phase` because the kernel has no `exp(i k n z)` in it -- so the
+    phase is relative to the same piston `asm_carrier_removed` removes. An
+    unconditional flag is a stronger statement than a conditional one and is the
+    reason this function takes no `method`.
+    """
+    out = fresnel_propagate(a_scalar_field(), distance_m=DISTANCE_M, model=a_fresnel_model())
+    assert out.validity == frozenset({"paraxial", "carrier_removed_phase"})
+
+    # And an inherited flag survives, exactly as it does through `propagate`.
+    source = a_scalar_field()
+    limited = ScalarField(
+        u=source.u,
+        sample_pitch_m=source.sample_pitch_m,
+        wavelength_m=source.wavelength_m,
+        reference_surface=source.reference_surface,
+        validity=frozenset({"no_wavefront_curvature_term"}),
+    )
+    inherited = fresnel_propagate(limited, distance_m=DISTANCE_M, model=a_fresnel_model())
+    assert inherited.validity == frozenset(
+        {"no_wavefront_curvature_term", "paraxial", "carrier_removed_phase"}
+    )
+
+
+def test_the_fresnel_result_lands_on_the_named_target_plane() -> None:
+    out = fresnel_propagate(
+        a_scalar_field(),
+        distance_m=DISTANCE_M,
+        model=a_fresnel_model(target_surface="image"),
+    )
+    assert out.reference_surface.name == "image"
+    assert out.reference_surface.z_m == pytest.approx(DISTANCE_M)
+
+
+def test_the_fresnel_propagation_registers_as_its_own_record() -> None:
+    """Criterion 8, and the reason there are two records rather than one with a mode.
+
+    `O_ASM_PROPAGATE` says "no Fresnel approximation and no term dropped". A
+    paraxial method under that record would make the record's own prose false, and
+    the id would read `O_ASM_` for a run that is not one. Since CHE-224 (R15.1) the
+    catalog also keys uniqueness on `implementation`, so a second claim needs a
+    second callable either way -- and this asserts both records exist, resolve to
+    different functions, and disagree in their `approximation` rather than only in
+    their ids.
+    """
+    catalogued = {d.operation_id: d for d in CATALOG}
+    record = catalogued["O_FRESNEL_PROPAGATE"]
+
+    assert record.kind is OperationKind.PHYSICAL_OPERATOR
+    assert record.composes == ()
+    assert record.backend == "chromatix"
+    assert record.capabilities == CAPABILITIES
+    assert record.derivative == DERIVATIVE
+    assert record.inputs == ("scalar_field",)
+    assert record.returns == ("scalar_field",)
+    assert resolve("O_FRESNEL_PROPAGATE") is fresnel_propagate
+    assert resolve("O_ASM_PROPAGATE") is propagate
+
+    # The two claims, side by side, so the pair cannot drift into saying one thing.
+    exact = catalogued["O_ASM_PROPAGATE"]
+    assert "no Fresnel approximation and no term dropped" in exact.approximation
+    assert "One term IS dropped" in record.approximation
+    assert "paraxial" in record.validity[1]
+
+    # One record per implementation, still.
+    for descriptor in (record, exact):
+        assert [
+            d.operation_id for d in CATALOG if d.implementation == descriptor.implementation
+        ] == [descriptor.operation_id]
+
+
+def test_no_gradient_is_claimed_by_the_fresnel_path_either() -> None:
+    assert not any(
+        "grad" in name or "differen" in name
+        for name in inspect.signature(fresnel_propagate).parameters
+    )
+    assert MODELS == ("asm", "asm_carrier_removed"), (
+        "the Fresnel kernel is a separate callable, so it must not appear in "
+        "`propagate`'s method vocabulary"
+    )

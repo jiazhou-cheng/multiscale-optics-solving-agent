@@ -63,7 +63,7 @@ def test_enumerating_the_whole_catalog_pulls_no_backend() -> None:
 import operations
 
 found = operations.find()
-assert len(found) == 15, found
+assert len(found) == 16, found
 for descriptor in found:
     # Read every field of every descriptor.
     assert descriptor.implementation and descriptor.approximation
@@ -75,7 +75,7 @@ for descriptor in found:
     _ = descriptor.capabilities, descriptor.cost, descriptor.derivative_evidence
 assert operations.find(input="ray_bundle", kind="physical_operator")
 assert operations.find(kind="coupler")
-assert len(operations.registered_ids()) == 15
+assert len(operations.registered_ids()) == 16
 """
     )
     assert not loaded & set(BACKENDS), (

@@ -34,7 +34,7 @@ CITATIONS = [
 def test_the_catalog_cites_something() -> None:
     """The meta-check: a parametrization over no citations proves nothing."""
     assert CITATIONS, "no catalog record cites a capability, so the tests below are vacuous"
-    assert len(CITATIONS) == 5, [operation for operation, _ in CITATIONS]
+    assert len(CITATIONS) == 6, [operation for operation, _ in CITATIONS]
 
 
 @pytest.mark.parametrize(
@@ -72,6 +72,11 @@ def test_only_the_operations_that_drive_a_backend_cite_a_record() -> None:
         # no backend and has no measured row of its own.
         "SOM_SPOT_DIAGRAM": "M_RAY_OPTILAND",
         "O_ASM_PROPAGATE": "M_WAVE_CHROMATIX",
+        # CHE-228 (R06.11). The Fresnel kernel runs on the same pinned build, in the
+        # same complex64-only storage the row measured, so it cites the same record.
+        # The measurement is about the package's device and dtype behaviour, and the
+        # paraxial substitution changes neither.
+        "O_FRESNEL_PROPAGATE": "M_WAVE_CHROMATIX",
         "O_FOCAL_PLANE_TRANSFORM": "M_WAVE_CHROMATIX",
     }
     for record in CATALOG:
@@ -88,10 +93,11 @@ def test_several_descriptors_may_cite_one_record() -> None:
     pack removes, so this is pinned as intended rather than tolerated.
 
     The chromatix count went 3 -> 2 on CHE-224 (R15.1), which merged
-    `S_WAVE_CHROMATIX` into `O_ASM_PROPAGATE`, and the optiland count went 2 -> 3 on
-    CHE-226 (R16) with `SOM_SPOT_DIAGRAM`. Note that the *record* is untouched in
-    both cases: what changed is how many descriptors cite it, which is exactly the
-    number this test exists to leave free.
+    `S_WAVE_CHROMATIX` into `O_ASM_PROPAGATE`, and back to 3 on CHE-228 (R06.11)
+    with `O_FRESNEL_PROPAGATE`; the optiland count went 2 -> 3 on CHE-226 (R16) with
+    `SOM_SPOT_DIAGRAM`. Note that the *record* is untouched in every case: what
+    changed is how many descriptors cite it, which is exactly the number this test
+    exists to leave free.
     """
     per_component: dict[str, list[str]] = {}
     for operation_id, component in CITATIONS:
@@ -101,7 +107,7 @@ def test_several_descriptors_may_cite_one_record() -> None:
         "SOM_SPOT_DIAGRAM",
         "SO_RAY_LAUNCH_TRACE",
     ]
-    assert len(per_component["M_WAVE_CHROMATIX"]) == 2
+    assert len(per_component["M_WAVE_CHROMATIX"]) == 3
     # And there is exactly one record per component, not one per citation.
     assert len(capability_record_ids()) == 2
 

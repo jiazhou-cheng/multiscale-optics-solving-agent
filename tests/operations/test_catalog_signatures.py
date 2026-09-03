@@ -237,7 +237,7 @@ def test_the_derivation_is_not_vacuous() -> None:
     thing for every operation would pass all fifty-six. These four facts are what
     say it does not.
     """
-    assert len(CASES) == 15
+    assert len(CASES) == 16
     assert _derive("S_SOURCE_PLANE_WAVE")["inputs"] == ()
     assert _derive("O_PROPAGATE_RAYS")["inputs"] == ("ray_bundle",)
     assert _derive("O_PROPAGATE_RAYS")["return_arity"] == 1
