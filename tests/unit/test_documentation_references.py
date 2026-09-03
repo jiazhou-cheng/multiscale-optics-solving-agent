@@ -378,10 +378,10 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
     files would be the pack coming back without the taxonomy review criterion 2 asks
     for.
 
-    `benchmarks/` moved 10 -> 16 for CHE-238/CHE-239, and the growth is the kind the
+    `benchmarks/` moved 10 -> 17 for CHE-238 through CHE-240, and the growth is the kind the
     docstring above sanctions rather than the kind it guards against. What arrived is
     one report (`reports/2026-09/`) and one verification harness
-    (`verification/`, five modules) for the overnight ray/wave verification run --
+    (`verification/`, six modules) for the overnight ray/wave verification run --
     executable evidence and the document it writes into, not prose restating what a
     module already says. The distinction the count exists to catch is a *prose pack*
     reappearing; this is the opposite kind of file.
@@ -401,4 +401,4 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
         tree: len([path for path in tracked if path.startswith(f"{tree}/")])
         for tree in ("knowledge", "benchmarks", "docs")
     }
-    assert counts == {"knowledge": 3, "benchmarks": 16, "docs": 2}, counts
+    assert counts == {"knowledge": 3, "benchmarks": 17, "docs": 2}, counts

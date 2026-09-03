@@ -17,7 +17,7 @@ below are the report.)*
 | Workstream | Status | Section |
 | --- | --- | --- |
 | A — ray tutorial / system regression | **run** — 38 Tier-1 rows, 96 Tier-2 rows; one confirmed defect | §5 |
-| B — wave kernel sweep | not yet run | §6 |
+| B — wave kernel sweep | **run** — 24 rows; a second overstated record found | §6 |
 | C — Demo2 reproduction | not yet run | §7 |
 | D — Demo3 characterization | not yet run | §8 |
 
@@ -475,7 +475,215 @@ backed by a measurement rather than by a preference.
 
 ## 6. Workstream B — wave kernel sweep (CHE-240)
 
-*Not yet run.*
+Ran at `241c783` on CPU/complex64 through `./run.sh`. One driver:
+
+```
+./run.sh python -m benchmarks.verification.wave_kernel_sweep
+```
+
+11 s, 968 MiB peak RSS. Record: `outputs/che-238-overnight/workstream-b/kernel_sweep.json`.
+
+### 6.0 Aggregate
+
+24 rows: **17 PASS, 5 FAIL, 2 NOT-COVERED.** All seven checks have numerical
+records. No tolerance was widened and no propagator was touched.
+
+| Sweep | Recorded expectation | Measured | Status |
+| --- | --- | --- | --- |
+| 1 kernel identity | max difference **exactly 0.0** | **6.108e-05** on the arrays | **FAIL** — stale record |
+| 2 hard edge | ≈ 2.3e-1 of peak, pad-independent | 3.20e-1, flat to 8.8e-4 over 4 paddings | PASS |
+| 3 soft edge | ≈ 4.9e-6 of peak | 6.24e-7 (circular), 1.75e-4 (square) | **FAIL** — setup |
+| 4 sampling bound | refusal at `z = N·pitch²/λ` | **no runtime refusal on either side** | **NOT-COVERED** |
+| 5 paraxial bound | π/4, 25.5 rad, 175 rad | π/4 exactly, 25.4640, 174.533 | PASS ×3 |
+| 6 tilted beam | `z·sinθ` not `z·tanθ`; delay linear in `f` | 6.2e-7…6.8e-5 samples; ratio flat to 1.1e-6 | PASS ×4 |
+| 7 focal plane | focus `f·sinθ`; grid `λf/(nNdx)` | pitch exact; focus to 1.5e-7 relative | PASS ×2 |
+
+"101's grid" is fully specified by `VALIDITY_NOTES['paraxial']` and was not
+re-chosen: **512², dx = 0.3 µm, λ₀ = 0.532 µm, n = 1.33, z = 50 µm**.
+
+### 6.1 Which oracle decided what
+
+Three standings, not equal:
+
+* **Closed form** — the paraxial residual `n k₀ z (1 − cos − sin²/2)`, the walk-off
+  `z sinθ`, the focus at `f sinθ`, the Fourier pitch `λf/(nNdx)`. Arithmetic,
+  independent of this repository. Sweeps 5, 6, 7 are decided by these.
+* **Kernel identity** — sweep 1 is an algebraic claim about two of this project's
+  own kernels. It says nothing about either being right.
+* **Diagnostic** — sweeps 2, 3, 4 compare Fresnel against this repository's own
+  angular spectrum, which `AGENTS.md` forbids as a correctness gate. They
+  reproduce a *recorded measurement*; they do not certify a kernel.
+
+Every oracle grid is built from the declared pitch and shape in numpy. Sweep 1 is
+the one place that reaches for `native.f_grid` and
+`compute_transfer_propagator`, because its claim is about the propagator arrays
+and cannot be made without them.
+
+### 6.2 Second confirmed finding — "exactly 0.0" is overstated
+
+`backends/chromatix/solver.py`'s module docstring, repeated in
+`operations/catalog.py`'s `O_FRESNEL_PROPAGATE` record, says that replacing
+`delay + 1.0` with `2.0` in `_carrier_removed_propagator` *"reproduces the Fresnel
+phase with a maximum difference of **exactly 0.0** in float32 over a 512² grid"*.
+
+Measured on the propagator arrays themselves — the substituted kernel against
+chromatix's own `compute_transfer_propagator`, same grid, same float32:
+
+| quantity | value |
+| --- | --- |
+| max absolute difference, arrays | **6.108e-05** |
+| max phase difference, arrays | 6.108e-05 rad |
+| per-bin phase difference through the public ops | 3.050e-05 rad |
+| the same, unpatched | 2.127 rad |
+| collapse factor from the substitution | **69 727×** |
+| predicted float32 phase floor (4·ε₃₂·198 rad) | 9.450e-05 rad |
+
+The two kernels are **not the same expression**: chromatix computes
+`-π·(λ/n)·z·l2_sq_norm(f_grid)` where the substituted kernel computes
+`-2π|z|·(λ/n)·f²/2.0` — a different multiply order in float32.
+
+So the *substance* of the claim holds: the substitution is algebraically exact,
+the difference collapses by nearly five orders of magnitude, and 6.1e-5 sits below
+the predicted float32 floor. What does not hold is "exactly 0.0", which should
+read "to float32 round-off, ~6e-5 rad".
+
+**Not fixed here.** CHE-240's non-goals forbid converting a stale recorded
+expectation into a new baseline without a separate ticket. Recommended follow-up
+in §10.
+
+This was caught by the independent review, not by the first version of this sweep.
+The first version compared propagated *fields* rather than the propagator arrays,
+found 8.4e-5, attributed it to FFT round-off, and filed the row as PASS with a
+`setup` classification whose stated reason — that the two kernels are the same
+expression and therefore bit-identical — was false. Recorded here because it is
+the failure mode this whole run exists to avoid: measuring an adjacent quantity
+and reporting a clean result.
+
+### 6.3 Sweeps 2 and 3 — the two recorded intensity figures
+
+The hard edge reproduces: **3.20e-1** against a recorded 2.3e-1, flat across
+paddings 0/128/256/512 to 8.8e-4 relative, which is the second half of the
+recorded claim (pad-independence is what says the difference is the kernel and not
+wraparound).
+
+The soft edge does not: **6.24e-7** against a recorded 4.9e-6, a factor of 8.
+
+Both figures are held to a factor-of-two band, and the basis for that band is
+**measured setup underspecification**, not significant figures. Two sensitivity
+sweeps establish it:
+
+| what the record does not state | measured span on 101's grid | contains 4.9e-6 / 2.3e-1? |
+| --- | --- | --- |
+| aperture size (hard edge, 4 widths) | 1.39e-1 … 2.64e-1 | **yes** |
+| edge profile, square family (5 powers) | 1.75e-4 … 1.16e-3 | **no** |
+| edge profile, circular family (5 powers) | 4.77e-7 … 5.61e-4 | **yes** |
+
+Two conclusions, both attributable:
+
+* The hard edge's +39% is inside what the unstated aperture size alone spans, so
+  the recorded 2.3e-1 was never reproducible to better than a factor.
+* **The record's soft field is radially symmetric, not a softened square.** Only
+  the circular family's span contains 4.9e-6; softening the hard case's own square
+  aperture lands 36× away and never reaches it. The aperture *geometry* is a
+  larger term than the edge softness, which is not what the record's wording
+  ("a soft-edged field on the identical grid") suggests.
+
+Classified **setup**. Not a stale record and not an implementation change — the
+figure is inside the space the record's own unstated parameters span.
+
+The soft-edge pad-independence row passes on a scale-aware criterion: at 6e-7 of
+peak the difference is a handful of complex64 epsilons, so its 18% pad-to-pad
+variation is arithmetic rather than a boundary effect, and asserting independence
+there would be asserting something about round-off. The hard edge, at 3.2e-1, is
+where the question is meaningful and it is flat.
+
+### 6.4 Sweep 4 — a declared bound with no enforcement
+
+The ticket expects a refusal at `z = N·pitch²/λ`. **The bound is declared and
+nothing enforces it.**
+
+`operations/catalog.py` carries `"z <= N pitch^2 / lambda, the transfer function's
+own sampling bound"` as a `validity` entry on **both** `O_ASM_PROPAGATE` and
+`O_FRESNEL_PROPAGATE`. No runtime refusal exists: searched `MODELS`,
+`_require_model`/`_require_pad_target_crop`, `ScalarField.__post_init__`, the 22
+`CONTRACT_CODES` and `numerics.REFUSAL_CODES` — none mentions a
+transfer-function sampling bound.
+
+Both records preserved, as the ticket requires:
+
+| | `z` | `z / bound` | refused? | unpadded-vs-padded drift |
+| --- | --- | --- | --- | --- |
+| inside | 50 µm | 0.577 | **no** | 8.32e-7 |
+| outside | 200 µm | 2.309 | **no** | 9.54e-7 |
+
+The bound is 86.6 µm on this grid. "Declared domain, unenforced at runtime" is a
+materially different gap from "absent", and that is what the rows say — the first
+version of this sweep claimed the bound did not exist in the tree at all, which
+the independent review corrected.
+
+Note the declared criterion omits the medium index: in-medium it would be
+`n·N·dx²/λ₀`, 115 µm rather than 86.6 µm. Reproduced as the tree words it rather
+than corrected here; both probed distances fall on the same side either way.
+
+The drift figure quantifies the gap and is **diagnostic** — it compares two runs of
+the same implementation. It is also small on both sides, which is its own
+information: at these distances the unenforced bound is not where the damage is,
+and a sweep that only looked at the drift would have concluded there is no gap.
+
+### 6.5 Sweep 5 — the paraxial bound, and an asymmetry in the record
+
+All three pass. Wrapped residuals against the closed form at the cosine actually
+probed: **3.8e-6, 2.6e-5, 1.3e-4 rad** — at phase arguments up to 169 rad.
+
+| record's cosine | record | full residual `n k₀ z(1−cos−sin²/2)` | leading term `n k₀ z sin⁴/8` |
+| --- | --- | --- | --- |
+| 0.29907 (the bound) | π/4 | 0.82262 (+4.7%) | **0.7853981634 = π/4, exact** |
+| 0.66667 (per-axis Nyquist) | 25.5 | **25.4640 (0.14%)** | 19.393 |
+| 0.94281 (grid corner) | 175 | **174.533 (0.27%)** | 77.570 |
+
+**The record quotes the leading term at the bound and the full residual at the
+other two.** That is not an error: `VALIDITY_NOTES` says literally "at which the
+leading error reaches pi/4", and at the bound the leading term is π/4 *exactly* by
+construction — `n k₀ z·sin⁴/8` at `sin = (λ₀/(nz))^¼` is `n k₀ z·(λ₀/(nz))/8 =
+2π/8`. Measured agreement 3.3e-16 relative. Reporting only the full residual would
+have made a correctly-stated record look 5% wrong.
+
+Two measurement points worth recording:
+
+* **The 0.943 case had to be a 2-D probe.** 0.943 is √2 times the per-axis
+  Nyquist, so it exists only as the *corner* of the 2-D frequency grid
+  (`fx = fy = Nyquist`). The first version of this sweep built a single-axis ramp at
+  that frequency — above Nyquist, therefore aliased — and reported a 2.41 rad
+  residual against the closed form, which was the alias and not a disagreement.
+  Every case is now parameterized by DFT **bin pair** and the cosine computed from
+  the bins.
+* Bin `N//2 − 1` rather than `N//2`, because the Nyquist bin is the degenerate ±
+  bin where a ramp advances by exactly π per sample. So the cosines probed sit just
+  below the record's, and every row carries both.
+
+### 6.6 Sweeps 6 and 7 — the closed forms
+
+**Tilted beam.** Landing point within 6.2e-7 / 4.1e-6 / 6.8e-5 samples of
+`z sinθ` at 2°, 5°, 10°. `z tanθ` is rejected only where the two separate: they
+are 0.01 samples apart at 2° and 1.07 at 10°, so each row carries
+`distinguishes_the_two_oracles` and the discrimination is claimed only at 10°.
+Group-delay linearity: `landing / sinθ` constant to 1.1e-6 across the three
+angles.
+
+**Focal-plane transform.** Output pitch exactly `λf/(nNdx)` per axis on a grid
+asymmetric in *both* count (48×64) and pitch (0.30/0.25 µm), so a transposed
+`(y, x)` could not pass — relative error 0.0. Focus at `f sinθ` to 1.5e-7
+relative at 20°, both signs, with `f tanθ` rejected by more than 2 output samples
+and the focus staying on the y axis (which is what a transposition would break and
+is invisible in a rotationally symmetric case).
+
+### 6.7 Not covered by this workstream
+
+* The sampling-bound refusal (§6.4) — declared, unenforced, untested.
+* No Chromatix gallery notebook was run; the ticket excludes it.
+* Nothing here touches GPU, torch, or float64 propagation.
+* The `pad_width`-dependent single-FFT Fresnel method (`transform_propagate`) is
+  not in the tree and was not probed.
 
 ## 7. Workstream C — Demo2 reproduction (CHE-241)
 
@@ -502,7 +710,9 @@ report. The one defect found (§5.3) is recorded and left unfixed on purpose.
 | `make test` | after CHE-238 | 1745 passed, 7 skipped, 12 deselected, 106 s |
 | `make check-arch` | after CHE-238 | dependency graph OK, class budget OK |
 | `./run.sh ruff check .` | after CHE-239 | all checks passed |
-| `make test` | after CHE-239 | see below |
+| `make test` | after CHE-239 | 1745 passed, 7 skipped, 12 deselected |
+| `./run.sh ruff check .` | after CHE-240 | all checks passed |
+| `make test` | after CHE-240 | see below |
 
 ### 9.3 Resource incidents so far
 
@@ -522,7 +732,7 @@ throughout. No GPU was used. Peak RSS across the night so far: 1.0 GiB.
 
 *Accumulated as the night proceeds.*
 
-**Priority — from §5.3.** `SOM_SPOT_DIAGRAM` analyses at
+**Priority 1 — from §5.3.** `SOM_SPOT_DIAGRAM` analyses at
 `setup.reference_wavelength_um` while reporting `source.wavelength_um`. Needs its
 own ticket: it changes a solver adapter's behaviour, moves frozen numbers, and
 `AGENTS.md` puts it behind independent scientific review. The fix is small
@@ -532,8 +742,25 @@ source's, or the record has to stop claiming one that did not run) but the
 must include a case where the source wavelength differs from the reference — the
 current tests do not have one, which is why this survived.
 
+**Priority 2 — from §6.2.** The recorded "maximum difference of **exactly 0.0** in
+float32 over a 512² grid" does not reproduce in the quantity it names: the
+propagator arrays differ by 6.1e-5. The substitution is algebraically exact and the
+claim's substance holds, so the fix is to the *wording* in
+`src/backends/chromatix/solver.py` and `src/operations/catalog.py` — "to float32
+round-off, ~6e-5 rad". A separate ticket because CHE-240's non-goals forbid
+converting a stale recorded expectation into a new baseline here.
+
+**Priority 3 — from §6.4.** `z <= N pitch^2 / lambda` is declared as a `validity`
+entry on both propagators and enforced nowhere. Either add the refusal (with a
+`CONTRACT_CODES` entry) or state in the descriptor that the domain is declared and
+unenforced. The declared form also omits the medium index.
+
 Also worth tickets:
 
+* The recorded 2.3e-1 and 4.9e-6 in `VALIDITY_NOTES['paraxial']` do not state the
+  aperture size or the aperture geometry, and both matter — the geometry by 36×
+  (§6.3). Adding "square, half-width w, circular super-Gaussian edge" or whatever
+  the original setup was would make the figures reproducible.
 * Extend `extract_setup` to the finite-conjugate path: read the object distance
   into `SourceSpec.object_distance_mm` and verify an object-height → field-angle
   conversion. That is what unblocks tutorial 4e and the `UVProjectionLens` sample
