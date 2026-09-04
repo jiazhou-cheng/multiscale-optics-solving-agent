@@ -74,6 +74,21 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     Chromatix onto the device and broke two tolerance-sensitive tests written
     against CPU float32 results).
 
+    Read that as being about the **default**, not about an inability to place.
+    CHE-244 measured it on the GPU image: `jax.devices("cpu")` does expose a
+    host device, `jax.device_put` onto it is honoured, and the placement is
+    sticky through subsequent operations (`jnp.sin` of a host-placed array stays
+    on the host). What JAX defaults to for a *newly created* array is the GPU,
+    which is exactly what breaks a mixed selection, since none of the tests this
+    rule protects place explicitly. One caveat worth knowing before relying on
+    the above: `numerics.arrays.to_namespace` cannot reach that host device on
+    the GPU image, because `_jax_device` selects from `jax.devices()` -- the
+    default backend only, `[CudaDevice(id=0)]` there -- rather than from
+    `jax.devices(platform)`, so it raises `DEVICE_NOT_AVAILABLE` for a host
+    target. No landed command hits that combination (`make test` runs the CPU
+    image and `make test-gpu` selects only `gpu`-marked tests), which is why
+    CHE-244 recorded it rather than fixing it.
+
     `trylast=True` matters: this hook must observe `items` after pytest's own
     `-m` deselection, because both decisions depend on what will really run
     rather than on what happened to be collected.

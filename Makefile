@@ -19,9 +19,12 @@
 # `benchmarks/agents/`, `scripts/validate_package.py` or `python -m cli`, none of
 # which exist any more.
 
-# The default suite. Since the deletion this is the two architecture gates and
-# nothing else: 32 tests in 0.06 s. `-n 8 --dist loadfile` came out of
-# addopts with the suite that justified it; see the measurement in pyproject.toml.
+# The default suite. Measured at CHE-244: 1770 passed, 16 skipped, 12 deselected,
+# 2 xfailed in 106 s (1745/7/12 before that ticket's parity cells, which add a
+# measured 1.05 s). It said "the two architecture gates and nothing else: 32
+# tests in 0.06 s" until then -- true right after the greenfield deletion, and
+# stale from R01 onward. `-n 8 --dist loadfile` came out of addopts with the
+# suite that justified it; see the measurement in pyproject.toml.
 test:
 	./run.sh pytest -q
 

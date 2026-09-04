@@ -514,3 +514,35 @@ conflicts with structural convenience, the scientific rule wins.
 The previous implementation may contain executable examples of these protections.
 Reusing the idea is encouraged; claiming the new tree is protected requires the
 new executable check to exist.
+
+---
+
+## 7. Parity evidence and correctness evidence
+
+*[LANDING GATE]* Landed at CHE-244 (T0) as `tests/parity/`.
+
+A **parity** claim and a **correctness** claim are different claims, and the
+first is routinely reported as though it were the second. "The GPU and the host
+agree to 3e-07" says the two legs computed the same thing. It does not say
+either of them computed the right thing, and when both legs run the same
+repository code it *cannot* say so — §6's rule that repository numerical code
+must not be the sole correctness oracle for the same numerical code applies with
+full force to a device-parity comparison, because the two legs are the same
+code.
+
+* *[LANDING GATE]* Parity tests declare which of the two they answer, and do not live with the oracles. The correctness gates are the analytic oracles in `tests/physics/`; parity tests answer "do the cells agree" and say so in the module that holds them.
+* *[LANDING GATE]* A parity leg is never an oracle, including the widest-precision host leg. It is characterization.
+* *[LANDING GATE]* Parity tests write no records and live outside `benchmarks/`. A cell is not a measurement anybody cites; giving it a record would turn a fixture into an artifact with a fingerprint and a staleness problem.
+* *[JUDGEMENT]* A parity gate needs a negative control that breaks it. A cross-device agreement test whose failure mode cannot be provoked is unfalsifiable, and the first half of such a criterion is empty without the second. `tests/parity/test_ray_to_scalar_parity.py` provokes TF32 by dropping `matmul_precision_kwargs`; measured, that moves the error from 3.2e-07 to 2.7e-04 against a gate at 7.6e-06.
+
+### Execution cells derive from capability packs
+
+*[LANDING GATE]* A `namespace × device × dtype` cell set is **derived from a
+declaration, never listed**. A hand-written matrix in a test tree is a second
+declaration of what a component supports, and the two drift silently — the
+first symptom is a suite that still passes while covering less than it says.
+
+* *[LANDING GATE]* Where a component has a capability pack (`knowledge/capabilities/`), the pack is the authority: devices, `device_namespaces`, and `accepted_input_dtypes`. A cell the pack does not admit does not enter the parameter list at all, because there is nothing to run and no environment fact to report.
+* *[LANDING GATE]* Where a component has none — ten of the seventeen catalog records carry `capabilities=None` — cells come from the project-wide declarations that do exist (`COMPUTE_NAMESPACES`, `ArrayNamespace.can_leave_host`, `PHASE_ACCUMULATION_FLOOR`) and from nothing else. **That asymmetry follows from who declared what and is not an omission.** Inventing dtype rows for a repo-owned operation nobody has probed is the same failure as a hand-written matrix.
+* *[LANDING GATE]* Placement is **observed off the buffer**, never inferred from the argument that requested it. `knowledge/capabilities/M_WAVE_CHROMATIX.json` records why: "a process-global JAX platform pin produces a successful complex64 run on the host while the caller asked for CUDA, with no error raised." A request and an observation are therefore different types — `parity.cells.Cell` and `numerics.precision.ArrayState` — and the read-back compares them field by field rather than by equality, since a request for `cuda` carries no ordinal and its observation is `cuda:0`.
+* *[LANDING GATE]* One derivation point per tolerance family. A floating-point bound spelled at a comparison site can be widened by one character with no reviewer seeing it, which is how §6's tolerance rule is broken in practice; `tests/parity/test_cells.py` forbids it mechanically rather than by convention.
