@@ -102,6 +102,7 @@ from backends.optiland.rays import (
     to_native_rays,
     to_ray_bundle,
     to_traced_ray_bundle,
+    trace_exit_state,
 )
 from backends.optiland.system import build_lens
 from numerics import (
@@ -464,6 +465,12 @@ def trace(
     reference, `amplitude`, `measure_weight` and a declared `measure_kind`, and no
     native ray state, native unit or solver type is observable in it.
 
+    **Where it comes back** is `rays.trace_exit_state(device, precision)`: host
+    NumPy for a `cpu` trace, JAX on the device for a `cuda` FP32 one, and the host
+    for `cuda` FP64 because `jax_enable_x64` is off and the dtype does not exist
+    there. Read the answer off `bundle.state`, never off the request -- see
+    `trace_exit_state` for why that distinction is load-bearing here.
+
     The source's field angle is expressible whatever it is: `build_lens` declares
     exactly the field being traced, so there is no enumerated field set for a
     request to fall outside of. The source's wavelength is likewise free -- it need
@@ -550,6 +557,12 @@ def trace(
         traced,
         launch=declaration,
         reference_surface=reference_surface,
+        # CHE-245 (T1). The outbound counterpart of `_resolve_namespace`: that
+        # decides which namespace drives the solver, this decides which compute
+        # namespace the rays are handed back in. Without it a CUDA trace returned
+        # host NumPy and every repo-owned node downstream ran on the host, because
+        # they all read `rays.xp`.
+        exit_state=trace_exit_state(device=device, precision=precision),
     )
     return bundle
 

@@ -1,0 +1,160 @@
+{
+  "written_at_utc": "2026-09-04T03:33:59.029309+00:00",
+  "git": {
+    "commit": "500e7737ed922d0fc5816546a166e788284c0073",
+    "branch": "main",
+    "dirty": true
+  },
+  "command": "/workspace/benchmarks/probes/optiland_device_exit.py",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "chromatix": "0.6.0",
+      "optiland": "0.6.0",
+      "torch": "2.13.0+cu126"
+    },
+    "device": {
+      "declaration": "observed, not requested. The container's visible device set decides which physical GPU is cuda:0; see MOA_GPUS in run.sh.",
+      "torch": {
+        "version": "2.13.0+cu126",
+        "cuda_build": "12.6",
+        "cuda_available": true,
+        "device_count": 1,
+        "device_names": [
+          "NVIDIA RTX A6000"
+        ]
+      },
+      "jax": {
+        "version": "0.6.2",
+        "default_backend": "gpu",
+        "devices": [
+          "cuda:0"
+        ],
+        "enable_x64": false
+      }
+    }
+  },
+  "probe": "p1",
+  "ticket": "CHE-245",
+  "title": "P1 -- where a trace exit lands",
+  "produced_by": "benchmarks/probes/optiland_device_exit.py --probe p1",
+  "rows": [
+    {
+      "case": "p1-placement-cpu-fp64-default",
+      "configuration": {
+        "system": "CookeTriplet",
+        "device": "cpu",
+        "precision": "fp64",
+        "num_rings": 8,
+        "reference_surface": "exit_pupil",
+        "exit_state_arm": "default"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "PASS",
+      "measured": {
+        "observed_exit_state": "numpy:float64@cpu",
+        "observed_namespace": "numpy",
+        "observed_device": "cpu",
+        "observed_dtype": "float64",
+        "ray_count": 217
+      },
+      "expected": {
+        "requested_exit_state": "numpy:float64@cpu"
+      },
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.0410286990008899,
+      "note": "Read off the emitted buffer with numerics.arrays.array_state, never from the argument that requested it. Device *kind* is compared and the ordinal is reported: a request for 'cuda' carries none and its observation is 'cuda:0'. The explicit_host arm is what every CUDA trace returned before CHE-245 -- host NumPy, which pinned every downstream repo-owned node to the host because they all read rays.xp. It is a row rather than a deleted 'before' record."
+    },
+    {
+      "case": "p1-placement-cpu-fp64-explicit_host",
+      "configuration": {
+        "system": "CookeTriplet",
+        "device": "cpu",
+        "precision": "fp64",
+        "num_rings": 8,
+        "reference_surface": "exit_pupil",
+        "exit_state_arm": "explicit_host"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "PASS",
+      "measured": {
+        "observed_exit_state": "numpy:float64@cpu",
+        "observed_namespace": "numpy",
+        "observed_device": "cpu",
+        "observed_dtype": "float64",
+        "ray_count": 217
+      },
+      "expected": {
+        "requested_exit_state": "numpy:float64@cpu"
+      },
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.03838108699710574,
+      "note": "Read off the emitted buffer with numerics.arrays.array_state, never from the argument that requested it. Device *kind* is compared and the ordinal is reported: a request for 'cuda' carries none and its observation is 'cuda:0'. The explicit_host arm is what every CUDA trace returned before CHE-245 -- host NumPy, which pinned every downstream repo-owned node to the host because they all read rays.xp. It is a row rather than a deleted 'before' record."
+    },
+    {
+      "case": "p1-placement-cuda-fp32-default",
+      "configuration": {
+        "system": "CookeTriplet",
+        "device": "cuda",
+        "precision": "fp32",
+        "num_rings": 8,
+        "reference_surface": "exit_pupil",
+        "exit_state_arm": "default"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "PASS",
+      "measured": {
+        "observed_exit_state": "jax:float32@cuda:0",
+        "observed_namespace": "jax",
+        "observed_device": "cuda:0",
+        "observed_dtype": "float32",
+        "ray_count": 217
+      },
+      "expected": {
+        "requested_exit_state": "jax:float32@cuda"
+      },
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 1.6418840990008903,
+      "note": "Read off the emitted buffer with numerics.arrays.array_state, never from the argument that requested it. Device *kind* is compared and the ordinal is reported: a request for 'cuda' carries none and its observation is 'cuda:0'. The explicit_host arm is what every CUDA trace returned before CHE-245 -- host NumPy, which pinned every downstream repo-owned node to the host because they all read rays.xp. It is a row rather than a deleted 'before' record."
+    },
+    {
+      "case": "p1-placement-cuda-fp32-explicit_host",
+      "configuration": {
+        "system": "CookeTriplet",
+        "device": "cuda",
+        "precision": "fp32",
+        "num_rings": 8,
+        "reference_surface": "exit_pupil",
+        "exit_state_arm": "explicit_host"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "PASS",
+      "measured": {
+        "observed_exit_state": "numpy:float32@cpu",
+        "observed_namespace": "numpy",
+        "observed_device": "cpu",
+        "observed_dtype": "float32",
+        "ray_count": 217
+      },
+      "expected": {
+        "requested_exit_state": "numpy:float32@cpu"
+      },
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.1010109310009284,
+      "note": "Read off the emitted buffer with numerics.arrays.array_state, never from the argument that requested it. Device *kind* is compared and the ordinal is reported: a request for 'cuda' carries none and its observation is 'cuda:0'. The explicit_host arm is what every CUDA trace returned before CHE-245 -- host NumPy, which pinned every downstream repo-owned node to the host because they all read rays.xp. It is a row rather than a deleted 'before' record."
+    }
+  ],
+  "status_counts": {
+    "PASS": 4
+  },
+  "peak_rss_kib": 2739432
+}

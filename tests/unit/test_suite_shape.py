@@ -45,6 +45,7 @@ and CHE-213, not frozen evidence pruned from a deleted tree. An empty
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -260,9 +261,39 @@ def test_the_only_committed_records_are_the_live_benchmark_outputs() -> None:
         and "__pycache__" not in str(path)
         and not str(path.relative_to(ROOT)).startswith((".claude", "outputs", "runs", "tmp_probes"))
     )
-    expected_trees = ("benchmarks/systems/records/", "knowledge/capabilities/")
+    # `benchmarks/probes/records/` joined the list at CHE-245 (T1) on exactly the
+    # same justification as the first entry: it is the live output of a committed
+    # driver (`benchmarks/probes/optiland_device_exit.py`), rewritten by re-running
+    # it, and co-located with its generator. What criterion 4 was about is the 152
+    # orphaned records the reference tree carried with no live driver behind them,
+    # and that is still what this pins -- a record here without a script beside it
+    # that rewrites it is the thing nobody declared the provenance of.
+    expected_trees = (
+        "benchmarks/systems/records/",
+        "benchmarks/probes/records/",
+        "knowledge/capabilities/",
+    )
     stray = [path for path in committed if not path.startswith(expected_trees)]
     assert stray == [], (
-        "a committed JSON artifact lives outside the two declared trees -- the "
-        "benchmark driver's own records and the capability pack:\n  " + "\n  ".join(stray)
+        "a committed JSON artifact lives outside the three declared trees -- the two "
+        "benchmark drivers' own records and the capability pack:\n  " + "\n  ".join(stray)
+    )
+
+    # The criterion the paragraph above argues, made executable rather than left
+    # as prose. A path prefix alone would let the whitelist grow into the orphan
+    # tree it was written against: what makes a committed record legitimate is
+    # that a script in the tree rewrites it, so every probe record has to name
+    # one and that script has to exist. `benchmarks/systems/records/` is covered
+    # by `tests/benchmarks/test_records.py`, which reads every field of those
+    # four; nothing reads the probe records, so this is where they are held.
+    orphans = []
+    for path in sorted((ROOT / "benchmarks" / "probes" / "records").rglob("*.json")):
+        produced_by = json.loads(path.read_text(encoding="utf-8")).get("produced_by", "")
+        script = produced_by.split()[0] if produced_by else ""
+        if not script or not (ROOT / script).exists():
+            orphans.append(f"{path.relative_to(ROOT)} -> produced_by={produced_by!r}")
+    assert orphans == [], (
+        "a probe record does not name a script in this tree that rewrites it, which is "
+        "exactly the provenance the deleted 152-record tree was missing:\n  "
+        + "\n  ".join(orphans)
     )

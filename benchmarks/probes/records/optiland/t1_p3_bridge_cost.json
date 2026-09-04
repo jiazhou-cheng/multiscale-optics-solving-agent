@@ -1,0 +1,244 @@
+{
+  "written_at_utc": "2026-09-04T03:35:31.300547+00:00",
+  "git": {
+    "commit": "500e7737ed922d0fc5816546a166e788284c0073",
+    "branch": "main",
+    "dirty": true
+  },
+  "command": "/workspace/benchmarks/probes/optiland_device_exit.py",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "chromatix": "0.6.0",
+      "optiland": "0.6.0",
+      "torch": "2.13.0+cu126"
+    },
+    "device": {
+      "declaration": "observed, not requested. The container's visible device set decides which physical GPU is cuda:0; see MOA_GPUS in run.sh.",
+      "torch": {
+        "version": "2.13.0+cu126",
+        "cuda_build": "12.6",
+        "cuda_available": true,
+        "device_count": 1,
+        "device_names": [
+          "NVIDIA RTX A6000"
+        ]
+      },
+      "jax": {
+        "version": "0.6.2",
+        "default_backend": "gpu",
+        "devices": [
+          "cuda:0"
+        ],
+        "enable_x64": false
+      }
+    }
+  },
+  "probe": "p3",
+  "ticket": "CHE-245",
+  "title": "P3 -- the on-device torch/JAX bridge",
+  "produced_by": "benchmarks/probes/optiland_device_exit.py --probe p3",
+  "rows": [
+    {
+      "case": "p3-bridge-3081",
+      "configuration": {
+        "elements_float32": 3081,
+        "mebibytes": 0.011753082275390625,
+        "ray_count": 1027,
+        "note": "3 x ray_count float32, i.e. one (N, 3) geometry column set",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "numerics.arrays.to_namespace",
+      "status": "BASELINE",
+      "measured": {
+        "timed_callable_dlpack": "jnp.from_dlpack(t) then block_until_ready()",
+        "timed_callable_host": "t.detach().cpu().numpy()",
+        "dlpack_on_device": {
+          "median_s": 0.00023783399956300855,
+          "min_s": 0.00022416600040742196,
+          "max_s": 0.0003432769990467932,
+          "samples_s": [
+            0.0003432769990467932,
+            0.0002537099971959833,
+            0.00023489999875891954,
+            0.00023783399956300855,
+            0.00022416600040742196
+          ]
+        },
+        "device_to_host_copy": {
+          "median_s": 2.718200266826898e-05,
+          "min_s": 2.5936999008990824e-05,
+          "max_s": 3.931800165446475e-05,
+          "samples_s": [
+            3.931800165446475e-05,
+            2.867399962269701e-05,
+            2.718200266826898e-05,
+            2.7132999093737453e-05,
+            2.5936999008990824e-05
+          ]
+        },
+        "host_copy_over_dlpack_median": 0.11428981019624045,
+        "dlpack_result_state": "jax:float32@cuda:0"
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.0002650160022312775,
+      "note": "The DLPack path is a device-resident view, so its cost is a flat dispatch overhead while the copy it replaces scales with the buffer. Below the crossover the bridge is the MORE expensive read -- 7x at 3e3 float32 -- which is not a defect but what a flat overhead against a scaling copy looks like. Recorded as the input to CHE-248's exit decision, and as the reason a device exit is cheap: the crossover is where preserving the device starts paying for itself. The result state is read back off the bridged buffer rather than assumed."
+    },
+    {
+      "case": "p3-bridge-29757",
+      "configuration": {
+        "elements_float32": 29757,
+        "mebibytes": 0.11351394653320312,
+        "ray_count": 9919,
+        "note": "3 x ray_count float32, i.e. one (N, 3) geometry column set",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "numerics.arrays.to_namespace",
+      "status": "BASELINE",
+      "measured": {
+        "timed_callable_dlpack": "jnp.from_dlpack(t) then block_until_ready()",
+        "timed_callable_host": "t.detach().cpu().numpy()",
+        "dlpack_on_device": {
+          "median_s": 0.0002344350032217335,
+          "min_s": 0.00021415300216176547,
+          "max_s": 0.0002760969982773531,
+          "samples_s": [
+            0.0002760969982773531,
+            0.0002414070004306268,
+            0.00023247900026035495,
+            0.0002344350032217335,
+            0.00021415300216176547
+          ]
+        },
+        "device_to_host_copy": {
+          "median_s": 6.649100032518618e-05,
+          "min_s": 6.489299994427711e-05,
+          "max_s": 7.67700003052596e-05,
+          "samples_s": [
+            7.67700003052596e-05,
+            6.751199907739647e-05,
+            6.489299994427711e-05,
+            6.553899947903119e-05,
+            6.649100032518618e-05
+          ]
+        },
+        "host_copy_over_dlpack_median": 0.28362232350728617,
+        "dlpack_result_state": "jax:float32@cuda:0"
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.0003009260035469197,
+      "note": "The DLPack path is a device-resident view, so its cost is a flat dispatch overhead while the copy it replaces scales with the buffer. Below the crossover the bridge is the MORE expensive read -- 7x at 3e3 float32 -- which is not a defect but what a flat overhead against a scaling copy looks like. Recorded as the input to CHE-248's exit decision, and as the reason a device exit is cheap: the crossover is where preserving the device starts paying for itself. The result state is read back off the bridged buffer rather than assumed."
+    },
+    {
+      "case": "p3-bridge-299757",
+      "configuration": {
+        "elements_float32": 299757,
+        "mebibytes": 1.1434822082519531,
+        "ray_count": 99919,
+        "note": "3 x ray_count float32, i.e. one (N, 3) geometry column set",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "numerics.arrays.to_namespace",
+      "status": "BASELINE",
+      "measured": {
+        "timed_callable_dlpack": "jnp.from_dlpack(t) then block_until_ready()",
+        "timed_callable_host": "t.detach().cpu().numpy()",
+        "dlpack_on_device": {
+          "median_s": 0.0002189899969380349,
+          "min_s": 0.0002074410003842786,
+          "max_s": 0.00027733100068871863,
+          "samples_s": [
+            0.00027733100068871863,
+            0.00022598999930778518,
+            0.00021549200027948245,
+            0.0002074410003842786,
+            0.0002189899969380349
+          ]
+        },
+        "device_to_host_copy": {
+          "median_s": 0.0004702320002252236,
+          "min_s": 0.00046075700083747506,
+          "max_s": 0.0005100999987917021,
+          "samples_s": [
+            0.0005100999987917021,
+            0.0004702320002252236,
+            0.00047698799971840344,
+            0.00046075700083747506,
+            0.0004658489997382276
+          ]
+        },
+        "host_copy_over_dlpack_median": 2.1472761623823384,
+        "dlpack_result_state": "jax:float32@cuda:0"
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.0006892219971632585,
+      "note": "The DLPack path is a device-resident view, so its cost is a flat dispatch overhead while the copy it replaces scales with the buffer. Below the crossover the bridge is the MORE expensive read -- 7x at 3e3 float32 -- which is not a defect but what a flat overhead against a scaling copy looks like. Recorded as the input to CHE-248's exit decision, and as the reason a device exit is cheap: the crossover is where preserving the device starts paying for itself. The result state is read back off the bridged buffer rather than assumed."
+    },
+    {
+      "case": "p3-bridge-3001557",
+      "configuration": {
+        "elements_float32": 3001557,
+        "mebibytes": 11.450031280517578,
+        "ray_count": 1000519,
+        "note": "3 x ray_count float32, i.e. one (N, 3) geometry column set",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "numerics.arrays.to_namespace",
+      "status": "BASELINE",
+      "measured": {
+        "timed_callable_dlpack": "jnp.from_dlpack(t) then block_until_ready()",
+        "timed_callable_host": "t.detach().cpu().numpy()",
+        "dlpack_on_device": {
+          "median_s": 0.00017713900160742924,
+          "min_s": 0.00016559399955440313,
+          "max_s": 0.00020287399820517749,
+          "samples_s": [
+            0.00020287399820517749,
+            0.00017979900076170452,
+            0.00016559399955440313,
+            0.00016583500109845772,
+            0.00017713900160742924
+          ]
+        },
+        "device_to_host_copy": {
+          "median_s": 0.0022298850017250516,
+          "min_s": 0.0021752520005975384,
+          "max_s": 0.0022848059998068493,
+          "samples_s": [
+            0.0022848059998068493,
+            0.002238405002572108,
+            0.0022298850017250516,
+            0.002198188998590922,
+            0.0021752520005975384
+          ]
+        },
+        "host_copy_over_dlpack_median": 12.588334480211556,
+        "dlpack_result_state": "jax:float32@cuda:0"
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.002407024003332481,
+      "note": "The DLPack path is a device-resident view, so its cost is a flat dispatch overhead while the copy it replaces scales with the buffer. Below the crossover the bridge is the MORE expensive read -- 7x at 3e3 float32 -- which is not a defect but what a flat overhead against a scaling copy looks like. Recorded as the input to CHE-248's exit decision, and as the reason a device exit is cheap: the crossover is where preserving the device starts paying for itself. The result state is read back off the bridged buffer rather than assumed."
+    }
+  ],
+  "status_counts": {
+    "BASELINE": 4
+  },
+  "peak_rss_kib": 16554396
+}

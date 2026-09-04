@@ -333,7 +333,14 @@ def test_the_deleted_vendored_data_has_an_analytic_replacement() -> None:
     pi-deep binary grating must put *zero* energy in every even order, which is a
     falsifiable statement about the physics rather than a comparison to a file.
     """
-    assert not (ROOT / "benchmarks" / "probes").exists()
+    # Narrowed by CHE-245 (T1) from `benchmarks/probes` to `benchmarks/probes/data`.
+    # This test's subject is the **vendored `.npy` masks**, and that is what must
+    # stay gone; `benchmarks/probes/` itself is the path the capability packs cite
+    # for the measurement a declaration rests on, and T1 lands three records under
+    # it from a committed driver. Asserting the whole tree away would have made the
+    # deletion of un-regenerable data also a ban on recording a measurement, which
+    # is not what R14.3 decided and not what the docstring above argues.
+    assert not (ROOT / "benchmarks" / "probes" / "data").exists()
     consumers = [
         str(path.relative_to(ROOT))
         for tree in (ROOT / "src", ROOT / "tests")

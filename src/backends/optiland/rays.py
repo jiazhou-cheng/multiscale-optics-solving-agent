@@ -147,7 +147,16 @@ from typing import Any
 
 import numpy as np
 
-from numerics import ArrayNamespace, DevicePlacement, Precision, dtype_of, to_namespace
+from numerics import (
+    ArrayNamespace,
+    ArrayState,
+    DeviceKind,
+    DevicePlacement,
+    DType,
+    Precision,
+    dtype_of,
+    to_namespace,
+)
 from representations import (
     UNVERIFIED,
     ContractError,
@@ -181,12 +190,14 @@ __all__ = [
     "hexapolar_area_weight_m2",
     "hexapolar_ray_count",
     "hexapolar_ring_index",
+    "host_exit_state",
     "require_declared_optical_path",
     "require_launch_surface",
     "surface_positions_m",
     "to_native_rays",
     "to_ray_bundle",
     "to_traced_ray_bundle",
+    "trace_exit_state",
 ]
 
 #: The lens geometry unit, in metres. CHE-30 part 4: `RealRays.opd` and every
@@ -422,6 +433,26 @@ _ALIVE_RULE = (
     "artifact whose contract forbids reading it."
 )
 
+#: What a clipped row's geometry is replaced by before it is dropped or zeroed.
+#:
+#: One declaration, read by both exits, because the two would otherwise carry two
+#: copies of a list whose *values* matter: `N = 1.0` and not `0.0` because a
+#: frozen ray can legitimately have `N = 0`, which divides by zero in the
+#: exit-pupil reparameterization -- a quantity that is then discarded, so the
+#: placeholder only has to keep the intermediate arithmetic finite. `intensity`
+#: and `wavelength` are deliberately absent: the intensity *is* the clip flag and
+#: overwriting it would erase the evidence, and the wavelength is checked for
+#: uniqueness across the whole fan.
+_SURVIVAL_PLACEHOLDERS: dict[str, float] = {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "L": 0.0,
+    "M": 0.0,
+    "N": 1.0,
+    "accumulator": 0.0,
+}
+
 
 def hexapolar_ray_count(num_rings: int) -> int:
     """How many rays an un-vignetted `num_rings` hexapolar fan produces.
@@ -537,10 +568,176 @@ def _host(value: Any) -> np.ndarray[Any, Any]:
     single line that made a float32 or GPU trace indistinguishable from a float64
     host one downstream; for the default host/float64 path this is a no-op, so the
     frozen fingerprints are unchanged.
+
+    **Narrowed by CHE-245 (T1) to the reads that genuinely want the host**, which
+    is now stated rather than left to be the only option. Four kinds of caller
+    remain, and the fourth is a bulk read that crosses the host even on a device
+    exit -- deliberately, and this docstring is the wrong place to imply otherwise:
+
+    * a **scalar or reduced observable** -- `_scalar`, the surface positions, and
+      every read in `analysis.py`. These are read once and turned into a Python
+      float or a small host array a record is written from; routing them through a
+      namespace bridge would add a device synchronization per scalar, which does
+      not raise, it only gets slower;
+    * the **launch path's** host-float64 columns (`launch.py::_launch_columns` and
+      the pupil coordinates at `launch.py:746/747`). Bulk, and deliberately host
+      float64: the object-space term computed from them is a piston-and-tilt
+      correction of order 1e4 waves, and computing it in float32 would inject an
+      error larger than the wavefront it corrects. CHE-245 does not touch them;
+    * the **host arm of a trace exit** -- `_exit_column` below, where the exit
+      state is host NumPy. That arm is literally this function, which is what
+      makes the `device="cpu"` path bit-identical by construction rather than by
+      argument;
+    * `to_ray_bundle`'s **nine-column trace read**, which is bulk and is
+      unconditional -- a CUDA launch trace still brings its columns to the host
+      here. Same recorded reason as the launch path's: the declaration computed
+      from them is `declare_optical_path_m`, which removes a chief-ray piston of
+      order 1e4 waves. Only the *finished* five arrays are then delivered to the
+      device, by `_exit_deliver`. See `to_ray_bundle`'s own docstring.
+
+    So what CHE-245 removed from this function is not "every bulk read on a
+    device exit". It is the bulk read on the **supplied-bundle** path
+    (`to_traced_ray_bundle`), which has no such declaration to compute and was
+    making a full round trip for nothing; `_exit_column` bridges those in place.
     """
     import optiland.backend.utils as be_utils
 
     return np.asarray(be_utils.to_numpy(value))
+
+
+def host_exit_state(dtype: DType) -> ArrayState:
+    """The exit state a trace has always delivered into: host NumPy, at `dtype`.
+
+    The default for every caller that names no exit, so `to_ray_bundle`'s
+    behaviour with the argument omitted is exactly its behaviour before CHE-245
+    (T1) existed. Named rather than spelled inline because two call sites default
+    to it and a second spelling of "the host" is how the two drift.
+    """
+    return ArrayState(
+        dtype=dtype, device=DevicePlacement.parse("cpu"), namespace=ArrayNamespace.NUMPY
+    )
+
+
+def trace_exit_state(*, device: DevicePlacement, precision: Precision) -> ArrayState:
+    """Where a trace run at `device`/`precision` should deliver its rays.
+
+    CHE-245 (T1). The inbound leg of this backend already decides the namespace
+    from the device -- `solver._resolve_namespace` forces torch for CUDA because
+    `set_device` raises on the NumPy backend. This is the outbound counterpart,
+    and it answers a different question: the solver's namespace is *torch*, which
+    `representations.contracts.adopt_array` refuses outright, so a bundle can
+    never be delivered in it. The exit therefore has to name a **compute**
+    namespace, and the choice is between the two in `COMPUTE_NAMESPACES`.
+
+    `cuda` -> JAX on the device
+        The point of the ticket. Every repo-owned node downstream reads
+        `rays.xp`, so a host-NumPy exit pins the whole rest of the graph to the
+        host. Measured on this project's own ramp sum at a 256x256 grid
+        (`benchmarks/probes/records/optiland/t1_p2_gpu_benefit_curve.json`, rows
+        `p2-downstream-ramp-sum-*`), a host exit costs the graph about **5x at 1e3
+        rays, 19x at 1e4, 51x at 1e5 and 63x at 1e6** -- an order of magnitude by
+        1e4 and closing on two by 1e6.
+
+        That record also says plainly that the *trace itself* is not the reason.
+        `cuda` against `cpu` end to end is **below 1 at 1e3 and 1e4 rays** -- CUDA
+        loses there, 0.66x and 0.83x -- and only 1.10x and 1.06x at 1e5 and 1e6,
+        with sample ranges (0.93-1.24 and 0.96-1.22) that straddle 1.0. Read those
+        as ranges and not as figures: this is a shared GPU host, and re-running P2
+        an hour apart moved the 1e5 ratio from 1.07x to 1.49x with no code change,
+        which is why the record keeps every sample and a min/max. Across every run
+        taken, CUDA never won the trace by more than about 1.5x. So this exit is
+        worth changing for the graph downstream of it and **not** for the trace,
+        which is the opposite of what the ticket's own framing assumed; recorded
+        here so the next reader does not re-derive it.
+    `cpu` -> host NumPy
+        Not merely the status quo by default: the host is the only place a
+        `float64` trace can be delivered at all, since `jax_enable_x64` is off in
+        every process this project runs (`backends/chromatix/fields.py` pins it)
+        and JAX silently returns float32 for a 64-bit request. `to_namespace`
+        refuses that with `SILENT_DTYPE_DOWNCAST` rather than performing it.
+
+    Which is also why a `cuda` request at `FP64` exits on the **host**: JAX cannot
+    represent the dtype the trace ran in, and the two honest options are a host
+    exit or a refusal. A refusal would remove a capability that works today
+    (`trace(device="cuda", precision="fp64")` returns a float64 host bundle), so
+    the exit is placed where the precision exists. This is not the "silent host
+    fallback" AGENTS.md forbids -- the trace itself still runs on the requested
+    device, and only the delivery buffer moves -- but it is not *announced*
+    either: `solver.trace` discards `to_ray_bundle`'s diagnostics, so the only
+    evidence a caller has is `bundle.state`, which they have to think to read.
+    That gap is real and is left open rather than papered over; closing it means
+    deciding where a public entry point reports execution provenance, which is
+    R13's subject and not this ticket's.
+    """
+    dtype = precision.real_dtype
+    if device.kind is DeviceKind.CUDA and precision is Precision.FP32:
+        return ArrayState(dtype=dtype, device=device, namespace=ArrayNamespace.JAX)
+    return host_exit_state(dtype)
+
+
+def _exit_column(value: Any, state: ArrayState) -> Any:
+    """One **native trace column** read into `state`, without a detour.
+
+    The two arms are the whole of CHE-245's change to a read:
+
+    * a host-NumPy exit is `_host(value)`, unchanged, so the `device="cpu"` path
+      produces the same bytes it always did;
+    * a device exit crosses to the exit namespace *on the device the column is
+      already on*. For the torch -> JAX pair `to_namespace` takes the DLPack
+      path, so no host copy is made. Measured
+      (`benchmarks/probes/records/optiland/t1_p3_bridge_cost.json`), the bridge
+      is a flat ~0.2 ms at every size -- it is a device-resident view, so its
+      cost is dispatch overhead -- while the device-to-host copy it replaces
+      scales, from ~0.03 ms at 3e3 float32 to ~2.2 ms at 3e6. The two cross
+      between 0.11 MiB and 1.14 MiB, so the bridge is the cheaper read from
+      roughly 1e5 rays up and, by an order of magnitude, the **more** expensive
+      one below it.
+
+    The two arms differ in what they do with `state.dtype`, and the asymmetry is
+    deliberate rather than an oversight:
+
+    * the **device** arm requests it, so a dtype JAX cannot hold raises
+      `SILENT_DTYPE_DOWNCAST` here instead of arriving as a float32 array still
+      claiming to be float64. That failure is reachable: JAX canonicalizes
+      dtypes with `jax_enable_x64` off, so `jnp.from_dlpack` of a float64 CUDA
+      tensor returns float32 and raises nothing -- which is exactly what the
+      refusal is for. Stated as the mechanism rather than as a measurement,
+      because no record in this ticket covers it;
+    * the **host** arm honours the namespace and the device and **inherits the
+      column's own dtype**, because it is `_host` verbatim and that is what makes
+      the `device="cpu"` path bit-identical. So `host_exit_state(FLOAT64)` on a
+      float32 trace delivers float32 rather than refusing. That is a real
+      looseness in the host arm's contract; it is stated here because the
+      alternative -- asserting the dtype on the host arm -- would put a check on
+      the one path this ticket must not perturb.
+    """
+    if state.namespace is ArrayNamespace.NUMPY:
+        return _host(value)
+    return to_namespace(
+        value, namespace=state.namespace, device=state.device, dtype=state.dtype
+    )
+
+
+def _exit_deliver(value: Any, state: ArrayState) -> Any:
+    """One **already-host** array into `state`, for a quantity computed on the host.
+
+    The sibling of `_exit_column`, and the difference is what the input is. A
+    trace column comes off the solver and may already be on a device;
+    `to_ray_bundle`'s five bundle arrays are derived on the host by
+    `declare_optical_path_m` and the hexapolar measure, both of which are host
+    float64 by the scientific decision `_host` quotes, so there is nothing to
+    bridge *from* -- only somewhere to put the result.
+
+    A host exit is therefore the identity, and not `_host(value)`: routing an
+    array that is already host NumPy through `optiland.backend.utils.to_numpy`
+    would put a converter with its own size-1 scalar-extraction behaviour on the
+    bit-identical path for no reason.
+    """
+    if state.namespace is ArrayNamespace.NUMPY:
+        return value
+    return to_namespace(
+        value, namespace=state.namespace, device=state.device, dtype=state.dtype
+    )
 
 
 def _scalar(thunk: Any) -> float | None:
@@ -751,6 +948,7 @@ def to_ray_bundle(
     *,
     launch: dict[str, Any],
     reference_surface: str,
+    exit_state: ArrayState | None = None,
 ) -> tuple[RayBundle, dict[str, Any]]:
     """Translate one native trace into a neutral `RayBundle` plus diagnostics.
 
@@ -770,6 +968,33 @@ def to_ray_bundle(
 
     Returns the bundle and a diagnostics mapping. Nothing in either is native: no
     `RealRays`, no intensity, no accumulator, no millimetre.
+
+    Where the bundle is delivered, CHE-245 (T1)
+    -------------------------------------------
+    `exit_state` names the `namespace x device x dtype` the five bundle arrays are
+    handed back in; omitted, it is `host_exit_state(<the traced dtype>)`, which is
+    what this function did before the argument existed. `solver.trace` passes
+    `trace_exit_state(...)`, so a CUDA trace comes back on the device instead of
+    pinning every downstream node to the host.
+
+    The *declaration* is unaffected and stays on the host in the precision the
+    trace ran in. That is deliberate and is not a half-measure: this function's
+    arithmetic is `declare_optical_path_m`, which removes a chief-ray piston of
+    order 1e4 waves, plus the hexapolar area element -- the same quantity
+    `launch.py::_launch_columns` records as unrepresentable in float32. Only the
+    finished artifact moves, which costs one host round trip on a CUDA launch
+    trace and buys every downstream node the device. The order of that cost, said
+    precisely rather than rounded up into a "round trip": a device-to-host copy of
+    one `(N, 3)` column set at 1e6 rays is ~2.2 ms
+    (`benchmarks/probes/records/optiland/t1_p3_bridge_cost.json`, row
+    `p3-bridge-3001557`), the read here is nine `N`-element columns rather than
+    three, and the host-to-device delivery leg **is measured by no record**. So
+    the honest statement is *single-digit to low-tens of milliseconds* against a
+    trace of several seconds at the same ray count
+    (`.../t1_p2_gpu_benefit_curve.json`) -- three orders apart, which is what
+    makes the detour acceptable -- and not a measured round-trip figure. The
+    supplied-bundle path (`to_traced_ray_bundle`) has no such term and does *not*
+    traverse the host.
 
     Raises:
         ContractError: the launch declaration does not describe this trace row for
@@ -801,6 +1026,9 @@ def to_ray_bundle(
             ("accumulator", traced.opd),
         )
     }
+    # The declaration is computed here, in the precision the trace ran in; only
+    # the finished arrays are delivered into `exit_state`. See the docstring.
+    exit_state = host_exit_state(dtype_of(native["x"])) if exit_state is None else exit_state
     shapes = {name: array.shape for name, array in native.items()}
     if native["x"].ndim != 1 or len(set(shapes.values())) != 1:
         raise ContractError(
@@ -858,15 +1086,7 @@ def to_ray_bundle(
         # quantity that is then discarded). Substituting is safe precisely because
         # nothing computed from a dead row survives into the bundle.
         native = {name: array.copy() for name, array in native.items()}
-        for name, placeholder in (
-            ("x", 0.0),
-            ("y", 0.0),
-            ("z", 0.0),
-            ("L", 0.0),
-            ("M", 0.0),
-            ("N", 1.0),
-            ("accumulator", 0.0),
-        ):
+        for name, placeholder in _SURVIVAL_PLACEHOLDERS.items():
             native[name][~alive] = placeholder
 
     wavelengths = np.unique(native["wavelength"])
@@ -989,8 +1209,8 @@ def to_ray_bundle(
     positions = np.stack([column[alive] for column in position_mm], axis=1) * NATIVE_LENGTH_M
     directions = np.stack([native[name][alive] for name in ("L", "M", "N")], axis=1)
     bundle = RayBundle(
-        positions_m=positions,
-        directions=directions,
+        positions_m=_exit_deliver(positions, exit_state),
+        directions=_exit_deliver(directions, exit_state),
         wavelength_m=wavelength_m,
         reference_surface=ReferenceSurface(
             name=reference_surface,
@@ -1001,10 +1221,18 @@ def to_ray_bundle(
         # sqrt of a real, non-negative power-like weight: a phase-free amplitude.
         # `adopt_array(widen_real=True)` widens it to the complex dtype of the
         # SAME precision, so a float32 trace does not gain ten digits here.
-        amplitude=np.sqrt(native["intensity"][alive]),
-        optical_path_m=optical_path_m[alive],
+        amplitude=_exit_deliver(np.sqrt(native["intensity"][alive]), exit_state),
+        optical_path_m=_exit_deliver(optical_path_m[alive], exit_state),
         optical_path_reference=optical_path_reference,
-        measure_weight=None if measure_weight is None else measure_weight[alive],
+        # The launch measure is host float64 by `_launch_columns`' recorded
+        # decision, so a device exit casts it to the trace's own precision. That
+        # is a quadrature cell area, not the 1e4-wave piston that decision is
+        # about: float32 carries it to ~6e-8 relative, far below any tolerance
+        # this project gates on, and the alternative is an artifact whose arrays
+        # live in two places, which `require_same_representation` refuses.
+        measure_weight=(
+            None if measure_weight is None else _exit_deliver(measure_weight[alive], exit_state)
+        ),
         measure_kind=measure_kind,
         # CHE-226 (R16). A sequential geometric trace divides no ray: one launched
         # ray refracts along one path through every surface, and the rows here are
@@ -1044,8 +1272,13 @@ def to_ray_bundle(
             if object_space["span_native"] is None
             else object_space["span_native"] * NATIVE_LENGTH_M
         ),
-        "observed_dtype": str(dtype_of(positions)),
-        "direction_norm_tolerance": direction_norm_tolerance(dtype_of(directions)),
+        "observed_dtype": str(dtype_of(bundle.positions_m)),
+        # Read back off the emitted buffer, never from `exit_state`. A requested
+        # device reported as an actual one is the failure CHE-244's parity fixture
+        # exists to catch, and this diagnostic must not be the place it happens.
+        "observed_exit_state": bundle.state.as_dict(),
+        "requested_exit_state": exit_state.as_dict(),
+        "direction_norm_tolerance": direction_norm_tolerance(dtype_of(bundle.directions)),
         "polarization": "missing; RealRays carries no polarization state, and none is fabricated",
         "coherence": (
             "the bundle declares an amplitude and a referenced optical path, so "
@@ -1319,12 +1552,44 @@ def to_traced_ray_bundle(
     Returns the bundle and a diagnostics mapping, on `to_ray_bundle`'s convention.
     Nothing in either is native.
 
+    The exit does not traverse the host, CHE-245 (T1)
+    ------------------------------------------------
+    There is no exit-state argument here because there is nothing to choose: the
+    bundle goes back into `rays.state`, the state the caller handed over, and that
+    was already true of the arrays this function *computes* (`home` below). What
+    changed is the **read**. The eight trace columns used to come back through
+    `_host` unconditionally, so a `device="cuda"` trace of a JAX-on-CUDA bundle
+    made a full round trip -- torch-cuda to host NumPy and back to CUDA -- and the
+    survival mask and the placeholder substitution were evaluated on the host in
+    between. They now cross once, in place, through `_exit_column`, and every step
+    below is written against `rays.xp`.
+
+    Unlike `to_ray_bundle` this path has no host-float64 declaration to compute:
+    it removes no piston, renames no reference and forms no area element. The sum
+    `compose_optical_path_m` takes is in the bundle's own dtype by the decision
+    that function already records, so there was never a precision reason for the
+    detour.
+
+    One residual, stated because CHE-245's bit-identity criterion is worded about
+    `device="cpu"` and this is the one place it holds about the *namespace*
+    instead. `_exit_column` requests `rays.state.dtype`, so on a non-NumPy exit a
+    column narrower than the trace's own precision is rounded at the read and
+    then again at `home`, where it used to be rounded once. That is at most 1 ulp
+    of the delivered dtype and only for a caller whose bundle is narrower than the
+    precision it asked the trace to run at (a JAX float32 bundle traced at
+    `fp64`). Every NumPy-namespace exit -- which is every path the suite and every
+    record under `benchmarks/systems/records/` exercise -- goes through `_host`
+    and is bit-identical. The extra rounding is accepted rather than removed
+    because the alternative is requesting the native dtype, which JAX cannot hold
+    at 64 bits and would turn a working combination into a refusal.
+
     Raises:
         ContractError: the image-space index could not be read, or every supplied
             ray was clipped.
     """
+    xp = rays.xp
     native = {
-        name: _host(value)
+        name: _exit_column(value, rays.state)
         for name, value in (
             ("x", traced.x),
             ("y", traced.y),
@@ -1336,17 +1601,17 @@ def to_traced_ray_bundle(
             ("accumulator", traced.opd),
         )
     }
-    shapes = {name: array.shape for name, array in native.items()}
+    shapes = {name: tuple(array.shape) for name, array in native.items()}
     if native["x"].ndim != 1 or len(set(shapes.values())) != 1:
         raise ContractError(
             "SHAPE_MISMATCH",
             f"the solver returned ray columns that are not equal-length 1-D arrays: {shapes!r}",
             declaration="positions_m",
         )
-    if int(native["x"].size) != rays.count:
+    if int(native["x"].shape[0]) != rays.count:
         raise ContractError(
             "SHAPE_MISMATCH",
-            f"the trace returned {int(native['x'].size)} rays for the {rays.count} that "
+            f"the trace returned {int(native['x'].shape[0])} rays for the {rays.count} that "
             "were supplied, so the two cannot be matched row for row and the caller's "
             "amplitude cannot be re-associated",
             declaration="positions_m",
@@ -1356,15 +1621,15 @@ def to_traced_ray_bundle(
     # and nothing else -- no aperture model of this package's own, which is R05.9's.
     alive = (
         (native["intensity"] > 0)
-        & np.isfinite(native["x"])
-        & np.isfinite(native["y"])
-        & np.isfinite(native["z"])
-        & np.isfinite(native["L"])
-        & np.isfinite(native["M"])
-        & np.isfinite(native["N"])
-        & np.isfinite(native["accumulator"])
+        & xp.isfinite(native["x"])
+        & xp.isfinite(native["y"])
+        & xp.isfinite(native["z"])
+        & xp.isfinite(native["L"])
+        & xp.isfinite(native["M"])
+        & xp.isfinite(native["N"])
+        & xp.isfinite(native["accumulator"])
     )
-    alive_count = int(np.count_nonzero(alive))
+    alive_count = int(xp.count_nonzero(alive))
     if alive_count == 0:
         raise ContractError(
             "EMPTY_ENSEMBLE",
@@ -1377,17 +1642,19 @@ def to_traced_ray_bundle(
         # placeholder because the frozen native state can be non-finite and
         # `RayBundle` forbids that outright, and the amplitude is zeroed below,
         # which is what makes the placeholder unreadable rather than merely wrong.
-        native = {name: array.copy() for name, array in native.items()}
-        for name, placeholder in (
-            ("x", 0.0),
-            ("y", 0.0),
-            ("z", 0.0),
-            ("L", 0.0),
-            ("M", 0.0),
-            ("N", 1.0),
-            ("accumulator", 0.0),
-        ):
-            native[name][~alive] = placeholder
+        #
+        # `where` rather than the boolean-indexed assignment this was until
+        # CHE-245: a JAX array has no item assignment, and `full_like` keeps the
+        # column's own dtype so the substitution is value-identical to the
+        # in-place version it replaces on the host.
+        native = {
+            name: (
+                xp.where(alive, array, xp.full_like(array, _SURVIVAL_PLACEHOLDERS[name]))
+                if name in _SURVIVAL_PLACEHOLDERS
+                else array
+            )
+            for name, array in native.items()
+        }
 
     image_z_m = _scalar(lambda: lens.surfaces.surfaces[-1].geometry.cs.z)
     if image_z_m is None:
@@ -1421,8 +1688,10 @@ def to_traced_ray_bundle(
             dtype=rays.state.dtype,
         )
 
-    xp = rays.xp
-    survived = home(alive.astype(np.float64)) > 0.0
+    # Already in the bundle's own state -- `_exit_column` read the columns there --
+    # so the mask needs no move. It was `home(alive.astype(np.float64)) > 0.0`
+    # until CHE-245, when the columns still arrived on the host.
+    survived = alive
     optical_path_m, optical_path_reference = compose_optical_path_m(
         rays,
         home(native["accumulator"] * NATIVE_LENGTH_M),
@@ -1433,9 +1702,9 @@ def to_traced_ray_bundle(
     bundle = dataclasses.replace(
         rays,
         positions_m=home(
-            np.stack([native[name] for name in ("x", "y", "z")], axis=1) * NATIVE_LENGTH_M
+            xp.stack([native[name] for name in ("x", "y", "z")], axis=1) * NATIVE_LENGTH_M
         ),
-        directions=home(np.stack([native[name] for name in ("L", "M", "N")], axis=1)),
+        directions=home(xp.stack([native[name] for name in ("L", "M", "N")], axis=1)),
         reference_surface=ReferenceSurface(
             name="image_surface",
             z_m=image_z_m,
@@ -1468,6 +1737,10 @@ def to_traced_ray_bundle(
         "measure_kind": rays.measure_kind,
         "measure": SUPPLIED_MEASURE_RULE,
         "observed_dtype": str(dtype_of(bundle.positions_m)),
+        # Read off the emitted buffer, as on the other path. Here it is also the
+        # claim that the exit went back where the caller's bundle was.
+        "observed_exit_state": bundle.state.as_dict(),
+        "requested_exit_state": rays.state.as_dict(),
         "direction_norm_tolerance": direction_norm_tolerance(dtype_of(bundle.directions)),
         "polarization": "missing; the native ray carries none on this path, and none is fabricated",
     }

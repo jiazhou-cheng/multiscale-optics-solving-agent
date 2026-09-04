@@ -1,0 +1,468 @@
+{
+  "written_at_utc": "2026-09-04T03:35:31.247999+00:00",
+  "git": {
+    "commit": "500e7737ed922d0fc5816546a166e788284c0073",
+    "branch": "main",
+    "dirty": true
+  },
+  "command": "/workspace/benchmarks/probes/optiland_device_exit.py",
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.8.0-84-generic-x86_64-with-glibc2.41",
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "jax": "0.6.2",
+      "jaxlib": "0.6.2",
+      "chromatix": "0.6.0",
+      "optiland": "0.6.0",
+      "torch": "2.13.0+cu126"
+    },
+    "device": {
+      "declaration": "observed, not requested. The container's visible device set decides which physical GPU is cuda:0; see MOA_GPUS in run.sh.",
+      "torch": {
+        "version": "2.13.0+cu126",
+        "cuda_build": "12.6",
+        "cuda_available": true,
+        "device_count": 1,
+        "device_names": [
+          "NVIDIA RTX A6000"
+        ]
+      },
+      "jax": {
+        "version": "0.6.2",
+        "default_backend": "gpu",
+        "devices": [
+          "cuda:0"
+        ],
+        "enable_x64": false
+      }
+    }
+  },
+  "probe": "p2",
+  "ticket": "CHE-245",
+  "title": "P2 -- what CUDA is worth, and where",
+  "produced_by": "benchmarks/probes/optiland_device_exit.py --probe p2",
+  "rows": [
+    {
+      "case": "p2-trace-1027",
+      "configuration": {
+        "system": "CookeTriplet",
+        "num_rings": 18,
+        "ray_count": 1027,
+        "precision": "fp32",
+        "reference_surface": "image_surface",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "BASELINE",
+      "measured": {
+        "cpu_fp32": {
+          "median_s": 0.055621045001316816,
+          "min_s": 0.05539934699845617,
+          "max_s": 0.05657997100206558,
+          "samples_s": [
+            0.056480496998119634,
+            0.055621045001316816,
+            0.05657997100206558,
+            0.05539934699845617,
+            0.055523934999655467
+          ]
+        },
+        "cuda_fp32": {
+          "median_s": 0.08430593099910766,
+          "min_s": 0.08419962900006794,
+          "max_s": 0.09718953700212296,
+          "samples_s": [
+            0.09718953700212296,
+            0.08464785400065011,
+            0.08419962900006794,
+            0.08430593099910766,
+            0.08430368599874782
+          ]
+        },
+        "cuda_speedup_median": 0.6597524556357196,
+        "cuda_speedup_range": [
+          0.5700134881519813,
+          0.6719741128790475
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.13992697600042447,
+      "note": "End-to-end trace, both legs at fp32 so a device change is not hiding behind a precision change -- fp32 is torch on either device (solver._resolve_namespace), so this compares torch-cpu against torch-cuda. End-to-end, including build_lens, launch and the exit, which is what a caller pays. Fixed and scaling cost are NOT decomposed here, so this row says CUDA loses at the smallest counts and does not say which component is responsible. `cuda_speedup_range` is the ratio of the extreme samples and is wide because this is a shared host: quote the range, not the median. No oracle -- a runtime is not a correctness claim about either leg."
+    },
+    {
+      "case": "p2-downstream-ramp-sum-1027",
+      "configuration": {
+        "kernel": "einsum(\"n,ny,nx->yx\", optimize=True) with matmul_precision_kwargs",
+        "source": "couplers/ray_to_scalar.py, the DIRECT reconstruction",
+        "ray_count": 1027,
+        "grid_shape": [
+          256,
+          256
+        ],
+        "dtype": "complex64",
+        "seed": 20260903,
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "C_RAY_TO_SCALAR",
+      "status": "BASELINE",
+      "measured": {
+        "numpy_cpu": {
+          "median_s": 0.0023891929995443206,
+          "min_s": 0.0023633119999431074,
+          "max_s": 0.002458083999954397,
+          "samples_s": [
+            0.0024404750001849607,
+            0.0023847730008128565,
+            0.0023891929995443206,
+            0.0023633119999431074,
+            0.002458083999954397
+          ]
+        },
+        "jax_cuda": {
+          "median_s": 0.00043934699715464376,
+          "min_s": 0.0004212059975543525,
+          "max_s": 0.0006868350028526038,
+          "samples_s": [
+            0.0006868350028526038,
+            0.000514368002768606,
+            0.00043934699715464376,
+            0.00042169500011368655,
+            0.0004212059975543525
+          ]
+        },
+        "cuda_speedup_median": 5.438054692572211,
+        "cuda_speedup_range": [
+          3.440872975500171,
+          5.835823834956684
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.0028285399966989644,
+      "note": "What a host exit costs the graph, not what the trace costs. This is the measurement CHE-245's design rests on: the bundle's namespace decides where every repo-owned node downstream runs, because they read rays.xp. block_until_ready is called on the device leg so an asynchronous dispatch is not recorded as a completed contraction. No oracle; accuracy of this same kernel is gated separately in tests/parity/test_ray_to_scalar_parity.py."
+    },
+    {
+      "case": "p2-trace-9919",
+      "configuration": {
+        "system": "CookeTriplet",
+        "num_rings": 57,
+        "ray_count": 9919,
+        "precision": "fp32",
+        "reference_surface": "image_surface",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "BASELINE",
+      "measured": {
+        "cpu_fp32": {
+          "median_s": 0.09606794100182015,
+          "min_s": 0.09491853800136596,
+          "max_s": 0.10931662800066988,
+          "samples_s": [
+            0.0956549319998885,
+            0.10931662800066988,
+            0.09606794100182015,
+            0.09491853800136596,
+            0.1087391100008972
+          ]
+        },
+        "cuda_fp32": {
+          "median_s": 0.11552240400123992,
+          "min_s": 0.11460841799998889,
+          "max_s": 0.13029867900331737,
+          "samples_s": [
+            0.13029867900331737,
+            0.11552240400123992,
+            0.12396486400029971,
+            0.11462671800109092,
+            0.11460841799998889
+          ]
+        },
+        "cuda_speedup_median": 0.8315957569649349,
+        "cuda_speedup_range": [
+          0.7284689202332539,
+          0.9538272136404542
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.21159034500306007,
+      "note": "End-to-end trace, both legs at fp32 so a device change is not hiding behind a precision change -- fp32 is torch on either device (solver._resolve_namespace), so this compares torch-cpu against torch-cuda. End-to-end, including build_lens, launch and the exit, which is what a caller pays. Fixed and scaling cost are NOT decomposed here, so this row says CUDA loses at the smallest counts and does not say which component is responsible. `cuda_speedup_range` is the ratio of the extreme samples and is wide because this is a shared host: quote the range, not the median. No oracle -- a runtime is not a correctness claim about either leg."
+    },
+    {
+      "case": "p2-downstream-ramp-sum-9919",
+      "configuration": {
+        "kernel": "einsum(\"n,ny,nx->yx\", optimize=True) with matmul_precision_kwargs",
+        "source": "couplers/ray_to_scalar.py, the DIRECT reconstruction",
+        "ray_count": 9919,
+        "grid_shape": [
+          256,
+          256
+        ],
+        "dtype": "complex64",
+        "seed": 20260903,
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "C_RAY_TO_SCALAR",
+      "status": "BASELINE",
+      "measured": {
+        "numpy_cpu": {
+          "median_s": 0.01586866899742745,
+          "min_s": 0.01574578600047971,
+          "max_s": 0.017760271002771333,
+          "samples_s": [
+            0.017760271002771333,
+            0.016075387997261714,
+            0.015746614000818226,
+            0.01586866899742745,
+            0.01574578600047971
+          ]
+        },
+        "jax_cuda": {
+          "median_s": 0.0008516310008417349,
+          "min_s": 0.000834964001114713,
+          "max_s": 0.0010337509993405547,
+          "samples_s": [
+            0.0010337509993405547,
+            0.000903678999748081,
+            0.0008516310008417349,
+            0.0008426070016867016,
+            0.000834964001114713
+          ]
+        },
+        "cuda_speedup_median": 18.633268377669644,
+        "cuda_speedup_range": [
+          15.231700874315173,
+          21.270702663900003
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.016720299998269184,
+      "note": "What a host exit costs the graph, not what the trace costs. This is the measurement CHE-245's design rests on: the bundle's namespace decides where every repo-owned node downstream runs, because they read rays.xp. block_until_ready is called on the device leg so an asynchronous dispatch is not recorded as a completed contraction. No oracle; accuracy of this same kernel is gated separately in tests/parity/test_ray_to_scalar_parity.py."
+    },
+    {
+      "case": "p2-trace-99919",
+      "configuration": {
+        "system": "CookeTriplet",
+        "num_rings": 182,
+        "ray_count": 99919,
+        "precision": "fp32",
+        "reference_surface": "image_surface",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "BASELINE",
+      "measured": {
+        "cpu_fp32": {
+          "median_s": 0.4422674289999122,
+          "min_s": 0.4077544969986775,
+          "max_s": 0.47360229499827255,
+          "samples_s": [
+            0.47360229499827255,
+            0.4516406599977927,
+            0.4077544969986775,
+            0.4422674289999122,
+            0.42432018099862034
+          ]
+        },
+        "cuda_fp32": {
+          "median_s": 0.40116213299916126,
+          "min_s": 0.38175264900201,
+          "max_s": 0.439267217003362,
+          "samples_s": [
+            0.43436586200186866,
+            0.40116213299916126,
+            0.38175264900201,
+            0.439267217003362,
+            0.38722329999654903
+          ]
+        },
+        "cuda_speedup_median": 1.1024655435283492,
+        "cuda_speedup_range": [
+          0.9282607060466265,
+          1.2405998916743048
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.8434295619990735,
+      "note": "End-to-end trace, both legs at fp32 so a device change is not hiding behind a precision change -- fp32 is torch on either device (solver._resolve_namespace), so this compares torch-cpu against torch-cuda. End-to-end, including build_lens, launch and the exit, which is what a caller pays. Fixed and scaling cost are NOT decomposed here, so this row says CUDA loses at the smallest counts and does not say which component is responsible. `cuda_speedup_range` is the ratio of the extreme samples and is wide because this is a shared host: quote the range, not the median. No oracle -- a runtime is not a correctness claim about either leg."
+    },
+    {
+      "case": "p2-downstream-ramp-sum-99919",
+      "configuration": {
+        "kernel": "einsum(\"n,ny,nx->yx\", optimize=True) with matmul_precision_kwargs",
+        "source": "couplers/ray_to_scalar.py, the DIRECT reconstruction",
+        "ray_count": 99919,
+        "grid_shape": [
+          256,
+          256
+        ],
+        "dtype": "complex64",
+        "seed": 20260903,
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "C_RAY_TO_SCALAR",
+      "status": "BASELINE",
+      "measured": {
+        "numpy_cpu": {
+          "median_s": 0.2083732230021269,
+          "min_s": 0.20336891500119236,
+          "max_s": 0.2142859560008219,
+          "samples_s": [
+            0.20935861600082717,
+            0.2083732230021269,
+            0.20784118600204238,
+            0.2142859560008219,
+            0.20336891500119236
+          ]
+        },
+        "jax_cuda": {
+          "median_s": 0.004083255000296049,
+          "min_s": 0.003934039999876404,
+          "max_s": 0.0042052489989146125,
+          "samples_s": [
+            0.004083255000296049,
+            0.003962044000218157,
+            0.003934039999876404,
+            0.004202053998596966,
+            0.0042052489989146125
+          ]
+        },
+        "cuda_speedup_median": 51.031156023079426,
+        "cuda_speedup_range": [
+          48.3607308517718,
+          54.46969426023988
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 0.21245647800242295,
+      "note": "What a host exit costs the graph, not what the trace costs. This is the measurement CHE-245's design rests on: the bundle's namespace decides where every repo-owned node downstream runs, because they read rays.xp. block_until_ready is called on the device leg so an asynchronous dispatch is not recorded as a completed contraction. No oracle; accuracy of this same kernel is gated separately in tests/parity/test_ray_to_scalar_parity.py."
+    },
+    {
+      "case": "p2-trace-1000519",
+      "configuration": {
+        "system": "CookeTriplet",
+        "num_rings": 577,
+        "ray_count": 1000519,
+        "precision": "fp32",
+        "reference_surface": "image_surface",
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "SO_RAY_LAUNCH_TRACE",
+      "status": "BASELINE",
+      "measured": {
+        "cpu_fp32": {
+          "median_s": 3.4640160929993726,
+          "min_s": 3.21892425400074,
+          "max_s": 3.7344594839996716,
+          "samples_s": [
+            3.21892425400074,
+            3.7344594839996716,
+            3.4640160929993726,
+            3.24296428299931,
+            3.72022783400098
+          ]
+        },
+        "cuda_fp32": {
+          "median_s": 3.2713944089991855,
+          "min_s": 3.0528121190000093,
+          "max_s": 3.3552170139992086,
+          "samples_s": [
+            3.0729238530002476,
+            3.3552170139992086,
+            3.3001623620002647,
+            3.2713944089991855,
+            3.0528121190000093
+          ]
+        },
+        "cuda_speedup_median": 1.058880605612796,
+        "cuda_speedup_range": [
+          0.9593788540562936,
+          1.2232850691194666
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 6.735410501998558,
+      "note": "End-to-end trace, both legs at fp32 so a device change is not hiding behind a precision change -- fp32 is torch on either device (solver._resolve_namespace), so this compares torch-cpu against torch-cuda. End-to-end, including build_lens, launch and the exit, which is what a caller pays. Fixed and scaling cost are NOT decomposed here, so this row says CUDA loses at the smallest counts and does not say which component is responsible. `cuda_speedup_range` is the ratio of the extreme samples and is wide because this is a shared host: quote the range, not the median. No oracle -- a runtime is not a correctness claim about either leg."
+    },
+    {
+      "case": "p2-downstream-ramp-sum-1000519",
+      "configuration": {
+        "kernel": "einsum(\"n,ny,nx->yx\", optimize=True) with matmul_precision_kwargs",
+        "source": "couplers/ray_to_scalar.py, the DIRECT reconstruction",
+        "ray_count": 1000519,
+        "grid_shape": [
+          256,
+          256
+        ],
+        "dtype": "complex64",
+        "seed": 20260903,
+        "repetitions": 5,
+        "statistic": "median of 5 after one discarded warm-up; min/max also recorded"
+      },
+      "descriptor": "C_RAY_TO_SCALAR",
+      "status": "BASELINE",
+      "measured": {
+        "numpy_cpu": {
+          "median_s": 2.05242220099899,
+          "min_s": 2.0321766850029235,
+          "max_s": 2.0585144920005405,
+          "samples_s": [
+            2.0321766850029235,
+            2.0571565089994692,
+            2.05242220099899,
+            2.0585144920005405,
+            2.035993323999719
+          ]
+        },
+        "jax_cuda": {
+          "median_s": 0.03276311899753637,
+          "min_s": 0.032632419002766255,
+          "max_s": 0.03395462199841859,
+          "samples_s": [
+            0.032632419002766255,
+            0.03276311899753637,
+            0.03395462199841859,
+            0.03292046899878187,
+            0.03270974499901058
+          ]
+        },
+        "cuda_speedup_median": 62.64428613018566,
+        "cuda_speedup_range": [
+          59.84978083683484,
+          63.08188466892509
+        ]
+      },
+      "expected": {},
+      "deltas": {},
+      "worst_relative_delta": 0.0,
+      "runtime_s": 2.0851853199965262,
+      "note": "What a host exit costs the graph, not what the trace costs. This is the measurement CHE-245's design rests on: the bundle's namespace decides where every repo-owned node downstream runs, because they read rays.xp. block_until_ready is called on the device leg so an asynchronous dispatch is not recorded as a completed contraction. No oracle; accuracy of this same kernel is gated separately in tests/parity/test_ray_to_scalar_parity.py."
+    }
+  ],
+  "status_counts": {
+    "BASELINE": 8
+  },
+  "peak_rss_kib": 16554396
+}

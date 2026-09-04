@@ -588,3 +588,146 @@ def test_the_composed_route_is_not_silently_rescaled() -> None:
     # Falsifiable: a modulus-only trace would have given |c| times the field, and
     # |c| times is a different field because c is not real.
     assert not np.allclose(scaled_field.u, abs(scale) * field.u, atol=1e-3 * reference)
+
+
+# ---------------------------------------------------------------------------
+# 8. CHE-245 (T1) -- the exit goes back into the caller's namespace
+# ---------------------------------------------------------------------------
+
+
+def _in_jax(rays: RayBundle) -> RayBundle:
+    """The same bundle, every array moved into JAX on the host.
+
+    Built with `numerics.to_namespace` -- the production mover -- rather than
+    `jnp.asarray`, so this fixture cannot disagree with the bridge the code under
+    test uses. The dtype drops to the FP32 family because `jax_enable_x64` is off
+    in every process this project runs, which is stated rather than worked around:
+    it is the reason a JAX bundle is *narrower* than the `fp64` execution below
+    and therefore exercises the one rounding difference CHE-245 records.
+    """
+    import dataclasses
+
+    from numerics import ArrayNamespace, DType, to_namespace
+
+    def moved(value: object, dtype: DType) -> object:
+        return to_namespace(value, namespace=ArrayNamespace.JAX, dtype=dtype)
+
+    return dataclasses.replace(
+        rays,
+        positions_m=moved(rays.positions_m, DType.FLOAT32),
+        directions=moved(rays.directions, DType.FLOAT32),
+        amplitude=moved(rays.amplitude, DType.COMPLEX64),
+        optical_path_m=moved(rays.optical_path_m, DType.FLOAT32),
+        measure_weight=moved(rays.measure_weight, DType.FLOAT32),
+    )
+
+
+def test_a_jax_bundle_comes_back_in_jax_and_not_on_the_host() -> None:
+    """CHE-245 (T1): the supplied-bundle exit is the caller's state, not NumPy.
+
+    The `_host()` read this path used until CHE-245 meant a JAX bundle came back
+    through host NumPy and was moved to JAX again at the end, so the survival mask
+    and the placeholder substitution were evaluated on the host in between. The
+    observable claim is narrow and is what this asserts: the returned bundle is in
+    the namespace the caller handed over.
+
+    Runs on the host with no device, which is the point -- the `xp`-generic arm of
+    `to_traced_ray_bundle` is reachable without a GPU, so the rewrite is gated by
+    `make test` rather than only by `make test-gpu`. `array_state` is read off the
+    emitted buffer; `RayBundle.state` is by declaration an observation.
+    """
+    from numerics import ArrayNamespace, array_state
+
+    rays = _in_jax(a_bundle())
+    assert array_state(rays.positions_m).namespace is ArrayNamespace.JAX, "fixture precondition"
+
+    traced = trace_rays(singlet_ref(), rays, execution=CPU64)
+
+    for name in ("positions_m", "directions", "amplitude", "optical_path_m", "measure_weight"):
+        observed = array_state(getattr(traced, name))
+        assert observed.namespace is ArrayNamespace.JAX, (
+            f"{name} came back as {observed}; the exit must be the caller's namespace, and a "
+            "host exit here is what pins every downstream node to the CPU"
+        )
+
+
+def test_a_jax_bundle_marks_exactly_the_rays_the_numpy_one_marks() -> None:
+    """The `xp.where` placeholder substitution agrees with the indexed assignment.
+
+    The mask arithmetic in `to_traced_ray_bundle` was boolean-indexed in-place
+    assignment on host NumPy until CHE-245 and is `xp.where(..., full_like(...))`
+    now, because a JAX array has no item assignment. This holds the two to the
+    same *survival decision* on the same rays, which is the part that must not
+    change; the geometry is compared only loosely, because the JAX leg is float32
+    where the NumPy leg is float64 and a bit comparison there would be a
+    precision test wearing a correctness test's clothes.
+    """
+    radii = INSIDE_RADII_M + MISSING_RADII_M
+    host = trace_rays(singlet_ref(), a_bundle(radii_m=radii), execution=CPU64)
+    device = trace_rays(singlet_ref(), _in_jax(a_bundle(radii_m=radii)), execution=CPU64)
+
+    assert device.count == host.count
+    np.testing.assert_array_equal(
+        np.asarray(device.amplitude) == 0.0,
+        np.asarray(host.amplitude) == 0.0,
+        err_msg="the two namespaces must mark the same rays as not having survived",
+    )
+    # float32 on a ~5e-3 m composed path: one ulp is ~5e-10 m, and this is the
+    # delivered precision of the JAX leg rather than a tolerance chosen to pass.
+    np.testing.assert_allclose(
+        np.asarray(device.positions_m), np.asarray(host.positions_m), rtol=0.0, atol=1e-8
+    )
+    assert bool(np.all(np.isfinite(np.asarray(device.positions_m))))
+    assert bool(np.all(np.isfinite(np.asarray(device.optical_path_m))))
+
+
+def test_no_per_ray_column_crosses_the_host_on_a_jax_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CHE-245 (T1) AC-3: the `O_RAY_TRACE` CUDA path no longer traverses the host.
+
+    The claim is **not** observable on the returned artifact, and that is why this
+    test looks the way it does. `to_traced_ray_bundle` has always finished by
+    moving its results into `rays.state` (`home`), so the exit namespace was
+    already the caller's before this ticket; what was wrong was the *route*, an
+    unconditional `_host` read of all eight trace columns followed by a move back.
+    A test that asserted only the final namespace would pass either way -- checked,
+    by reverting the read and watching it stay green.
+
+    So what is asserted is the absence of the detour: with a JAX bundle, no array
+    the size of the ensemble may pass through `_host` at all. Small reads still
+    do and must -- `_scalar` reads the image plane's z and the refractive index,
+    and `require_launch_surface` reads the surface positions -- so the gate is on
+    *bulk*, which is what the ticket scoped. 64 rays against a 4-surface system
+    keeps the two unambiguous.
+
+    On the host this runs as a structural check; on CUDA it is the same code path
+    with torch on the other side of the bridge, which is why the assertion does
+    not need a device to be meaningful.
+    """
+    from backends.optiland import rays as rays_module
+
+    radii = tuple(np.linspace(0.0, 2.0e-4, 64))
+    rays = _in_jax(a_bundle(radii_m=radii))
+    assert rays.count == 64, "fixture precondition: the bulk size must be unmistakable"
+
+    crossed: list[int] = []
+    original = rays_module._host
+
+    def spy(value: object) -> object:
+        out = original(value)
+        crossed.append(int(np.size(out)))
+        return out
+
+    monkeypatch.setattr(rays_module, "_host", spy)
+    traced = trace_rays(singlet_ref(), rays, execution=CPU64)
+
+    assert traced.count == 64
+    assert crossed, "the small host reads still happen; a gate that saw none would be vacuous"
+    bulk = [size for size in crossed if size >= rays.count]
+    assert not bulk, (
+        f"{len(bulk)} host read(s) of size {bulk} crossed the host for a {rays.count}-ray "
+        "bundle. A bulk column must reach the caller's namespace through "
+        "numerics.to_namespace -- DLPack for torch/JAX -- and not via a device-to-host copy; "
+        f"the small reads that legitimately cross are {sorted(set(crossed) - set(bulk))}"
+    )
