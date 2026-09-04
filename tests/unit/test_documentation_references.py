@@ -400,6 +400,23 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
     configuration through this project's catalogued operations, and reports the
     difference -- which needs a direct `optiland` import and has no closed form to
     gate on. Two kinds of thing, two directories.
+
+    `benchmarks/` moved 17 -> 23 for CHE-245 (T1), and it is a **third** kind of
+    thing again: `probes/` is a driver, its provenance helper and three records of
+    what the machine did -- where a buffer landed, how long a device took, what a
+    DLPack bridge costs. Not a benchmark, because nothing decides it: every row is
+    `BASELINE`, a recorded value with no oracle. Not a verification harness,
+    because there is no third-party implementation on the other side of the
+    comparison. `benchmarks/probes/__init__.py` states the three-way distinction,
+    and `tests/unit/test_suite_shape.py` holds each of those records to naming a
+    script in this tree that rewrites it -- which is the property the deleted
+    152-record tree was missing and the reason a record tree is admissible here at
+    all.
+
+    Note for whoever next changes this number: it counts `git ls-files`, so a new
+    file is invisible to this gate until it is staged. CHE-245's full-suite run
+    was green with its six files untracked and this test failed on the very next
+    run. Stage first, then run.
     """
     tracked = subprocess.run(
         ["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True
@@ -408,4 +425,4 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
         tree: len([path for path in tracked if path.startswith(f"{tree}/")])
         for tree in ("knowledge", "benchmarks", "docs")
     }
-    assert counts == {"knowledge": 3, "benchmarks": 17, "docs": 2}, counts
+    assert counts == {"knowledge": 3, "benchmarks": 23, "docs": 2}, counts
