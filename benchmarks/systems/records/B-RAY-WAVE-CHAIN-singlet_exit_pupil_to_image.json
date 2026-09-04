@@ -1,0 +1,469 @@
+{
+  "written_at_utc": "2026-09-04T04:55:37Z",
+  "environment": {
+    "numpy": "2.2.6",
+    "scipy": "1.15.3",
+    "jax": "0.6.2",
+    "chromatix": "0.6.0"
+  },
+  "benchmark": "B-RAY-WAVE-CHAIN",
+  "ticket": "CHE-247",
+  "configuration": "singlet_exit_pupil_to_image",
+  "produced_by": "benchmarks/systems/b_ray_wave_chain.py",
+  "composition": [
+    {
+      "step": 0,
+      "operation": "SO_RAY_LAUNCH_TRACE",
+      "request": {
+        "execution": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "sampling": {
+          "num_rings": 8,
+          "reference_surface": "exit_pupil"
+        },
+        "setup": "OpticalSetup(name='T3ChainSinglet', surfaces=(SurfaceSpec(thickness_mm=0.05, radius_mm=2.5, curvature_per_mm=None, conic=0.0, aspheric_coefficients=(), clear_semi_diameter_mm=0.75, material={'kind': 'ideal', 'refractive_index': 1.5}, comment='convex front face, and the aperture stop'), SurfaceSpec(thickness_mm=4.9, radius_mm=None, curvature_per_mm=None, conic=0.0, aspheric_coefficients=(), clear_semi_diameter_mm=0.75, material={'kind': 'air'}, comment='plane rear face; the sampled plane sits 67 um inside paraxial focus')), entrance_pupil_diameter_mm=0.5, stop_index=0, reference_wavelength_um=0.55, description='CHE-247 (T3): a plano-convex singlet, convex toward the collimated side, declared here rather than imported because benchmarks/ does not read tests/. Chosen for being the cheapest traceable unvignetted system; no number in this record is a claim about this lens.')",
+        "source": "SourceSpec(wavelength_um=0.55, field_angle_deg=(0.0, 0.0), object_distance_mm=None)"
+      },
+      "produces": "ray_bundle"
+    },
+    {
+      "step": 1,
+      "operation": "O_PROPAGATE_RAYS",
+      "request": {
+        "execution": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "to": "ReferenceSurface(name='image_surface', z_m=0.00495, medium_index=1.0, normal=(0.0, 0.0, 1.0))"
+      },
+      "produces": "ray_bundle"
+    },
+    {
+      "step": 2,
+      "operation": "C_RAY_TO_SCALAR",
+      "request": {
+        "execution": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "grazing": "band_limit",
+        "grid_shape": [
+          64,
+          64
+        ],
+        "sample_pitch_m": [
+          5e-07,
+          5e-07
+        ]
+      },
+      "produces": "scalar_field"
+    },
+    {
+      "step": 3,
+      "operation": "O_COMPLEX_TRANSMISSION",
+      "request": {
+        "amplitude": 1.0,
+        "execution": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        }
+      },
+      "produces": "scalar_field"
+    },
+    {
+      "step": 4,
+      "operation": "M_PSF",
+      "request": {
+        "execution": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "normalization": "energy"
+      },
+      "produces": "psf"
+    }
+  ],
+  "parameters": {
+    "grid_shape": [
+      64,
+      64
+    ],
+    "sample_pitch_m": [
+      5e-07,
+      5e-07
+    ],
+    "precision": "fp32",
+    "cuda_device": "cuda:0",
+    "num_rings": 8,
+    "ray_count": 217,
+    "image_surface_z_m": 0.00495
+  },
+  "execution": {
+    "cuda": {
+      "status": "completed",
+      "route": [
+        "SO_RAY_LAUNCH_TRACE",
+        "O_PROPAGATE_RAYS",
+        "C_RAY_TO_SCALAR",
+        "O_COMPLEX_TRANSMISSION",
+        "M_PSF"
+      ],
+      "nodes": [
+        {
+          "operation_id": "SO_RAY_LAUNCH_TRACE",
+          "status": "completed",
+          "requested": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "O_PROPAGATE_RAYS",
+          "status": "completed",
+          "requested": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "C_RAY_TO_SCALAR",
+          "status": "completed",
+          "requested": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "O_COMPLEX_TRANSMISSION",
+          "status": "completed",
+          "requested": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "M_PSF",
+          "status": "completed",
+          "requested": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cuda:0",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        }
+      ]
+    },
+    "host": {
+      "status": "completed",
+      "route": [
+        "SO_RAY_LAUNCH_TRACE",
+        "O_PROPAGATE_RAYS",
+        "C_RAY_TO_SCALAR",
+        "O_COMPLEX_TRANSMISSION",
+        "M_PSF"
+      ],
+      "nodes": [
+        {
+          "operation_id": "SO_RAY_LAUNCH_TRACE",
+          "status": "completed",
+          "requested": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "O_PROPAGATE_RAYS",
+          "status": "completed",
+          "requested": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "placement_disagreement": []
+        },
+        {
+          "operation_id": "C_RAY_TO_SCALAR",
+          "status": "completed",
+          "requested": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cpu",
+            "precision": "fp64"
+          },
+          "placement_disagreement": [
+            "precision"
+          ]
+        },
+        {
+          "operation_id": "O_COMPLEX_TRANSMISSION",
+          "status": "completed",
+          "requested": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cpu",
+            "precision": "fp64"
+          },
+          "placement_disagreement": [
+            "precision"
+          ]
+        },
+        {
+          "operation_id": "M_PSF",
+          "status": "completed",
+          "requested": {
+            "device": "cpu",
+            "precision": "fp32"
+          },
+          "observed": {
+            "device": "cpu",
+            "precision": "fp64"
+          },
+          "placement_disagreement": [
+            "precision"
+          ]
+        }
+      ]
+    }
+  },
+  "the_route_che_247_named": {
+    "plan": "SO_RAY_LAUNCH_TRACE -> C_RAY_TO_SCALAR -> O_ASM_PROPAGATE -> M_PSF, exactly as CHE-247's Scope writes it and with nothing spliced in",
+    "route": [
+      "SO_RAY_LAUNCH_TRACE",
+      "C_RAY_TO_SCALAR",
+      "O_ASM_PROPAGATE",
+      "M_PSF"
+    ],
+    "status": "failed",
+    "nodes": [
+      {
+        "operation_id": "SO_RAY_LAUNCH_TRACE",
+        "status": "completed",
+        "requested": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "observed": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "placement_disagreement": []
+      },
+      {
+        "operation_id": "C_RAY_TO_SCALAR",
+        "status": "completed",
+        "requested": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "observed": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "placement_disagreement": []
+      },
+      {
+        "operation_id": "O_ASM_PROPAGATE",
+        "status": "refused",
+        "requested": {
+          "device": "cuda:0",
+          "precision": "fp32"
+        },
+        "observed": {},
+        "placement_disagreement": [],
+        "diagnostics": "REPRESENTATION_INCONSISTENT: [REPRESENTATION_INCONSISTENT] the field declares `surface_only`: it is valid at its own reference surface and nowhere else, so propagating it is not a loss of accuracy but a different physical claim. Nothing in the result would record that. (declaration: 'validity') Remedy: Re-derive the field at the surface you want, or drop the flag deliberately."
+      }
+    ],
+    "finding": "O_ASM_PROPAGATE refuses the coupler's output. C_RAY_TO_SCALAR emits `surface_only` on every field -- CHE-50: the wavelet sum is linear in the transverse coordinate, so the reconstruction carries no wavefront-curvature term and is valid only AT its declared surface -- and every Chromatix propagation and focal-plane transform refuses a surface_only field. The four-node route CHE-247 names is therefore not executable, by a deliberate scientific gate rather than a defect, and three nodes were observed on cuda:0 before the refusal. The remedy ray_to_scalar itself names is to advance the RAY state and reconstruct there, which is the route recorded above."
+  },
+  "host_round_trip": {
+    "location": "src/backends/optiland/rays.py::to_ray_bundle, the nine-column trace read",
+    "node": "SO_RAY_LAUNCH_TRACE",
+    "why_it_is_deliberate": "the declaration computed from those columns is declare_optical_path_m, which removes a chief-ray piston of order 1e4 waves; launch.py::_launch_columns records that float32 would inject an error larger than the wavefront it corrects. CHE-245 kept the read and moved only the finished arrays.",
+    "buffer": {
+      "columns": 9,
+      "rays": 217,
+      "dtype": "float32",
+      "mebibytes": 0.007450103759765625
+    },
+    "device_to_host_s": 2.5886001822073013e-05,
+    "host_to_device_s": 0.00016334399697370827,
+    "round_trip_s": 0.00018922999879578128,
+    "measured_with": "median of 5 after one discarded warm-up. **The device->host figure is a proxy**: the real outbound leg is `_host` -> optiland.backend.utils.to_numpy on a *torch* CUDA tensor, and this times jax.device_get on a JAX buffer of the same shape through numerics.to_namespace. The host->device leg IS numerics.to_namespace, which is what rays.py uses to deliver. Timed rather than instrumented because a benchmark here imports no backend; tests/parity/test_chain_parity.py counts the crossings instead.",
+    "others_in_the_chain": "none in bulk. Nodes 2-5 are written against the representation's own namespace and were observed on cuda:0. Scalar host reads remain -- a float(xp.max(...)) in a contract check is a synchronization and eight bytes, not a round trip -- and are not counted here."
+  },
+  "chain_parity": {
+    "note": "The naive CUDA-against-CPU number is NOT a device measurement, and the decomposition below is the point. The cpu leg runs the coupler at FP64 because the Optiland host exit leaves optical_path_m and measure_weight at host float64 (CHE-245 keeps that asymmetry so the host path stays bit-identical) and _compute_precision takes the maximum over the arrays a bundle carries; the CUDA leg has no such option, since jax_enable_x64 is off. So the cpu leg reports placement_disagreement on `precision`, which is the record catching exactly this.",
+    "device_only_peak_relative": 1.2297914519655757e-06,
+    "precision_only_peak_relative": 0.00036380055629684106,
+    "both_peak_relative": 0.00036333955227690933,
+    "host_leg_observed_precision": [
+      "fp32",
+      "fp32",
+      "fp64",
+      "fp64",
+      "fp64"
+    ],
+    "host_leg_placement_disagreement": [
+      "precision"
+    ],
+    "why_precision_dominates": "O_PROPAGATE_RAYS composes an absolute optical path -- measured |opl|max 4.93e-3 m with a span of only 5.7e-8 m -- and float32 resolves 4.93e-3 m to about 4.8e-10 m, i.e. ~5.5e-3 rad of phase against a meaningful span of ~0.65 rad. compose_optical_path_m's own docstring predicts this: it cannot remove the absolute piston, because the incoming reference is what fixes the zero."
+  },
+  "gates": [
+    {
+      "name": "every_node_observed_on_the_requested_cuda_device",
+      "oracle": "every one of the 5 nodes reports 'cuda:0', read off its own result by numerics.arrays.array_state",
+      "oracle_kind": "closed_form",
+      "measured": [
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0"
+      ],
+      "expected": [
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0"
+      ],
+      "tolerance": 0.0,
+      "tolerance_basis": "exact string equality, so the tolerance is zero rather than absent. Filed closed_form because nothing in this repository's numerics decides it -- array_state reads the framework's own report off the buffer -- with the caveat that it is an environment observation and not arithmetic, which ORACLE_KINDS has no third value for.",
+      "passed": true
+    },
+    {
+      "name": "no_node_reports_placement_disagreement",
+      "oracle": "NodeRecord.placement_disagreement is empty at every node: the set of keys where the observed device or precision differs from the requested one",
+      "oracle_kind": "closed_form",
+      "measured": [],
+      "expected": [],
+      "tolerance": 0.0,
+      "tolerance_basis": "a set comparison; zero for the same reason as the row above. This is the gate CHE-247 AC-1 names, and it is what catches a run reporting success while having computed somewhere the caller did not ask for.",
+      "passed": true
+    },
+    {
+      "name": "energy_normalization_integrates_to_one_on_cuda",
+      "oracle": "1.0 exactly, by the declaration in measurements/psf.py: energy gives intensity = |u|^2 / (sum(|u|^2) dy dx), which integrates to 1 over the sampled window",
+      "oracle_kind": "closed_form",
+      "measured": 1.0000000579430626,
+      "expected": 1.0,
+      "tolerance": 3.814697265625e-06,
+      "tolerance_basis": "sqrt(4096) * eps(float32)/2: the probabilistic rounding growth of a 4096-term reduction at the narrower leg's unit roundoff. Not the deterministic n*u worst case, which is unreachable for a pairwise/blockwise reduction and would make the gate loose enough to pass a leg that had lost samples. Derived, not fitted.",
+      "passed": true
+    },
+    {
+      "name": "energy_normalization_integrates_to_one_on_the_host",
+      "oracle": "1.0 exactly, the same declaration; the host leg computes at FP64",
+      "oracle_kind": "closed_form",
+      "measured": 1.0,
+      "expected": 1.0,
+      "tolerance": 3.814697265625e-06,
+      "tolerance_basis": "the same derivation, deliberately not retightened for the wider leg: one bound for one definitional identity, and a second number here would be a second place to change.",
+      "passed": true
+    },
+    {
+      "name": "peak_normalization_has_unit_maximum_on_cuda",
+      "oracle": "1.0 exactly, by the declaration in measurements/psf.py: peak gives intensity = |u|^2 / max(|u|^2), so max == 1 by construction",
+      "oracle_kind": "closed_form",
+      "measured": 0.9999999403953552,
+      "expected": 1.0,
+      "tolerance": 1.1920928955078125e-07,
+      "tolerance_basis": "one ulp of float32: eps(float32). NOT zero, and the reason is specific -- psf.py:365 forms `scale = 1.0 / raw_peak` and psf.py:379 multiplies by it, so the gated quantity is x * fl32(1/x) rather than x/x. A division would be exact; a multiply by a rounded reciprocal is not, and measured it misses by one ulp for about 15 % of float32 values. A zero here would have been a gate that flips on any change that moves the peak, which is a fitted-by-luck zero rather than a derived one. Three orders below any real mis-normalization.",
+      "passed": true
+    },
+    {
+      "name": "the_precision_gap_stays_inside_its_float32_phase_quantum",
+      "oracle": "2 * 2 pi n |opl|max eps(float32) / lambda: the relative intensity error a float32 absolute optical path can produce, derived from the quantum of the path itself rather than from either leg's output",
+      "oracle_kind": "closed_form",
+      "measured": 0.00036380055629684106,
+      "expected": 0.0,
+      "tolerance": 0.013436857385732706,
+      "tolerance_basis": "|opl|max = 4.933333e-03 m after O_PROPAGATE_RAYS, eps(float32) = 1.192e-07, lambda = 5.500e-07 m, giving a phase quantum of 6.718e-03 rad and, doubled for |u|^2, a bound of 1.344e-02. A strict worst case -- every wavelet's phase error adding coherently -- so the measured value sits well inside it; what it catches is an order-of-magnitude regression rather than a factor of two. Filed closed_form because the bound comes from the dtype and the geometry, not from either leg's numbers.",
+      "passed": true
+    },
+    {
+      "name": "device_only_deviation_is_recorded_not_decided_here",
+      "oracle": "the same chain's last three nodes on a host copy of the CUDA bundle with every dtype preserved, so only the device differs",
+      "oracle_kind": "diagnostic",
+      "measured": 1.2297914519655757e-06,
+      "expected": 0.0,
+      "tolerance": null,
+      "tolerance_basis": "none, on purpose. Two of this repository's own paths cannot decide each other (AGENTS.md), so this entry is evidence. The comparison is *gated* in tests/parity/test_chain_parity.py against tests/parity/cells.py::tolerance_for, which is this project's one tolerance derivation and which benchmarks/ deliberately cannot import.",
+      "passed": true
+    }
+  ],
+  "negative_controls": [
+    {
+      "name": "raw_normalization_does_not_integrate_to_one",
+      "changed": "normalization='raw' instead of 'energy' at M_PSF",
+      "breaks_gate": "energy_normalization_integrates_to_one_on_cuda",
+      "measured": 1.3666080540070074e-24,
+      "reference": 1.0000000579430626,
+      "broke_the_gate": true
+    },
+    {
+      "name": "the_host_leg_is_not_observed_on_cuda",
+      "changed": "execution.device='cpu' instead of 'cuda:0' at every node",
+      "breaks_gate": "every_node_observed_on_the_requested_cuda_device",
+      "measured": [
+        "cpu",
+        "cpu",
+        "cpu",
+        "cpu",
+        "cpu"
+      ],
+      "reference": [
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0",
+        "cuda:0"
+      ],
+      "broke_the_gate": true
+    }
+  ],
+  "not_covered": [
+    "Chromatix, and with it the JAX-side backend boundary CHE-247 wanted covered. O_ASM_PROPAGATE cannot take this chain's field; see the_route_che_247_named.",
+    "any physics claim about this lens. The two deciding closed forms are definitional properties of measurements.psf and the placement rows are environment observations; nothing here is an optical oracle.",
+    "gradients. The chain is forward_only and no derivative is claimed at any boundary.",
+    "a second chain, a planner, or any route search. The plan is written down.",
+    "the host->device leg of any node other than the first: only node 1 traverses the host in bulk, and host_round_trip times a buffer of its shape rather than instrumenting the call."
+  ]
+}

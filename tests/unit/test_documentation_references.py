@@ -413,6 +413,12 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
     152-record tree was missing and the reason a record tree is admissible here at
     all.
 
+    `benchmarks/` moved 23 -> 25 for CHE-247 (T3): one benchmark module and one
+    record. It is a `systems/` benchmark and not a third tree, because it composes
+    this project's public vocabulary through a plan and is decided by closed
+    forms -- the difference from the other two is only that it needs a CUDA
+    device, which `benchmarks/README.md` states.
+
     Note for whoever next changes this number: it counts `git ls-files`, so a new
     file is invisible to this gate until it is staged. CHE-245's full-suite run
     was green with its six files untracked and this test failed on the very next
@@ -425,4 +431,4 @@ def test_the_tree_counts_are_what_the_report_claims() -> None:
         tree: len([path for path in tracked if path.startswith(f"{tree}/")])
         for tree in ("knowledge", "benchmarks", "docs")
     }
-    assert counts == {"knowledge": 3, "benchmarks": 23, "docs": 2}, counts
+    assert counts == {"knowledge": 3, "benchmarks": 25, "docs": 2}, counts

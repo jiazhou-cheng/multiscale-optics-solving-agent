@@ -98,7 +98,11 @@ def verify_placement(cell: Cell, value: Any, *, dtype: DType | None = None) -> A
     while its observation is `cuda:0`, so device **kind** is what is asserted
     and the ordinal is reported. A cell that asked for `cuda:1` and landed on
     `cuda:0` is out of scope here -- the shared-GPU policy is one device per
-    workload, so there is no cell that names an ordinal.
+    workload, so the ordinal is always the container's `0`. `cells_for` names no
+    ordinal; `test_chain_parity.CUDA_CELL` does, because `ExecutionRecord`
+    compares requested and observed device *strings* and a bare `cuda` request
+    against a `cuda:0` observation would read as a disagreement. Either way the
+    comparison here is on kind.
 
     `dtype` overrides the compared dtype for the case where a kernel's output
     family differs from its input family by construction: `psf` returns

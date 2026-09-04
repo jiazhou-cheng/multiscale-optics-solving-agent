@@ -182,7 +182,9 @@ def _cells_without_a_pack(*, complex_data: bool) -> tuple[Cell, ...]:
     )
 
 
-def tolerance_for(cell: Cell, *, accumulation_length: int, matmul: bool) -> float:
+def tolerance_for(
+    cell: Cell, *, accumulation_length: int, matmul: bool, squared: bool = False
+) -> float:
     """The only place in `tests/parity/` a floating-point tolerance is decided.
 
     `AGENTS.md`: "Do not widen a tolerance merely to make a benchmark pass."
@@ -213,6 +215,17 @@ def tolerance_for(cell: Cell, *, accumulation_length: int, matmul: bool) -> floa
         library choose the contraction order, so two cells may associate the
         same sum differently; that is a legitimate difference between cells and
         not a defect in either.
+    squaring
+        A further factor of 2 when `squared` is set, for a comparison made on
+        `|u|^2` rather than on `u`: `d(|u|^2)/|u|^2 = 2 d|u|/|u|`, so a bound
+        derived for an amplitude is tight by exactly two for an intensity. Added
+        at CHE-247 (T3), whose chain ends in `measurements.psf`. It is **here**
+        and not at the comparison site for the reason this whole function exists:
+        `2.0 * tolerance_for(...)` written beside an assertion is a tolerance
+        literal at a comparison, invisible to
+        `test_cells.py::test_no_tolerance_is_spelled_at_a_comparison` -- which
+        scans comparators, not multiplications -- and nudgeable by one character
+        with nothing failing.
 
     A safety factor of 2 covers the FMA contraction each backend is free to
     apply. It is stated here rather than folded into one of the factors above so
@@ -244,5 +257,13 @@ def tolerance_for(cell: Cell, *, accumulation_length: int, matmul: bool) -> floa
     growth = math.sqrt(accumulation_length)
     complex_factor = 2.0 if cell.dtype.is_complex else 1.0
     contraction_factor = 2.0 if matmul else 1.0
+    squaring_factor = 2.0 if squared else 1.0
     safety = 2.0
-    return safety * unit_roundoff * growth * complex_factor * contraction_factor
+    return (
+        safety
+        * unit_roundoff
+        * growth
+        * complex_factor
+        * contraction_factor
+        * squaring_factor
+    )

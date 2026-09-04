@@ -74,12 +74,26 @@ check-arch:
 # any negative control fails to break the gate it names.
 #
 # A record measures the code at a commit, so re-run this and commit the regenerated
-# records in the same change as any edit to `sources/`, `operators/` or
-# `backends/chromatix/`. `tests/benchmarks/test_records.py` is what checks in the
-# default suite that the committed records claim a clean, closed-form-decided run.
+# records in the same change as any edit to `sources/`, `operators/`,
+# `backends/chromatix/` or -- since CHE-247 -- `backends/optiland/`, `couplers/`,
+# `runtime/` or `measurements/`. `tests/benchmarks/test_records.py` is what checks
+# in the default suite that the committed records claim a clean,
+# closed-form-decided run.
+#
+# `b_ray_wave_chain` (CHE-247, T3) is the exception to "these are CPU runs": its
+# whole subject is a chain executed on CUDA, so **it needs a device and this
+# invocation does not attach one**. Without one it prints SKIPPED, leaves its
+# committed record alone and exits 0 -- regenerating a GPU record from a host-only
+# run would replace a measurement with a claim about nothing. Regenerate it with:
+#
+#     MOA_GPUS=device=6 ./run.sh --gpu python -m benchmarks.systems.b_ray_wave_chain
+#
+# It is listed here anyway so that `make benchmarks` names every benchmark in the
+# tree; a target that silently omitted one would be the reason a record went stale.
 benchmarks:
 	./run.sh python -m benchmarks.systems.b4f_ideal
 	./run.sh python -m benchmarks.systems.b_fourier_ptychography
+	./run.sh python -m benchmarks.systems.b_ray_wave_chain
 
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

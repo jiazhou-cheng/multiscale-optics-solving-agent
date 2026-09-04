@@ -38,10 +38,20 @@ benchmarks/
   systems/
     b4f_ideal.py                     CHE-212 (R06.7) -- the ideal coherent 4f relay
     b_fourier_ptychography.py        CHE-213 (R06.8) -- the FP forward model
+    b_ray_wave_chain.py              CHE-247 (T3) -- one ray->wave chain, on CUDA
     records/
       B-4F-IDEAL-<configuration>.json
       B-FP-FORWARD-<configuration>.json
+      B-RAY-WAVE-CHAIN-<configuration>.json
+  verification/                      CHE-238..242 -- this project against the tool
+  probes/                            CHE-245 (T1) -- measurements of the machine
+  reports/                           the documents those runs write into
 ```
+
+`probes/` is a third kind of thing and its own `__init__.py` says so: a probe
+answers a question about the machine -- where a buffer landed, how long a device
+took -- and its rows carry no oracle at all. Nothing here decides it, so it is
+neither a benchmark nor a verification comparison.
 
 One module per system, one record per configuration, records beside the script
 that writes them. The project's single `|U|^2` is `measurements.psf` — see "The
@@ -52,8 +62,16 @@ intensity path" below.
 ```
 ./run.sh python -m benchmarks.systems.b4f_ideal
 ./run.sh python -m benchmarks.systems.b_fourier_ptychography
-make benchmarks          # both of the above, in order
+MOA_GPUS=device=6 ./run.sh --gpu python -m benchmarks.systems.b_ray_wave_chain
+make benchmarks          # all three, in order
 ```
+
+The third one **needs a CUDA device** and `make benchmarks` does not attach one:
+run under `--gpu` it produces its record, and without a device it prints SKIPPED,
+leaves the committed record alone and exits 0. That asymmetry is deliberate --
+regenerating a GPU record from a host-only run would replace a measurement with a
+claim about nothing -- and it is why `make benchmarks` stays green on a CPU host
+while still naming every benchmark in the tree.
 
 `python -m` and not a path, because the scripts import `benchmarks.record`. Each
 exits non-zero if any gate fails or any negative control fails to break the gate
@@ -122,5 +140,11 @@ already covers.
 
 No agentic or planned execution path. No reconstruction, optimization or
 inverse problem. No family/instance registry, no verifier stack, no plotting.
-No GPU requirement: both benchmarks are CPU and take about three seconds each. If a case
-needs a grid that makes that false, shrink the case.
+
+Two of the three benchmarks are CPU and take about three seconds each; if a case
+needs a grid that makes that false, shrink the case. **`b_ray_wave_chain` is the
+exception and had to be**: its subject is a chain executed on CUDA, which is not
+a property any host run can measure. It is still seconds, on a 64 x 64 grid and
+217 rays, because the numbers it reports are placements and two definitional
+identities rather than a converged physical result. A benchmark that needed a
+large grid to make a *placement* claim would be measuring the wrong thing.
