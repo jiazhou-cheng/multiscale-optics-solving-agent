@@ -86,11 +86,50 @@ The three modules
   emitter with the `1/R` amplitude carried and its reference distance declared.
 
 `_grid` is private and holds what the three sources share: the shape
-and pitch declarations, the `Frame.origin_index` coordinate axes, and the two
-refusals `|k_t| <= n k0` and `|k_t| <= pi/d`. Those refusals are written once on
+and pitch declarations, the `Frame.origin_index` coordinate axes, the two
+refusals `|k_t| <= n k0` and `|k_t| <= pi/d`, and -- since CHE-246 (T2) -- the
+delivery and accumulation contract below. Those refusals are written once on
 purpose -- two sources with independently written copies diverge the first time one
 is edited, and the symptom is one source accepting a geometry the other refuses,
 with nothing in the suite comparing them.
+
+Where a field is built, and where it lands
+--------------------------------------------
+CHE-246 (T2) gave all three sources a `namespace` / `device` target, which is the
+wave path's GPU entry point: before it, GPU wave work meant constructing on the
+host and copying by hand, and nothing in this package could return a device
+field.
+
+What a caller of this package needs to know is that **the target moves the buffer
+and not the arithmetic**. Every source accumulates the real quantity under its
+exponent -- the phase ramp, the Gaussian envelope, the spherical radius -- in
+**host float64**, casts once to `complex64`, and delivers that array to the
+target. That is not a shortcut. All three records declare the float64
+accumulation in their `validity`, and `jax_enable_x64` is disabled in every
+process this project runs (`backends/chromatix/fields.py` pins it off on import;
+it is process-global and cannot be set after the first array exists), so a source
+that accumulated in a JAX target would accumulate in float32 -- ~6e-5 rad on a
+100 um grid against the ~6e-8 the cast itself costs -- while still carrying a
+descriptor that claimed otherwise. A false declaration, not a performance detail.
+
+Three consequences worth stating, because they are what a caller can rely on:
+
+* **every namespace receives bit-identical bytes.** Same arithmetic, same cast,
+  only the buffer moved. `tests/parity/test_sources_parity.py` asserts exact
+  equality with no tolerance, which is what makes the float64 declaration
+  falsifiable from outside this package;
+* `namespace=numpy, device=None` -- the default -- is the identity, so nothing
+  about the pre-CHE-246 behaviour changed;
+* a device request costs one host `complex128` intermediate, ~40 bytes per
+  sample, before the 8-byte-per-sample device copy. Irrelevant at the grid sizes
+  in the suite, and worth knowing for a large one.
+
+The alternative considered and rejected: both ramp sources are **separable**, so
+the float64 work is only `O(N)` and the `O(N^2)` outer product could be formed in
+the target namespace at `complex64` without touching the declaration. It does not
+generalize -- `spherical_wave`'s `R` is not separable -- and, decisively, the
+different rounding order would break the bit-identity above and with it both the
+frozen NumPy results and the exactness of the parity gate.
 
 The layer this package is, and the three it is not
 ---------------------------------------------------

@@ -1,9 +1,19 @@
 """The one parity fixture: construct a buffer in a cell, and observe where it landed.
 
-Every buffer a parity test computes on comes from the `place` fixture, and
-`place` never returns without having read the buffer's state back off the buffer
-itself. That is the whole mechanism. `knowledge/capabilities/M_WAVE_CHROMATIX.json`
-records the failure it exists for:
+Every buffer a parity test computes on is placed by
+`numerics.arrays.to_namespace` and is read back off the buffer itself before any
+test touches it. That is the whole mechanism, and there are two routes to it:
+the `place` fixture below, for a subject whose input is host data; and a
+**production operation that takes a `namespace`/`device` target**, for a subject
+whose input is constructed rather than moved. CHE-246 (T2) created the second
+route by giving `sources/` that target, so `test_psf_parity.py` and
+`test_sources_parity.py` build their fields with a source and then call
+`verify_placement` directly, while `test_ray_to_scalar_parity.py` still goes
+through `place`. What is not permitted either way is a bespoke `jnp.asarray` plus
+`device_put`, or a buffer no one read back.
+
+`knowledge/capabilities/M_WAVE_CHROMATIX.json` records the failure the read-back
+exists for:
 
     "A requested device must never be reported as an actual one -- a
     process-global JAX platform pin produces a successful complex64 run on the
@@ -121,8 +131,14 @@ def place() -> Any:
 
     A fixture rather than a plain helper so that the skip decisions land inside
     a test's own setup, where pytest attributes them to the parametrized cell
-    that could not run, and so that no parity test can reach a buffer by
-    another route.
+    that could not run.
+
+    Used by the subjects whose input is host data to be *moved*. A subject whose
+    input is *constructed* -- since CHE-246 (T2), anything built by `sources/`
+    with a `namespace`/`device` target -- does not go through here: there is no
+    host array to place. Those call `unavailable_reason` for the skip and
+    `verify_placement` for the read-back directly, which is the half of this
+    module that is the actual guarantee. See the module docstring.
     """
 
     def _place(cell: Cell, values: Any, *, dtype: DType | None = None) -> Any:

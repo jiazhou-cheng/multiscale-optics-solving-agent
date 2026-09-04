@@ -476,7 +476,13 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "reference_surface",
             "waist_radius_m",
         ),
-        optional=("center_m", "transverse_wavevector_rad_per_m", "amplitude"),
+        optional=(
+            "center_m",
+            "transverse_wavevector_rad_per_m",
+            "amplitude",
+            "namespace",
+            "device",
+        ),
         approximation=(
             "an ideal monochromatic, fully coherent, scalar Gaussian beam **at its "
             "waist plane**: A exp(-rho^2 / w0^2) times exactly the carrier ramp "
@@ -501,6 +507,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "truncated Gaussian rings when it is propagated",
             "the field is complex64; the envelope and the phase ramp are accumulated "
             "in float64 before the cast",
+            "the float64 accumulation is on the HOST, whatever `namespace`/`device` "
+            "ask for, because jax_enable_x64 is off in this process and JAX cannot "
+            "represent float64: accumulating in the target would silently reduce it "
+            "to float32 while this line still claimed otherwise. The array is cast "
+            "once and moved once, so every namespace gets bit-identical bytes",
         ),
         evidence=(
             "tests/sources/test_gaussian_beam.py",
@@ -516,7 +527,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
         returns=("scalar_field",),
         implementation="sources.plane_wave:plane_wave",
         requires=("shape", "sample_pitch_m", "wavelength_m", "reference_surface"),
-        optional=("transverse_wavevector_rad_per_m", "amplitude"),
+        optional=("transverse_wavevector_rad_per_m", "amplitude", "namespace", "device"),
         approximation=(
             "an ideal monochromatic, fully coherent, scalar plane wave sampled at a "
             "declared surface: A exp(i(k_y y + k_x x)) with k_t in rad/m. No spectral "
@@ -531,6 +542,11 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "aliases and reads back as a different, entirely plausible angle",
             "the field is complex64, which is the one storage dtype of this project's "
             "wave path; the phase ramp is accumulated in float64 before the cast",
+            "the float64 accumulation is on the HOST, whatever `namespace`/`device` "
+            "ask for, because jax_enable_x64 is off in this process and JAX cannot "
+            "represent float64: accumulating in the target would silently reduce the "
+            "ramp to float32 while this line still claimed otherwise. The array is "
+            "cast once and moved once, so every namespace gets bit-identical bytes",
         ),
         evidence=(
             "tests/sources/test_plane_wave.py",
@@ -552,7 +568,7 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "reference_surface",
             "source_position_m",
         ),
-        optional=("amplitude", "converging"),
+        optional=("amplitude", "converging", "namespace", "device"),
         approximation=(
             "the analytic spherical field of a point emitter, sampled on a plane: "
             "A (R_ref / R) exp(+/- i n k0 R) with R_ref = 1 m, exact at its declared "
@@ -578,6 +594,13 @@ CATALOG: tuple[OperationDescriptor, ...] = (
             "travelling in -z, which this project's forward SPATIAL_FACTOR cannot carry",
             "no aperture argument: truncation composes through the thin-element "
             "operator, which is strictly more expressive than a hard disc here",
+            "the field is complex64 and R -- the real quantity under the exponent, at "
+            "~1e7 rad per metre of it -- is accumulated in float64 before the cast",
+            "the float64 accumulation is on the HOST, whatever `namespace`/`device` "
+            "ask for, because jax_enable_x64 is off in this process and JAX cannot "
+            "represent float64: accumulating in the target would silently reduce it "
+            "to float32 while this line still claimed otherwise. The array is cast "
+            "once and moved once, so every namespace gets bit-identical bytes",
         ),
         evidence=(
             "tests/sources/test_spherical_wave.py",

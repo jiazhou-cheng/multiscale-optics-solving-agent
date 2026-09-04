@@ -4,7 +4,8 @@ CHE-210 (R06.5). Two public functions:
 
 ```python
 sources.plane_wave(shape, *, sample_pitch_m, wavelength_m, reference_surface,
-                   transverse_wavevector_rad_per_m=(0.0, 0.0), amplitude=1.0) -> ScalarField
+                   transverse_wavevector_rad_per_m=(0.0, 0.0), amplitude=1.0,
+                   namespace=ArrayNamespace.NUMPY, device=None) -> ScalarField
 sources.transverse_wavevector_from_angle(theta_rad, phi_rad, *,
                                          wavelength_m, medium_index) -> tuple[float, float]
 ```
@@ -108,12 +109,15 @@ import math
 
 import numpy as np
 
+from numerics import ArrayNamespace, DevicePlacement
 from representations import Frame, ReferenceSurface, ScalarField
 from representations.contracts import require_positive_si
 from sources._grid import (
     SOURCE_DTYPE,
+    deliver,
     grid_coordinates,
     require_grid_shape,
+    require_phase_accumulation,
     require_sample_pitch,
     require_transverse_wavevector,
 )
@@ -175,6 +179,8 @@ def plane_wave(
     reference_surface: ReferenceSurface,
     transverse_wavevector_rad_per_m: tuple[float, float] = (0.0, 0.0),
     amplitude: float = 1.0,
+    namespace: ArrayNamespace = ArrayNamespace.NUMPY,
+    device: DevicePlacement | None = None,
 ) -> ScalarField:
     """A fully declared coherent plane wave at `reference_surface`.
 
@@ -191,6 +197,16 @@ def plane_wave(
             an angle with `transverse_wavevector_from_angle`.
         amplitude: uniform peak amplitude. Dimensionless and relative; see the
             module docstring on normalization.
+        namespace: which array namespace the field is returned in. `numpy` (the
+            default) reproduces this function's behaviour before CHE-246 (T2)
+            exactly. `jax` is the wave path's GPU entry point; `torch` is refused,
+            because a representation holds data in a compute namespace.
+        device: where the returned buffer lives. `None` means wherever the
+            namespace puts a new array. **The arithmetic does not move**: the
+            real quantity under the exponent is accumulated in host float64 and
+            cast once, because JAX cannot represent float64 in this process and a
+            source that accumulated in the target would silently break the
+            float64 validity line above. See `sources/_grid.py`.
 
     Returns:
         A `ScalarField` of `complex64` on the `n // 2` origin, declaring
@@ -221,11 +237,11 @@ def plane_wave(
     # float64 throughout, cast once. See `_grid.grid_coordinates` on why the
     # origin comes from the frame rather than from a rewritten `n // 2`.
     y, x = grid_coordinates(counts, pitch, frame)
-    phase = ky * y[:, None] + kx * x[None, :]
+    phase = require_phase_accumulation(ky * y[:, None] + kx * x[None, :], source="plane_wave")
     u = (peak * np.exp(1j * phase)).astype(SOURCE_DTYPE)
 
     return ScalarField(
-        u=u,
+        u=deliver(u, namespace=namespace, device=device),
         sample_pitch_m=(dy, dx),
         wavelength_m=wavelength,
         reference_surface=reference_surface,

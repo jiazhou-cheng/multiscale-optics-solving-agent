@@ -5,8 +5,8 @@ CHE-215 (R06.10), item 2. One public function:
 ```python
 sources.gaussian_beam(shape, *, sample_pitch_m, wavelength_m, reference_surface,
                       waist_radius_m, center_m=(0.0, 0.0),
-                      transverse_wavevector_rad_per_m=(0.0, 0.0),
-                      amplitude=1.0) -> ScalarField
+                      transverse_wavevector_rad_per_m=(0.0, 0.0), amplitude=1.0,
+                      namespace=ArrayNamespace.NUMPY, device=None) -> ScalarField
 ```
 
     E(y, x) = A exp(-((y - y0)^2 + (x - x0)^2) / w0^2) exp(i(k_y y + k_x x))
@@ -82,12 +82,15 @@ import math
 
 import numpy as np
 
+from numerics import ArrayNamespace, DevicePlacement
 from representations import ContractError, Frame, ReferenceSurface, ScalarField
 from representations.contracts import require_positive_si
 from sources._grid import (
     SOURCE_DTYPE,
+    deliver,
     grid_coordinates,
     require_grid_shape,
+    require_phase_accumulation,
     require_sample_pitch,
     require_transverse_wavevector,
 )
@@ -110,6 +113,8 @@ def gaussian_beam(
     center_m: tuple[float, float] = (0.0, 0.0),
     transverse_wavevector_rad_per_m: tuple[float, float] = (0.0, 0.0),
     amplitude: float = 1.0,
+    namespace: ArrayNamespace = ArrayNamespace.NUMPY,
+    device: DevicePlacement | None = None,
 ) -> ScalarField:
     """A Gaussian beam at its waist, on `reference_surface`.
 
@@ -130,6 +135,16 @@ def gaussian_beam(
             `plane_wave`. `(0, 0)` is normal incidence. Build it from an angle with
             `transverse_wavevector_from_angle`.
         amplitude: peak amplitude at the envelope centre. Unnormalized.
+        namespace: which array namespace the field is returned in. `numpy` (the
+            default) reproduces this function's behaviour before CHE-246 (T2)
+            exactly. `jax` is the wave path's GPU entry point; `torch` is refused,
+            because a representation holds data in a compute namespace.
+        device: where the returned buffer lives. `None` means wherever the
+            namespace puts a new array. **The arithmetic does not move**: the
+            real quantity under the exponent is accumulated in host float64 and
+            cast once, because JAX cannot represent float64 in this process and a
+            source that accumulated in the target would silently break the
+            float64 validity line this record carries. See `sources/_grid.py`.
 
     Returns:
         A `ScalarField` of `complex64`, `validity=frozenset()`.
@@ -180,13 +195,22 @@ def gaussian_beam(
     # float64 throughout, cast once. The envelope and the ramp are accumulated
     # separately and multiplied, so a wide beam reduces to `plane_wave` exactly.
     y, x = grid_coordinates(counts, pitch, frame)
-    radial_squared = (y[:, None] - y0) ** 2 + (x[None, :] - x0) ** 2
-    envelope = np.exp(-radial_squared / (waist * waist))
-    phase = ky * y[:, None] + kx * x[None, :]
+    # Both quantities, because this record's validity line names both: "the
+    # envelope and the phase ramp are accumulated in float64 before the cast".
+    # Guarding only the ramp would leave half of a declaration unchecked.
+    radial_squared = require_phase_accumulation(
+        (y[:, None] - y0) ** 2 + (x[None, :] - x0) ** 2, source="gaussian_beam"
+    )
+    envelope = require_phase_accumulation(
+        np.exp(-radial_squared / (waist * waist)), source="gaussian_beam"
+    )
+    phase = require_phase_accumulation(
+        ky * y[:, None] + kx * x[None, :], source="gaussian_beam"
+    )
     u = (peak * envelope * np.exp(1j * phase)).astype(SOURCE_DTYPE)
 
     return ScalarField(
-        u=u,
+        u=deliver(u, namespace=namespace, device=device),
         sample_pitch_m=(dy, dx),
         wavelength_m=wavelength,
         reference_surface=reference_surface,

@@ -14,6 +14,7 @@ every convention it does not take as an argument is one it invented.
 from __future__ import annotations
 
 import ast
+import importlib
 import math
 from pathlib import Path
 
@@ -433,3 +434,62 @@ def test_the_module_defines_no_class() -> None:
     """
     source = MODULE.read_text(encoding="utf-8")
     assert [n.name for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef)] == []
+
+
+# ---------------------------------------------------------------------------
+# CHE-246 (T2) -- the float64 accumulation, refused when it is not float64
+# ---------------------------------------------------------------------------
+
+
+def test_a_float32_accumulation_is_refused_rather_than_silently_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The one executable thing standing behind this record's float64 validity line.
+
+    `S_SOURCE_PLANE_WAVE` declares "the phase ramp is accumulated in float64
+    before the cast". CHE-246 (T2) added `sources._grid.require_phase_accumulation`
+    to make that checkable, and this is the test that shows the check has teeth.
+
+    **It covers the regression the parity gate cannot see.**
+    `tests/parity/test_sources_parity.py` compares cells against each other, so it
+    catches an accumulation that moved into the target namespace -- the cells stop
+    being bit-identical. It cannot catch a *uniform* host float32 accumulation: a
+    float32 coordinate axis degrades every cell identically, every comparison
+    stays exact, and all three records' validity lines quietly become false. That
+    is also the likelier regression, because it needs no design change -- one
+    `dtype=np.float32` anywhere upstream does it.
+
+    Simulated at `grid_coordinates`, which is where the axes come from, rather
+    than by editing the accumulation itself: this is the shape a real regression
+    would have. Patched on the *importing* module, because `plane_wave` binds the
+    name at import time -- patching `sources._grid` would leave this module's own
+    reference untouched and the test would pass while changing nothing.
+    """
+    # `importlib` and not `from sources import plane_wave`: that name is the
+    # re-exported *function*, and `sources.plane_wave` is the module it lives in.
+    module = importlib.import_module("sources.plane_wave")
+
+    original = module.grid_coordinates
+
+    def narrowed(*arguments: object, **keywords: object) -> tuple[object, object]:
+        y, x = original(*arguments, **keywords)  # type: ignore[arg-type]
+        return y.astype(np.float32), x.astype(np.float32)
+
+    monkeypatch.setattr(module, "grid_coordinates", narrowed)
+
+    with pytest.raises(ValueError) as raised:
+        plane_wave(
+            (8, 8),
+            sample_pitch_m=(2.0e-6, 2.0e-6),
+            wavelength_m=550.0e-9,
+            reference_surface=ReferenceSurface(
+                name="image_surface", z_m=0.0, medium_index=1.0
+            ),
+            transverse_wavevector_rad_per_m=(1.0e5, 0.0),
+        )
+
+    assert getattr(raised.value, "code", None) == "SILENT_DTYPE_DOWNCAST", raised.value
+    assert "sources.plane_wave" in str(raised.value), (
+        "the refusal names the source, so a reader is sent to the accumulation site "
+        "rather than to numerics"
+    )

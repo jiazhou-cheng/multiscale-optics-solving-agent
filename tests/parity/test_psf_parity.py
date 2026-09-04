@@ -1,12 +1,24 @@
 """Subject 1: `M_PSF` agrees across numpy-cpu, jax-cpu and jax-cuda.
 
-**The field is built by hand, and that is a finding rather than a convenience.**
-`sources.plane_wave` and its two siblings are hardcoded NumPy with no device or
-namespace parameter (`src/sources/_grid.py`), so no source in this project can
-construct a field on a device. Every cell here therefore assembles its own
-`ScalarField` from host data through `place`. **CHE-246 (T2) is the ticket that
-fixes it, and replacing the hand construction below with `sources.plane_wave`
-while these tests keep passing is T2's completion signal.**
+**The field comes from a source, which is CHE-246 (T2)'s completion signal.**
+Until T2 the three sources were hardcoded NumPy with no device or namespace
+parameter, so no source in this project could construct a field on a device and
+every cell here assembled its own `ScalarField` from host data through the
+`place` fixture. T0 recorded that hand construction as a finding and named its
+removal as the signal. It is removed: each cell now calls
+`sources.gaussian_beam` with the cell's own `namespace` and `device`, and every
+assertion below is unchanged.
+
+**Why `gaussian_beam` and not `plane_wave`**, which is the function CHE-246's
+AC-4 names. A plane wave has uniform `|u|`, so `|u|^2` has no unique maximum and
+`peak_index` -- the one assertion in this module that is *exact* rather than
+tolerant, and which this file's own docstring calls load-bearing -- becomes a
+comparison between two arbitrary argmax tie-breaks over an array whose last bits
+differ per namespace. `gaussian_beam` is the same carrier ramp times a real
+envelope (`operations/catalog.py` says so of `S_SOURCE_GAUSSIAN_BEAM`: "exactly
+the carrier ramp plane_wave writes"), so it exercises the same placement path and
+the same complex arithmetic while leaving the peak unambiguous.
+`test_sources_parity.py` is where `plane_wave` itself is held to the cells.
 
 **What this subject proves, and what it does not.** `measurements.psf` is
 `|u|^2` times a declared scalar -- purely elementwise, with one reduction for
@@ -27,10 +39,12 @@ import pytest
 from measurements.psf import PSF_NORMALIZATIONS, psf
 from numerics.arrays import to_namespace
 from numerics.precision import ArrayNamespace, DType
-from parity.cells import cells_for, tolerance_for
-from parity.conftest import verify_placement
+from parity.cells import Cell, cells_for, tolerance_for
+from parity.conftest import unavailable_reason, verify_placement
 from representations.geometry import ReferenceSurface
 from representations.scalar import ScalarField
+from sources import gaussian_beam
+from sources.plane_wave import transverse_wavevector_from_angle
 
 COMPONENT = "M_PSF"
 CELLS = cells_for(COMPONENT, complex_data=True)
@@ -40,56 +54,100 @@ _PITCH_M = (2.0e-6, 2.0e-6)
 _WAVELENGTH_M = 550.0e-9
 _SURFACE = ReferenceSurface(name="image_surface", z_m=0.0, medium_index=1.0)
 
+#: `w0`, chosen so the envelope is well inside a 32-sample grid at this pitch:
+#: the grid half-extent is 32 um and this waist puts the `1/e` amplitude radius
+#: at 12 um, i.e. 2.7 w0 of half-extent, which `S_SOURCE_GAUSSIAN_BEAM`'s own
+#: truncation note puts past the ~1e-7 power level. A truncated Gaussian would
+#: still be a valid parity subject -- both legs would truncate identically -- but
+#: it would make `peak_index` sensitive to the rim rather than to the envelope.
+_WAIST_M = 1.2e-5
 
-def _amplitude() -> Any:
-    """A deterministic complex field with a unique peak and a non-trivial phase.
+#: A tilt, and it is load-bearing exactly as T0's hand-built one was: without it
+#: every cell would agree on a real, separable array and the complex arithmetic
+#: `tolerance_for` accounts for would never happen. Stated as an angle through
+#: the project's own converter rather than as a raw `(k_y, k_x)`, so the cell is
+#: a physical illumination rather than two numbers that happen to be inside
+#: Nyquist. 0.05 rad at 550 nm is |k_t| ~ 5.7e5 rad/m against a Nyquist limit of
+#: 1.57e6, so the ramp is sampled about 2.7x above the aliasing bound.
+_TILT_RAD_PER_M = transverse_wavevector_from_angle(
+    0.05, 0.3, wavelength_m=_WAVELENGTH_M, medium_index=_SURFACE.medium_index
+)
 
-    The tilt matters: without it every cell would agree on a real, separable
-    array and the complex arithmetic `tolerance_for` accounts for would never
-    happen. The Gaussian envelope gives `peak_index` a single unambiguous
-    answer, so the index comparison below can be exact rather than tolerant.
+
+def _field(cell: Cell) -> ScalarField:
+    """The subject's field, constructed **in the cell** by a production source.
+
+    This is what CHE-246 (T2) made possible and it is the whole of T0's
+    completion signal: no `ScalarField(...)` assembled here, no `place` fixture
+    on the input, and the namespace and device are the cell's.
+
+    The `place` fixture is consequently no longer used by this subject: it exists
+    to move host data into a cell, and there is no host data to move. What is
+    still borrowed from `tests/parity/conftest.py` is the half that matters --
+    `unavailable_reason` for the skip taxonomy and `verify_placement` for the
+    read-back -- because a source that cannot reach a device *raises*, and "no
+    CUDA device attached" is an environment fact rather than a failure.
     """
-    ny, nx = _SHAPE
-    y = (np.arange(ny, dtype=np.float64) - ny // 2)[:, None]
-    x = (np.arange(nx, dtype=np.float64) - nx // 2)[None, :]
-    envelope = np.exp(-(y**2 + x**2) / (2.0 * 6.0**2))
-    phase = 0.37 * y + 0.11 * x
-    return (envelope * np.exp(1j * phase)).astype(np.complex128)
-
-
-_AMPLITUDE = _amplitude()
-
-
-def _field(u: Any) -> ScalarField:
-    return ScalarField(
-        u=u,
+    field = gaussian_beam(
+        _SHAPE,
         sample_pitch_m=_PITCH_M,
         wavelength_m=_WAVELENGTH_M,
         reference_surface=_SURFACE,
+        waist_radius_m=_WAIST_M,
+        transverse_wavevector_rad_per_m=_TILT_RAD_PER_M,
+        namespace=cell.namespace,
+        device=cell.device,
     )
+    # The *input* observed too, not only `psf`'s output. Without this the subject
+    # would assert that the measurement did not move the data while taking on
+    # trust that the source put it there in the first place, which is the exact
+    # substitution `conftest.verify_placement` exists to refuse.
+    return _field_with_observed_placement(cell, field)
+
+
+def _field_with_observed_placement(cell: Cell, field: ScalarField) -> ScalarField:
+    verify_placement(cell, field.u)
+    return field
 
 
 def _reference(dtype: DType, normalization: str) -> Any:
     """The host leg, **at the cell's own dtype**. Characterization, not an oracle.
 
-    Deliberately not a complex128 reference. Casting the same complex128 source
-    to complex64 costs about one ulp of the amplitude, which becomes two ulp of
-    `|u|^2`, and comparing a complex64 cell against a complex128 leg would fold
-    that input quantization into a number `tolerance_for` derives for
-    *arithmetic* -- so the gate would be measuring the cast and would need
-    widening for a reason that has nothing to do with where the kernel ran.
-    Every cell casting from the same source at the same dtype gets bit-identical
-    inputs, and what is left over is exactly the namespace and device difference
-    this package exists to see.
+    Deliberately not a complex128 reference, and since CHE-246 that is a
+    property of the source rather than a construction here. `gaussian_beam`
+    accumulates its envelope and ramp in host float64 and casts once to
+    complex64 whatever `namespace` asks for -- it must, because
+    `jax_enable_x64` is off and JAX cannot represent float64 -- so **every cell
+    receives bit-identical input bytes**, and what is left over is exactly the
+    namespace and device difference this package exists to see. Comparing a
+    complex64 cell against a complex128 leg would instead fold the input
+    quantization into a number `tolerance_for` derives for *arithmetic*, so the
+    gate would be measuring the cast.
 
     It follows that the numpy-cpu cell compares against itself. That comparison
     is not vacuous but it is weak -- it says the placement path is a no-op on
-    the host, which is what `_host`-style code paths are supposed to be -- and
-    the asymmetry is the point of `tests/parity/__init__.py`'s note that the
-    host leg is characterization.
+    the host, which is what a host code path is supposed to be -- and the
+    asymmetry is the point of `tests/parity/__init__.py`'s note that the host leg
+    is characterization.
     """
-    u = to_namespace(_AMPLITUDE, namespace=ArrayNamespace.NUMPY, dtype=dtype)
-    return psf(_field(u), normalization=normalization)
+    return psf(_field(_host_cell(dtype)), normalization=normalization)
+
+
+def _host_cell(dtype: DType) -> Cell:
+    """The numpy-cpu cell of this subject's own set, found rather than written out.
+
+    Looked up instead of constructed, for two reasons. `parity/cells.py`'s "no
+    hand-written namespace/device/dtype list" rule applies to this module too.
+    And taking the device from a fixed index -- `CELLS[0].device`, which is what
+    this was -- silently assumes the ordering: if that entry were ever a CUDA
+    cell, this would build a *numpy-cuda* request and `to_namespace` would raise
+    `NUMPY_CANNOT_LEAVE_HOST` inside the reference leg, i.e. a failure in the
+    comparison rather than a skip in the cell.
+    """
+    for cell in CELLS:
+        if cell.namespace is ArrayNamespace.NUMPY:
+            return Cell(namespace=cell.namespace, device=cell.device, dtype=dtype)
+    raise AssertionError(f"{COMPONENT} declares no host cell to compare against")
 
 
 def _host(value: Any) -> Any:
@@ -111,7 +169,7 @@ def _relative(observed: Any, reference: Any) -> float:
 
 @pytest.mark.parametrize("normalization", PSF_NORMALIZATIONS)
 @pytest.mark.parametrize("cell", [cell.param for cell in CELLS])
-def test_psf_agrees_across_cells(cell: Any, normalization: str, place: Any) -> None:
+def test_psf_agrees_across_cells(cell: Any, normalization: str) -> None:
     """AC-5: the four reported quantities agree, in every cell, at a derived tolerance.
 
     `raw_window_energy` is compared at the reduction's own accumulation length
@@ -120,7 +178,10 @@ def test_psf_agrees_across_cells(cell: Any, normalization: str, place: Any) -> N
     the other is not. Handing both the same tolerance would either overtighten
     the sum or loosen the map by the same factor.
     """
-    field = _field(place(cell, _AMPLITUDE))
+    reason = unavailable_reason(cell)
+    if reason is not None:
+        pytest.skip(reason)
+    field = _field(cell)
     result = psf(field, normalization=normalization)
     reference = _reference(cell.dtype, normalization)
 

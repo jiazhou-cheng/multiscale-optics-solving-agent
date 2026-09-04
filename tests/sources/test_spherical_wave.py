@@ -421,4 +421,17 @@ def test_the_module_defines_no_class_and_imports_no_backend() -> None:
             imported.update(alias.name.split(".")[0] for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported.add(node.module.split(".")[0])
-    assert imported <= {"__future__", "math", "numpy", "representations", "sources"}
+    # `numerics` joined the set at CHE-246 (T2), which gave this source a
+    # `namespace`/`device` target: it needs `ArrayNamespace` and `DevicePlacement`
+    # to spell the argument. Not a widening of what this test protects --
+    # `sources/ -> numerics` is a declared edge of the dependency allowlist and
+    # `scripts/check_dependencies.py` enforces it -- and the claim here is still
+    # "no class, and no solver on the path".
+    assert imported <= {
+        "__future__",
+        "math",
+        "numerics",
+        "numpy",
+        "representations",
+        "sources",
+    }

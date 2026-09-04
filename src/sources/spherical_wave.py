@@ -4,8 +4,8 @@ CHE-215 (R06.10), item 3. One public function:
 
 ```python
 sources.spherical_wave(shape, *, sample_pitch_m, wavelength_m, reference_surface,
-                       source_position_m, amplitude=1.0,
-                       converging=False) -> ScalarField
+                       source_position_m, amplitude=1.0, converging=False,
+                       namespace=ArrayNamespace.NUMPY, device=None) -> ScalarField
 ```
 
     E(r) = A (R_ref / R) exp(+/- i n k0 R),    R = |r - r_s|,    R_ref = 1 m
@@ -122,13 +122,16 @@ import math
 
 import numpy as np
 
+from numerics import ArrayNamespace, DevicePlacement
 from representations import ContractError, Frame, ReferenceSurface, ScalarField
 from representations.contracts import require_positive_si
 from sources._grid import (
     SOURCE_DTYPE,
+    deliver,
     grid_coordinates,
     nyquist_limit_rad_per_m,
     require_grid_shape,
+    require_phase_accumulation,
     require_sample_pitch,
 )
 
@@ -148,6 +151,8 @@ def spherical_wave(
     source_position_m: tuple[float, float, float],
     amplitude: float = 1.0,
     converging: bool = False,
+    namespace: ArrayNamespace = ArrayNamespace.NUMPY,
+    device: DevicePlacement | None = None,
 ) -> ScalarField:
     """A diverging or converging spherical wave sampled on `reference_surface`.
 
@@ -167,6 +172,16 @@ def spherical_wave(
         converging: `False` (default) gives `exp(+i n k0 R)`, diverging;
             `True` gives `exp(-i n k0 R)`, converging. The two are complex
             conjugates and no intensity can tell them apart.
+        namespace: which array namespace the field is returned in. `numpy` (the
+            default) reproduces this function's behaviour before CHE-246 (T2)
+            exactly. `jax` is the wave path's GPU entry point; `torch` is refused,
+            because a representation holds data in a compute namespace.
+        device: where the returned buffer lives. `None` means wherever the
+            namespace puts a new array. **The arithmetic does not move**: `R` is
+            accumulated in host float64 and cast once, because JAX cannot
+            represent float64 in this process and a source that accumulated in
+            the target would silently break the float64 validity line this record
+            carries. See `sources/_grid.py`.
 
     Returns:
         A `ScalarField` of `complex64`, `validity=frozenset()`.
@@ -259,6 +274,11 @@ def spherical_wave(
             )
 
     sign = -1.0 if converging else 1.0
+    # `radius` and not a phase: for this source the accumulated real quantity IS
+    # the radius, and `n k0 R` is ~1e7 rad per metre of it at visible wavelengths.
+    # Assigned rather than called for its check, as in the other two sources, so
+    # that a `verify_dtype` which ever returned a converted array is not ignored.
+    radius = require_phase_accumulation(radius, source="spherical_wave")
     u = (
         reference_amplitude
         * (REFERENCE_DISTANCE_M / radius)
@@ -266,7 +286,7 @@ def spherical_wave(
     ).astype(SOURCE_DTYPE)
 
     return ScalarField(
-        u=u,
+        u=deliver(u, namespace=namespace, device=device),
         sample_pitch_m=(dy, dx),
         wavelength_m=wavelength,
         reference_surface=reference_surface,
